@@ -83,7 +83,10 @@ export function GlobalAiPanel() {
     // ── Engine bridge ────────────────────────
     useEffect(() => {
         // @ts-expect-error — global bridge
+        const existing = window.__aceGlobalAi ?? {};
+        // @ts-expect-error — global bridge
         window.__aceGlobalAi = {
+            ...existing,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             setEngine: (e: any) => {
                 // e may be a React ref (has .current) or direct engine

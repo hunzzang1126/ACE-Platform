@@ -330,9 +330,8 @@ export function useCanvasSync(
             }
         }
 
-        // 2. Convert overlay elements → Text/ImageElements
+        // Save ALL overlays — including hidden ones (visibility is a property, not a delete)
         for (const oel of overlayElements) {
-            if (oel.visible === false) continue;
             elements.push(overlayToDesignElement(oel, canvasW, canvasH));
         }
 
@@ -370,9 +369,8 @@ export function useCanvasSync(
             elements.push(engineNodeToShapeElement(node, canvasW, canvasH));
         }
 
-        // 2. Convert overlay elements → Text/ImageElements
+        // Save ALL overlays — including hidden ones (visibility is a property, not a delete)
         for (const oel of overlayElements) {
-            if (oel.visible === false) continue;
             elements.push(overlayToDesignElement(oel, canvasW, canvasH));
         }
 

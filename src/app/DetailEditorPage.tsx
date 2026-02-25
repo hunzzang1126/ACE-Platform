@@ -46,6 +46,7 @@ export function DetailEditorPage() {
         engineRef,
         state,
         actions,
+        syncState,
         retryInit,
     } = useCanvasEngine(width, height, false);
 
@@ -58,11 +59,16 @@ export function DetailEditorPage() {
     // Prevent double-restore (React strict mode)
     const restoredRef = useRef(false);
 
-    // ── Save handler ──
+    // Track whether the user actually interacted (dirty = needs save)
+    // This prevents React Strict Mode's phantom unmount from overwriting valid saved data
+    const isDirtyRef = useRef(false);
+
+    // ── Save handler (manual) ──
     const handleSave = useCallback(() => {
         setSaveStatus('saving');
         const result = saveToStore(engineRef, overlay.overlayElements);
         console.log('[DetailEditor] Save result:', result);
+        isDirtyRef.current = false; // Saved — no longer dirty
         setSaveStatus('saved');
         setTimeout(() => setSaveStatus('idle'), 2000);
     }, [saveToStore, engineRef, overlay.overlayElements]);
@@ -85,33 +91,53 @@ export function DetailEditorPage() {
                 if (restoredOverlays.length > 0) {
                     overlay.restoreElements(restoredOverlays);
                 }
+                // Sync engine state → React (update nodeCount, nodes for layer panel)
+                syncState();
             }
         }
-    }, [state.status, engineRef, handleSave, restoreFromStore, overlay, actions]);
+    }, [state.status, engineRef, handleSave, restoreFromStore, overlay, actions, syncState]);
 
     // ── Keep latest refs for auto-save (avoids stale closure) ──
-    // These refs always point to the latest values so the unmount cleanup can access them
     const saveFromCachedRef = useRef(saveFromCachedNodes);
     const overlayElementsRef = useRef(overlay.overlayElements);
     const cachedNodesRef = useRef(state.nodes);
     useEffect(() => { saveFromCachedRef.current = saveFromCachedNodes; }, [saveFromCachedNodes]);
-    useEffect(() => { overlayElementsRef.current = overlay.overlayElements; }, [overlay.overlayElements]);
     useEffect(() => { cachedNodesRef.current = state.nodes; }, [state.nodes]);
 
-    // Auto-save when leaving the page (navigating away or unmounting)
+    // Track overlay changes → mark dirty
+    const prevOverlayCountRef = useRef(overlay.overlayElements.length);
+    useEffect(() => {
+        overlayElementsRef.current = overlay.overlayElements;
+        // If overlay count changed and we already restored, the user made a change
+        if (restoredRef.current && overlay.overlayElements.length !== prevOverlayCountRef.current) {
+            isDirtyRef.current = true;
+        }
+        prevOverlayCountRef.current = overlay.overlayElements.length;
+    }, [overlay.overlayElements]);
+
+    // Track node changes → mark dirty
+    const prevNodeCountRef = useRef(state.nodes.length);
+    useEffect(() => {
+        if (restoredRef.current && state.nodes.length !== prevNodeCountRef.current) {
+            isDirtyRef.current = true;
+        }
+        prevNodeCountRef.current = state.nodes.length;
+    }, [state.nodes]);
+
+    // Auto-save when leaving the page (only if dirty)
     useEffect(() => {
         return () => {
-            // Use cached node data — engine may already be freed by useCanvasEngine cleanup
+            if (!isDirtyRef.current) {
+                console.log('[DetailEditor] Auto-save skipped — no changes made');
+                return;
+            }
+
             const nodes = cachedNodesRef.current;
             const overlays = overlayElementsRef.current;
             const save = saveFromCachedRef.current;
 
-            if (nodes.length > 0 || overlays.length > 0) {
-                console.log('[DetailEditor] Auto-save on exit:', { nodes: nodes.length, overlays: overlays.length });
-                save(nodes, overlays);
-            } else {
-                console.log('[DetailEditor] Skipping auto-save: nothing to save');
-            }
+            console.log('[DetailEditor] Auto-save on exit:', { nodes: nodes.length, overlays: overlays.length });
+            save(nodes, overlays);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);

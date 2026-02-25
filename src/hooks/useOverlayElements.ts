@@ -329,7 +329,8 @@ export function useOverlayElements(canvasWidth = 300, canvasHeight = 250) {
     // ── Restore from saved data ──
     const restoreElements = useCallback((savedOverlays: OverlayElement[]) => {
         if (savedOverlays.length === 0) return;
-        setElements((prev) => [...prev, ...savedOverlays]);
+        // Replace, not append — this is initial load from saved data
+        setElements(savedOverlays);
         console.log(`[useOverlayElements] Restored ${savedOverlays.length} overlay elements`);
     }, []);
 
