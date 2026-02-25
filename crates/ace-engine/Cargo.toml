@@ -1,0 +1,29 @@
+[package]
+name = "ace-engine"
+version = "0.1.0"
+edition = "2021"
+description = "ACE rendering engine — WebGPU via wgpu"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wgpu = "24"
+glam = { version = "0.29", features = ["serde"] }
+bytemuck = { version = "1", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+log = "0.4"
+lyon = "1"
+
+# WASM-specific
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+web-sys = { version = "0.3", features = [
+    "Document", "Window", "Element", "HtmlCanvasElement",
+    "Gpu", "GpuAdapter", "GpuDevice", "GpuCanvasContext",
+    "GpuTextureFormat", "GpuCanvasConfiguration",
+] }
+console_log = "1"
+console_error_panic_hook = "0.1"

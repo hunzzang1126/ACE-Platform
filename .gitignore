@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+dist/
+.cache/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Rust
+target/
+pkg/
+*.wasm
+
+# Tauri
+src-tauri/target/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python (AI sidecar)
+__pycache__/
+*.pyc
+.venv/
+chroma_data/
