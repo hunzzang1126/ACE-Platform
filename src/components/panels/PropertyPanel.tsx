@@ -41,12 +41,30 @@ interface Props {
     actions?: CanvasEngineActions | null;
     selectedOverlay?: OverlayElement | null;
     onOverlayUpdate?: (id: string, updates: Partial<OverlayElement>) => void;
+    canvasWidth?: number;
+    canvasHeight?: number;
 }
 
-export function PropertyPanel({ nodes = [], selection = [], actions, selectedOverlay, onOverlayUpdate }: Props) {
+export function PropertyPanel({ nodes = [], selection = [], actions, selectedOverlay, onOverlayUpdate, canvasWidth = 300, canvasHeight = 250 }: Props) {
     const selectedNode = nodes.find((n) => selection.includes(n.id));
     const hasOverlay = !!selectedOverlay;
     const hasShape = !!selectedNode;
+
+    // Canvas alignment for overlay elements  
+    const alignOverlay = useCallback((dir: 'left' | 'center-h' | 'right' | 'top' | 'center-v' | 'bottom') => {
+        if (!selectedOverlay || !onOverlayUpdate) return;
+        const { id, w, h } = selectedOverlay;
+        const updates: Partial<OverlayElement> = {};
+        switch (dir) {
+            case 'left': updates.x = 0; break;
+            case 'center-h': updates.x = (canvasWidth - w) / 2; break;
+            case 'right': updates.x = canvasWidth - w; break;
+            case 'top': updates.y = 0; break;
+            case 'center-v': updates.y = (canvasHeight - h) / 2; break;
+            case 'bottom': updates.y = canvasHeight - h; break;
+        }
+        onOverlayUpdate(id, updates);
+    }, [selectedOverlay, onOverlayUpdate, canvasWidth, canvasHeight]);
 
     // Nothing selected
     if (!hasOverlay && !hasShape) {
@@ -122,6 +140,18 @@ export function PropertyPanel({ nodes = [], selection = [], actions, selectedOve
                     </div>
                 </Section>
 
+                {/* Canvas Alignment */}
+                <Section label="Canvas Alignment">
+                    <div className="pp-align-row">
+                        <button className="pp-align-btn" title="Left" onClick={() => alignOverlay('left')}><IcAlignLeft size={14} /></button>
+                        <button className="pp-align-btn" title="Center H" onClick={() => alignOverlay('center-h')}><IcAlignCenterH size={14} /></button>
+                        <button className="pp-align-btn" title="Right" onClick={() => alignOverlay('right')}><IcAlignRight size={14} /></button>
+                        <button className="pp-align-btn" title="Top" onClick={() => alignOverlay('top')}><IcAlignTop size={14} /></button>
+                        <button className="pp-align-btn" title="Center V" onClick={() => alignOverlay('center-v')}><IcAlignCenterV size={14} /></button>
+                        <button className="pp-align-btn" title="Bottom" onClick={() => alignOverlay('bottom')}><IcAlignBottom size={14} /></button>
+                    </div>
+                </Section>
+
                 {/* Opacity */}
                 <Section label="Opacity">
                     <OpacitySlider value={selectedOverlay.opacity} onChange={(v) => onOverlayUpdate?.(selectedOverlay.id, { opacity: v })} />
@@ -149,6 +179,18 @@ export function PropertyPanel({ nodes = [], selection = [], actions, selectedOve
                         <option value="contain">Contain</option>
                         <option value="fill">Fill</option>
                     </select>
+                </Section>
+
+                {/* Canvas Alignment */}
+                <Section label="Canvas Alignment">
+                    <div className="pp-align-row">
+                        <button className="pp-align-btn" title="Left" onClick={() => alignOverlay('left')}><IcAlignLeft size={14} /></button>
+                        <button className="pp-align-btn" title="Center H" onClick={() => alignOverlay('center-h')}><IcAlignCenterH size={14} /></button>
+                        <button className="pp-align-btn" title="Right" onClick={() => alignOverlay('right')}><IcAlignRight size={14} /></button>
+                        <button className="pp-align-btn" title="Top" onClick={() => alignOverlay('top')}><IcAlignTop size={14} /></button>
+                        <button className="pp-align-btn" title="Center V" onClick={() => alignOverlay('center-v')}><IcAlignCenterV size={14} /></button>
+                        <button className="pp-align-btn" title="Bottom" onClick={() => alignOverlay('bottom')}><IcAlignBottom size={14} /></button>
+                    </div>
                 </Section>
 
                 <Section label="Opacity">
@@ -205,6 +247,18 @@ export function PropertyPanel({ nodes = [], selection = [], actions, selectedOve
                             />
                             Autoplay
                         </label>
+                    </div>
+                </Section>
+
+                {/* Canvas Alignment */}
+                <Section label="Canvas Alignment">
+                    <div className="pp-align-row">
+                        <button className="pp-align-btn" title="Left" onClick={() => alignOverlay('left')}><IcAlignLeft size={14} /></button>
+                        <button className="pp-align-btn" title="Center H" onClick={() => alignOverlay('center-h')}><IcAlignCenterH size={14} /></button>
+                        <button className="pp-align-btn" title="Right" onClick={() => alignOverlay('right')}><IcAlignRight size={14} /></button>
+                        <button className="pp-align-btn" title="Top" onClick={() => alignOverlay('top')}><IcAlignTop size={14} /></button>
+                        <button className="pp-align-btn" title="Center V" onClick={() => alignOverlay('center-v')}><IcAlignCenterV size={14} /></button>
+                        <button className="pp-align-btn" title="Bottom" onClick={() => alignOverlay('bottom')}><IcAlignBottom size={14} /></button>
                     </div>
                 </Section>
 

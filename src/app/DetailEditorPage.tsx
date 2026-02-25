@@ -248,6 +248,8 @@ export function DetailEditorPage() {
                         actions={actions}
                         selectedOverlay={overlay.selectedOverlayElement}
                         onOverlayUpdate={overlay.updateElement}
+                        canvasWidth={width}
+                        canvasHeight={height}
                     />
                 </aside>
             </div>
