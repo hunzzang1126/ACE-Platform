@@ -42,19 +42,13 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId }: Pro
     // ── Play All animation loop ──
     useEffect(() => {
         if (!isPlaying) return;
-        startTimeRef.current = performance.now() / 1000 - currentTime;
+        startTimeRef.current = performance.now() / 1000;
 
         const frame = () => {
             const now = performance.now() / 1000;
             const elapsed = now - startTimeRef.current;
-
-            if (elapsed >= TIMELINE_DURATION) {
-                // Loop back
-                setCurrentTime(0);
-                startTimeRef.current = now;
-            } else {
-                setCurrentTime(elapsed);
-            }
+            // Seamless infinite loop — modulo wraps around without any reset
+            setCurrentTime(elapsed % TIMELINE_DURATION);
             rafRef.current = requestAnimationFrame(frame);
         };
         rafRef.current = requestAnimationFrame(frame);
