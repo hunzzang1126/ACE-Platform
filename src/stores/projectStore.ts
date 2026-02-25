@@ -7,8 +7,18 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { persist, type StorageValue } from 'zustand/middleware';
+import { enableMapSet } from 'immer';
+
+// Enable Immer MapSet plugin — selectedIds is Set<string>
+enableMapSet();
 import { v4 as uuid } from 'uuid';
 import type { CreativeSetSummary, Folder } from '@/schema/design.types';
+
+// ── Trash item type ──
+export interface TrashedItem {
+    item: CreativeSetSummary;
+    deletedAt: number; // timestamp
+}
 
 // ── Demo data generator ──
 function generateDemoData(): { sets: CreativeSetSummary[]; folders: Folder[] } {
@@ -44,6 +54,7 @@ export type ViewMode = 'list' | 'grid' | 'compact';
 interface ProjectState {
     creativeSets: CreativeSetSummary[];
     folders: Folder[];
+    trash: TrashedItem[];
     currentFolderId: string | null;
 
     // Dashboard UI state
@@ -66,6 +77,11 @@ interface ProjectState {
     duplicateCreativeSet: (id: string) => void;
     navigateToFolder: (folderId: string | null) => void;
 
+    // Trash Actions
+    restoreFromTrash: (id: string) => void;
+    permanentDelete: (id: string) => void;
+    emptyTrash: () => void;
+
     // UI Actions
     setSearchQuery: (query: string) => void;
     setSort: (column: SortColumn) => void;
@@ -84,6 +100,7 @@ export const useProjectStore = create<ProjectState>()(
         immer((set) => ({
             creativeSets: demoData.sets,
             folders: demoData.folders,
+            trash: [],
             currentFolderId: null,
 
             searchQuery: '',
@@ -124,7 +141,14 @@ export const useProjectStore = create<ProjectState>()(
 
             deleteCreativeSet: (id) => {
                 set((state) => {
-                    state.creativeSets = state.creativeSets.filter((s) => s.id !== id);
+                    const idx = state.creativeSets.findIndex((s) => s.id === id);
+                    if (idx === -1) return;
+                    // Move to trash instead of permanent delete
+                    const [removed] = state.creativeSets.splice(idx, 1);
+                    state.trash.push({
+                        item: JSON.parse(JSON.stringify(removed)),
+                        deletedAt: Date.now(),
+                    });
                     state.selectedIds.delete(id);
                 });
             },
@@ -211,6 +235,30 @@ export const useProjectStore = create<ProjectState>()(
             clearSelection: () => set((state) => { state.selectedIds = new Set(); }),
             setCurrentPage: (page) => set({ currentPage: page }),
             setItemsPerPage: (count) => set({ itemsPerPage: count, currentPage: 1 }),
+
+            // ── Trash Actions ──
+            restoreFromTrash: (id) => {
+                set((state) => {
+                    const idx = state.trash.findIndex((t) => t.item.id === id);
+                    if (idx === -1) return;
+                    const restored = state.trash[idx];
+                    if (!restored) return;
+                    state.trash.splice(idx, 1);
+                    state.creativeSets.push(restored.item);
+                });
+            },
+
+            permanentDelete: (id) => {
+                set((state) => {
+                    state.trash = state.trash.filter((t) => t.item.id !== id);
+                });
+            },
+
+            emptyTrash: () => {
+                set((state) => {
+                    state.trash = [];
+                });
+            },
         })),
         {
             name: 'ace-project-store',
@@ -218,6 +266,7 @@ export const useProjectStore = create<ProjectState>()(
             partialize: (state) => ({
                 creativeSets: state.creativeSets,
                 folders: state.folders,
+                trash: state.trash,
             }),
             // Custom storage to handle Set<string> and ensure JSON compat
             storage: {

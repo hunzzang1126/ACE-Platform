@@ -554,3 +554,14 @@
     min-width: 40px;
     text-align: center;
 }
+
+/* ── Trash ── */
+.trash-btn-danger {
+    background: #d93025;
+    color: #fff;
+    border: none;
+}
+
+.trash-btn-danger:hover {
+    background: #b3261e;
+}

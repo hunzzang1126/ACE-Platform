@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────────
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { DashboardPage } from './DashboardPage';
+import { TrashPage } from './TrashPage';
 import { GeneralEditorPage } from './GeneralEditorPage';
 import { DetailEditorPage } from './DetailEditorPage';
 import EngineTestPage from './EngineTestPage';
@@ -28,6 +29,7 @@ export default function App() {
                         <Route path="/effects-test" element={<EffectsTestPage />} />
                         <Route path="/export-test" element={<ExportTestPage />} />
                         <Route path="/ai-test" element={<AiTestPage />} />
+                        <Route path="/trash" element={<TrashPage />} />
                     </Routes>
                 </div>
                 <GlobalAiPanel />

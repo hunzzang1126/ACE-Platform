@@ -211,7 +211,7 @@ export function CreativeSetTable({ items, folders, onOpenSet, onOpenFolder }: Pr
 
             {/* Context menu */}
             {contextMenu && (
-                <div className="context-menu" style={{ top: contextMenu.y, left: contextMenu.x }}>
+                <div className="context-menu" style={{ top: contextMenu.y, left: contextMenu.x }} onClick={(e) => e.stopPropagation()}>
                     {contextMenu.type === 'set' && (
                         <>
                             <button className="context-item" onClick={() => { onOpenSet(contextMenu.id); setContextMenu(null); }}>Open</button>
