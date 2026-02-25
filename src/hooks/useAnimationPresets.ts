@@ -73,8 +73,8 @@ function easeOut(t: number): number {
     return 1 - inv * inv * inv;
 }
 
-/** Compute animation style at given time for a preset */
-function computeAnimStyle(
+/** Compute animation style at given time for a preset — exported for preview grid */
+export function computeAnimStyle(
     preset: AnimPresetType,
     currentTime: number,
     animDuration: number,

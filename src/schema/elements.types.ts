@@ -3,6 +3,13 @@
 // ─────────────────────────────────────────────────
 import type { ElementConstraints } from './constraints.types';
 
+/** Serializable animation config — persisted with the element */
+export interface ElementAnimation {
+    preset: 'none' | 'fade' | 'slide-left' | 'slide-right' | 'slide-up' | 'slide-down' | 'scale' | 'ascend' | 'descend';
+    duration: number;   // seconds
+    startTime: number;  // element start time offset (seconds)
+}
+
 /** 기본 요소 공통 속성 */
 export interface BaseElement {
     id: string;
@@ -16,6 +23,8 @@ export interface BaseElement {
     zIndex: number;
     /** 블렌드 모드 */
     blendMode?: string;
+    /** Animation preset (persisted) */
+    animation?: ElementAnimation;
 }
 
 // ── Text ──

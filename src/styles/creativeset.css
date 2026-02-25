@@ -325,6 +325,82 @@
     color: #3c4043;
 }
 
+/* ── Banner Grid Wrapper + Play All Toolbar ── */
+.banner-grid-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    flex: 1;
+}
+
+.banner-grid-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 4px;
+}
+
+.banner-play-all-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 16px;
+    border: 1px solid #dadce0;
+    border-radius: 20px;
+    background: #fff;
+    color: #3c4043;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.banner-play-all-btn:hover {
+    background: #1a73e8;
+    color: #fff;
+    border-color: #1a73e8;
+}
+
+.banner-play-all-btn.playing {
+    background: #e8453c;
+    color: #fff;
+    border-color: #e8453c;
+}
+
+.banner-play-all-btn.playing:hover {
+    background: #c5221f;
+    border-color: #c5221f;
+}
+
+.banner-play-progress {
+    flex: 1;
+    max-width: 300px;
+    height: 4px;
+    background: #e8eaed;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.banner-play-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #1a73e8, #34a853);
+    border-radius: 2px;
+    transition: width 0.05s linear;
+}
+
+.banner-no-anim-hint {
+    font-size: 12px;
+    color: #9aa0a6;
+    font-style: italic;
+}
+
+/* Playing state card border */
+.banner-card--playing {
+    border-color: #1a73e8 !important;
+    box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.15);
+}
+
 /* ── Banner Grid ── */
 .banner-grid {
     display: flex;

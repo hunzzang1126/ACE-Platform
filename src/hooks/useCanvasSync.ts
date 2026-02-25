@@ -6,10 +6,11 @@
 
 import { useCallback } from 'react';
 import { useDesignStore } from '@/stores/designStore';
-import type { DesignElement, ShapeElement, TextElement, ImageElement, VideoElement } from '@/schema/elements.types';
+import type { DesignElement, ShapeElement, TextElement, ImageElement, VideoElement, ElementAnimation } from '@/schema/elements.types';
 import type { ElementConstraints } from '@/schema/constraints.types';
 import type { EngineNode } from './useCanvasEngine';
 import type { OverlayElement } from './useOverlayElements';
+import { useAnimPresetStore } from './useAnimationPresets';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Engine = any;
@@ -209,6 +210,8 @@ function engineNodeToShapeElement(
     else if (node.w > node.h * 3) name = 'Banner Strip';
     else if (Math.abs(node.w - node.h) < 10) name = 'Square Shape';
 
+    const animation = getAnimationForElement(`engine-${node.id}`);
+
     return {
         id: `engine-${node.id}`,
         name,
@@ -221,7 +224,15 @@ function engineNodeToShapeElement(
         locked: false,
         zIndex: node.z_index ?? 0,
         borderRadius: node.border_radius ?? 0,
+        animation,
     } as ShapeElement;
+}
+
+/** Read animation config from the animPresetStore for an element */
+function getAnimationForElement(elementId: string): ElementAnimation | undefined {
+    const config = useAnimPresetStore.getState().presets[elementId];
+    if (!config || config.anim === 'none') return undefined;
+    return { preset: config.anim, duration: config.animDuration, startTime: config.startTime };
 }
 
 /**
@@ -233,6 +244,7 @@ function overlayToDesignElement(
     canvasH: number,
 ): DesignElement {
     const constraints = absoluteToConstraints(oel.x, oel.y, oel.w, oel.h, canvasW, canvasH);
+    const animation = getAnimationForElement(oel.id);
 
     if (oel.type === 'text') {
         return {
@@ -254,6 +266,7 @@ function overlayToDesignElement(
             visible: oel.visible !== false,
             locked: oel.locked ?? false,
             zIndex: oel.zIndex ?? 1,
+            animation,
         } as TextElement;
     }
 
@@ -270,6 +283,7 @@ function overlayToDesignElement(
             visible: oel.visible !== false,
             locked: oel.locked ?? false,
             zIndex: oel.zIndex ?? 1,
+            animation,
         } as ImageElement;
     }
 
@@ -288,6 +302,7 @@ function overlayToDesignElement(
         autoplay: oel.autoplay ?? true,
         opacity: oel.opacity ?? 1,
         visible: oel.visible !== false,
+        animation,
         locked: oel.locked ?? false,
         zIndex: oel.zIndex ?? 1,
     } as VideoElement;
@@ -434,6 +449,15 @@ export function useCanvasSync(
                 restoredShapes++;
                 console.log(`[useCanvasSync] Restored shape: ${shape.name} (id=${nodeId}) at ${x},${y} ${w}x${h} color=${shape.fill}`);
 
+                // Restore animation preset for this shape
+                if (el.animation && el.animation.preset !== 'none') {
+                    useAnimPresetStore.getState().setPreset(`engine-${nodeId}`, {
+                        anim: el.animation.preset,
+                        animDuration: el.animation.duration,
+                        startTime: el.animation.startTime,
+                    });
+                }
+
             } else if (el.type === 'text') {
                 const text = el as TextElement;
                 const { x, y, w, h } = constraintsToAbsolute(text.constraints, canvasW, canvasH);
@@ -456,6 +480,15 @@ export function useCanvasSync(
                     zIndex: text.zIndex ?? 1,
                 });
 
+                // Restore animation preset for this text element
+                if (el.animation && el.animation.preset !== 'none') {
+                    useAnimPresetStore.getState().setPreset(text.id, {
+                        anim: el.animation.preset,
+                        animDuration: el.animation.duration,
+                        startTime: el.animation.startTime,
+                    });
+                }
+
             } else if (el.type === 'image') {
                 const img = el as ImageElement;
                 const { x, y, w, h } = constraintsToAbsolute(img.constraints, canvasW, canvasH);
@@ -471,6 +504,15 @@ export function useCanvasSync(
                     locked: img.locked ?? false,
                     zIndex: img.zIndex ?? 1,
                 });
+
+                // Restore animation preset
+                if (el.animation && el.animation.preset !== 'none') {
+                    useAnimPresetStore.getState().setPreset(img.id, {
+                        anim: el.animation.preset,
+                        animDuration: el.animation.duration,
+                        startTime: el.animation.startTime,
+                    });
+                }
 
             } else if (el.type === 'video') {
                 const vid = el as VideoElement;
@@ -492,6 +534,15 @@ export function useCanvasSync(
                     locked: vid.locked ?? false,
                     zIndex: vid.zIndex ?? 1,
                 });
+
+                // Restore animation preset
+                if (el.animation && el.animation.preset !== 'none') {
+                    useAnimPresetStore.getState().setPreset(vid.id, {
+                        anim: el.animation.preset,
+                        animDuration: el.animation.duration,
+                        startTime: el.animation.startTime,
+                    });
+                }
             }
         }
 

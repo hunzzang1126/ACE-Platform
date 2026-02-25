@@ -88,7 +88,7 @@ export interface Project {
 }
 
 // Re-export all schema types from one place
-export type { DesignElement, DesignElementType } from './elements.types';
+export type { DesignElement, DesignElementType, ElementAnimation } from './elements.types';
 export type {
     ElementConstraints,
     HorizontalConstraint,
