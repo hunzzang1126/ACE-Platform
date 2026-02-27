@@ -32,7 +32,6 @@ function getPreviewScale(w: number, h: number) {
 
 export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRunAIQA, qaStatus }: Props) {
     const navigate = useNavigate();
-    const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
     const rafRef = useRef<number>(0);
     const startTimeRef = useRef<number>(0);
@@ -42,37 +41,6 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
         [variants, visibleIds],
     );
 
-    // ── Play All animation loop ──
-    useEffect(() => {
-        if (!isPlaying) return;
-        startTimeRef.current = performance.now() / 1000;
-
-        const frame = () => {
-            const now = performance.now() / 1000;
-            const elapsed = now - startTimeRef.current;
-            // Seamless infinite loop — modulo wraps around without any reset
-            setCurrentTime(elapsed % TIMELINE_DURATION);
-            rafRef.current = requestAnimationFrame(frame);
-        };
-        rafRef.current = requestAnimationFrame(frame);
-
-        return () => cancelAnimationFrame(rafRef.current);
-    }, [isPlaying]); // eslint-disable-line react-hooks/exhaustive-deps
-
-    const handlePlayAll = useCallback(() => {
-        if (isPlaying) {
-            setIsPlaying(false);
-            setCurrentTime(0);
-        } else {
-            setCurrentTime(0);
-            setIsPlaying(true);
-        }
-    }, [isPlaying]);
-
-    const handleDoubleClick = useCallback((variantId: string) => {
-        navigate(`/editor/detail/${variantId}`);
-    }, [navigate]);
-
     // Check if any element across all visible variants has an animation
     const hasAnyAnimation = useMemo(() => {
         return visibleVariants.some((v) =>
@@ -80,17 +48,36 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
         );
     }, [visibleVariants]);
 
+    // ── Auto-loop: starts automatically when animations exist ──
+    useEffect(() => {
+        if (!hasAnyAnimation) {
+            setCurrentTime(0);
+            return;
+        }
+        startTimeRef.current = performance.now() / 1000;
+
+        const frame = () => {
+            const now = performance.now() / 1000;
+            const elapsed = now - startTimeRef.current;
+            setCurrentTime(elapsed % TIMELINE_DURATION);
+            rafRef.current = requestAnimationFrame(frame);
+        };
+        rafRef.current = requestAnimationFrame(frame);
+
+        return () => cancelAnimationFrame(rafRef.current);
+    }, [hasAnyAnimation]);
+
+    const isPlaying = hasAnyAnimation;
+
+    const handleDoubleClick = useCallback((variantId: string) => {
+        navigate(`/editor/detail/${variantId}`);
+    }, [navigate]);
+
+
     return (
         <div className="banner-grid-wrapper">
-            {/* Play All controls */}
+            {/* Toolbar */}
             <div className="banner-grid-toolbar">
-                <button
-                    className={`banner-play-all-btn ${isPlaying ? 'playing' : ''}`}
-                    onClick={handlePlayAll}
-                    title={isPlaying ? 'Stop all previews' : 'Play all previews simultaneously'}
-                >
-                    {isPlaying ? '■ Stop' : '▶ Play All'}
-                </button>
                 {isPlaying && (
                     <div className="banner-play-progress">
                         <div
@@ -152,7 +139,16 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                                         height,
                                         transform: `scale(${scale})`,
                                         transformOrigin: 'top left',
-                                        backgroundColor: variant.backgroundColor || '#FFFFFF',
+                                        backgroundColor: (() => {
+                                            // Smart background: find first full-canvas shape
+                                            if (variant.backgroundColor && variant.backgroundColor !== '#FFFFFF') return variant.backgroundColor;
+                                            const bgShape = variant.elements.find(
+                                                (el) => el.type === 'shape'
+                                                    && (el.constraints?.vertical?.offset ?? 0) === 0
+                                                    && (el.constraints?.size?.height ?? 0) >= height * 0.8
+                                            );
+                                            return (bgShape as { fill?: string } | undefined)?.fill || variant.backgroundColor || '#FFFFFF';
+                                        })(),
                                     }}
                                 >
                                     {/* Render elements as colored divs */}
@@ -185,7 +181,7 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                                                     transition: isPlaying ? 'none' : undefined,
                                                     ...animStyle,
                                                     ...(el.type === 'shape' ? { backgroundColor: el.fill || '#ccc', borderRadius: el.borderRadius ?? 0 } : {}),
-                                                    ...(el.type === 'text' ? { color: el.color, fontSize: el.fontSize, fontFamily: el.fontFamily, fontWeight: el.fontWeight, display: 'flex', alignItems: 'center', justifyContent: el.textAlign === 'center' ? 'center' : 'flex-start', overflow: 'visible', whiteSpace: 'nowrap' as const, lineHeight: 1.1 } : {}),
+                                                    ...(el.type === 'text' ? { color: el.color, fontSize: el.fontSize, fontFamily: el.fontFamily, fontWeight: el.fontWeight, display: 'flex', alignItems: 'center', justifyContent: el.textAlign === 'center' ? 'center' : 'flex-start', overflow: 'hidden', whiteSpace: 'normal' as const, wordBreak: 'break-word' as const, lineHeight: 1.2, textAlign: el.textAlign as 'left' | 'center' | 'right' } : {}),
                                                     ...(el.type === 'button' ? { backgroundColor: el.backgroundColor, borderRadius: el.borderRadius ?? 0, color: el.color, fontSize: el.fontSize, fontFamily: el.fontFamily, fontWeight: el.fontWeight, display: 'flex', alignItems: 'center', justifyContent: 'center' } : {}),
                                                     ...(el.type === 'image' ? { backgroundColor: '#e0e0e0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#999' } : {}),
                                                 }}

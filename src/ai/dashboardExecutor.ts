@@ -531,6 +531,7 @@ export function executeDashboardTool(
                 useDesignStore.setState((state) => {
                     if (!state.creativeSet) return;
                     for (const variant of state.creativeSet.variants) {
+                        const canvasH = variant.preset?.height || 250;
                         variant.elements.push({
                             id: uuid(),
                             name: elName,
@@ -551,6 +552,10 @@ export function executeDashboardTool(
                             },
                             // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         } as any);
+                        // ★ If this shape covers the full canvas, also set variant.backgroundColor
+                        if (y === 0 && height >= canvasH * 0.8) {
+                            variant.backgroundColor = fill;
+                        }
                     }
                 });
 
