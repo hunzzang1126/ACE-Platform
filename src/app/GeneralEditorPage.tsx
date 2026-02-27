@@ -8,9 +8,12 @@ import { CreativeSetTopBar } from '@/components/creativeset/CreativeSetTopBar';
 import { SizeSidebar } from '@/components/creativeset/SizeSidebar';
 import { BannerPreviewGrid } from '@/components/creativeset/BannerPreviewGrid';
 import { AddSizeModal } from '@/components/creativeset/AddSizeModal';
+import { VisionQAReport } from '@/components/creativeset/VisionQAReport';
+import { useVisionQA } from '@/hooks/useVisionQA';
 import type { BannerPreset } from '@/schema/design.types';
 import { v4 as uuid } from 'uuid';
 import type { DesignElement } from '@/schema/elements.types';
+import '@/styles/visionqa.css';
 
 export function GeneralEditorPage() {
     const creativeSet = useDesignStore((s) => s.creativeSet);
@@ -19,6 +22,9 @@ export function GeneralEditorPage() {
 
     // Modal state
     const [showAddSizeModal, setShowAddSizeModal] = useState(false);
+
+    // Vision QA
+    const { status: qaStatus, report: qaReport, error: qaError, progress: qaProgress, runQA, reset: resetQA } = useVisionQA();
 
     // Visible size toggles — all visible by default
     const [visibleIds, setVisibleIds] = useState<Set<string>>(new Set());
@@ -113,6 +119,8 @@ export function GeneralEditorPage() {
                         variants={creativeSet.variants}
                         visibleIds={visibleIds}
                         masterVariantId={creativeSet.masterVariantId}
+                        onRunAIQA={() => runQA(creativeSet.id, creativeSet.masterVariantId, creativeSet.variants)}
+                        qaStatus={qaStatus}
                     />
                 </main>
             </div>
@@ -124,6 +132,30 @@ export function GeneralEditorPage() {
                     onAdd={handleAddSizes}
                     onClose={() => setShowAddSizeModal(false)}
                 />
+            )}
+
+            {/* Vision QA Loading Overlay */}
+            {(qaStatus === 'capturing' || qaStatus === 'analyzing') && (
+                <div className="vqa-loading-overlay">
+                    <div className="vqa-loading-spinner" />
+                    <div className="vqa-loading-text">
+                        {qaStatus === 'capturing' ? 'Capturing screenshots...' : '🤖 AI is analyzing your designs...'}
+                    </div>
+                    <div className="vqa-loading-progress">{qaProgress}</div>
+                </div>
+            )}
+
+            {/* Vision QA Report Modal */}
+            {qaStatus === 'done' && qaReport && (
+                <VisionQAReport report={qaReport} onClose={resetQA} />
+            )}
+
+            {/* Vision QA Error */}
+            {qaStatus === 'error' && qaError && (
+                <div className="vqa-loading-overlay" onClick={resetQA}>
+                    <div className="vqa-loading-text">❌ {qaError}</div>
+                    <div className="vqa-loading-progress">Click anywhere to dismiss</div>
+                </div>
             )}
         </div>
     );

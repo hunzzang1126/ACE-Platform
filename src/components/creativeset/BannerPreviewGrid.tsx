@@ -7,11 +7,14 @@ import { useNavigate } from 'react-router-dom';
 import type { BannerVariant } from '@/schema/design.types';
 import { resolveConstraints } from '@/schema/constraints.types';
 import { computeAnimStyle, type AnimPresetType } from '@/hooks/useAnimationPresets';
+import type { QAStatus } from '@/hooks/useVisionQA';
 
 interface Props {
     variants: BannerVariant[];
     visibleIds: Set<string>;
     masterVariantId: string;
+    onRunAIQA?: () => void;
+    qaStatus?: QAStatus;
 }
 
 // Max preview card dimension in px
@@ -27,7 +30,7 @@ function getPreviewScale(w: number, h: number) {
     return Math.min(scaleW, scaleH, 1);
 }
 
-export function BannerPreviewGrid({ variants, visibleIds, masterVariantId }: Props) {
+export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRunAIQA, qaStatus }: Props) {
     const navigate = useNavigate();
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
@@ -100,6 +103,17 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId }: Pro
                     <span className="banner-no-anim-hint">
                         Add animations in the editor to preview here
                     </span>
+                )}
+                {/* AI QA Button */}
+                {onRunAIQA && (
+                    <button
+                        className="banner-ai-qa-btn"
+                        onClick={onRunAIQA}
+                        disabled={qaStatus === 'capturing' || qaStatus === 'analyzing'}
+                        title="Run AI Vision QA on all sizes"
+                    >
+                        🤖 AI QA
+                    </button>
                 )}
             </div>
 
