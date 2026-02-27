@@ -369,13 +369,13 @@ export function executeDashboardTool(
                 return { success: true, message: `Set "${property}" = "${rawValue}" on ${updated} element(s) matching "${params.element_name}".` };
             }
 
-            // ── Element Creation (with alignment support) ──
+            // ── Element Creation (with alignment + auto-spacing) ──
 
             case 'add_text': {
                 if (!designStore.creativeSet) return { success: false, message: 'No creative set open.' };
 
                 const content = (params.content as string) || 'Text';
-                const y = Number(params.y) || 0;
+                let y = Number(params.y) || 0;
                 const fontSize = Number(params.fontSize) || 24;
                 const fontWeight = Number(params.fontWeight) || 700;
                 const color = (params.color as string) || '#ffffff';
@@ -390,6 +390,20 @@ export function executeDashboardTool(
                 const canvasW = firstVariant?.preset?.width || 300;
                 const width = Number(params.width) || Math.round(canvasW * 0.8);
                 const height = Number(params.height) || Math.round(fontSize * 1.6);
+
+                // ★ Auto-collision: push down if overlapping existing elements
+                if (firstVariant) {
+                    const MIN_GAP = 6;
+                    for (const el of firstVariant.elements) {
+                        const elY = el.constraints?.vertical?.offset ?? 0;
+                        const elH = el.constraints?.size?.height ?? 0;
+                        const elBottom = elY + elH;
+                        // Check if new element overlaps this one
+                        if (y >= elY && y < elBottom + MIN_GAP) {
+                            y = elBottom + MIN_GAP;
+                        }
+                    }
+                }
 
                 // Build horizontal constraint based on align
                 const horizontal = align === 'center'
@@ -430,14 +444,14 @@ export function executeDashboardTool(
                     }
                 });
 
-                return { success: true, message: `Text "${content}" — ${fontSize}px ${color}, align=${align}` };
+                return { success: true, message: `Text "${content}" — ${fontSize}px ${color}, align=${align}, y=${y}` };
             }
 
             case 'add_shape': {
                 if (!designStore.creativeSet) return { success: false, message: 'No creative set open.' };
 
                 const shapeType = (params.shapeType as string) || 'rectangle';
-                const y = Number(params.y) || 0;
+                let y = Number(params.y) || 0;
                 const fill = (params.fill as string) || '#333333';
                 const borderRadius = Number(params.borderRadius) || 0;
                 const opacity = Number(params.opacity) ?? 1;
@@ -450,6 +464,19 @@ export function executeDashboardTool(
                 const canvasW = firstVariant?.preset?.width || 300;
                 const width = Number(params.width) || canvasW;
                 const height = Number(params.height) || 100;
+
+                // ★ Auto-collision for small centered shapes (dividers, accents)
+                if (firstVariant && align === 'center' && height < 50) {
+                    const MIN_GAP = 6;
+                    for (const el of firstVariant.elements) {
+                        const elY = el.constraints?.vertical?.offset ?? 0;
+                        const elH = el.constraints?.size?.height ?? 0;
+                        const elBottom = elY + elH;
+                        if (y >= elY && y < elBottom + MIN_GAP) {
+                            y = elBottom + MIN_GAP;
+                        }
+                    }
+                }
 
                 // Build horizontal constraint based on align
                 const horizontal = align === 'center'
@@ -498,7 +525,7 @@ export function executeDashboardTool(
                 if (!designStore.creativeSet) return { success: false, message: 'No creative set open.' };
 
                 const text = ((params.text as string) || 'CLICK HERE').toUpperCase();
-                const y = Number(params.y) || 200;
+                let y = Number(params.y) || 200;
                 const bgColor = (params.bgColor as string) || '#c9a84c';
                 const textColor = (params.textColor as string) || '#ffffff';
                 const fontSize = Number(params.fontSize) || 14;
@@ -509,6 +536,19 @@ export function executeDashboardTool(
                 const canvasW = firstVariant?.preset?.width || 300;
                 const width = Number(params.width) || Math.round(canvasW * 0.6);
                 const height = Number(params.height) || 40;
+
+                // ★ Auto-collision: push button down if overlapping
+                if (firstVariant) {
+                    const MIN_GAP = 8;
+                    for (const el of firstVariant.elements) {
+                        const elY = el.constraints?.vertical?.offset ?? 0;
+                        const elH = el.constraints?.size?.height ?? 0;
+                        const elBottom = elY + elH;
+                        if (y >= elY && y < elBottom + MIN_GAP) {
+                            y = elBottom + MIN_GAP;
+                        }
+                    }
+                }
 
                 const btnShapeId = uuid();
                 const btnTextId = uuid();
