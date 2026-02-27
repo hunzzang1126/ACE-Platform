@@ -151,47 +151,53 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                                         })(),
                                     }}
                                 >
-                                    {/* Render elements as colored divs */}
-                                    {variant.elements.map((el) => {
-                                        const resolved = resolveConstraints(el.constraints, width, height);
+                                    {/* Render elements sorted: shapes first, text/buttons on top */}
+                                    {[...variant.elements]
+                                        .sort((a, b) => {
+                                            // Shapes always behind text/buttons
+                                            const order = { shape: 0, image: 1, text: 2, button: 3 } as Record<string, number>;
+                                            return (order[a.type] ?? 1) - (order[b.type] ?? 1);
+                                        })
+                                        .map((el, sortedIdx) => {
+                                            const resolved = resolveConstraints(el.constraints, width, height);
 
-                                        // Compute animation style if playing
-                                        let animStyle: React.CSSProperties = {};
-                                        if (isPlaying && el.animation && el.animation.preset !== 'none') {
-                                            animStyle = computeAnimStyle(
-                                                el.animation.preset as AnimPresetType,
-                                                currentTime,
-                                                el.animation.duration,
-                                                el.animation.startTime,
+                                            // Compute animation style if playing
+                                            let animStyle: React.CSSProperties = {};
+                                            if (isPlaying && el.animation && el.animation.preset !== 'none') {
+                                                animStyle = computeAnimStyle(
+                                                    el.animation.preset as AnimPresetType,
+                                                    currentTime,
+                                                    el.animation.duration,
+                                                    el.animation.startTime,
+                                                );
+                                            }
+
+                                            return (
+                                                <div
+                                                    key={el.id}
+                                                    className="banner-element"
+                                                    style={{
+                                                        position: 'absolute',
+                                                        left: resolved.x,
+                                                        top: resolved.y,
+                                                        width: resolved.width,
+                                                        height: resolved.height,
+                                                        opacity: el.opacity,
+                                                        zIndex: sortedIdx,
+                                                        transition: isPlaying ? 'none' : undefined,
+                                                        ...animStyle,
+                                                        ...(el.type === 'shape' ? { backgroundColor: el.fill || '#ccc', borderRadius: el.borderRadius ?? 0 } : {}),
+                                                        ...(el.type === 'text' ? { color: el.color, fontSize: el.fontSize, fontFamily: el.fontFamily, fontWeight: el.fontWeight, display: 'flex', alignItems: 'center', justifyContent: el.textAlign === 'center' ? 'center' : 'flex-start', overflow: 'hidden', whiteSpace: 'normal' as const, wordBreak: 'break-word' as const, lineHeight: 1.2, textAlign: el.textAlign as 'left' | 'center' | 'right' } : {}),
+                                                        ...(el.type === 'button' ? { backgroundColor: el.backgroundColor, borderRadius: el.borderRadius ?? 0, color: el.color, fontSize: el.fontSize, fontFamily: el.fontFamily, fontWeight: el.fontWeight, display: 'flex', alignItems: 'center', justifyContent: 'center' } : {}),
+                                                        ...(el.type === 'image' ? { backgroundColor: '#e0e0e0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#999' } : {}),
+                                                    }}
+                                                >
+                                                    {el.type === 'text' && el.content}
+                                                    {el.type === 'button' && el.label}
+                                                    {el.type === 'image' && '🖼'}
+                                                </div>
                                             );
-                                        }
-
-                                        return (
-                                            <div
-                                                key={el.id}
-                                                className="banner-element"
-                                                style={{
-                                                    position: 'absolute',
-                                                    left: resolved.x,
-                                                    top: resolved.y,
-                                                    width: resolved.width,
-                                                    height: resolved.height,
-                                                    opacity: el.opacity,
-                                                    zIndex: el.zIndex,
-                                                    transition: isPlaying ? 'none' : undefined,
-                                                    ...animStyle,
-                                                    ...(el.type === 'shape' ? { backgroundColor: el.fill || '#ccc', borderRadius: el.borderRadius ?? 0 } : {}),
-                                                    ...(el.type === 'text' ? { color: el.color, fontSize: el.fontSize, fontFamily: el.fontFamily, fontWeight: el.fontWeight, display: 'flex', alignItems: 'center', justifyContent: el.textAlign === 'center' ? 'center' : 'flex-start', overflow: 'hidden', whiteSpace: 'normal' as const, wordBreak: 'break-word' as const, lineHeight: 1.2, textAlign: el.textAlign as 'left' | 'center' | 'right' } : {}),
-                                                    ...(el.type === 'button' ? { backgroundColor: el.backgroundColor, borderRadius: el.borderRadius ?? 0, color: el.color, fontSize: el.fontSize, fontFamily: el.fontFamily, fontWeight: el.fontWeight, display: 'flex', alignItems: 'center', justifyContent: 'center' } : {}),
-                                                    ...(el.type === 'image' ? { backgroundColor: '#e0e0e0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#999' } : {}),
-                                                }}
-                                            >
-                                                {el.type === 'text' && el.content}
-                                                {el.type === 'button' && el.label}
-                                                {el.type === 'image' && '🖼'}
-                                            </div>
-                                        );
-                                    })}
+                                        })}
                                 </div>
                             </div>
 
