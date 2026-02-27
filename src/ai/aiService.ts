@@ -28,7 +28,7 @@ const DEFAULT_CONFIG: AiConfig = {
     apiKey: '',
     endpoint: 'https://api.anthropic.com',
     model: 'claude-sonnet-4-20250514',
-    maxToolRounds: 15,
+    maxToolRounds: 30,
 };
 
 export function loadConfig(): AiConfig {
