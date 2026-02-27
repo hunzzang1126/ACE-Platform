@@ -398,13 +398,15 @@ export function executeDashboardTool(
 
                 // Calculate default width relative to canvas
                 const canvasW = firstVariant?.preset?.width || 300;
-                const width = Number(params.width) || Math.round(canvasW * 0.92);
+                const width = Number(params.width) || Math.round(canvasW * 0.95);
                 // Estimate multi-line height: approximate chars-per-line, adjust height if wrapping
-                const avgCharWidth = fontSize * 0.55; // rough monospaced estimate
+                const avgCharWidth = fontSize * 0.55;
                 const charsPerLine = Math.max(1, Math.floor(width / avgCharWidth));
                 const lineCount = Math.ceil(content.length / charsPerLine);
-                const singleLineH = Math.round(fontSize * 2.0);
-                const height = Number(params.height) || singleLineH * lineCount;
+                const singleLineH = Math.round(fontSize * 1.8);
+                const estimatedH = singleLineH * lineCount;
+                // Use max of AI-specified height and our estimate so text never clips
+                const height = Math.max(Number(params.height) || 0, estimatedH);
 
                 // ★ Auto-collision: push down if overlapping existing TEXT or BUTTON elements
                 // Skip shapes (backgrounds, accent bars) to avoid pushing text off-canvas

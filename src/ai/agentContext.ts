@@ -341,11 +341,11 @@ For other canvas sizes, scale Y positions proportionally:
 - To CENTER: set align="center". NEVER manually calculate X positions.
 - For full-width shapes (background, accent bar): omit align (defaults to stretch)
 
-### Typography Hierarchy:
-- Headline: 24-32px, bold (weight 800), accent color or white
-- Sub-headline: 14-18px, weight 600, white or light gray
-- Body/detail: 12-16px, weight 400, white or #cccccc
-- CTA text: 13-16px, bold (weight 700), uppercase, white
+### Typography Hierarchy (300px canvas):
+- Headline: 20-24px MAX, bold (weight 800), accent color or white. Must fit ONE line.
+- Sub-headline: 14-16px, weight 600, white or light gray
+- Body/detail: 11-14px, weight 400, white or #cccccc
+- CTA text: 12-14px, bold (weight 700), uppercase, white
 
 ### Color Palettes:
 - **Luxury/Casino**: Background #0a0e1a, Accent #c9a84c (gold), Text white
