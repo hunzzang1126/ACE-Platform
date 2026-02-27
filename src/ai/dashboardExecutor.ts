@@ -398,8 +398,13 @@ export function executeDashboardTool(
 
                 // Calculate default width relative to canvas
                 const canvasW = firstVariant?.preset?.width || 300;
-                const width = Number(params.width) || Math.round(canvasW * 0.8);
-                const height = Number(params.height) || Math.round(fontSize * 2.2);
+                const width = Number(params.width) || Math.round(canvasW * 0.92);
+                // Estimate multi-line height: approximate chars-per-line, adjust height if wrapping
+                const avgCharWidth = fontSize * 0.55; // rough monospaced estimate
+                const charsPerLine = Math.max(1, Math.floor(width / avgCharWidth));
+                const lineCount = Math.ceil(content.length / charsPerLine);
+                const singleLineH = Math.round(fontSize * 2.0);
+                const height = Number(params.height) || singleLineH * lineCount;
 
                 // ★ Auto-collision: push down if overlapping existing TEXT or BUTTON elements
                 // Skip shapes (backgrounds, accent bars) to avoid pushing text off-canvas
