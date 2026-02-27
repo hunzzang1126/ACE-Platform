@@ -2,6 +2,7 @@
 // Design Element Types
 // ─────────────────────────────────────────────────
 import type { ElementConstraints } from './constraints.types';
+import type { LayoutRole } from './layoutRoles';
 
 /** Serializable animation config — persisted with the element */
 export interface ElementAnimation {
@@ -25,6 +26,8 @@ export interface BaseElement {
     blendMode?: string;
     /** Animation preset (persisted) */
     animation?: ElementAnimation;
+    /** Semantic role for Smart Sizing layout intelligence */
+    role?: LayoutRole;
 }
 
 // ── Text ──
