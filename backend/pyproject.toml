@@ -1,0 +1,16 @@
+[project]
+name = "ace-backend"
+version = "0.1.0"
+description = "ACE Creative Engine — Backend API"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "openai>=1.50.0",
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.0.0",
+    "python-multipart>=0.0.9",
+]
+
+[project.scripts]
+dev = "uvicorn app.main:app --reload --port 8000"
