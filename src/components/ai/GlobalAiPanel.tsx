@@ -163,6 +163,13 @@ export function GlobalAiPanel() {
             const engine = engineRef.current?.current ?? engineRef.current;
             console.log('[GlobalAiPanel] Engine for AI:', engine ? 'connected' : 'null');
 
+            // Inject design context so AI knows about the current creative set
+            const designState = useDesignStore.getState();
+            serviceRef.current.setDesignContext(
+                designState.creativeSet ?? null,
+                designState.creativeSet?.masterVariantId,
+            );
+
             await serviceRef.current.chat(msg, engine, {
                 onCanvasScan: (s: string) => setLive(prev => ({ ...prev, phase: 'scanning', canvasScan: s })),
                 onThinking: (t: string) => setLive(prev => ({ ...prev, phase: 'thinking', thinking: t })),

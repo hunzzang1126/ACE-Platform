@@ -7,6 +7,8 @@
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Engine = any;
 
+import { buildSmartContext, contextToPromptSection, type SmartContext } from './smartContextBuilder';
+
 /**
  * Chat message with tool execution history.
  */
@@ -280,15 +282,27 @@ export class AgentContext {
     /**
      * Build the full system prompt with scene context.
      */
-    static buildSystemPrompt(engine: Engine, trackedNodes: SceneNodeInfo[]): string {
+    static buildSystemPrompt(
+        engine: Engine,
+        trackedNodes: SceneNodeInfo[],
+        smartCtx?: SmartContext,
+    ): string {
         const hasEngine = !!engine;
         const sceneRAG = hasEngine ? AgentContext.buildSceneRAG(engine, trackedNodes) : '';
         const intent = AgentContext.inferDesignIntent(trackedNodes);
 
-        // Dynamic context section based on available engine
-        const contextSection = hasEngine
-            ? `\n## Design Intent\n${intent}\n\n${sceneRAG}`
-            : `\n## Current Context\nYou are on the dashboard or editor page. No canvas engine is active.\nUse dashboard tools to manage creative sets, sizes, and navigation.`;
+        // Smart Context replaces generic context when available
+        let contextSection: string;
+        if (smartCtx) {
+            contextSection = '\n' + contextToPromptSection(smartCtx);
+            if (hasEngine) {
+                contextSection += `\n\n## Design Intent\n${intent}\n\n${sceneRAG}`;
+            }
+        } else if (hasEngine) {
+            contextSection = `\n## Design Intent\n${intent}\n\n${sceneRAG}`;
+        } else {
+            contextSection = `\n## Current Context\nYou are on the dashboard or editor page. No canvas engine is active.\nUse dashboard tools to manage creative sets, sizes, and navigation.`;
+        }
 
         return `You are ACE AI — a world-class creative director and banner design AI.
 You design premium, polished multi-size banner ads. You EXECUTE by calling tools — never describe.

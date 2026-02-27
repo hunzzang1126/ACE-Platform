@@ -11,6 +11,8 @@ import { AgentContext, type AgentMessage, type ToolCallRecord, type SceneNodeInf
 import { getToolsForClaude } from './agentTools';
 import { executeToolCall, type ExecutionResult } from './commandExecutor';
 import { DASHBOARD_TOOL_NAMES } from './dashboardTools';
+import { buildSmartContext, pushAction, type SmartContext } from './smartContextBuilder';
+import type { CreativeSet } from '@/schema/design.types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Engine = any;
@@ -100,11 +102,18 @@ export class AiService {
     private context: AgentContext;
     private config: AiConfig;
     private trackedNodes: SceneNodeInfo[];
+    /** Design context for smart context builder */
+    designContext?: { creativeSet: CreativeSet | null; activeVariantId?: string };
 
     constructor(trackedNodes: SceneNodeInfo[]) {
         this.context = new AgentContext();
         this.config = loadConfig();
         this.trackedNodes = trackedNodes;
+    }
+
+    /** Set the current design context for smart AI prompting */
+    setDesignContext(creativeSet: CreativeSet | null, activeVariantId?: string): void {
+        this.designContext = { creativeSet, activeVariantId };
     }
 
     getContext(): AgentContext {
@@ -169,8 +178,16 @@ export class AiService {
         await nextFrame();
         await sleep(400);
 
-        // Build system prompt
-        const systemPrompt = AgentContext.buildSystemPrompt(engine, this.trackedNodes);
+        // Build system prompt with smart context
+        const smartCtx = buildSmartContext(
+            engine ? 'editor' : 'dashboard',
+            this.designContext?.creativeSet,
+            this.designContext?.activeVariantId,
+        );
+        const systemPrompt = AgentContext.buildSystemPrompt(engine, this.trackedNodes, smartCtx);
+
+        // Track user action for context continuity
+        pushAction(`User: ${userMessage.substring(0, 100)}`);
 
         // Phase 1: Thinking
         progress.onThinking(`Analyzing your request with Claude...\nUsing: ${this.config.model}`);
