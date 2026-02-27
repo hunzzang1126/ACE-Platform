@@ -1,13 +1,14 @@
 // ─────────────────────────────────────────────────
-// AI Service — Agentic Loop with Live Progress
+// AI Service — Claude API + Agentic Loop
 // ─────────────────────────────────────────────────
-// Client-side LLM integration with:
-// - Streaming response display
+// Client-side LLM integration using Anthropic Claude API:
+// - Claude Messages API (/v1/messages)
+// - Extended thinking for complex reasoning
 // - 4-phase agentic loop (think → plan → execute → reflect)
 // ─────────────────────────────────────────────────
 
-import { AgentContext, type AgentMessage, type AgentPhase, type ToolCallRecord, type SceneNodeInfo } from './agentContext';
-import { getToolsForApi } from './agentTools';
+import { AgentContext, type AgentMessage, type ToolCallRecord, type SceneNodeInfo } from './agentContext';
+import { getToolsForClaude } from './agentTools';
 import { executeToolCall, type ExecutionResult } from './commandExecutor';
 import { DASHBOARD_TOOL_NAMES } from './dashboardTools';
 
@@ -18,16 +19,16 @@ type Engine = any;
 
 export interface AiConfig {
     apiKey: string;
-    endpoint: string;       // e.g. "https://api.openai.com/v1"
-    model: string;           // e.g. "gpt-4o"
-    maxToolRounds: number;   // max tool-use iterations (default 10)
+    endpoint: string;
+    model: string;
+    maxToolRounds: number;
 }
 
 const DEFAULT_CONFIG: AiConfig = {
     apiKey: '',
-    endpoint: 'https://api.openai.com/v1',
-    model: 'gpt-4o',
-    maxToolRounds: 10,
+    endpoint: 'https://api.anthropic.com',
+    model: 'claude-sonnet-4-20250514',
+    maxToolRounds: 15,
 };
 
 export function loadConfig(): AiConfig {
@@ -45,31 +46,46 @@ export function saveConfig(config: AiConfig): void {
 // ── Live Progress Callbacks ──────────────────────
 
 export interface LiveProgress {
-    /** Called when scanning the canvas state */
     onCanvasScan: (summary: string) => void;
-    /** Called when AI starts thinking */
     onThinking: (content: string) => void;
-    /** Called when AI generates a plan */
     onPlan: (steps: string[]) => void;
-    /** Called before each tool execution */
     onStepStart: (stepIndex: number, toolName: string, params: Record<string, unknown>) => void;
-    /** Called after each tool execution */
     onStepComplete: (stepIndex: number, result: ExecutionResult) => void;
-    /** Called during reflection phase */
     onReflection: (content: string) => void;
-    /** Called when streaming text tokens arrive */
     onToken: (token: string) => void;
-    /** Called when the full response is complete */
     onComplete: (message: AgentMessage) => void;
-    /** Called on error */
     onError: (error: string) => void;
 }
 
-/**
- * Override executor for specific tool sets (e.g. dashboard tools).
- * Return ExecutionResult if handled, or null to fall through to default executor.
- */
 export type ToolExecutorOverride = (toolName: string, params: Record<string, unknown>) => ExecutionResult | null;
+
+// ── Claude API Types ─────────────────────────────
+
+interface ClaudeContentBlock {
+    type: 'text' | 'tool_use' | 'tool_result';
+    text?: string;
+    id?: string;
+    name?: string;
+    input?: Record<string, unknown>;
+    tool_use_id?: string;
+    content?: string;
+    is_error?: boolean;
+}
+
+interface ClaudeMessage {
+    role: 'user' | 'assistant';
+    content: string | ClaudeContentBlock[];
+}
+
+interface ClaudeResponse {
+    id: string;
+    type: string;
+    role: string;
+    content: ClaudeContentBlock[];
+    model: string;
+    stop_reason: 'end_turn' | 'tool_use' | 'max_tokens' | 'stop_sequence';
+    usage: { input_tokens: number; output_tokens: number };
+}
 
 // ── AI Service ───────────────────────────────────
 
@@ -101,7 +117,6 @@ export class AiService {
         return !!this.config.apiKey;
     }
 
-    /** Get the latest assistant reply from context history. */
     getLastReply(): string {
         const msgs = this.context.getHistory();
         for (let i = msgs.length - 1; i >= 0; i--) {
@@ -112,8 +127,7 @@ export class AiService {
     }
 
     /**
-     * Main chat method — runs the full agentic loop.
-     * @param executorOverride Optional function to handle specific tools (e.g. dashboard tools)
+     * Main chat method — runs the full agentic loop with Claude.
      */
     async chat(
         userMessage: string,
@@ -134,7 +148,7 @@ export class AiService {
         };
         this.context.addMessage(userMsg);
 
-        // Phase 0: Canvas scan — only if engine is available
+        // Phase 0: Canvas scan
         let canvasSummary = 'No canvas engine connected (dashboard mode).';
         if (engine) {
             const nodeCount = engine.node_count?.() ?? 0;
@@ -148,11 +162,11 @@ export class AiService {
         await nextFrame();
         await sleep(400);
 
-        // Build system prompt with scene RAG
+        // Build system prompt
         const systemPrompt = AgentContext.buildSystemPrompt(engine, this.trackedNodes);
 
         // Phase 1: Thinking
-        progress.onThinking(`Reading your request and preparing the AI model...\nUsing: ${this.config.model}`);
+        progress.onThinking(`Analyzing your request with Claude...\nUsing: ${this.config.model}`);
         await nextFrame();
 
         try {
@@ -163,8 +177,7 @@ export class AiService {
     }
 
     /**
-     * The core agentic loop — handles multi-round tool calling.
-     * Uses nextFrame() between phases so React renders each transition.
+     * The core agentic loop — handles multi-round tool calling with Claude.
      */
     private async agenticLoop(
         engine: Engine,
@@ -172,104 +185,121 @@ export class AiService {
         progress: LiveProgress,
         executorOverride?: ToolExecutorOverride,
     ): Promise<void> {
-        const messages = this.buildApiMessages(systemPrompt);
-        const tools = getToolsForApi();
+        const messages = this.buildClaudeMessages();
+        const tools = getToolsForClaude();
 
         let rounds = 0;
         let finished = false;
 
-        // Let React render the "Thinking" phase
         await nextFrame();
 
         while (!finished && rounds < this.config.maxToolRounds) {
             rounds++;
 
-            // Call LLM API (this blocks while waiting for the response)
-            const response = await this.callLlm(messages, tools, progress);
+            const response = await this.callClaude(systemPrompt, messages, tools, progress);
 
             if (!response) {
-                progress.onError('No response from AI');
+                progress.onError('No response from Claude');
                 return;
             }
 
-            // Check for tool calls
-            const toolCalls = response.tool_calls;
-            if (toolCalls && toolCalls.length > 0) {
-                // Phase 2: Planning — show the plan
-                const planSteps = toolCalls.map(
-                    (tc: ToolCallResponse) => `${tc.function.name}(${truncateArgs(tc.function.arguments)})`
+            // Extract text and tool_use blocks
+            const textBlocks = response.content.filter(b => b.type === 'text');
+            const toolBlocks = response.content.filter(b => b.type === 'tool_use');
+
+            // Stream text content
+            for (const block of textBlocks) {
+                if (block.text) {
+                    for (const char of block.text) {
+                        progress.onToken(char);
+                        await sleep(6);
+                    }
+                }
+            }
+
+            if (response.stop_reason === 'tool_use' && toolBlocks.length > 0) {
+                // Phase 2: Planning
+                const planSteps = toolBlocks.map(tc =>
+                    `${tc.name}(${truncateArgs(JSON.stringify(tc.input ?? {}))})`
                 );
                 progress.onPlan(planSteps);
-                await sleep(800); // Let user read the plan
+                await sleep(600);
 
-                // Phase 3: Executing — step by step with visible progress
-                const toolResults: ToolCallRecord[] = [];
-                for (let i = 0; i < toolCalls.length; i++) {
-                    const tc = toolCalls[i] as ToolCallResponse;
-                    const params = JSON.parse(tc.function.arguments) as Record<string, unknown>;
+                // Store assistant message with tool_use blocks
+                messages.push({
+                    role: 'assistant',
+                    content: response.content,
+                });
 
-                    progress.onStepStart(i, tc.function.name, params);
-                    await nextFrame(); // Show "running" state
+                // Phase 3: Execute tools and build tool_result blocks
+                const toolResults: ClaudeContentBlock[] = [];
+                const toolRecords: ToolCallRecord[] = [];
+
+                for (let i = 0; i < toolBlocks.length; i++) {
+                    const tc = toolBlocks[i]!;
+                    const params = (tc.input ?? {}) as Record<string, unknown>;
+
+                    progress.onStepStart(i, tc.name!, params);
+                    await nextFrame();
 
                     const startTime = Date.now();
 
-                    // Route tool execution: override first, then dashboard, then canvas
+                    // Route execution: override → dashboard → canvas
                     let result: ExecutionResult;
-                    const overrideResult = executorOverride?.(tc.function.name, params);
+                    const overrideResult = executorOverride?.(tc.name!, params);
                     if (overrideResult) {
                         result = overrideResult;
-                    } else if (DASHBOARD_TOOL_NAMES.has(tc.function.name)) {
-                        // Skip — dashboard tools handled by override, but if no override, return error
-                        result = { success: false, message: `Dashboard tool "${tc.function.name}" not available in this context.` };
+                    } else if (DASHBOARD_TOOL_NAMES.has(tc.name!)) {
+                        result = { success: false, message: `Dashboard tool "${tc.name}" not available.` };
                     } else if (engine) {
-                        result = executeToolCall(engine, tc.function.name, params, this.trackedNodes);
+                        result = executeToolCall(engine, tc.name!, params, this.trackedNodes);
                     } else {
-                        result = { success: false, message: `Canvas engine not available. Navigate to the editor first.` };
+                        result = { success: false, message: 'Canvas engine not available. Navigate to the editor first.' };
                     }
                     const durationMs = Date.now() - startTime;
 
                     progress.onStepComplete(i, result);
-                    await sleep(400); // Show "done" state for each step
+                    await sleep(300);
 
                     toolResults.push({
-                        name: tc.function.name,
+                        type: 'tool_result',
+                        tool_use_id: tc.id!,
+                        content: JSON.stringify(result),
+                        is_error: !result.success,
+                    });
+
+                    toolRecords.push({
+                        name: tc.name!,
                         input: params,
                         result,
                         durationMs,
                     });
-
-                    // Add tool result to messages for the next round
-                    messages.push({
-                        role: 'assistant',
-                        content: null,
-                        tool_calls: [tc],
-                    });
-                    messages.push({
-                        role: 'tool',
-                        tool_call_id: tc.id,
-                        content: JSON.stringify(result),
-                    });
                 }
 
-                // Store tool calls with the assistant message
-                if (response.content) {
-                    const assistantMsg: AgentMessage = {
+                // Send tool results back as a user message
+                messages.push({
+                    role: 'user',
+                    content: toolResults,
+                });
+
+                // Store text from this round if any
+                const roundText = textBlocks.map(b => b.text).filter(Boolean).join('\n');
+                if (roundText) {
+                    this.context.addMessage({
                         role: 'assistant',
-                        content: response.content,
+                        content: roundText,
                         timestamp: Date.now(),
-                        toolCalls: toolResults,
-                    };
-                    this.context.addMessage(assistantMsg);
+                        toolCalls: toolRecords,
+                    });
                 }
             } else {
                 // No tool calls — final text response
                 finished = true;
 
-                const content = response.content ?? '';
+                const content = textBlocks.map(b => b.text).filter(Boolean).join('\n');
 
-                // Phase 4: Reflection — stream text with visible typing
                 progress.onReflection(content);
-                await sleep(500); // Show reflection before completing
+                await sleep(500);
 
                 const assistantMsg: AgentMessage = {
                     role: 'assistant',
@@ -287,64 +317,60 @@ export class AiService {
     }
 
     /**
-     * Build the API messages array from conversation history.
+     * Build Claude messages from conversation history.
      */
-    private buildApiMessages(systemPrompt: string): ApiMessage[] {
-        const messages: ApiMessage[] = [
-            { role: 'system', content: systemPrompt },
-        ];
-
-        // Add recent conversation history
+    private buildClaudeMessages(): ClaudeMessage[] {
+        const messages: ClaudeMessage[] = [];
         const recent = this.context.getRecentMessages(10);
         for (const msg of recent) {
-            messages.push({ role: msg.role as 'user' | 'assistant', content: msg.content });
+            messages.push({
+                role: msg.role as 'user' | 'assistant',
+                content: msg.content,
+            });
         }
-
         return messages;
     }
 
     /**
-     * Call the LLM API (OpenAI-compatible).
+     * Call the Claude Messages API.
      */
-    private async callLlm(
-        messages: ApiMessage[],
-        tools: ReturnType<typeof getToolsForApi>,
+    private async callClaude(
+        systemPrompt: string,
+        messages: ClaudeMessage[],
+        tools: ReturnType<typeof getToolsForClaude>,
         progress: LiveProgress,
-    ): Promise<LlmResponse | null> {
-        const { apiKey, endpoint, model } = this.config;
+    ): Promise<ClaudeResponse | null> {
+        const { apiKey, model } = this.config;
+
+        // Use Vite dev proxy to bypass CORS
+        const isLocalDev = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+        const apiUrl = isLocalDev
+            ? '/api/anthropic/v1/messages'
+            : 'https://api.anthropic.com/v1/messages';
 
         const body = {
             model,
+            max_tokens: 4096,
+            system: systemPrompt,
             messages,
             tools: tools.length > 0 ? tools : undefined,
-            tool_choice: 'auto',
-            stream: false, // Streaming handled via onToken for text
         };
 
-        // Use Vite dev proxy to bypass CORS when running on localhost
-        const isLocalDev = typeof window !== 'undefined' && window.location.hostname === 'localhost';
-        let apiUrl: string;
-        if (isLocalDev && endpoint.includes('api.openai.com')) {
-            // Route through Vite proxy: /api/openai/v1/chat/completions
-            apiUrl = `/api/openai/v1/chat/completions`;
-        } else {
-            apiUrl = `${endpoint}/chat/completions`;
-        }
-
-        console.log(`[AiService] callLlm → ${apiUrl} (model: ${model})`);
+        console.log(`[AiService] callClaude → ${apiUrl} (model: ${model}, msgs: ${messages.length})`);
 
         const resp = await fetch(apiUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
+                'x-api-key': apiKey,
+                'anthropic-version': '2023-06-01',
+                'anthropic-dangerous-direct-browser-access': 'true',
             },
             body: JSON.stringify(body),
         });
 
         if (!resp.ok) {
             const errorText = await resp.text();
-            // Parse OpenAI error format for a readable message
             let errorMsg = `API Error ${resp.status}`;
             try {
                 const errJson = JSON.parse(errorText);
@@ -357,63 +383,25 @@ export class AiService {
             return null;
         }
 
-        const data = await resp.json();
-        const choice = data.choices?.[0];
-        if (!choice) return null;
+        const data = await resp.json() as ClaudeResponse;
+        console.log(`[AiService] Claude response: stop=${data.stop_reason}, blocks=${data.content.length}, usage=${data.usage.input_tokens}in/${data.usage.output_tokens}out`);
 
-        const message = choice.message;
-
-        // Stream text content character by character for live display
-        if (message.content) {
-            for (const char of message.content) {
-                progress.onToken(char);
-                // Small delay for streaming effect
-                await sleep(8);
-            }
-        }
-
-        return {
-            content: message.content ?? null,
-            tool_calls: message.tool_calls ?? null,
-        };
+        return data;
     }
 }
 
 // ── Types ────────────────────────────────────────
 
-interface ApiMessage {
-    role: string;
-    content: string | null;
-    tool_calls?: ToolCallResponse[];
-    tool_call_id?: string;
-}
-
-interface ToolCallResponse {
-    id: string;
-    type: 'function';
-    function: {
-        name: string;
-        arguments: string;
-    };
-}
-
-interface LlmResponse {
-    content: string | null;
-    tool_calls: ToolCallResponse[] | null;
-}
-
 function sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-/** Wait for the next animation frame + microtask so React can paint */
 function nextFrame(): Promise<void> {
     return new Promise(resolve => {
         requestAnimationFrame(() => setTimeout(resolve, 16));
     });
 }
 
-/** Truncate tool arguments for readable plan display */
 function truncateArgs(argsJson: string): string {
     try {
         const obj = JSON.parse(argsJson);
@@ -423,4 +411,3 @@ function truncateArgs(argsJson: string): string {
         return argsJson.length > 60 ? argsJson.slice(0, 57) + '...' : argsJson;
     }
 }
-

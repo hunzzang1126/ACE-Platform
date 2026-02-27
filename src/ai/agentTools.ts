@@ -481,6 +481,22 @@ export function getToolsForApi(): Array<{
 }
 
 /**
+ * Convert tool definitions to Claude tool-calling format.
+ * Claude uses `input_schema` instead of `parameters`.
+ */
+export function getToolsForClaude(): Array<{
+    name: string;
+    description: string;
+    input_schema: object;
+}> {
+    return ALL_TOOLS.map(t => ({
+        name: t.name,
+        description: t.description,
+        input_schema: t.parameters,
+    }));
+}
+
+/**
  * Get tool by name.
  */
 export function getToolByName(name: string): ToolDefinition | undefined {

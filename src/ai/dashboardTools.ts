@@ -150,6 +150,39 @@ const update_element_property: ToolDefinition = {
     category: 'create',
 };
 
+// ── Dynamic / Catch-All Tools ───────────────────
+
+const set_custom_style: ToolDefinition = {
+    name: 'set_custom_style',
+    description: 'Apply ANY custom CSS style(s) to an element across all sizes. Use this for effects not covered by other tools — glow, blur, text-shadow, gradient backgrounds, borders, transforms, filters, etc. The styles are applied as inline CSS.',
+    parameters: {
+        type: 'object',
+        properties: {
+            element_name: { type: 'string', description: 'Name or partial name of the element to style' },
+            styles: {
+                type: 'object',
+                description: 'CSS properties as key-value pairs. Use camelCase keys (e.g. boxShadow, textShadow, filter, backgroundImage, border, transform). Values are CSS strings.',
+            },
+        },
+        required: ['element_name', 'styles'],
+    },
+    category: 'create',
+};
+
+const execute_dynamic_action: ToolDefinition = {
+    name: 'execute_dynamic_action',
+    description: 'Execute a custom JavaScript action on the design. Use when no existing tool can accomplish the request. Write JS code that will be evaluated with access to: `designStore` (Zustand store with creativeSet, variants, elements), `document`, `window`. Return a result string. Use this for complex multi-step operations, batch updates, conditional logic, or any capability not covered by other tools.',
+    parameters: {
+        type: 'object',
+        properties: {
+            description: { type: 'string', description: 'Human-readable description of what this action does' },
+            code: { type: 'string', description: 'JavaScript code to execute. Must return a string result. Has access to designStore (Zustand), document, window.' },
+        },
+        required: ['description', 'code'],
+    },
+    category: 'create',
+};
+
 // ── Export Registry ──────────────────────────────
 
 export const DASHBOARD_TOOLS: ToolDefinition[] = [
@@ -164,6 +197,8 @@ export const DASHBOARD_TOOLS: ToolDefinition[] = [
     list_elements,
     update_element_text,
     update_element_property,
+    set_custom_style,
+    execute_dynamic_action,
 ];
 
 export const DASHBOARD_TOOL_NAMES = new Set(DASHBOARD_TOOLS.map(t => t.name));

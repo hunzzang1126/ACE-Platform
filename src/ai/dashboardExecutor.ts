@@ -368,6 +368,79 @@ export function executeDashboardTool(
                 return { success: true, message: `Set "${property}" = "${rawValue}" on ${updated} element(s) matching "${params.element_name}".` };
             }
 
+            // ── Dynamic / Catch-All Tools ────────────
+            case 'set_custom_style': {
+                const cs = designStore.creativeSet;
+                if (!cs) return { success: false, message: 'No creative set open.' };
+
+                const elementName = (params.element_name as string || '').toLowerCase();
+                const styles = params.styles as Record<string, string>;
+                if (!elementName || !styles || typeof styles !== 'object') {
+                    return { success: false, message: 'element_name and styles object are required.' };
+                }
+
+                let updated = 0;
+                for (const variant of cs.variants) {
+                    for (const el of variant.elements) {
+                        if (el.name.toLowerCase().includes(elementName)) {
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            const raw = el as any;
+                            // Merge new styles with existing customStyles
+                            raw.customStyles = { ...(raw.customStyles || {}), ...styles };
+                            updated++;
+                        }
+                    }
+                }
+
+                if (updated === 0) {
+                    return { success: false, message: `No element matching "${params.element_name}" found.` };
+                }
+
+                useDesignStore.setState((state) => {
+                    state.creativeSet = cs;
+                });
+
+                const styleList = Object.entries(styles).map(([k, v]) => `${k}: ${v}`).join(', ');
+                return { success: true, message: `Applied custom styles to ${updated} element(s) matching "${params.element_name}": ${styleList}` };
+            }
+
+            case 'execute_dynamic_action': {
+                const description = params.description as string || 'Custom action';
+                const code = params.code as string;
+                if (!code) {
+                    return { success: false, message: 'code is required.' };
+                }
+
+                try {
+                    // Create a sandboxed execution context
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    const fn = new Function(
+                        'designStore',
+                        'useDesignStore',
+                        'useProjectStore',
+                        `"use strict";
+                        try {
+                            ${code}
+                        } catch (e) {
+                            return "Error: " + e.message;
+                        }`
+                    );
+
+                    const result = fn(
+                        useDesignStore.getState(),
+                        useDesignStore,
+                        useProjectStore,
+                    );
+
+                    const resultStr = typeof result === 'string' ? result : JSON.stringify(result ?? 'Done');
+                    console.log(`[DashboardExecutor] Dynamic action "${description}" result:`, resultStr);
+                    return { success: true, message: `✅ ${description}: ${resultStr}` };
+                } catch (err) {
+                    console.error(`[DashboardExecutor] Dynamic action failed:`, err);
+                    return { success: false, message: `Failed to execute "${description}": ${err}` };
+                }
+            }
+
             default:
                 return { success: false, message: `Unknown dashboard tool: ${toolName}` };
         }

@@ -44,9 +44,9 @@ export function GlobalAiPanel() {
     const [showSettings, setShowSettings] = useState(false);
     const [config, setConfig] = useState<AiConfig>({
         apiKey: '',
-        endpoint: 'https://api.openai.com/v1',
-        model: 'gpt-4o',
-        maxToolRounds: 10,
+        endpoint: 'https://api.anthropic.com',
+        model: 'claude-sonnet-4-20250514',
+        maxToolRounds: 15,
     });
 
     const bottomRef = useRef<HTMLDivElement>(null);
