@@ -385,8 +385,18 @@ export function executeDashboardTool(
                 const xParam = Number(params.x) || 0;
                 const elName = (params.name as string) || content.substring(0, 20);
 
-                // Calculate default width relative to canvas
+                // ★ Deduplication: skip if a text element with same content already exists
                 const firstVariant = designStore.creativeSet.variants[0];
+                if (firstVariant) {
+                    const dup = firstVariant.elements.find(
+                        (el) => el.type === 'text' && (el as { content?: string }).content === content
+                    );
+                    if (dup) {
+                        return { success: true, message: `Text "${content}" already exists (skip duplicate).` };
+                    }
+                }
+
+                // Calculate default width relative to canvas
                 const canvasW = firstVariant?.preset?.width || 300;
                 const width = Number(params.width) || Math.round(canvasW * 0.8);
                 const height = Number(params.height) || Math.round(fontSize * 2.2);
@@ -470,8 +480,18 @@ export function executeDashboardTool(
                 const xParam = Number(params.x) || 0;
                 const elName = (params.name as string) || `Shape`;
 
-                // Calculate default dimensions
+                // ★ Deduplication: skip if a shape with same name already exists
                 const firstVariant = designStore.creativeSet.variants[0];
+                if (firstVariant && elName !== 'Shape') {
+                    const dup = firstVariant.elements.find(
+                        (el) => el.type === 'shape' && el.name === elName
+                    );
+                    if (dup) {
+                        return { success: true, message: `Shape "${elName}" already exists (skip duplicate).` };
+                    }
+                }
+
+                // Calculate default dimensions
                 const canvasW = firstVariant?.preset?.width || 300;
                 const width = Number(params.width) || canvasW;
                 const height = Number(params.height) || 100;
@@ -543,7 +563,16 @@ export function executeDashboardTool(
                 const borderRadius = Number(params.borderRadius) || 6;
                 const elName = (params.name as string) || 'CTA Button';
 
+                // ★ Deduplication: skip if a button with same text already exists
                 const firstVariant = designStore.creativeSet.variants[0];
+                if (firstVariant) {
+                    const dup = firstVariant.elements.find(
+                        (el) => el.type === 'text' && (el as { content?: string }).content === text
+                    );
+                    if (dup) {
+                        return { success: true, message: `Button "${text}" already exists (skip duplicate).` };
+                    }
+                }
                 const canvasW = firstVariant?.preset?.width || 300;
                 const width = Number(params.width) || Math.round(canvasW * 0.6);
                 const height = Number(params.height) || 40;
