@@ -6,6 +6,7 @@
 
 import { useCallback } from 'react';
 import { useDesignStore } from '@/stores/designStore';
+import { loadVideoBlob } from '@/stores/videoStorage';
 import type { DesignElement, ShapeElement, TextElement, ImageElement, VideoElement, ElementAnimation } from '@/schema/elements.types';
 import type { ElementConstraints } from '@/schema/constraints.types';
 import type { EngineNode } from './useCanvasEngine';
@@ -534,6 +535,19 @@ export function useCanvasSync(
                     locked: vid.locked ?? false,
                     zIndex: vid.zIndex ?? 1,
                 });
+
+                // ★ Async: restore blob URL from IndexedDB if current one is invalid
+                const vidId = vid.id;
+                const currentSrc = vid.videoSrc || '';
+                if (!currentSrc || currentSrc.startsWith('blob:')) {
+                    loadVideoBlob(vidId).then((freshUrl) => {
+                        if (freshUrl) {
+                            // Update the overlay element with a fresh blob URL
+                            const oel = overlayElements.find(o => o.id === vidId);
+                            if (oel) oel.videoSrc = freshUrl;
+                        }
+                    }).catch(() => {/* IndexedDB unavailable */ });
+                }
 
                 // Restore animation preset
                 if (el.animation && el.animation.preset !== 'none') {

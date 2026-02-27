@@ -3,6 +3,7 @@
 // These are HTML elements positioned over the WebGPU canvas
 // ─────────────────────────────────────────────────
 import { useState, useCallback, useRef } from 'react';
+import { saveVideoBlob } from '@/stores/videoStorage';
 
 export interface OverlayElement {
     id: string;
@@ -196,6 +197,8 @@ export function useOverlayElements(canvasWidth = 300, canvasHeight = 250) {
                 };
                 setElements((prev) => [...prev, newEl]);
                 setSelectedOverlayId(id);
+                // ★ Persist video blob to IndexedDB
+                saveVideoBlob(id, file).catch(console.error);
             };
         };
         video.src = objectUrl;

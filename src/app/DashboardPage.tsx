@@ -35,38 +35,36 @@ export function DashboardPage() {
     // This ensures the dashboard listing always reflects the real data
     useEffect(() => {
         const allCS = useDesignStore.getState().getAllCreativeSets();
-        if (allCS.length > 0) {
-            // Rebuild projectStore from designStore (source of truth)
-            useProjectStore.setState((state) => {
-                // Build a map of existing project entries by ID for merging
-                const existingMap = new Map(state.creativeSets.map(s => [s.id, s]));
+        // Always rebuild projectStore from designStore (source of truth)
+        useProjectStore.setState((state) => {
+            // Build a map of existing project entries by ID for merging
+            const existingMap = new Map(state.creativeSets.map(s => [s.id, s]));
 
-                // Update/add entries from designStore
-                for (const cs of allCS) {
-                    const existing = existingMap.get(cs.id);
-                    if (existing) {
-                        // Update variant count to reflect reality
-                        existing.variantCount = cs.variants.length;
-                        existing.name = cs.name;
-                        existing.updatedAt = cs.updatedAt;
-                    } else {
-                        // Add missing entry
-                        state.creativeSets.push({
-                            id: cs.id,
-                            name: cs.name,
-                            variantCount: cs.variants.length,
-                            createdAt: cs.createdAt,
-                            updatedAt: cs.updatedAt,
-                            createdBy: 'Young An',
-                        });
-                    }
+            // Update/add entries from designStore
+            for (const cs of allCS) {
+                const existing = existingMap.get(cs.id);
+                if (existing) {
+                    // Update variant count to reflect reality
+                    existing.variantCount = cs.variants.length;
+                    existing.name = cs.name;
+                    existing.updatedAt = cs.updatedAt;
+                } else {
+                    // Add missing entry
+                    state.creativeSets.push({
+                        id: cs.id,
+                        name: cs.name,
+                        variantCount: cs.variants.length,
+                        createdAt: cs.createdAt,
+                        updatedAt: cs.updatedAt,
+                        createdBy: 'Young An',
+                    });
                 }
+            }
 
-                // Remove entries that no longer exist in designStore
-                const validIds = new Set(allCS.map(cs => cs.id));
-                state.creativeSets = state.creativeSets.filter(s => validIds.has(s.id));
-            });
-        }
+            // Remove entries that no longer exist in designStore
+            const validIds = new Set(allCS.map(cs => cs.id));
+            state.creativeSets = state.creativeSets.filter(s => validIds.has(s.id));
+        });
     }, []);
 
     // ── Computed data ──

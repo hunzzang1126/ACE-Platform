@@ -21,31 +21,7 @@ export interface TrashedItem {
     deletedAt: number; // timestamp
 }
 
-// ── Demo data generator ──
-function generateDemoData(): { sets: CreativeSetSummary[]; folders: Folder[] } {
-    const now = new Date();
-    const authors = ['Young An', 'Aidan Payne', 'Dylan Edwards'];
-
-    const demoSets: CreativeSetSummary[] = [
-        { id: uuid(), name: '01062023-CA_ON-BELLMEDIA_Poker_Thrill', variantCount: 5, createdAt: '2023-06-01T10:00:00Z', updatedAt: '2023-06-01T10:00:00Z', createdBy: 'Dylan Edwards' },
-        { id: uuid(), name: '04122025-CA-100k-Freeroll', variantCount: 8, createdAt: '2025-12-04T10:00:00Z', updatedAt: '2025-12-04T10:00:00Z', createdBy: 'Aidan Payne' },
-        { id: uuid(), name: '05012023-ALL-Rush_Cash_Swipe', variantCount: 12, createdAt: '2023-01-06T10:00:00Z', updatedAt: '2023-01-06T10:00:00Z', createdBy: 'Dylan Edwards' },
-        { id: uuid(), name: '08022023-CA-GG_Home_of_WSOP', variantCount: 6, createdAt: '2023-02-07T10:00:00Z', updatedAt: '2023-02-07T10:00:00Z', createdBy: 'Dylan Edwards' },
-        { id: uuid(), name: '08062023-CA_ON-Live_Nation', variantCount: 4, createdAt: '2023-06-08T10:00:00Z', updatedAt: '2023-06-08T10:00:00Z', createdBy: 'Dylan Edwards' },
-        { id: uuid(), name: '09012023-ALL-Spin_Gold_ELO', variantCount: 7, createdAt: '2023-01-09T10:00:00Z', updatedAt: '2023-01-09T10:00:00Z', createdBy: 'Dylan Edwards' },
-        { id: uuid(), name: '10062022-ALL-Bounty-Jackpot', variantCount: 10, createdAt: '2022-10-06T10:00:00Z', updatedAt: '2022-10-06T10:00:00Z', createdBy: 'Dylan Edwards' },
-        { id: uuid(), name: '11022022-CA_ON-Spin_Gold_100KSpin_GGPokerCA', variantCount: 3, createdAt: '2022-10-19T10:00:00Z', updatedAt: '2022-10-19T10:00:00Z', createdBy: 'Dylan Edwards' },
-        { id: uuid(), name: '11082022-CA_ON-Sunday-Flagships-GGPokerCA', variantCount: 9, createdAt: '2022-11-08T10:00:00Z', updatedAt: '2022-11-08T10:00:00Z', createdBy: 'Dylan Edwards' },
-        { id: uuid(), name: '11132025-ReCA-Dynamic-Ad-Test', variantCount: 2, createdAt: '2025-11-13T10:00:00Z', updatedAt: '2025-11-13T10:00:00Z', createdBy: 'Aidan Payne' },
-        { id: uuid(), name: '12122022-CA_ON-GGPokerCA_Holdem_Omaha_Leaderboards', variantCount: 6, createdAt: '2022-12-12T10:00:00Z', updatedAt: '2022-12-12T10:00:00Z', createdBy: 'Dylan Edwards' },
-        { id: uuid(), name: '13122022-ALL-Cash_Games_Welcome', variantCount: 5, createdAt: '2022-12-13T10:00:00Z', updatedAt: '2022-12-13T10:00:00Z', createdBy: 'Dylan Edwards' },
-        { id: uuid(), name: '14032023-CA_ON-GGPokerCA_Hourly_Freerolls', variantCount: 4, createdAt: '2023-03-14T10:00:00Z', updatedAt: '2023-03-14T10:00:00Z', createdBy: 'Dylan Edwards' },
-        { id: uuid(), name: '2026-Spring-Campaign-Global', variantCount: 15, createdAt: now.toISOString(), updatedAt: now.toISOString(), createdBy: 'Young An' },
-        { id: uuid(), name: '2026-Valentine-Promo', variantCount: 8, createdAt: now.toISOString(), updatedAt: now.toISOString(), createdBy: 'Young An' },
-    ];
-
-    return { sets: demoSets, folders: [] };
-}
+// No demo data — user data only
 
 // ── Sort types ──
 export type SortColumn = 'name' | 'variantCount' | 'createdAt' | 'createdBy';
@@ -94,13 +70,11 @@ interface ProjectState {
     setItemsPerPage: (count: number) => void;
 }
 
-const demoData = generateDemoData();
-
 export const useProjectStore = create<ProjectState>()(
     persist(
         immer((set) => ({
-            creativeSets: demoData.sets,
-            folders: demoData.folders,
+            creativeSets: [],
+            folders: [],
             trash: [],
             currentFolderId: null,
 
