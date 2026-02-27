@@ -46,7 +46,7 @@ export function GlobalAiPanel() {
         apiKey: '',
         endpoint: 'https://api.anthropic.com',
         model: 'claude-sonnet-4-20250514',
-        maxToolRounds: 15,
+        maxToolRounds: 30,
     });
 
     const bottomRef = useRef<HTMLDivElement>(null);

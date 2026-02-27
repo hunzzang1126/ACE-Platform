@@ -368,6 +368,107 @@ export function executeDashboardTool(
                 return { success: true, message: `Set "${property}" = "${rawValue}" on ${updated} element(s) matching "${params.element_name}".` };
             }
 
+            // ── Element Creation ──────────────────────
+
+            case 'add_text': {
+                const cs = designStore.creativeSet;
+                if (!cs) return { success: false, message: 'No creative set open.' };
+
+                const content = (params.content as string) || 'Text';
+                const x = Number(params.x) || 0;
+                const y = Number(params.y) || 0;
+                const width = Number(params.width) || 200;
+                const height = Number(params.height) || 40;
+                const fontSize = Number(params.fontSize) || 24;
+                const fontWeight = Number(params.fontWeight) || 700;
+                const color = (params.color as string) || '#ffffff';
+                const fontFamily = (params.fontFamily as string) || 'Inter';
+                const textAlign = (params.textAlign as string) || 'center';
+                const elName = (params.name as string) || content.substring(0, 20);
+
+                const newEl = {
+                    id: uuid(),
+                    name: elName,
+                    type: 'text' as const,
+                    content,
+                    fontFamily,
+                    fontSize,
+                    fontWeight,
+                    fontStyle: 'normal' as const,
+                    color,
+                    textAlign: textAlign as 'left' | 'center' | 'right',
+                    lineHeight: 1.2,
+                    letterSpacing: 0,
+                    autoShrink: false,
+                    opacity: 1,
+                    visible: true,
+                    locked: false,
+                    zIndex: cs.variants[0]?.elements.length || 0,
+                    constraints: {
+                        horizontal: { anchor: 'left' as const, offset: x },
+                        vertical: { anchor: 'top' as const, offset: y },
+                        size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width, height },
+                        rotation: 0,
+                    },
+                };
+
+                for (const variant of cs.variants) {
+                    variant.elements.push({ ...newEl });
+                }
+
+                useDesignStore.setState((state) => {
+                    state.creativeSet = cs;
+                });
+
+                return { success: true, message: `Text "${content}" added at (${x}, ${y}) — ${fontSize}px ${color}` };
+            }
+
+            case 'add_shape': {
+                const cs = designStore.creativeSet;
+                if (!cs) return { success: false, message: 'No creative set open.' };
+
+                const shapeType = (params.shapeType as string) || 'rectangle';
+                const x = Number(params.x) || 0;
+                const y = Number(params.y) || 0;
+                const width = Number(params.width) || 100;
+                const height = Number(params.height) || 100;
+                const fill = (params.fill as string) || '#333333';
+                const borderRadius = Number(params.borderRadius) || 0;
+                const opacity = Number(params.opacity) ?? 1;
+                const elName = (params.name as string) || `Shape ${shapeType}`;
+
+                const newEl = {
+                    id: uuid(),
+                    name: elName,
+                    type: 'shape' as const,
+                    shapeType: shapeType as 'rectangle' | 'ellipse' | 'line',
+                    fill,
+                    stroke: undefined,
+                    strokeWidth: 0,
+                    borderRadius,
+                    opacity: Number.isFinite(opacity) ? opacity : 1,
+                    visible: true,
+                    locked: false,
+                    zIndex: cs.variants[0]?.elements.length || 0,
+                    constraints: {
+                        horizontal: { anchor: 'left' as const, offset: x },
+                        vertical: { anchor: 'top' as const, offset: y },
+                        size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width, height },
+                        rotation: 0,
+                    },
+                };
+
+                for (const variant of cs.variants) {
+                    variant.elements.push({ ...newEl });
+                }
+
+                useDesignStore.setState((state) => {
+                    state.creativeSet = cs;
+                });
+
+                return { success: true, message: `Shape "${shapeType}" (${width}×${height}) added at (${x}, ${y}) — fill ${fill}` };
+            }
+
             // ── Dynamic / Catch-All Tools ────────────
             case 'set_custom_style': {
                 const cs = designStore.creativeSet;

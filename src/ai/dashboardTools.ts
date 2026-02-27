@@ -150,6 +150,52 @@ const update_element_property: ToolDefinition = {
     category: 'create',
 };
 
+// ── Element Creation ────────────────────────────
+
+const add_text: ToolDefinition = {
+    name: 'add_text',
+    description: 'Add a text element to the active variant. Creates a text element with content, font, color, and position. The element is added to ALL size variants. Use this to put text on banners.',
+    parameters: {
+        type: 'object',
+        properties: {
+            content: { type: 'string', description: 'Text content to display' },
+            x: { type: 'number', description: 'X position (px)' },
+            y: { type: 'number', description: 'Y position (px)' },
+            width: { type: 'number', description: 'Width (px). Default 200' },
+            height: { type: 'number', description: 'Height (px). Default 40' },
+            fontSize: { type: 'number', description: 'Font size (px). Default 24' },
+            fontWeight: { type: 'number', description: 'Font weight (100-900). Default 700' },
+            color: { type: 'string', description: 'Text color (hex, e.g. #c9a84c). Default #ffffff' },
+            fontFamily: { type: 'string', description: 'Font family. Default "Inter"' },
+            textAlign: { type: 'string', description: 'Text alignment: left, center, right. Default "center"' },
+            name: { type: 'string', description: 'Element name for reference' },
+        },
+        required: ['content', 'x', 'y'],
+    },
+    category: 'create',
+};
+
+const add_shape: ToolDefinition = {
+    name: 'add_shape',
+    description: 'Add a shape element (rectangle, ellipse) to the active variant. Creates a shape element with fill color and position. The element is added to ALL size variants.',
+    parameters: {
+        type: 'object',
+        properties: {
+            shapeType: { type: 'string', description: 'Shape type: rectangle, ellipse. Default "rectangle"' },
+            x: { type: 'number', description: 'X position (px)' },
+            y: { type: 'number', description: 'Y position (px)' },
+            width: { type: 'number', description: 'Width (px). Default 100' },
+            height: { type: 'number', description: 'Height (px). Default 100' },
+            fill: { type: 'string', description: 'Fill color (hex). Default "#333333"' },
+            borderRadius: { type: 'number', description: 'Border radius (px). Default 0' },
+            opacity: { type: 'number', description: 'Opacity 0-1. Default 1' },
+            name: { type: 'string', description: 'Element name for reference' },
+        },
+        required: ['x', 'y'],
+    },
+    category: 'create',
+};
+
 // ── Dynamic / Catch-All Tools ───────────────────
 
 const set_custom_style: ToolDefinition = {
@@ -197,6 +243,8 @@ export const DASHBOARD_TOOLS: ToolDefinition[] = [
     list_elements,
     update_element_text,
     update_element_property,
+    add_text,
+    add_shape,
     set_custom_style,
     execute_dynamic_action,
 ];
