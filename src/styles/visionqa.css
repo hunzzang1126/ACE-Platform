@@ -271,6 +271,112 @@
     font-size: 13px;
 }
 
+/* Fix Bar */
+.vqa-fix-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 24px;
+    background: #f0f4ff;
+    border-bottom: 1px solid #d8e2f0;
+}
+
+.vqa-fix-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 20px;
+    border: none;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #6C63FF, #8b5cf6);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.vqa-fix-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #5a52e0, #7c4ddb);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(108, 99, 255, 0.3);
+}
+
+.vqa-fix-btn:disabled {
+    opacity: 0.7;
+    cursor: wait;
+}
+
+.vqa-fix-spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: vqaSpin 0.8s linear infinite;
+    display: inline-block;
+}
+
+.vqa-fix-hint {
+    font-size: 12px;
+    color: #5f6368;
+}
+
+.vqa-fix-success {
+    font-size: 14px;
+    font-weight: 600;
+    color: #34a853;
+}
+
+.vqa-recheck-btn {
+    padding: 6px 16px;
+    border: 1px solid #dadce0;
+    border-radius: 20px;
+    background: #fff;
+    color: #3c4043;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.vqa-recheck-btn:hover {
+    background: #1a73e8;
+    color: #fff;
+    border-color: #1a73e8;
+}
+
+/* Fix Details */
+.vqa-fix-details {
+    padding: 12px 24px;
+    background: #f6fff6;
+    border-bottom: 1px solid #d4edda;
+}
+
+.vqa-fix-details-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #34a853;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 0 0 8px;
+}
+
+.vqa-fix-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 4px 0;
+    font-size: 13px;
+    color: #3c4043;
+}
+
+.vqa-fix-icon {
+    font-size: 12px;
+    flex-shrink: 0;
+}
+
 /* AI QA button */
 .banner-ai-qa-btn {
     display: inline-flex;

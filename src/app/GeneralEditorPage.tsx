@@ -24,7 +24,7 @@ export function GeneralEditorPage() {
     const [showAddSizeModal, setShowAddSizeModal] = useState(false);
 
     // Vision QA
-    const { status: qaStatus, report: qaReport, error: qaError, progress: qaProgress, runQA, reset: resetQA } = useVisionQA();
+    const { status: qaStatus, report: qaReport, fixResult: qaFixResult, error: qaError, progress: qaProgress, runQA, autoFix, reset: resetQA } = useVisionQA();
 
     // Visible size toggles — all visible by default
     const [visibleIds, setVisibleIds] = useState<Set<string>>(new Set());
@@ -146,8 +146,16 @@ export function GeneralEditorPage() {
             )}
 
             {/* Vision QA Report Modal */}
-            {qaStatus === 'done' && qaReport && (
-                <VisionQAReport report={qaReport} onClose={resetQA} />
+            {(qaStatus === 'done' || qaStatus === 'fixing' || qaStatus === 'fixed') && qaReport && (
+                <VisionQAReport
+                    report={qaReport}
+                    qaStatus={qaStatus}
+                    fixResult={qaFixResult}
+                    fixProgress={qaProgress}
+                    onAutoFix={() => autoFix(creativeSet.id, creativeSet.masterVariantId, creativeSet.variants)}
+                    onRecheck={() => runQA(creativeSet.id, creativeSet.masterVariantId, creativeSet.variants)}
+                    onClose={resetQA}
+                />
             )}
 
             {/* Vision QA Error */}

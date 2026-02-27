@@ -1,11 +1,17 @@
 // ─────────────────────────────────────────────────
-// VisionQAReport — Modal showing AI QA results
+// VisionQAReport — Modal showing AI QA results + Auto-Fix
 // ─────────────────────────────────────────────────
-import type { VisionQAResponse } from '@/api/backendService';
+import type { VisionQAResponse, AutoFixResponse } from '@/api/backendService';
+import type { QAStatus } from '@/hooks/useVisionQA';
 import '@/styles/visionqa.css';
 
 interface Props {
     report: VisionQAResponse;
+    qaStatus: QAStatus;
+    fixResult: AutoFixResponse | null;
+    fixProgress: string;
+    onAutoFix: () => void;
+    onRecheck: () => void;
     onClose: () => void;
 }
 
@@ -22,8 +28,15 @@ function severityIcon(severity: string): string {
     return '🟢';
 }
 
-export function VisionQAReport({ report, onClose }: Props) {
+export function VisionQAReport({ report, qaStatus, fixResult, fixProgress, onAutoFix, onRecheck, onClose }: Props) {
     const totalIssues = report.variants.reduce((sum, v) => sum + v.issues.length, 0);
+    const isFixing = qaStatus === 'fixing';
+    const isFixed = qaStatus === 'fixed';
+
+    // Count total fixes applied
+    const totalFixes = fixResult
+        ? fixResult.variants.reduce((sum, v) => sum + v.fixes.length, 0)
+        : 0;
 
     return (
         <div className="vqa-overlay" onClick={onClose}>
@@ -70,6 +83,61 @@ export function VisionQAReport({ report, onClose }: Props) {
                         )}
                     </div>
                 </div>
+
+                {/* Auto-Fix Row */}
+                {totalIssues > 0 && (
+                    <div className="vqa-fix-bar">
+                        {isFixed ? (
+                            <>
+                                <span className="vqa-fix-success">
+                                    ✅ Applied {totalFixes} fix{totalFixes !== 1 ? 'es' : ''} — {fixProgress}
+                                </span>
+                                <button className="vqa-recheck-btn" onClick={onRecheck}>
+                                    🔄 Re-check
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <button
+                                    className="vqa-fix-btn"
+                                    onClick={onAutoFix}
+                                    disabled={isFixing}
+                                >
+                                    {isFixing ? (
+                                        <>
+                                            <span className="vqa-fix-spinner" />
+                                            {fixProgress || 'Fixing...'}
+                                        </>
+                                    ) : (
+                                        '🔧 Auto-Fix All Issues'
+                                    )}
+                                </button>
+                                <span className="vqa-fix-hint">
+                                    AI will adjust element layouts to resolve all issues
+                                </span>
+                            </>
+                        )}
+                    </div>
+                )}
+
+                {/* Fix Details (after fix applied) */}
+                {isFixed && fixResult && totalFixes > 0 && (
+                    <div className="vqa-fix-details">
+                        <h4 className="vqa-fix-details-title">Changes Applied:</h4>
+                        {fixResult.variants.map(v => (
+                            v.fixes.length > 0 && (
+                                <div key={v.variant_id} className="vqa-fix-variant">
+                                    {v.fixes.map((fix, i) => (
+                                        <div key={i} className="vqa-fix-item">
+                                            <span className="vqa-fix-icon">✏️</span>
+                                            <span className="vqa-fix-text">{fix.explanation}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )
+                        ))}
+                    </div>
+                )}
 
                 {/* Per-Variant Results */}
                 <div className="vqa-variants">

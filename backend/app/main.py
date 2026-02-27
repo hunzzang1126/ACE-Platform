@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from app.routes import health, vision_qa  # noqa: E402
+from app.routes import health, vision_qa, vision_fix  # noqa: E402
 
 
 @asynccontextmanager
@@ -45,3 +45,4 @@ app.add_middleware(
 # ── Routes ──
 app.include_router(health.router, tags=["Health"])
 app.include_router(vision_qa.router, prefix="/api", tags=["Vision QA"])
+app.include_router(vision_fix.router, prefix="/api", tags=["Vision Auto-Fix"])
