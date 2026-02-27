@@ -155,7 +155,7 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                                     {[...variant.elements]
                                         .sort((a, b) => {
                                             // Shapes always behind text/buttons
-                                            const order = { shape: 0, image: 1, text: 2, button: 3 } as Record<string, number>;
+                                            const order = { shape: 0, video: 1, image: 2, text: 3, button: 4 } as Record<string, number>;
                                             return (order[a.type] ?? 1) - (order[b.type] ?? 1);
                                         })
                                         .map((el, sortedIdx) => {
@@ -189,12 +189,40 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                                                         ...(el.type === 'shape' ? { backgroundColor: el.fill || '#ccc', borderRadius: el.borderRadius ?? 0 } : {}),
                                                         ...(el.type === 'text' ? { color: el.color, fontSize: el.fontSize, fontFamily: el.fontFamily, fontWeight: el.fontWeight, display: 'flex', alignItems: 'flex-start', justifyContent: el.textAlign === 'center' ? 'center' : 'flex-start', overflow: 'visible', whiteSpace: 'normal' as const, wordBreak: 'break-word' as const, lineHeight: 1.2, textAlign: el.textAlign as 'left' | 'center' | 'right' } : {}),
                                                         ...(el.type === 'button' ? { backgroundColor: el.backgroundColor, borderRadius: el.borderRadius ?? 0, color: el.color, fontSize: el.fontSize, fontFamily: el.fontFamily, fontWeight: el.fontWeight, display: 'flex', alignItems: 'center', justifyContent: 'center' } : {}),
-                                                        ...(el.type === 'image' ? { backgroundColor: '#e0e0e0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#999' } : {}),
+                                                        ...(el.type === 'image' ? { overflow: 'hidden' } : {}),
+                                                        ...(el.type === 'video' ? { overflow: 'hidden' } : {}),
                                                     }}
                                                 >
                                                     {el.type === 'text' && el.content}
                                                     {el.type === 'button' && el.label}
-                                                    {el.type === 'image' && '🖼'}
+                                                    {el.type === 'image' && el.src && (
+                                                        <img
+                                                            src={el.src}
+                                                            alt=""
+                                                            style={{
+                                                                width: '100%',
+                                                                height: '100%',
+                                                                objectFit: el.fit || 'cover',
+                                                                display: 'block',
+                                                            }}
+                                                        />
+                                                    )}
+                                                    {el.type === 'video' && (
+                                                        <video
+                                                            src={el.videoSrc}
+                                                            poster={el.posterSrc || undefined}
+                                                            autoPlay
+                                                            muted
+                                                            loop
+                                                            playsInline
+                                                            style={{
+                                                                width: '100%',
+                                                                height: '100%',
+                                                                objectFit: el.fit || 'cover',
+                                                                display: 'block',
+                                                            }}
+                                                        />
+                                                    )}
                                                 </div>
                                             );
                                         })}
