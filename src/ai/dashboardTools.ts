@@ -112,6 +112,44 @@ const delete_all_creative_sets: ToolDefinition = {
     category: 'scene',
 };
 
+// ── Element Editing ─────────────────────────────
+
+const list_elements: ToolDefinition = {
+    name: 'list_elements',
+    description: 'List all design elements in the current creative set (across all size variants). Returns element IDs, names, types, and content.',
+    parameters: { type: 'object', properties: {}, required: [] },
+    category: 'scene',
+};
+
+const update_element_text: ToolDefinition = {
+    name: 'update_element_text',
+    description: 'Update the text content of a text or button element across ALL sizes. Use for language translation, copy changes, etc. Matches by element name (partial match supported).',
+    parameters: {
+        type: 'object',
+        properties: {
+            element_name: { type: 'string', description: 'Name or partial name of the element to update (e.g. "Headline", "CTA")' },
+            new_text: { type: 'string', description: 'New text content' },
+        },
+        required: ['element_name', 'new_text'],
+    },
+    category: 'create',
+};
+
+const update_element_property: ToolDefinition = {
+    name: 'update_element_property',
+    description: 'Update a property (color, fontSize, fontFamily, backgroundColor, fill, opacity, etc.) on an element across ALL sizes. Matches by element name.',
+    parameters: {
+        type: 'object',
+        properties: {
+            element_name: { type: 'string', description: 'Name or partial name of the element' },
+            property: { type: 'string', description: 'Property to change (e.g. "color", "fill", "fontSize", "fontFamily", "backgroundColor", "opacity", "label")' },
+            value: { type: 'string', description: 'New value (string or number as string)' },
+        },
+        required: ['element_name', 'property', 'value'],
+    },
+    category: 'create',
+};
+
 // ── Export Registry ──────────────────────────────
 
 export const DASHBOARD_TOOLS: ToolDefinition[] = [
@@ -123,6 +161,9 @@ export const DASHBOARD_TOOLS: ToolDefinition[] = [
     add_size,
     remove_size,
     navigate_to,
+    list_elements,
+    update_element_text,
+    update_element_property,
 ];
 
 export const DASHBOARD_TOOL_NAMES = new Set(DASHBOARD_TOOLS.map(t => t.name));

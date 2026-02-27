@@ -43,46 +43,63 @@ export function executeToolCall(
     params: Record<string, unknown>,
     trackedNodes: SceneNodeInfo[],
 ): ExecutionResult {
+    // ── Guard: Engine must exist ──
+    if (!engine) {
+        return { success: false, message: `Cannot execute "${toolName}": no canvas engine available. Navigate to a canvas editor first.` };
+    }
+
+    // ── Safe number extraction — never pass undefined/NaN to WASM ──
+    const num = (key: string, fallback = 0): number => {
+        const v = params[key];
+        if (v === undefined || v === null) return fallback;
+        const n = Number(v);
+        return Number.isFinite(n) ? n : fallback;
+    };
+    const str = (key: string, fallback = ''): string => {
+        const v = params[key];
+        return typeof v === 'string' ? v : fallback;
+    };
+
     try {
         switch (toolName) {
             // ── Create ───────────────────────────────
             case 'add_rect': {
-                const x = params.x as number, y = params.y as number;
-                const w = params.w as number, h = params.h as number;
-                const r = params.r as number, g = params.g as number, b = params.b as number;
-                const a = (params.a as number) ?? 1.0;
+                const x = num('x'), y = num('y');
+                const w = num('w', 100), h = num('h', 100);
+                const r = num('r', 0.5), g = num('g', 0.5), b = num('b', 0.5);
+                const a = num('a', 1.0);
                 const id = engine.add_rect(x, y, w, h, r, g, b, a) as number;
                 trackedNodes.push(makeNodeInfo(id, 'rect', x, y, w, h, rgbToHex(r, g, b), a));
                 return { success: true, message: `Rectangle created at (${x}, ${y}) with size ${w}×${h}`, nodeId: id };
             }
 
             case 'add_rounded_rect': {
-                const x = params.x as number, y = params.y as number;
-                const w = params.w as number, h = params.h as number;
-                const r = params.r as number, g = params.g as number, b = params.b as number;
-                const a = (params.a as number) ?? 1.0;
-                const radius = params.radius as number;
+                const x = num('x'), y = num('y');
+                const w = num('w', 100), h = num('h', 100);
+                const r = num('r', 0.5), g = num('g', 0.5), b = num('b', 0.5);
+                const a = num('a', 1.0);
+                const radius = num('radius', 8);
                 const id = engine.add_rounded_rect(x, y, w, h, r, g, b, a, radius) as number;
                 trackedNodes.push(makeNodeInfo(id, 'rounded_rect', x, y, w, h, rgbToHex(r, g, b), a));
                 return { success: true, message: `Rounded rect created (radius ${radius}) at (${x}, ${y})`, nodeId: id };
             }
 
             case 'add_ellipse': {
-                const cx = params.cx as number, cy = params.cy as number;
-                const rx = params.rx as number, ry = params.ry as number;
-                const r = params.r as number, g = params.g as number, b = params.b as number;
-                const a = (params.a as number) ?? 1.0;
+                const cx = num('cx', 100), cy = num('cy', 100);
+                const rx = num('rx', 50), ry = num('ry', 50);
+                const r = num('r', 0.5), g = num('g', 0.5), b = num('b', 0.5);
+                const a = num('a', 1.0);
                 const id = engine.add_ellipse(cx, cy, rx, ry, r, g, b, a) as number;
                 trackedNodes.push(makeNodeInfo(id, 'ellipse', cx - rx, cy - ry, rx * 2, ry * 2, rgbToHex(r, g, b), a));
                 return { success: true, message: `Ellipse created at center (${cx}, ${cy}) with radii ${rx}×${ry}`, nodeId: id };
             }
 
             case 'add_gradient_rect': {
-                const x = params.x as number, y = params.y as number;
-                const w = params.w as number, h = params.h as number;
-                const r1 = params.r1 as number, g1 = params.g1 as number, b1 = params.b1 as number, a1 = params.a1 as number;
-                const r2 = params.r2 as number, g2 = params.g2 as number, b2 = params.b2 as number, a2 = params.a2 as number;
-                const angle_deg = params.angle_deg as number;
+                const x = num('x'), y = num('y');
+                const w = num('w', 100), h = num('h', 100);
+                const r1 = num('r1', 0.2), g1 = num('g1', 0.4), b1 = num('b1', 0.8), a1 = num('a1', 1.0);
+                const r2 = num('r2', 0.8), g2 = num('g2', 0.2), b2 = num('b2', 0.4), a2 = num('a2', 1.0);
+                const angle_deg = num('angle_deg', 45);
                 const id = engine.add_gradient_rect(x, y, w, h, r1, g1, b1, a1, r2, g2, b2, a2, angle_deg) as number;
                 trackedNodes.push(makeNodeInfo(id, 'gradient_rect', x, y, w, h, 'gradient', a1));
                 return { success: true, message: `Gradient rect at (${x}, ${y}), angle ${angle_deg}°`, nodeId: id };
@@ -90,15 +107,16 @@ export function executeToolCall(
 
             // ── Style ────────────────────────────────
             case 'set_opacity': {
-                const { node_id, opacity } = params as { node_id: number; opacity: number };
-                // Engine doesn't have direct set_opacity, use scene mutation
+                const node_id = num('node_id');
+                const opacity = num('opacity', 1.0);
                 const node = trackedNodes.find(n => n.id === node_id);
                 if (node) node.opacity = opacity;
                 return { success: true, message: `Opacity of node ${node_id} set to ${opacity}` };
             }
 
             case 'set_blend_mode': {
-                const { node_id, mode } = params as { node_id: number; mode: string };
+                const node_id = num('node_id');
+                const mode = str('mode', 'normal');
                 engine.set_blend_mode(node_id, mode);
                 const node = trackedNodes.find(n => n.id === node_id);
                 if (node) node.effects.blendMode = mode;
@@ -107,11 +125,11 @@ export function executeToolCall(
 
             // ── Effects ──────────────────────────────
             case 'set_shadow': {
-                const node_id = params.node_id as number;
-                const offset_x = params.offset_x as number, offset_y = params.offset_y as number;
-                const blur = params.blur as number;
-                const r = params.r as number, g = params.g as number, b = params.b as number;
-                const a = (params.a as number) ?? 0.5;
+                const node_id = num('node_id');
+                const offset_x = num('offset_x', 2), offset_y = num('offset_y', 2);
+                const blur = num('blur', 4);
+                const r = num('r'), g = num('g'), b = num('b');
+                const a = num('a', 0.5);
                 engine.set_shadow(node_id, offset_x, offset_y, blur, r, g, b, a);
                 const node = trackedNodes.find(n => n.id === node_id);
                 if (node) node.effects.hasShadow = true;
@@ -119,7 +137,7 @@ export function executeToolCall(
             }
 
             case 'remove_shadow': {
-                const { node_id } = params as { node_id: number };
+                const node_id = num('node_id');
                 engine.remove_shadow(node_id);
                 const node = trackedNodes.find(n => n.id === node_id);
                 if (node) node.effects.hasShadow = false;
@@ -127,7 +145,8 @@ export function executeToolCall(
             }
 
             case 'set_brightness': {
-                const { node_id, brightness } = params as { node_id: number; brightness: number };
+                const node_id = num('node_id');
+                const brightness = num('brightness', 1);
                 engine.set_brightness(node_id, brightness);
                 const node = trackedNodes.find(n => n.id === node_id);
                 if (node) node.effects.brightness = brightness;
@@ -135,7 +154,8 @@ export function executeToolCall(
             }
 
             case 'set_contrast': {
-                const { node_id, contrast } = params as { node_id: number; contrast: number };
+                const node_id = num('node_id');
+                const contrast = num('contrast', 1);
                 engine.set_contrast(node_id, contrast);
                 const node = trackedNodes.find(n => n.id === node_id);
                 if (node) node.effects.contrast = contrast;
@@ -143,7 +163,8 @@ export function executeToolCall(
             }
 
             case 'set_saturation': {
-                const { node_id, saturation } = params as { node_id: number; saturation: number };
+                const node_id = num('node_id');
+                const saturation = num('saturation', 1);
                 engine.set_saturation(node_id, saturation);
                 const node = trackedNodes.find(n => n.id === node_id);
                 if (node) node.effects.saturation = saturation;
@@ -151,7 +172,8 @@ export function executeToolCall(
             }
 
             case 'set_hue_rotate': {
-                const { node_id, degrees } = params as { node_id: number; degrees: number };
+                const node_id = num('node_id');
+                const degrees = num('degrees');
                 engine.set_hue_rotate(node_id, degrees);
                 const node = trackedNodes.find(n => n.id === node_id);
                 if (node) node.effects.hueRotate = degrees;
@@ -160,9 +182,11 @@ export function executeToolCall(
 
             // ── Animation ────────────────────────────
             case 'add_keyframe': {
-                const { node_id, property, time, value, easing } = params as {
-                    node_id: number; property: string; time: number; value: number; easing: string;
-                };
+                const node_id = num('node_id');
+                const property = str('property', 'opacity');
+                const time = num('time');
+                const value = num('value');
+                const easing = str('easing', 'linear');
                 engine.add_keyframe(node_id, property, time, value, easing);
                 const node = trackedNodes.find(n => n.id === node_id);
                 if (node) node.animations.push(`${property}: ${time}s → ${value}`);
@@ -170,13 +194,13 @@ export function executeToolCall(
             }
 
             case 'set_duration': {
-                const { duration } = params as { duration: number };
+                const duration = num('duration', 2);
                 engine.set_duration(duration);
                 return { success: true, message: `Timeline duration set to ${duration}s` };
             }
 
             case 'set_looping': {
-                const { looping } = params as { looping: boolean };
+                const looping = params.looping !== false;
                 engine.set_looping(looping);
                 return { success: true, message: `Looping ${looping ? 'enabled' : 'disabled'}` };
             }
@@ -197,20 +221,20 @@ export function executeToolCall(
             }
 
             case 'anim_seek': {
-                const { time } = params as { time: number };
+                const time = num('time');
                 engine.anim_seek(time);
                 return { success: true, message: `Seeked to ${time}s` };
             }
 
             case 'anim_set_speed': {
-                const { speed } = params as { speed: number };
+                const speed = num('speed', 1);
                 engine.anim_set_speed(speed);
                 return { success: true, message: `Playback speed set to ${speed}x` };
             }
 
             // ── Selection ────────────────────────────
             case 'select_node': {
-                const { node_id } = params as { node_id: number };
+                const node_id = num('node_id');
                 engine.select(node_id);
                 return { success: true, message: `Node ${node_id} selected` };
             }

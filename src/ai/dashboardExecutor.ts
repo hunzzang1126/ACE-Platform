@@ -259,6 +259,115 @@ export function executeDashboardTool(
                 return { success: false, message: `Unknown page: ${page}` };
             }
 
+            // ── Element Editing ──────────────────────
+            case 'list_elements': {
+                const cs = designStore.creativeSet;
+                if (!cs) return { success: false, message: 'No creative set open.' };
+                const master = cs.variants.find(v => v.id === cs.masterVariantId);
+                if (!master || master.elements.length === 0) {
+                    return { success: true, message: 'No elements in the master design.', data: [] };
+                }
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const elements = master.elements.map((el: any) => ({
+                    id: el.id,
+                    name: el.name,
+                    type: el.type,
+                    content: el.content ?? el.label ?? '',
+                    color: el.color ?? el.fill ?? '',
+                    fontSize: el.fontSize ?? null,
+                    fontFamily: el.fontFamily ?? null,
+                }));
+                const summary = elements.map((e: { name: string; type: string; content: string }) =>
+                    `• ${e.name} (${e.type}): "${e.content}"`
+                ).join('\n');
+                return { success: true, message: `Elements in master:\n${summary}`, data: elements };
+            }
+
+            case 'update_element_text': {
+                const cs = designStore.creativeSet;
+                if (!cs) return { success: false, message: 'No creative set open.' };
+
+                const elementName = (params.element_name as string || '').toLowerCase();
+                const newText = params.new_text as string;
+                if (!elementName || newText === undefined) {
+                    return { success: false, message: 'element_name and new_text are required.' };
+                }
+
+                let updated = 0;
+                for (const variant of cs.variants) {
+                    for (const el of variant.elements) {
+                        if (el.name.toLowerCase().includes(elementName)) {
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            const raw = el as any;
+                            if (el.type === 'text' && 'content' in raw) {
+                                raw.content = newText;
+                                updated++;
+                            } else if (el.type === 'button' && 'label' in raw) {
+                                raw.label = newText;
+                                updated++;
+                            } else if ('content' in raw) {
+                                raw.content = newText;
+                                updated++;
+                            }
+                        }
+                    }
+                }
+
+                if (updated === 0) {
+                    return { success: false, message: `No element matching "${params.element_name}" found.` };
+                }
+
+                // Force store update
+                useDesignStore.setState((state) => {
+                    state.creativeSet = cs;
+                });
+
+                return { success: true, message: `Updated text to "${newText}" on ${updated} element(s) matching "${params.element_name}" across all sizes.` };
+            }
+
+            case 'update_element_property': {
+                const cs = designStore.creativeSet;
+                if (!cs) return { success: false, message: 'No creative set open.' };
+
+                const elementName = (params.element_name as string || '').toLowerCase();
+                const property = params.property as string;
+                const rawValue = params.value as string;
+                if (!elementName || !property) {
+                    return { success: false, message: 'element_name and property are required.' };
+                }
+
+                // Convert value to appropriate type
+                let value: unknown = rawValue;
+                const numericProps = ['fontSize', 'opacity', 'borderRadius', 'lineHeight', 'letterSpacing', 'fontWeight', 'zIndex'];
+                if (numericProps.includes(property)) {
+                    value = Number(rawValue);
+                    if (!Number.isFinite(value as number)) {
+                        return { success: false, message: `Invalid numeric value "${rawValue}" for property "${property}".` };
+                    }
+                }
+
+                let updated = 0;
+                for (const variant of cs.variants) {
+                    for (const el of variant.elements) {
+                        if (el.name.toLowerCase().includes(elementName)) {
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            (el as any)[property] = value;
+                            updated++;
+                        }
+                    }
+                }
+
+                if (updated === 0) {
+                    return { success: false, message: `No element matching "${params.element_name}" found.` };
+                }
+
+                useDesignStore.setState((state) => {
+                    state.creativeSet = cs;
+                });
+
+                return { success: true, message: `Set "${property}" = "${rawValue}" on ${updated} element(s) matching "${params.element_name}".` };
+            }
+
             default:
                 return { success: false, message: `Unknown dashboard tool: ${toolName}` };
         }
