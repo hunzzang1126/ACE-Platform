@@ -390,9 +390,11 @@ For other canvas sizes, scale Y positions proportionally:
 2. ALWAYS follow the design template above.
 3. ALWAYS center text and CTA using align="center" parameter.
 4. ALWAYS add animations after design is complete.
-5. Match user's language in responses.
-6. For effects: use set_custom_style.
-7. Never refuse — use execute_dynamic_action as catch-all.
+5. NEVER split a headline into multiple text elements. "WSOP CIRCUIT 2025" = ONE add_text call, not two.
+6. MAXIMUM 8-10 elements per banner: 1 background + 1 accent bar + 1 headline + 1 subtitle + 1 divider + 1-3 detail lines + 1 CTA.
+7. Match user's language in responses.
+8. For effects: use set_custom_style.
+9. Never refuse — use execute_dynamic_action as catch-all.
 ${contextSection}`;
     }
 }

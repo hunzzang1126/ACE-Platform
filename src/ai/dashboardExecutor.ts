@@ -406,11 +406,14 @@ export function executeDashboardTool(
                         const elH = storedH > 0 ? storedH : 30;
                         const elBottom = elY + elH;
 
-                        // Only push down if actually overlapping, and don't exceed canvas
-                        if (y >= elY && y < elBottom + MIN_GAP && elBottom + MIN_GAP < canvasH - 10) {
+                        // Only push down if actually overlapping
+                        if (y >= elY && y < elBottom + MIN_GAP) {
                             y = elBottom + MIN_GAP;
                         }
                     }
+                    // ★ Canvas boundary clamp — never push past canvas bottom
+                    y = Math.min(y, canvasH - height - 4);
+                    if (y < 0) y = 0;
                 }
 
                 // Build horizontal constraint based on align
@@ -547,8 +550,10 @@ export function executeDashboardTool(
 
                 // ★ Auto-collision: push button down if overlapping
                 if (firstVariant) {
+                    const canvasH = firstVariant.preset?.height || 250;
                     const MIN_GAP = 8;
                     for (const el of firstVariant.elements) {
+                        if (el.type === 'shape') continue; // skip backgrounds
                         const elY = el.constraints?.vertical?.offset ?? 0;
                         const elH = el.constraints?.size?.height ?? 0;
                         const elBottom = elY + elH;
@@ -556,6 +561,9 @@ export function executeDashboardTool(
                             y = elBottom + MIN_GAP;
                         }
                     }
+                    // ★ Canvas boundary clamp
+                    y = Math.min(y, canvasH - height - 4);
+                    if (y < 0) y = 0;
                 }
 
                 const btnShapeId = uuid();
