@@ -219,6 +219,24 @@ const add_button: ToolDefinition = {
     category: 'create',
 };
 
+// ── Animation Tools ─────────────────────────────
+
+const set_animation: ToolDefinition = {
+    name: 'set_animation',
+    description: 'Apply an animation preset to an element (by name). Presets: fade, slide-left, slide-right, slide-up, slide-down, scale, ascend, descend, none. Use staggered startTime values for sequential entrance effects.',
+    parameters: {
+        type: 'object',
+        properties: {
+            element_name: { type: 'string', description: 'Name or partial name of the element to animate' },
+            preset: { type: 'string', description: 'Animation preset: fade, slide-left, slide-right, slide-up, slide-down, scale, ascend, descend, none' },
+            duration: { type: 'number', description: 'Animation duration in seconds. Default 0.5' },
+            startTime: { type: 'number', description: 'Start time offset in seconds. Use staggered values (0.0, 0.3, 0.6, 0.9...) for sequential entrance. Default 0' },
+        },
+        required: ['element_name', 'preset'],
+    },
+    category: 'animation',
+};
+
 // ── Dynamic / Catch-All Tools ───────────────────
 
 const set_custom_style: ToolDefinition = {
@@ -269,6 +287,7 @@ export const DASHBOARD_TOOLS: ToolDefinition[] = [
     add_text,
     add_shape,
     add_button,
+    set_animation,
     set_custom_style,
     execute_dynamic_action,
 ];

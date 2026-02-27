@@ -34,13 +34,20 @@ const DEFAULT_CONFIG: AiConfig = {
 export function loadConfig(): AiConfig {
     try {
         const stored = localStorage.getItem('ace-ai-config');
-        if (stored) return { ...DEFAULT_CONFIG, ...JSON.parse(stored) };
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            // NEVER load maxToolRounds from storage — always use code default
+            delete parsed.maxToolRounds;
+            return { ...DEFAULT_CONFIG, ...parsed };
+        }
     } catch { /* */ }
     return { ...DEFAULT_CONFIG };
 }
 
 export function saveConfig(config: AiConfig): void {
-    localStorage.setItem('ace-ai-config', JSON.stringify(config));
+    // Don't persist maxToolRounds — it's a code-level constant
+    const { maxToolRounds: _, ...rest } = config;
+    localStorage.setItem('ace-ai-config', JSON.stringify(rest));
 }
 
 // ── Live Progress Callbacks ──────────────────────

@@ -6,6 +6,7 @@
 
 import { useProjectStore } from '@/stores/projectStore';
 import { useDesignStore } from '@/stores/designStore';
+import { useAnimPresetStore } from '@/hooks/useAnimationPresets';
 import type { BannerPreset } from '@/schema/design.types';
 import { v4 as uuid } from 'uuid';
 
@@ -569,6 +570,58 @@ export function executeDashboardTool(
                 });
 
                 return { success: true, message: `CTA Button "${text}" — ${width}×${height} ${bgColor}, centered` };
+            }
+
+            // ── Animation ──────────────────────────────
+            case 'set_animation': {
+                if (!designStore.creativeSet) return { success: false, message: 'No creative set open.' };
+
+                const elementName = (params.element_name as string) || '';
+                const preset = (params.preset as string) || 'fade';
+                const duration = Number(params.duration) || 0.5;
+                const startTime = Number(params.startTime) || 0;
+
+                const validPresets = ['none', 'fade', 'slide-left', 'slide-right', 'slide-up', 'slide-down', 'scale', 'ascend', 'descend'];
+                if (!validPresets.includes(preset)) {
+                    return { success: false, message: `Invalid preset "${preset}". Valid: ${validPresets.join(', ')}` };
+                }
+
+                const animData = { preset, duration, startTime };
+                let updated = 0;
+
+                // Update animation in designStore for persistence
+                useDesignStore.setState((state) => {
+                    if (!state.creativeSet) return;
+                    for (const variant of state.creativeSet.variants) {
+                        for (const el of variant.elements) {
+                            if (el.name.toLowerCase().includes(elementName.toLowerCase())) {
+                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                (el as any).animation = animData;
+                                updated++;
+                            }
+                        }
+                    }
+                });
+
+                // Also set in animPresetStore for live preview
+                try {
+                    const cs = useDesignStore.getState().creativeSet;
+                    if (cs) {
+                        for (const variant of cs.variants) {
+                            for (const el of variant.elements) {
+                                if (el.name.toLowerCase().includes(elementName.toLowerCase())) {
+                                    useAnimPresetStore.getState().setPreset(el.id, {
+                                        anim: preset as 'fade' | 'slide-left' | 'slide-right' | 'slide-up' | 'slide-down' | 'scale' | 'ascend' | 'descend' | 'none',
+                                        animDuration: duration,
+                                        startTime,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                } catch { /* animPresetStore not available */ }
+
+                return { success: true, message: `Animation "${preset}" (${duration}s, start ${startTime}s) applied to ${updated} element(s) matching "${elementName}"` };
             }
 
             // ── Dynamic / Catch-All Tools ────────────

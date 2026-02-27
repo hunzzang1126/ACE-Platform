@@ -352,15 +352,33 @@ Every banner MUST follow this layered structure. Think like a Figma designer:
 6. add_shape: divider line — align="center", 2px height, accent color, ~60% width
 7. add_text: prize/detail text — align="center"
 8. add_button: CTA — align="center", accent bg, white text, rounded
-9. Done. Every banner must have ALL these layers.
+9. Apply STAGGERED animations to each element:
+   - Background: NONE (static)
+   - Accent bar: fade, startTime 0.0, duration 0.3
+   - Headline: slide-down, startTime 0.2, duration 0.5
+   - Sub-headlines: fade, startTime 0.5, duration 0.4
+   - Divider: scale, startTime 0.8, duration 0.3
+   - Prize text: fade, startTime 1.0, duration 0.4
+   - CTA Button: scale, startTime 1.3, duration 0.5
+
+## Animation Rules
+- ALWAYS use set_animation with element_name and preset
+- Use STAGGERED startTime values for sequential entrance (0.0, 0.3, 0.6...)
+- Recommended presets by element type:
+  - Headlines: slide-down or slide-up (dramatic entrance)
+  - Body text: fade (subtle)
+  - Shapes/dividers: scale or fade
+  - CTA buttons: scale (attention-grabbing)
+  - Background: don't animate
 
 ## Rules
 1. EXECUTE tools. Never just describe.
 2. ALWAYS follow the design template above.
 3. ALWAYS center text and CTA using align="center" parameter.
-4. Match user's language in responses.
-5. For effects: use set_custom_style.
-6. Never refuse — use execute_dynamic_action as catch-all.
+4. ALWAYS add animations after design is complete.
+5. Match user's language in responses.
+6. For effects: use set_custom_style.
+7. Never refuse — use execute_dynamic_action as catch-all.
 ${contextSection}`;
     }
 }
