@@ -321,7 +321,7 @@ export class AiService {
      */
     private buildClaudeMessages(): ClaudeMessage[] {
         const messages: ClaudeMessage[] = [];
-        const recent = this.context.getRecentMessages(10);
+        const recent = this.context.getRecentMessages(4);
         for (const msg of recent) {
             messages.push({
                 role: msg.role as 'user' | 'assistant',
@@ -350,7 +350,7 @@ export class AiService {
 
         const body = {
             model,
-            max_tokens: 4096,
+            max_tokens: 2048,
             system: systemPrompt,
             messages,
             tools: tools.length > 0 ? tools : undefined,
@@ -358,35 +358,53 @@ export class AiService {
 
         console.log(`[AiService] callClaude → ${apiUrl} (model: ${model}, msgs: ${messages.length})`);
 
-        const resp = await fetch(apiUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-api-key': apiKey,
-                'anthropic-version': '2023-06-01',
-                'anthropic-dangerous-direct-browser-access': 'true',
-            },
-            body: JSON.stringify(body),
-        });
+        // Retry loop for rate limits (429)
+        const maxRetries = 3;
+        let lastError = '';
 
-        if (!resp.ok) {
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+            const resp = await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': apiKey,
+                    'anthropic-version': '2023-06-01',
+                    'anthropic-dangerous-direct-browser-access': 'true',
+                },
+                body: JSON.stringify(body),
+            });
+
+            if (resp.ok) {
+                const data = await resp.json() as ClaudeResponse;
+                console.log(`[AiService] Claude response: stop=${data.stop_reason}, blocks=${data.content.length}, usage=${data.usage.input_tokens}in/${data.usage.output_tokens}out`);
+                return data;
+            }
+
+            // Rate limit — retry with backoff
+            if (resp.status === 429) {
+                const waitSec = 10 * Math.pow(2, attempt); // 10s, 20s, 40s
+                console.warn(`[AiService] Rate limited (429). Retrying in ${waitSec}s... (attempt ${attempt + 1}/${maxRetries})`);
+                progress.onThinking(`Rate limited. Waiting ${waitSec}s before retrying... (${attempt + 1}/${maxRetries})`);
+                await sleep(waitSec * 1000);
+                continue;
+            }
+
+            // Other error — don't retry
             const errorText = await resp.text();
-            let errorMsg = `API Error ${resp.status}`;
             try {
                 const errJson = JSON.parse(errorText);
-                errorMsg = errJson?.error?.message || errorMsg + ': ' + errorText.substring(0, 200);
+                lastError = errJson?.error?.message || `API Error ${resp.status}: ${errorText.substring(0, 200)}`;
             } catch {
-                errorMsg += ': ' + errorText.substring(0, 200);
+                lastError = `API Error ${resp.status}: ${errorText.substring(0, 200)}`;
             }
-            console.error(`[AiService] ${errorMsg}`);
-            progress.onError(errorMsg);
+            console.error(`[AiService] ${lastError}`);
+            progress.onError(lastError);
             return null;
         }
 
-        const data = await resp.json() as ClaudeResponse;
-        console.log(`[AiService] Claude response: stop=${data.stop_reason}, blocks=${data.content.length}, usage=${data.usage.input_tokens}in/${data.usage.output_tokens}out`);
-
-        return data;
+        // All retries exhausted
+        progress.onError(`Rate limit exceeded after ${maxRetries} retries. Please wait a minute and try again.`);
+        return null;
     }
 }
 
