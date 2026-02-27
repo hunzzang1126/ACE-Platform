@@ -533,6 +533,38 @@
     color: #9aa0a6;
 }
 
+/* ── Right-click Context Menu ── */
+.banner-ctx-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: none;
+    border: none;
+    color: #c9d1d9;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.1s;
+    white-space: nowrap;
+}
+
+.banner-ctx-item:hover {
+    background: rgba(74, 158, 255, 0.15);
+    color: #fff;
+}
+
+.banner-ctx-item--danger {
+    color: #8b949e;
+}
+
+.banner-ctx-item--danger:hover {
+    background: rgba(255, 100, 100, 0.1);
+    color: #f85149;
+}
+
 /* ── Empty Banner State ── */
 .cs-empty-banner {
     text-align: center;

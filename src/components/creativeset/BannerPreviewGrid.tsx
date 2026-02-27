@@ -1,13 +1,59 @@
 // ─────────────────────────────────────────────────
 // BannerPreviewGrid – Scaled banner preview cards
-// with animated preview + Play All (BannerFlow-like)
+// with animated preview + auto-loop + right-click export
 // ─────────────────────────────────────────────────
 import { useMemo, useCallback, useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { BannerVariant } from '@/schema/design.types';
 import { resolveConstraints } from '@/schema/constraints.types';
 import { computeAnimStyle, type AnimPresetType } from '@/hooks/useAnimationPresets';
+import { loadVideoBlob } from '@/stores/videoStorage';
 import type { QAStatus } from '@/hooks/useVisionQA';
+
+interface ContextMenuState {
+    x: number;
+    y: number;
+    variantId: string;
+}
+
+/** Capture a banner card DOM element to a PNG data URL */
+async function captureBannerCard(cardEl: HTMLElement, w: number, h: number): Promise<string> {
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d')!;
+    // Use html serialization + foreignObject as fallback
+    const data = new XMLSerializer().serializeToString(cardEl);
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><foreignObject width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml">${data}</div></foreignObject></svg>`;
+    const img = new Image();
+    const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    return new Promise((resolve) => {
+        img.onload = () => {
+            ctx.drawImage(img, 0, 0);
+            URL.revokeObjectURL(url);
+            resolve(canvas.toDataURL('image/png'));
+        };
+        img.onerror = () => {
+            URL.revokeObjectURL(url);
+            // Fallback: draw background + simple rendering
+            ctx.fillStyle = '#1a1f2e';
+            ctx.fillRect(0, 0, w, h);
+            resolve(canvas.toDataURL('image/png'));
+        };
+        img.src = url;
+    });
+}
+
+/** Download a data URL as a file */
+function downloadDataURL(dataURL: string, filename: string) {
+    const a = document.createElement('a');
+    a.href = dataURL;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+}
 
 interface Props {
     variants: BannerVariant[];
@@ -35,11 +81,37 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
     const [currentTime, setCurrentTime] = useState(0);
     const rafRef = useRef<number>(0);
     const startTimeRef = useRef<number>(0);
+    const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+    // ── Context menu state ──
+    const [ctxMenu, setCtxMenu] = useState<ContextMenuState | null>(null);
+
+    // ── Video blob URL restoration map ──
+    const [videoUrls, setVideoUrls] = useState<Record<string, string>>({});
 
     const visibleVariants = useMemo(
         () => variants.filter((v) => visibleIds.has(v.id)),
         [variants, visibleIds],
     );
+
+    // ── Restore video blob URLs from IndexedDB ──
+    useEffect(() => {
+        const videoEls: { id: string }[] = [];
+        for (const v of visibleVariants) {
+            for (const el of v.elements) {
+                if (el.type === 'video') videoEls.push({ id: el.id });
+            }
+        }
+        if (videoEls.length === 0) return;
+        let cancelled = false;
+        for (const { id } of videoEls) {
+            loadVideoBlob(id).then((url) => {
+                if (cancelled || !url) return;
+                setVideoUrls((prev) => ({ ...prev, [id]: url }));
+            }).catch(() => {/* ok */ });
+        }
+        return () => { cancelled = true; };
+    }, [visibleVariants]);
 
     // Check if any element across all visible variants has an animation
     const hasAnyAnimation = useMemo(() => {
@@ -72,6 +144,52 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
     const handleDoubleClick = useCallback((variantId: string) => {
         navigate(`/editor/detail/${variantId}`);
     }, [navigate]);
+
+    // ── Right-click context menu ──
+    const handleContextMenu = useCallback((e: React.MouseEvent, variantId: string) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setCtxMenu({ x: e.clientX, y: e.clientY, variantId });
+    }, []);
+
+    const closeCtxMenu = useCallback(() => setCtxMenu(null), []);
+
+    // Close context menu on any click
+    useEffect(() => {
+        if (!ctxMenu) return;
+        const handler = () => setCtxMenu(null);
+        window.addEventListener('click', handler);
+        return () => window.removeEventListener('click', handler);
+    }, [ctxMenu]);
+
+    // ── Export single size as PNG ──
+    const handleExportPNG = useCallback(async (variantId: string) => {
+        setCtxMenu(null);
+        const variant = variants.find((v) => v.id === variantId);
+        if (!variant) return;
+        const cardEl = cardRefs.current[variantId]?.querySelector('.banner-card-canvas') as HTMLElement;
+        if (!cardEl) return;
+        try {
+            const dataURL = await captureBannerCard(cardEl, variant.preset.width, variant.preset.height);
+            downloadDataURL(dataURL, `banner_${variant.preset.width}x${variant.preset.height}.png`);
+        } catch {
+            alert('Export failed. Try again.');
+        }
+    }, [variants]);
+
+    // ── Export ALL sizes as PNGs ──
+    const handleExportAll = useCallback(async () => {
+        setCtxMenu(null);
+        for (const variant of visibleVariants) {
+            const cardEl = cardRefs.current[variant.id]?.querySelector('.banner-card-canvas') as HTMLElement;
+            if (!cardEl) continue;
+            try {
+                const dataURL = await captureBannerCard(cardEl, variant.preset.width, variant.preset.height);
+                downloadDataURL(dataURL, `banner_${variant.preset.width}x${variant.preset.height}.png`);
+                await new Promise((r) => setTimeout(r, 300)); // stagger downloads
+            } catch { /* skip */ }
+        }
+    }, [visibleVariants]);
 
 
     return (
@@ -116,8 +234,10 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                     return (
                         <div
                             key={variant.id}
+                            ref={(el) => { cardRefs.current[variant.id] = el; }}
                             className={`banner-card ${isPlaying ? 'banner-card--playing' : ''}`}
                             onDoubleClick={() => handleDoubleClick(variant.id)}
+                            onContextMenu={(e) => handleContextMenu(e, variant.id)}
                         >
                             {/* Dimension label */}
                             <div className="banner-card-header">
@@ -209,7 +329,7 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                                                     )}
                                                     {el.type === 'video' && (
                                                         <video
-                                                            src={el.videoSrc}
+                                                            src={videoUrls[el.id] || el.videoSrc}
                                                             poster={el.posterSrc || undefined}
                                                             autoPlay
                                                             muted
@@ -220,6 +340,7 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                                                                 height: '100%',
                                                                 objectFit: el.fit || 'cover',
                                                                 display: 'block',
+                                                                pointerEvents: 'none',
                                                             }}
                                                         />
                                                     )}
@@ -261,6 +382,52 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                     </div>
                 )}
             </div>
+
+            {/* ── Right-click context menu ── */}
+            {ctxMenu && (
+                <div
+                    className="banner-ctx-menu"
+                    style={{
+                        position: 'fixed',
+                        top: ctxMenu.y,
+                        left: ctxMenu.x,
+                        zIndex: 10000,
+                        background: '#1e2231',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: 8,
+                        padding: '4px 0',
+                        minWidth: 180,
+                        boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <button
+                        className="banner-ctx-item"
+                        onClick={() => handleExportPNG(ctxMenu.variantId)}
+                    >
+                        📥 Export This Size (PNG)
+                    </button>
+                    <button
+                        className="banner-ctx-item"
+                        onClick={handleExportAll}
+                    >
+                        📦 Export All Sizes (PNG)
+                    </button>
+                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', margin: '4px 0' }} />
+                    <button
+                        className="banner-ctx-item"
+                        onClick={() => { setCtxMenu(null); handleDoubleClick(ctxMenu.variantId); }}
+                    >
+                        ✏️ Open in Editor
+                    </button>
+                    <button
+                        className="banner-ctx-item banner-ctx-item--danger"
+                        onClick={closeCtxMenu}
+                    >
+                        ✕ Cancel
+                    </button>
+                </div>
+            )}
         </div>
     );
 }
