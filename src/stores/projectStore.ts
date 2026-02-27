@@ -8,6 +8,7 @@ import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { persist, type StorageValue } from 'zustand/middleware';
 import { enableMapSet } from 'immer';
+import { useDesignStore } from './designStore';
 
 // Enable Immer MapSet plugin — selectedIds is Set<string>
 enableMapSet();
@@ -249,13 +250,19 @@ export const useProjectStore = create<ProjectState>()(
             },
 
             permanentDelete: (id) => {
+                // Clean up designStore first
+                try { useDesignStore.getState().deleteCreativeSet(id); } catch { /* ok */ }
                 set((state) => {
                     state.trash = state.trash.filter((t) => t.item.id !== id);
                 });
             },
 
             emptyTrash: () => {
+                // Clean up ALL trashed items from designStore
                 set((state) => {
+                    for (const t of state.trash) {
+                        try { useDesignStore.getState().deleteCreativeSet(t.item.id); } catch { /* ok */ }
+                    }
                     state.trash = [];
                 });
             },
