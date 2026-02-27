@@ -65,10 +65,15 @@ Wasm Bridge: 복잡한 레이아웃 계산(Constraint-based)은 Rust로 작성�
    **Rule**: Use chained flow testing — every test ends with `save → exit → re-enter → verify`.
    **Rule**: Git commit after each Part passes. Never commit broken code.
 
-7. **Git Discipline**:
-   - Commit after each successful fix/feature with a descriptive message
+7. **Git Discipline (MANDATORY — Zero Code Loss Policy)**:
+   - **EVERY successful code change MUST be committed immediately** — no exceptions
+   - After ANY build-passing edit → `git add -A && git commit -m "..."` RIGHT AWAY
+   - Commit messages must be descriptive: `feat:`, `fix:`, `refactor:`, `chore:` prefixes
    - Before editing a file, verify it compiles first
    - After editing, verify no regressions in connected features
+   - **NEVER accumulate uncommitted changes** — if you've made 2+ changes without committing, STOP and commit now
+   - If a task involves multiple files, commit after EACH logical unit (not at the very end)
+   - **Rationale**: Code loss = wasted API cost + wasted user time. This is UNACCEPTABLE.
 
 
 📝 안티그레비티/에디터에 바로 붙여넣을 요약본 (영문 포함)
