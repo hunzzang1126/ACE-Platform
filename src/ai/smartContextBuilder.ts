@@ -15,6 +15,7 @@
 import type { CreativeSet, BannerVariant } from '@/schema/design.types';
 import type { DesignElement, TextElement, ShapeElement, ButtonElement } from '@/schema/elements.types';
 import { getAspectCategory, type AspectCategory } from '@/schema/layoutRoles';
+import { loadUserPrefs, prefsToPromptSection } from '@/stores/userPrefs';
 
 // ── Types ──
 
@@ -195,6 +196,13 @@ export function contextToPromptSection(ctx: SmartContext): string {
         for (const action of ctx.recentActions.slice(-5)) {
             lines.push(`- ${action}`);
         }
+    }
+
+    // ── User Preferences ──
+    const prefs = loadUserPrefs();
+    if (prefs.stats.totalDesigns > 0) {
+        lines.push('');
+        lines.push(prefsToPromptSection(prefs));
     }
 
     return lines.join('\n');
