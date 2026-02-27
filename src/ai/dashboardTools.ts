@@ -154,44 +154,67 @@ const update_element_property: ToolDefinition = {
 
 const add_text: ToolDefinition = {
     name: 'add_text',
-    description: 'Add a text element to the active variant. Creates a text element with content, font, color, and position. The element is added to ALL size variants. Use this to put text on banners.',
+    description: 'Add a text element to the banner. Added to ALL size variants. Use align="center" for centered text (recommended for banners).',
     parameters: {
         type: 'object',
         properties: {
             content: { type: 'string', description: 'Text content to display' },
-            x: { type: 'number', description: 'X position (px)' },
-            y: { type: 'number', description: 'Y position (px)' },
-            width: { type: 'number', description: 'Width (px). Default 200' },
+            y: { type: 'number', description: 'Y position from top (px)' },
+            width: { type: 'number', description: 'Width (px). Default: 80% of canvas width' },
             height: { type: 'number', description: 'Height (px). Default 40' },
             fontSize: { type: 'number', description: 'Font size (px). Default 24' },
             fontWeight: { type: 'number', description: 'Font weight (100-900). Default 700' },
-            color: { type: 'string', description: 'Text color (hex, e.g. #c9a84c). Default #ffffff' },
+            color: { type: 'string', description: 'Text color (hex). Default #ffffff' },
             fontFamily: { type: 'string', description: 'Font family. Default "Inter"' },
-            textAlign: { type: 'string', description: 'Text alignment: left, center, right. Default "center"' },
-            name: { type: 'string', description: 'Element name for reference' },
+            textAlign: { type: 'string', description: 'Text alignment within box: left, center, right. Default "center"' },
+            align: { type: 'string', description: 'Horizontal position on canvas: "center" (RECOMMENDED), "left", "right". Default "center"' },
+            x: { type: 'number', description: 'X position (px). Only used when align="left". Ignored when align="center".' },
+            name: { type: 'string', description: 'Element name for layer panel' },
         },
-        required: ['content', 'x', 'y'],
+        required: ['content', 'y'],
     },
     category: 'create',
 };
 
 const add_shape: ToolDefinition = {
     name: 'add_shape',
-    description: 'Add a shape element (rectangle, ellipse) to the active variant. Creates a shape element with fill color and position. The element is added to ALL size variants.',
+    description: 'Add a shape element (rectangle, ellipse) to the banner. Added to ALL size variants. Use align="center" for centered shapes (dividers, accent bars).',
     parameters: {
         type: 'object',
         properties: {
             shapeType: { type: 'string', description: 'Shape type: rectangle, ellipse. Default "rectangle"' },
-            x: { type: 'number', description: 'X position (px)' },
-            y: { type: 'number', description: 'Y position (px)' },
-            width: { type: 'number', description: 'Width (px). Default 100' },
+            y: { type: 'number', description: 'Y position from top (px)' },
+            width: { type: 'number', description: 'Width (px). Default: canvas width (full bleed)' },
             height: { type: 'number', description: 'Height (px). Default 100' },
             fill: { type: 'string', description: 'Fill color (hex). Default "#333333"' },
             borderRadius: { type: 'number', description: 'Border radius (px). Default 0' },
             opacity: { type: 'number', description: 'Opacity 0-1. Default 1' },
-            name: { type: 'string', description: 'Element name for reference' },
+            align: { type: 'string', description: 'Horizontal position: "center", "left", "stretch" (full width). Default "stretch"' },
+            x: { type: 'number', description: 'X offset (px). Only used when align="left". Default 0' },
+            name: { type: 'string', description: 'Element name for layer panel' },
         },
-        required: ['x', 'y'],
+        required: ['y'],
+    },
+    category: 'create',
+};
+
+const add_button: ToolDefinition = {
+    name: 'add_button',
+    description: 'Add a CTA button (rounded rectangle + centered text) to the banner. Creates BOTH a shape background and text label. Always centered horizontally. Added to ALL size variants.',
+    parameters: {
+        type: 'object',
+        properties: {
+            text: { type: 'string', description: 'Button text (auto-uppercased). e.g. "Register Now"' },
+            y: { type: 'number', description: 'Y position from top (px)' },
+            width: { type: 'number', description: 'Button width (px). Default: 60% of canvas width' },
+            height: { type: 'number', description: 'Button height (px). Default 40' },
+            bgColor: { type: 'string', description: 'Background color (hex). Default "#c9a84c"' },
+            textColor: { type: 'string', description: 'Text color (hex). Default "#ffffff"' },
+            fontSize: { type: 'number', description: 'Font size (px). Default 14' },
+            borderRadius: { type: 'number', description: 'Border radius (px). Default 6' },
+            name: { type: 'string', description: 'Button name. Default "CTA Button"' },
+        },
+        required: ['text', 'y'],
     },
     category: 'create',
 };
@@ -245,6 +268,7 @@ export const DASHBOARD_TOOLS: ToolDefinition[] = [
     update_element_property,
     add_text,
     add_shape,
+    add_button,
     set_custom_style,
     execute_dynamic_action,
 ];

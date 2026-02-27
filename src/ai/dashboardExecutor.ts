@@ -368,24 +368,35 @@ export function executeDashboardTool(
                 return { success: true, message: `Set "${property}" = "${rawValue}" on ${updated} element(s) matching "${params.element_name}".` };
             }
 
-            // ── Element Creation ──────────────────────
+            // ── Element Creation (with alignment support) ──
 
             case 'add_text': {
                 if (!designStore.creativeSet) return { success: false, message: 'No creative set open.' };
 
                 const content = (params.content as string) || 'Text';
-                const x = Number(params.x) || 0;
                 const y = Number(params.y) || 0;
-                const width = Number(params.width) || 200;
-                const height = Number(params.height) || 40;
                 const fontSize = Number(params.fontSize) || 24;
                 const fontWeight = Number(params.fontWeight) || 700;
                 const color = (params.color as string) || '#ffffff';
                 const fontFamily = (params.fontFamily as string) || 'Inter';
                 const textAlign = (params.textAlign as string) || 'center';
+                const align = (params.align as string) || 'center';
+                const xParam = Number(params.x) || 0;
                 const elName = (params.name as string) || content.substring(0, 20);
 
-                // Mutate inside setState where Immer provides a mutable draft
+                // Calculate default width relative to canvas
+                const firstVariant = designStore.creativeSet.variants[0];
+                const canvasW = firstVariant?.preset?.width || 300;
+                const width = Number(params.width) || Math.round(canvasW * 0.8);
+                const height = Number(params.height) || Math.round(fontSize * 1.6);
+
+                // Build horizontal constraint based on align
+                const horizontal = align === 'center'
+                    ? { anchor: 'center' as const, offset: 0 }
+                    : align === 'right'
+                        ? { anchor: 'right' as const, offset: xParam }
+                        : { anchor: 'left' as const, offset: xParam };
+
                 useDesignStore.setState((state) => {
                     if (!state.creativeSet) return;
                     for (const variant of state.creativeSet.variants) {
@@ -408,7 +419,7 @@ export function executeDashboardTool(
                             locked: false,
                             zIndex: variant.elements.length,
                             constraints: {
-                                horizontal: { anchor: 'left' as const, offset: x },
+                                horizontal,
                                 vertical: { anchor: 'top' as const, offset: y },
                                 size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width, height },
                                 rotation: 0,
@@ -418,23 +429,41 @@ export function executeDashboardTool(
                     }
                 });
 
-                return { success: true, message: `Text "${content}" added at (${x}, ${y}) — ${fontSize}px ${color}` };
+                return { success: true, message: `Text "${content}" — ${fontSize}px ${color}, align=${align}` };
             }
 
             case 'add_shape': {
                 if (!designStore.creativeSet) return { success: false, message: 'No creative set open.' };
 
                 const shapeType = (params.shapeType as string) || 'rectangle';
-                const x = Number(params.x) || 0;
                 const y = Number(params.y) || 0;
-                const width = Number(params.width) || 100;
-                const height = Number(params.height) || 100;
                 const fill = (params.fill as string) || '#333333';
                 const borderRadius = Number(params.borderRadius) || 0;
                 const opacity = Number(params.opacity) ?? 1;
-                const elName = (params.name as string) || `Shape ${shapeType}`;
+                const align = (params.align as string) || 'stretch';
+                const xParam = Number(params.x) || 0;
+                const elName = (params.name as string) || `Shape`;
 
-                // Mutate inside setState where Immer provides a mutable draft
+                // Calculate default dimensions
+                const firstVariant = designStore.creativeSet.variants[0];
+                const canvasW = firstVariant?.preset?.width || 300;
+                const width = Number(params.width) || canvasW;
+                const height = Number(params.height) || 100;
+
+                // Build horizontal constraint based on align
+                const horizontal = align === 'center'
+                    ? { anchor: 'center' as const, offset: 0 }
+                    : align === 'stretch'
+                        ? { anchor: 'stretch' as const, offset: 0, marginLeft: 0, marginRight: 0 }
+                        : align === 'right'
+                            ? { anchor: 'right' as const, offset: xParam }
+                            : { anchor: 'left' as const, offset: xParam };
+
+                // For stretch, use relative width
+                const sizeMode = align === 'stretch'
+                    ? { widthMode: 'relative' as const, heightMode: 'fixed' as const, width: 1, height }
+                    : { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width, height };
+
                 useDesignStore.setState((state) => {
                     if (!state.creativeSet) return;
                     for (const variant of state.creativeSet.variants) {
@@ -451,9 +480,9 @@ export function executeDashboardTool(
                             locked: false,
                             zIndex: variant.elements.length,
                             constraints: {
-                                horizontal: { anchor: 'left' as const, offset: x },
+                                horizontal,
                                 vertical: { anchor: 'top' as const, offset: y },
-                                size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width, height },
+                                size: sizeMode,
                                 rotation: 0,
                             },
                             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -461,7 +490,85 @@ export function executeDashboardTool(
                     }
                 });
 
-                return { success: true, message: `Shape "${shapeType}" (${width}×${height}) added at (${x}, ${y}) — fill ${fill}` };
+                return { success: true, message: `Shape "${shapeType}" ${width}×${height} — fill ${fill}, align=${align}` };
+            }
+
+            case 'add_button': {
+                if (!designStore.creativeSet) return { success: false, message: 'No creative set open.' };
+
+                const text = ((params.text as string) || 'CLICK HERE').toUpperCase();
+                const y = Number(params.y) || 200;
+                const bgColor = (params.bgColor as string) || '#c9a84c';
+                const textColor = (params.textColor as string) || '#ffffff';
+                const fontSize = Number(params.fontSize) || 14;
+                const borderRadius = Number(params.borderRadius) || 6;
+                const elName = (params.name as string) || 'CTA Button';
+
+                const firstVariant = designStore.creativeSet.variants[0];
+                const canvasW = firstVariant?.preset?.width || 300;
+                const width = Number(params.width) || Math.round(canvasW * 0.6);
+                const height = Number(params.height) || 40;
+
+                const btnShapeId = uuid();
+                const btnTextId = uuid();
+
+                useDesignStore.setState((state) => {
+                    if (!state.creativeSet) return;
+                    for (const variant of state.creativeSet.variants) {
+                        const z = variant.elements.length;
+                        // Button background shape
+                        variant.elements.push({
+                            id: btnShapeId,
+                            name: `${elName} BG`,
+                            type: 'shape' as const,
+                            shapeType: 'rectangle' as const,
+                            fill: bgColor,
+                            strokeWidth: 0,
+                            borderRadius,
+                            opacity: 1,
+                            visible: true,
+                            locked: false,
+                            zIndex: z,
+                            constraints: {
+                                horizontal: { anchor: 'center' as const, offset: 0 },
+                                vertical: { anchor: 'top' as const, offset: y },
+                                size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width, height },
+                                rotation: 0,
+                            },
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        } as any);
+
+                        // Button text label (centered on button)
+                        variant.elements.push({
+                            id: btnTextId,
+                            name: elName,
+                            type: 'text' as const,
+                            content: text,
+                            fontFamily: 'Inter',
+                            fontSize,
+                            fontWeight: 700,
+                            fontStyle: 'normal' as const,
+                            color: textColor,
+                            textAlign: 'center' as const,
+                            lineHeight: 1,
+                            letterSpacing: 1,
+                            autoShrink: false,
+                            opacity: 1,
+                            visible: true,
+                            locked: false,
+                            zIndex: z + 1,
+                            constraints: {
+                                horizontal: { anchor: 'center' as const, offset: 0 },
+                                vertical: { anchor: 'top' as const, offset: y + Math.round((height - fontSize) / 2) },
+                                size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width, height: Math.round(fontSize * 1.4) },
+                                rotation: 0,
+                            },
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        } as any);
+                    }
+                });
+
+                return { success: true, message: `CTA Button "${text}" — ${width}×${height} ${bgColor}, centered` };
             }
 
             // ── Dynamic / Catch-All Tools ────────────
