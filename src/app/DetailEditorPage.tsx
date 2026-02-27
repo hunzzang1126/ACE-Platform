@@ -97,6 +97,46 @@ export function DetailEditorPage() {
         }
     }, [state.status, engineRef, handleSave, restoreFromStore, overlay, actions, syncState]);
 
+    // ── Live re-render when AI tools add elements to designStore ──
+    // Watches element count for the active variant; when it changes, re-sync canvas
+    const lastElementCountRef = useRef(-1);
+    useEffect(() => {
+        if (state.status !== 'ready' || !restoredRef.current) return;
+        if (!variantId || !creativeSet) return;
+
+        const currentVariant = creativeSet.variants.find((v) => v.id === variantId);
+        if (!currentVariant) return;
+
+        const currentCount = currentVariant.elements.length;
+
+        // Skip initial render (handled by restoreFromStore above)
+        if (lastElementCountRef.current === -1) {
+            lastElementCountRef.current = currentCount;
+            return;
+        }
+
+        // Only re-sync if count changed (from AI add_text/add_shape calls)
+        if (currentCount !== lastElementCountRef.current) {
+            lastElementCountRef.current = currentCount;
+            console.log(`[DetailEditor] Store elements changed (${currentCount}), re-syncing canvas...`);
+
+            const engine = engineRef.current;
+            if (engine) {
+                // Clear current engine nodes
+                try { engine.clear_scene(); } catch { /* ok */ }
+                // Clear current overlays
+                overlay.clearOverlays();
+                // Re-restore everything from the updated store
+                const { overlayElements: restoredOverlays } = restoreFromStore(engine);
+                if (restoredOverlays.length > 0) {
+                    overlay.restoreElements(restoredOverlays);
+                }
+                syncState();
+                isDirtyRef.current = true;
+            }
+        }
+    }, [creativeSet, variantId, state.status, engineRef, restoreFromStore, overlay, syncState]);
+
     // ── Keep latest refs for auto-save (avoids stale closure) ──
     const saveFromCachedRef = useRef(saveFromCachedNodes);
     const overlayElementsRef = useRef(overlay.overlayElements);

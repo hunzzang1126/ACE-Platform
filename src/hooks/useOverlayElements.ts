@@ -326,6 +326,12 @@ export function useOverlayElements(canvasWidth = 300, canvasHeight = 250) {
         );
     }, []);
 
+    // ── Clear all overlays ──
+    const clearOverlays = useCallback(() => {
+        setElements([]);
+        setSelectedOverlayId(null);
+    }, []);
+
     // ── Restore from saved data ──
     const restoreElements = useCallback((savedOverlays: OverlayElement[]) => {
         if (savedOverlays.length === 0) return;
@@ -357,6 +363,7 @@ export function useOverlayElements(canvasWidth = 300, canvasHeight = 250) {
         toggleVisibility,
         duplicateOverlay,
         renameOverlay,
+        clearOverlays,
         restoreElements,
     };
 }
