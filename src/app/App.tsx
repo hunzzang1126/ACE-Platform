@@ -11,7 +11,7 @@ import AnimationTestPage from './AnimationTestPage';
 import EffectsTestPage from './EffectsTestPage';
 import ExportTestPage from './ExportTestPage';
 import AiTestPage from './AiTestPage';
-import { EngineStatusBadge } from '../components/engine/EngineStatusBadge';
+
 import { GlobalAiPanel } from '../components/ai/GlobalAiPanel';
 
 export default function App() {
@@ -34,7 +34,7 @@ export default function App() {
                 </div>
                 <GlobalAiPanel />
             </div>
-            <EngineStatusBadge />
+
         </BrowserRouter>
     );
 }
