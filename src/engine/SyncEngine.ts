@@ -3,11 +3,13 @@
 // ─────────────────────────────────────────────────
 // 마스터 배너의 변경 사항을 슬레이브 배너에 "즉시" 전파.
 // 제약 조건(constraints)을 기반으로 다른 크기의 배너에 맞게 좌표를 재계산.
+// role이 있는 요소는 Smart Layout 엔진으로 비율별 최적 위치 계산.
 
 import type { BannerVariant, CreativeSet } from '@/schema/design.types';
 import type { DesignElement } from '@/schema/elements.types';
 import type { ElementConstraints } from '@/schema/constraints.types';
 import { resolveConstraints } from '@/schema/constraints.types';
+import { computeSmartConstraints, getSmartFontSize } from './smartLayout';
 
 // ── Types ──
 
@@ -62,15 +64,45 @@ export class SyncEngine {
             const slaveElement = variant.elements.find((el) => el.id === masterElement.id);
             if (!slaveElement) continue;
 
-            // 제약 조건 기반으로 슬레이브 크기에 맞는 좌표 재계산
+            // ── Smart Layout: role이 있으면 비율별 최적 재배치, 없으면 기존 방식 ──
+            let smartConstraints: ElementConstraints | undefined;
+            if (masterElement.role) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const raw = masterElement as any;
+                smartConstraints = computeSmartConstraints({
+                    role: masterElement.role,
+                    canvasW: variant.preset.width,
+                    canvasH: variant.preset.height,
+                    elWidth: raw.constraints?.size?.width,
+                    elHeight: raw.constraints?.size?.height,
+                    fontSize: raw.fontSize ?? raw.size ?? undefined,
+                });
+            }
+
+            const constraintsToUse = smartConstraints ?? masterElement.constraints;
             const resolved = resolveConstraints(
-                masterElement.constraints,
+                constraintsToUse,
                 variant.preset.width,
                 variant.preset.height,
             );
 
             // 변경 사항 계산 (constraints + 비레이아웃 속성)
             const changes = SyncEngine.computeChanges(masterElement, slaveElement);
+
+            // If smart layout computed new constraints, use those instead of master's
+            if (smartConstraints) {
+                changes.constraints = smartConstraints;
+            }
+
+            // Adapt font size for text/button elements based on role + target size
+            if (masterElement.role && (masterElement.type === 'text' || masterElement.type === 'button')) {
+                const smartFontSize = getSmartFontSize(
+                    masterElement.role,
+                    variant.preset.width,
+                    variant.preset.height,
+                );
+                (changes as Record<string, unknown>).fontSize = smartFontSize;
+            }
 
             result.deltas.push({
                 variantId: variant.id,
