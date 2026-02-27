@@ -384,6 +384,7 @@ export function executeDashboardTool(
                 const align = (params.align as string) || 'center';
                 const xParam = Number(params.x) || 0;
                 const elName = (params.name as string) || content.substring(0, 20);
+                const role = (params.role as string) || undefined;
 
                 // ★ Deduplication: skip if a text element with same content already exists
                 const firstVariant = designStore.creativeSet.variants[0];
@@ -467,6 +468,7 @@ export function executeDashboardTool(
                                 size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width, height },
                                 rotation: 0,
                             },
+                            ...(role ? { role } : {}),
                             // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         } as any);
                     }
@@ -486,6 +488,7 @@ export function executeDashboardTool(
                 const align = (params.align as string) || 'stretch';
                 const xParam = Number(params.x) || 0;
                 const elName = (params.name as string) || `Shape`;
+                const role = (params.role as string) || undefined;
 
                 // ★ Deduplication: skip if a shape with same name already exists
                 const firstVariant = designStore.creativeSet.variants[0];
@@ -552,6 +555,7 @@ export function executeDashboardTool(
                                 size: sizeMode,
                                 rotation: 0,
                             },
+                            ...(role ? { role } : {}),
                             // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         } as any);
                         // ★ If this shape covers the full canvas, also set variant.backgroundColor
@@ -574,6 +578,7 @@ export function executeDashboardTool(
                 const fontSize = Number(params.fontSize) || 14;
                 const borderRadius = Number(params.borderRadius) || 6;
                 const elName = (params.name as string) || 'CTA Button';
+                const role = (params.role as string) || 'cta';
 
                 // ★ Deduplication: skip if a button with same text already exists
                 const firstVariant = designStore.creativeSet.variants[0];
@@ -633,6 +638,7 @@ export function executeDashboardTool(
                                 size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width, height },
                                 rotation: 0,
                             },
+                            role,
                             // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         } as any);
 
