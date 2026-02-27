@@ -416,3 +416,24 @@ export const useDesignStore = create<DesignState>()(
         ),
     ),
 );
+
+// ── Cross-tab sync: when another tab writes to localStorage, rehydrate this store ──
+if (typeof window !== 'undefined') {
+    window.addEventListener('storage', (e) => {
+        if (e.key !== 'ace-design-store' || !e.newValue) return;
+        try {
+            const parsed = JSON.parse(e.newValue);
+            const data = parsed?.state as Partial<DesignState> | undefined;
+            if (!data) return;
+            useDesignStore.setState((state) => {
+                if (data.allCreativeSets) state.allCreativeSets = data.allCreativeSets;
+                if (data.activeCreativeSetId !== undefined) {
+                    state.activeCreativeSetId = data.activeCreativeSetId;
+                    state.creativeSet = data.activeCreativeSetId
+                        ? state.allCreativeSets[data.activeCreativeSetId] ?? null
+                        : null;
+                }
+            });
+        } catch { /* malformed data — ignore */ }
+    });
+}

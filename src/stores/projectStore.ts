@@ -271,3 +271,19 @@ export const useProjectStore = create<ProjectState>()(
     ),
 );
 
+// ── Cross-tab sync: when another tab writes to localStorage, rehydrate this store ──
+if (typeof window !== 'undefined') {
+    window.addEventListener('storage', (e) => {
+        if (e.key !== 'ace-project-store' || !e.newValue) return;
+        try {
+            const parsed = JSON.parse(e.newValue);
+            const data = parsed?.state as Partial<ProjectState> | undefined;
+            if (!data) return;
+            useProjectStore.setState((state) => {
+                if (data.creativeSets) state.creativeSets = data.creativeSets;
+                if (data.folders) state.folders = data.folders;
+                if (data.trash) state.trash = data.trash;
+            });
+        } catch { /* malformed data — ignore */ }
+    });
+}
