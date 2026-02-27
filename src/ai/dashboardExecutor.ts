@@ -371,8 +371,7 @@ export function executeDashboardTool(
             // ── Element Creation ──────────────────────
 
             case 'add_text': {
-                const cs = designStore.creativeSet;
-                if (!cs) return { success: false, message: 'No creative set open.' };
+                if (!designStore.creativeSet) return { success: false, message: 'No creative set open.' };
 
                 const content = (params.content as string) || 'Text';
                 const x = Number(params.x) || 0;
@@ -386,46 +385,44 @@ export function executeDashboardTool(
                 const textAlign = (params.textAlign as string) || 'center';
                 const elName = (params.name as string) || content.substring(0, 20);
 
-                const newEl = {
-                    id: uuid(),
-                    name: elName,
-                    type: 'text' as const,
-                    content,
-                    fontFamily,
-                    fontSize,
-                    fontWeight,
-                    fontStyle: 'normal' as const,
-                    color,
-                    textAlign: textAlign as 'left' | 'center' | 'right',
-                    lineHeight: 1.2,
-                    letterSpacing: 0,
-                    autoShrink: false,
-                    opacity: 1,
-                    visible: true,
-                    locked: false,
-                    zIndex: cs.variants[0]?.elements.length || 0,
-                    constraints: {
-                        horizontal: { anchor: 'left' as const, offset: x },
-                        vertical: { anchor: 'top' as const, offset: y },
-                        size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width, height },
-                        rotation: 0,
-                    },
-                };
-
-                for (const variant of cs.variants) {
-                    variant.elements.push({ ...newEl });
-                }
-
+                // Mutate inside setState where Immer provides a mutable draft
                 useDesignStore.setState((state) => {
-                    state.creativeSet = cs;
+                    if (!state.creativeSet) return;
+                    for (const variant of state.creativeSet.variants) {
+                        variant.elements.push({
+                            id: uuid(),
+                            name: elName,
+                            type: 'text' as const,
+                            content,
+                            fontFamily,
+                            fontSize,
+                            fontWeight,
+                            fontStyle: 'normal' as const,
+                            color,
+                            textAlign: textAlign as 'left' | 'center' | 'right',
+                            lineHeight: 1.2,
+                            letterSpacing: 0,
+                            autoShrink: false,
+                            opacity: 1,
+                            visible: true,
+                            locked: false,
+                            zIndex: variant.elements.length,
+                            constraints: {
+                                horizontal: { anchor: 'left' as const, offset: x },
+                                vertical: { anchor: 'top' as const, offset: y },
+                                size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width, height },
+                                rotation: 0,
+                            },
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        } as any);
+                    }
                 });
 
                 return { success: true, message: `Text "${content}" added at (${x}, ${y}) — ${fontSize}px ${color}` };
             }
 
             case 'add_shape': {
-                const cs = designStore.creativeSet;
-                if (!cs) return { success: false, message: 'No creative set open.' };
+                if (!designStore.creativeSet) return { success: false, message: 'No creative set open.' };
 
                 const shapeType = (params.shapeType as string) || 'rectangle';
                 const x = Number(params.x) || 0;
@@ -437,33 +434,31 @@ export function executeDashboardTool(
                 const opacity = Number(params.opacity) ?? 1;
                 const elName = (params.name as string) || `Shape ${shapeType}`;
 
-                const newEl = {
-                    id: uuid(),
-                    name: elName,
-                    type: 'shape' as const,
-                    shapeType: shapeType as 'rectangle' | 'ellipse' | 'line',
-                    fill,
-                    stroke: undefined,
-                    strokeWidth: 0,
-                    borderRadius,
-                    opacity: Number.isFinite(opacity) ? opacity : 1,
-                    visible: true,
-                    locked: false,
-                    zIndex: cs.variants[0]?.elements.length || 0,
-                    constraints: {
-                        horizontal: { anchor: 'left' as const, offset: x },
-                        vertical: { anchor: 'top' as const, offset: y },
-                        size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width, height },
-                        rotation: 0,
-                    },
-                };
-
-                for (const variant of cs.variants) {
-                    variant.elements.push({ ...newEl });
-                }
-
+                // Mutate inside setState where Immer provides a mutable draft
                 useDesignStore.setState((state) => {
-                    state.creativeSet = cs;
+                    if (!state.creativeSet) return;
+                    for (const variant of state.creativeSet.variants) {
+                        variant.elements.push({
+                            id: uuid(),
+                            name: elName,
+                            type: 'shape' as const,
+                            shapeType: shapeType as 'rectangle' | 'ellipse' | 'line',
+                            fill,
+                            strokeWidth: 0,
+                            borderRadius,
+                            opacity: Number.isFinite(opacity) ? opacity : 1,
+                            visible: true,
+                            locked: false,
+                            zIndex: variant.elements.length,
+                            constraints: {
+                                horizontal: { anchor: 'left' as const, offset: x },
+                                vertical: { anchor: 'top' as const, offset: y },
+                                size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width, height },
+                                rotation: 0,
+                            },
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        } as any);
+                    }
                 });
 
                 return { success: true, message: `Shape "${shapeType}" (${width}×${height}) added at (${x}, ${y}) — fill ${fill}` };
