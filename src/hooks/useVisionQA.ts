@@ -10,6 +10,7 @@ import { resolveConstraints } from '@/schema/constraints.types';
 import type { BannerVariant } from '@/schema/design.types';
 import type { DesignElement } from '@/schema/elements.types';
 import { useDesignStore } from '@/stores/designStore';
+import { runSmartSizingQA, type QAIssue } from '@/engine/smartSizingQA';
 
 export type QAStatus = 'idle' | 'capturing' | 'analyzing' | 'done' | 'error' | 'fixing' | 'fixed';
 
@@ -60,6 +61,7 @@ export function useVisionQA() {
     const [fixResult, setFixResult] = useState<AutoFixResponse | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [progress, setProgress] = useState<string>('');
+    const [sizingIssues, setSizingIssues] = useState<QAIssue[]>([]);
 
     const updateVariantElement = useDesignStore((s) => s.updateVariantElement);
 
@@ -73,6 +75,16 @@ export function useVisionQA() {
             setError(null);
             setReport(null);
             setFixResult(null);
+            setSizingIssues([]);
+
+            // ── Pre-flight: Smart Sizing QA (client-side, instant) ──
+            setProgress('Running smart sizing validation...');
+            const clientIssues = runSmartSizingQA(variants);
+            setSizingIssues(clientIssues);
+            const errorCount = clientIssues.filter(i => i.severity === 'error').length;
+            if (errorCount > 0) {
+                setProgress(`Found ${errorCount} sizing error${errorCount > 1 ? 's' : ''} — proceeding to visual check...`);
+            }
 
             const master = variants.find(v => v.id === masterVariantId);
             if (!master) throw new Error('Master variant not found');
@@ -210,7 +222,8 @@ export function useVisionQA() {
         setFixResult(null);
         setError(null);
         setProgress('');
+        setSizingIssues([]);
     }, []);
 
-    return { status, report, fixResult, error, progress, runQA, autoFix, reset };
+    return { status, report, fixResult, error, progress, sizingIssues, runQA, autoFix, reset };
 }
