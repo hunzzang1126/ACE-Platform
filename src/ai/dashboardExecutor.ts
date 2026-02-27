@@ -389,17 +389,25 @@ export function executeDashboardTool(
                 const firstVariant = designStore.creativeSet.variants[0];
                 const canvasW = firstVariant?.preset?.width || 300;
                 const width = Number(params.width) || Math.round(canvasW * 0.8);
-                const height = Number(params.height) || Math.round(fontSize * 1.6);
+                const height = Number(params.height) || Math.round(fontSize * 2.2);
 
-                // ★ Auto-collision: push down if overlapping existing elements
+                // ★ Auto-collision: push down if overlapping existing TEXT or BUTTON elements
+                // Skip shapes (backgrounds, accent bars) to avoid pushing text off-canvas
                 if (firstVariant) {
-                    const MIN_GAP = 6;
+                    const canvasH = firstVariant.preset?.height || 250;
+                    const MIN_GAP = 10;
                     for (const el of firstVariant.elements) {
+                        // Skip shape elements (backgrounds, accent bars, dividers are fine)
+                        // Only collide with OTHER text elements and button text
+                        if (el.type === 'shape') continue;
+
                         const elY = el.constraints?.vertical?.offset ?? 0;
-                        const elH = el.constraints?.size?.height ?? 0;
+                        const storedH = el.constraints?.size?.height ?? 0;
+                        const elH = storedH > 0 ? storedH : 30;
                         const elBottom = elY + elH;
-                        // Check if new element overlaps this one
-                        if (y >= elY && y < elBottom + MIN_GAP) {
+
+                        // Only push down if actually overlapping, and don't exceed canvas
+                        if (y >= elY && y < elBottom + MIN_GAP && elBottom + MIN_GAP < canvasH - 10) {
                             y = elBottom + MIN_GAP;
                         }
                     }
