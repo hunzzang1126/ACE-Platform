@@ -8,6 +8,7 @@ import { useState, useCallback } from 'react';
 import type { BannerVariant, CreativeSet } from '@/schema/design.types';
 import { runSmartSizingQA } from '@/engine/smartSizingQA';
 import { generateFixes, type FixResult } from '@/engine/smartSizingFixer';
+import { runDesignHeuristics } from '@/engine/designHeuristics';
 import { runBatchVisionCheck } from '@/ai/visionSelfCheck';
 import { orchestrateResize } from '@/ai/services/resizeOrchestrator';
 import { resolveAllRoleDefaults } from '@/engine/bannerRoleResolver';
@@ -103,7 +104,21 @@ export function useSmartCheck() {
                 }
             }
 
-            // Step 4: Vision API self-check (optional, skips if no API key)
+            // Step 5: Design quality heuristics (safe zone, contrast, text overflow)
+            let heuristicFixes = 0;
+            for (const variant of variants) {
+                const hFixes = runDesignHeuristics(variant);
+                for (const fix of hFixes) {
+                    try {
+                        updateVariantElement(fix.variantId, fix.elementId, fix.patch);
+                        heuristicFixes++;
+                    } catch {
+                        // Skip failed patches
+                    }
+                }
+            }
+
+            // Step 6: Vision API self-check (optional, skips if no API key)
             let visionIssueCount = 0;
             try {
                 const visionResults = await runBatchVisionCheck(variants);
