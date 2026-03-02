@@ -9,6 +9,7 @@ import type { BannerVariant } from '@/schema/design.types';
 import type { QAIssue } from '@/engine/smartSizingQA';
 import { resolveConstraints } from '@/schema/constraints.types';
 import { getAspectCategory } from '@/schema/layoutRoles';
+import { computeSmartConstraints } from '@/engine/smartLayout';
 
 export interface FixResult {
     variantId: string;
@@ -135,11 +136,31 @@ function fixOutOfBounds(
     canvasH: number,
     variantId: string,
 ): FixResult[] {
+    // If element has a role, use smart layout engine for optimal placement
+    if (el.role) {
+        const smartConstraints = computeSmartConstraints({
+            role: el.role,
+            canvasW,
+            canvasH,
+            elWidth: bounds.width,
+            elHeight: bounds.height,
+            fontSize: el.type === 'text' ? el.fontSize : undefined,
+        });
+        return [{
+            variantId,
+            elementId: el.id,
+            elementName: el.name,
+            rule: 'out-of-bounds',
+            description: `Repositioned "${el.name}" using smart layout rules`,
+            patch: { constraints: smartConstraints } as Partial<DesignElement>,
+        }];
+    }
+
+    // Fallback: simple edge clamping for elements without roles
     const fixes: FixResult[] = [];
     const newConstraints = { ...el.constraints };
     let changed = false;
 
-    // Clamp X
     if (bounds.x < 0) {
         newConstraints.horizontal = { anchor: 'left' as const, offset: 4 };
         changed = true;
@@ -147,8 +168,6 @@ function fixOutOfBounds(
         newConstraints.horizontal = { anchor: 'right' as const, offset: 4 };
         changed = true;
     }
-
-    // Clamp Y
     if (bounds.y < 0) {
         newConstraints.vertical = { anchor: 'top' as const, offset: 4 };
         changed = true;
@@ -156,22 +175,12 @@ function fixOutOfBounds(
         newConstraints.vertical = { anchor: 'bottom' as const, offset: 4 };
         changed = true;
     }
-
-    // If element is bigger than canvas, shrink it
     if (bounds.width > canvasW) {
-        newConstraints.size = {
-            ...newConstraints.size,
-            widthMode: 'relative' as const,
-            width: 0.95,
-        };
+        newConstraints.size = { ...newConstraints.size, widthMode: 'relative' as const, width: 0.95 };
         changed = true;
     }
     if (bounds.height > canvasH) {
-        newConstraints.size = {
-            ...newConstraints.size,
-            heightMode: 'relative' as const,
-            height: 0.95,
-        };
+        newConstraints.size = { ...newConstraints.size, heightMode: 'relative' as const, height: 0.95 };
         changed = true;
     }
 
@@ -185,7 +194,6 @@ function fixOutOfBounds(
             patch: { constraints: newConstraints } as Partial<DesignElement>,
         });
     }
-
     return fixes;
 }
 
