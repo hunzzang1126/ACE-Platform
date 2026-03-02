@@ -1,30 +1,31 @@
 // ─────────────────────────────────────────────────
-// DashboardPage – Bannerflow-style File Manager
+// DashboardPage – Figma-inspired Project Dashboard
 // ─────────────────────────────────────────────────
-import { useCallback, useMemo, useEffect } from 'react';
+import { useCallback, useMemo, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useProjectStore, type SortColumn } from '@/stores/projectStore';
+import { useProjectStore } from '@/stores/projectStore';
 import { useDesignStore } from '@/stores/designStore';
 import { BANNER_PRESETS } from '@/schema/presets';
 import { AppSidebar } from '@/components/layout/AppSidebar';
-import { DashboardToolbar } from '@/components/dashboard/DashboardToolbar';
-import { CreativeSetTable } from '@/components/dashboard/CreativeSetTable';
-import { Pagination } from '@/components/dashboard/Pagination';
+import { ProjectCard } from '@/components/dashboard/ProjectCard';
+import { IcFolder } from '@/components/ui/Icons';
+
+function getGreeting(): string {
+    const h = new Date().getHours();
+    if (h < 12) return 'Good morning';
+    if (h < 18) return 'Good afternoon';
+    return 'Good evening';
+}
 
 export function DashboardPage() {
     const navigate = useNavigate();
+    const [searchQuery, setSearchQuery] = useState('');
 
     // Project store
     const creativeSets = useProjectStore((s) => s.creativeSets);
     const folders = useProjectStore((s) => s.folders);
     const currentFolderId = useProjectStore((s) => s.currentFolderId);
-    const searchQuery = useProjectStore((s) => s.searchQuery);
-    const sortColumn = useProjectStore((s) => s.sortColumn);
-    const sortDirection = useProjectStore((s) => s.sortDirection);
-    const currentPage = useProjectStore((s) => s.currentPage);
-    const itemsPerPage = useProjectStore((s) => s.itemsPerPage);
     const createCreativeSetProject = useProjectStore((s) => s.createCreativeSet);
-    const createFolder = useProjectStore((s) => s.createFolder);
     const navigateToFolder = useProjectStore((s) => s.navigateToFolder);
 
     // Design store
@@ -32,103 +33,53 @@ export function DashboardPage() {
     const openCreativeSet = useDesignStore((s) => s.openCreativeSet);
 
     // ── Sync projectStore from designStore on mount ──
-    // This ensures the dashboard listing always reflects the real data
     useEffect(() => {
         const allCS = useDesignStore.getState().getAllCreativeSets();
-        // Always rebuild projectStore from designStore (source of truth)
         useProjectStore.setState((state) => {
-            // Build a map of existing project entries by ID for merging
             const existingMap = new Map(state.creativeSets.map(s => [s.id, s]));
-
-            // Update/add entries from designStore
             for (const cs of allCS) {
                 const existing = existingMap.get(cs.id);
                 if (existing) {
-                    // Update variant count to reflect reality
                     existing.variantCount = cs.variants.length;
                     existing.name = cs.name;
                     existing.updatedAt = cs.updatedAt;
                 } else {
-                    // Add missing entry
                     state.creativeSets.push({
-                        id: cs.id,
-                        name: cs.name,
-                        variantCount: cs.variants.length,
-                        createdAt: cs.createdAt,
-                        updatedAt: cs.updatedAt,
-                        createdBy: 'Young An',
+                        id: cs.id, name: cs.name, variantCount: cs.variants.length,
+                        createdAt: cs.createdAt, updatedAt: cs.updatedAt, createdBy: 'Young An',
                     });
                 }
             }
-
-            // Remove entries that no longer exist in designStore
             const validIds = new Set(allCS.map(cs => cs.id));
             state.creativeSets = state.creativeSets.filter(s => validIds.has(s.id));
         });
     }, []);
 
-    // ── Computed data ──
-    const { filteredItems, filteredFolders, totalItems } = useMemo(() => {
-        // Filter by current folder
-        let setItems = creativeSets.filter((s) =>
+    // ── Computed ──
+    const { displaySets, displayFolders, totalSizes } = useMemo(() => {
+        let sets = creativeSets.filter((s) =>
             currentFolderId ? s.folderId === currentFolderId : !s.folderId,
         );
-        let folderItems = folders.filter((f) =>
+        let flds = folders.filter((f) =>
             currentFolderId ? f.parentId === currentFolderId : !f.parentId,
         );
-
-        // Search filter
         if (searchQuery) {
             const q = searchQuery.toLowerCase();
-            setItems = setItems.filter((s) => s.name.toLowerCase().includes(q));
-            folderItems = folderItems.filter((f) => f.name.toLowerCase().includes(q));
+            sets = sets.filter((s) => s.name.toLowerCase().includes(q));
+            flds = flds.filter((f) => f.name.toLowerCase().includes(q));
         }
-
-        // Sort creative sets
-        const sorted = [...setItems].sort((a, b) => {
-            let cmp = 0;
-            switch (sortColumn) {
-                case 'name': cmp = a.name.localeCompare(b.name); break;
-                case 'variantCount': cmp = a.variantCount - b.variantCount; break;
-                case 'createdAt': cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(); break;
-                case 'createdBy': cmp = a.createdBy.localeCompare(b.createdBy); break;
-            }
-            return sortDirection === 'asc' ? cmp : -cmp;
-        });
-
-        const total = folderItems.length + sorted.length;
-
-        // Paginate (sets only, folders always shown)
-        const startIdx = (currentPage - 1) * itemsPerPage;
-        const paginatedSets = sorted.slice(
-            Math.max(0, startIdx - folderItems.length),
-            Math.max(0, startIdx + itemsPerPage - folderItems.length),
-        );
-        const paginatedFolders = startIdx < folderItems.length
-            ? folderItems.slice(startIdx, Math.min(folderItems.length, startIdx + itemsPerPage))
-            : [];
-
-        return { filteredItems: paginatedSets, filteredFolders: paginatedFolders, totalItems: total };
-    }, [creativeSets, folders, currentFolderId, searchQuery, sortColumn, sortDirection, currentPage, itemsPerPage]);
-
-    // ── Breadcrumb ──
-    const breadcrumb = useMemo(() => {
-        if (!currentFolderId) return ['Creative Sets'];
-        const folder = folders.find((f) => f.id === currentFolderId);
-        return ['Creative Sets', folder?.name ?? 'Folder'];
-    }, [currentFolderId, folders]);
+        const total = sets.reduce((sum, s) => sum + s.variantCount, 0);
+        return { displaySets: sets, displayFolders: flds, totalSizes: total };
+    }, [creativeSets, folders, currentFolderId, searchQuery]);
 
     // ── Handlers ──
     const handleNewCreativeSet = useCallback(() => {
         const defaultPreset = BANNER_PRESETS[0]!;
         const csId = createCreativeSet('Untitled Creative Set', defaultPreset);
-        // Also add to projectStore for dashboard listing
         createCreativeSetProject('Untitled Creative Set');
-        // Sync the projectStore entry ID with designStore
         useProjectStore.setState((state) => {
             const last = state.creativeSets[state.creativeSets.length - 1];
             if (last) {
-                // Replace the auto-generated ID with the designStore ID
                 state.creativeSets = state.creativeSets.filter(s => s.id !== last.id);
                 state.creativeSets.push({ ...last, id: csId });
             }
@@ -136,29 +87,16 @@ export function DashboardPage() {
         navigate('/editor');
     }, [createCreativeSetProject, createCreativeSet, navigate]);
 
-    const handleNewFolder = useCallback(() => {
-        createFolder('New Folder');
-    }, [createFolder]);
-
     const handleOpenSet = useCallback((id: string) => {
-        // Try to open from designStore (full data preserved)
         const opened = openCreativeSet(id);
-        if (opened) {
-            navigate('/editor');
-            return;
-        }
-
-        // Fallback: if not in designStore (legacy/demo entry), create a new creative set
+        if (opened) { navigate('/editor'); return; }
         const set = creativeSets.find((s) => s.id === id);
         if (set) {
             const defaultPreset = BANNER_PRESETS[0]!;
             const csId = createCreativeSet(set.name, defaultPreset);
-            // Update projectStore entry to point to the new designStore ID
             useProjectStore.setState((state) => {
                 const entry = state.creativeSets.find(s => s.id === id);
-                if (entry) {
-                    entry.id = csId;
-                }
+                if (entry) entry.id = csId;
             });
             navigate('/editor');
         }
@@ -168,34 +106,95 @@ export function DashboardPage() {
         navigateToFolder(folderId);
     }, [navigateToFolder]);
 
-    const handleNavigateUp = useCallback(() => {
-        if (currentFolderId) {
-            const folder = folders.find((f) => f.id === currentFolderId);
-            navigateToFolder(folder?.parentId ?? null);
-        }
-    }, [currentFolderId, folders, navigateToFolder]);
+    const isEmpty = displaySets.length === 0 && displayFolders.length === 0;
 
     return (
         <div className="dashboard-layout">
             <AppSidebar />
             <main className="dashboard-main">
-                <DashboardToolbar
-                    breadcrumb={breadcrumb}
-                    onNewCreativeSet={handleNewCreativeSet}
-                    onNewFolder={handleNewFolder}
-                    onNavigateUp={handleNavigateUp}
-                />
-                <div className="dashboard-content">
-                    <CreativeSetTable
-                        items={filteredItems}
-                        folders={filteredFolders}
-                        onOpenSet={handleOpenSet}
-                        onOpenFolder={handleOpenFolder}
+                {/* Hero Greeting */}
+                <section className="dashboard-hero">
+                    <div className="dashboard-hero__content">
+                        <h1 className="dashboard-hero__title">{getGreeting()}, Young</h1>
+                        <p className="dashboard-hero__subtitle">
+                            {creativeSets.length} project{creativeSets.length !== 1 ? 's' : ''}, {totalSizes} size{totalSizes !== 1 ? 's' : ''}
+                        </p>
+                    </div>
+                    <button className="dashboard-hero__cta" onClick={handleNewCreativeSet}>
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                            <line x1="8" y1="2" x2="8" y2="14" /><line x1="2" y1="8" x2="14" y2="8" />
+                        </svg>
+                        New Project
+                    </button>
+                </section>
+
+                {/* Search */}
+                <div className="dashboard-search-bar">
+                    <svg className="dashboard-search-bar__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                        <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                    </svg>
+                    <input
+                        className="dashboard-search-bar__input"
+                        placeholder="Search projects..."
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
                     />
                 </div>
-                <Pagination totalItems={totalItems} />
+
+                {/* Content */}
+                <div className="dashboard-content">
+                    {/* Folders */}
+                    {displayFolders.length > 0 && (
+                        <div className="dashboard-section">
+                            <h2 className="dashboard-section__title">Folders</h2>
+                            <div className="project-grid">
+                                {displayFolders.map(folder => (
+                                    <div key={folder.id} className="folder-card" onDoubleClick={() => handleOpenFolder(folder.id)}>
+                                        <div className="folder-card__icon"><IcFolder size={24} /></div>
+                                        <span className="folder-card__name">{folder.name}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Projects */}
+                    <div className="dashboard-section">
+                        <h2 className="dashboard-section__title">
+                            {currentFolderId ? 'Projects' : 'All Projects'}
+                        </h2>
+                        {isEmpty ? (
+                            <div className="dashboard-empty">
+                                <div className="dashboard-empty__icon">
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" opacity="0.3">
+                                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                                        <line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" />
+                                    </svg>
+                                </div>
+                                <p>No projects yet</p>
+                                <button className="dashboard-empty__btn" onClick={handleNewCreativeSet}>
+                                    Create your first project
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="project-grid">
+                                {displaySets.map(set => (
+                                    <ProjectCard
+                                        key={set.id}
+                                        id={set.id}
+                                        name={set.name}
+                                        variantCount={set.variantCount}
+                                        createdAt={set.createdAt}
+                                        createdBy={set.createdBy}
+                                        type="set"
+                                        onOpen={handleOpenSet}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
             </main>
         </div>
     );
 }
-
