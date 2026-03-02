@@ -16,6 +16,7 @@ import type { CreativeSet, BannerVariant } from '@/schema/design.types';
 import type { DesignElement, TextElement, ShapeElement, ButtonElement } from '@/schema/elements.types';
 import { getAspectCategory, type AspectCategory } from '@/schema/layoutRoles';
 import { loadUserPrefs, prefsToPromptSection } from '@/stores/userPrefs';
+import { buildDesignSystemPrompt } from '@/ai/prompts/bannerDesignPrompt';
 
 // ── Types ──
 
@@ -203,6 +204,20 @@ export function contextToPromptSection(ctx: SmartContext): string {
     if (prefs.stats.totalDesigns > 0) {
         lines.push('');
         lines.push(prefsToPromptSection(prefs));
+    }
+
+    // ── Design System Guidelines ──
+    if (ctx.activeVariant) {
+        const brandColors = ctx.brand
+            ? { primary: ctx.brand.primaryColor, secondary: ctx.brand.secondaryColor }
+            : undefined;
+        lines.push('');
+        lines.push(buildDesignSystemPrompt(
+            ctx.activeVariant.width,
+            ctx.activeVariant.height,
+            ctx.activeVariant.aspectCategory,
+            brandColors,
+        ));
     }
 
     return lines.join('\n');
