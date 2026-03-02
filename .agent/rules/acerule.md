@@ -75,6 +75,50 @@ Wasm Bridge: 복잡한 레이아웃 계산(Constraint-based)은 Rust로 작성�
    - If a task involves multiple files, commit after EACH logical unit (not at the very end)
    - **Rationale**: Code loss = wasted API cost + wasted user time. This is UNACCEPTABLE.
 
+8. **Code Maintainability (Clean Architecture — Zero Tech Debt Policy)**:
+
+   **File Size Limits:**
+   - **Hard limit: 400 lines** per file. If a file approaches this, immediately plan extraction.
+   - **Ideal: 150-300 lines** — each file should serve ONE cohesive purpose.
+   - A file can exceed 300L ONLY IF it serves a single, cohesive responsibility (e.g., one complex hook, one component with no sub-components).
+   - **NEVER mix UI components + business logic + type definitions in one file.**
+
+   **When to Extract:**
+   - Sub-components inside a parent → separate `ComponentName.tsx`
+   - Inline styles/constants → `componentStyles.ts` or `componentHelpers.ts`
+   - Types shared by 3+ files → `types.ts` or `featureTypes.ts`
+   - Hooks over 200L → split by concern (keyboard, sync, drag, etc.)
+   - Switch/case blocks over 15 cases → split into executor/handler modules
+
+   **Extraction Rules:**
+   - **Always re-export** from the original file for backward compatibility (avoid mass import rewrites).
+   - **Build check after every extraction** — `tsc --noEmit` must pass before moving on.
+   - **One commit per extraction** — atomic, reversible changes.
+   - **Delete dead code immediately** — orphaned files, unused imports, commented-out blocks.
+
+   **File Naming Conventions:**
+   - Components: `PascalCase.tsx` (e.g., `LayerRow.tsx`, `TimelineBar.tsx`)
+   - Hooks: `camelCase.ts` with `use` prefix (e.g., `useCanvasKeyboard.ts`)
+   - Types: `camelCase.ts` with descriptive suffix (e.g., `canvasTypes.ts`)
+   - Executors: `camelCase.ts` with category prefix (e.g., `designExecutor.ts`, `projectExecutor.ts`)
+   - Helpers/Utils: `camelCase.ts` with `Helpers` suffix (e.g., `bottomPanelHelpers.ts`)
+   - Styles: `camelCase.ts` with `Styles` suffix (e.g., `aiChatStyles.ts`)
+
+   **Dependency Direction (Layer Rules):**
+   ```
+   Pages → Components → Hooks → Stores → Types/Schema
+                ↓
+            UI Components (no business logic)
+   ```
+   - Hooks NEVER import from Components
+   - Stores NEVER import from Hooks or Components
+   - Types/Schema files have ZERO imports from project code
+
+   **Import Hygiene:**
+   - `import type {}` for all type-only imports (better tree-shaking)
+   - Absolute imports via `@/` alias — no relative `../../` beyond 1 level
+   - Group imports: React → External libs → Internal modules → Types → Styles
+
 
 📝 안티그레비티/에디터에 바로 붙여넣을 요약본 (영문 포함)
 이 요약본은 클로드 4.6이 읽었을 때 가장 잘 알아듣는 형태입니다.
