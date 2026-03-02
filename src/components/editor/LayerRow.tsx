@@ -46,7 +46,7 @@ export function OverlayLayerRow({
             }}
             onClick={() => { if (justDragged.current) return; onSelect(el.id); }}
         >
-            <span className="bp-layer-icon">{el.type === 'text' ? 'T' : '🖼'}</span>
+            <span className="bp-layer-icon">{el.type === 'text' ? 'T' : ''}</span>
             {isRenaming ? (
                 <input
                     className="bp-rename-input"
@@ -74,10 +74,10 @@ export function OverlayLayerRow({
             )}
             <div className="bp-layer-actions">
                 <button className="bp-layer-action-btn" title={isLocked ? 'Unlock' : 'Lock'} onClick={(e) => { e.stopPropagation(); onToggleLock?.(el.id); }}>
-                    {isLocked ? '🔒' : '🔓'}
+                    {isLocked ? 'Locked' : 'Unlocked'}
                 </button>
                 <button className="bp-layer-action-btn" title={isVisible ? 'Hide' : 'Show'} onClick={(e) => { e.stopPropagation(); onToggleVisibility?.(el.id); }}>
-                    {isVisible ? '👁' : '👁‍🗨'}
+                    {isVisible ? 'V' : 'H'}
                 </button>
                 <button className="bp-layer-action-btn" title="Delete" onClick={(e) => { e.stopPropagation(); onDelete?.(el.id); }}>
                     <IcClose size={9} />

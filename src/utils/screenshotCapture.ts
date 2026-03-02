@@ -129,7 +129,7 @@ export function renderVariantToCanvas(
             ctx.font = '12px Inter';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText('🖼', el.x + el.width / 2, el.y + el.height / 2);
+            ctx.fillText('', el.x + el.width / 2, el.y + el.height / 2);
         }
 
         ctx.globalAlpha = 1;

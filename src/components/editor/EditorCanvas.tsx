@@ -509,7 +509,7 @@ export function EditorCanvas({
                         <span style={{ color: '#34a853' }}>overlay selected</span>
                     </>
                 )}
-                {state.canUndo && <span style={{ color: '#8b949e' }}>⌘Z undo</span>}
+                {state.canUndo && <span style={{ color: '#8b949e' }}>Cmd+Z undo</span>}
 
                 {/* Zoom controls in status bar */}
                 <span style={{ marginLeft: 'auto', display: 'flex', gap: 4, alignItems: 'center' }}>

@@ -131,7 +131,7 @@ export default function EffectsTestPage() {
             background: '#0d1117', fontFamily: 'Inter, system-ui, sans-serif', color: '#e6edf3',
         }}>
             <h1 style={{ fontSize: 22, fontWeight: 600, marginBottom: 12, letterSpacing: -0.5 }}>
-                ✨ ACE Engine — Pro Effects
+                 ACE Engine — Pro Effects
             </h1>
 
             <div style={{ display: 'flex', gap: 20, marginBottom: 12 }}>
@@ -144,7 +144,7 @@ export default function EffectsTestPage() {
                         {status === 'no-webgpu' ? (
                             <div style={fallbackBox}>🚫 WebGPU not available</div>
                         ) : status === 'error' ? (
-                            <div style={fallbackBox}>⚠️ {errorMsg}</div>
+                            <div style={fallbackBox}>[Warning] {errorMsg}</div>
                         ) : (
                             <div style={{ position: 'relative', width: WIDTH, height: HEIGHT }}>
                                 <canvas ref={canvasRef} width={WIDTH} height={HEIGHT}
@@ -154,7 +154,7 @@ export default function EffectsTestPage() {
                                         position: 'absolute', inset: 0, display: 'flex',
                                         alignItems: 'center', justifyContent: 'center',
                                         background: 'rgba(22,25,31,0.9)', color: '#adb5bd', fontSize: 14,
-                                    }}>⚡ Loading...</div>
+                                    }}>Loading...</div>
                                 )}
                             </div>
                         )}

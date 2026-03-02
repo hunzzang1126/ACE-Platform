@@ -94,7 +94,7 @@ export function AddSizeModal({ existingPresetIds, onAdd, onClose }: Props) {
                 {/* Header */}
                 <div className="modal-header">
                     <h2 className="modal-title">ADD CREATIVE SIZES</h2>
-                    <button className="modal-close" onClick={onClose}>✕</button>
+                    <button className="modal-close" onClick={onClose}>x</button>
                 </div>
 
                 {/* Tabs */}

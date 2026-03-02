@@ -209,7 +209,7 @@ export function useCanvasEngine(
                 // ── Success! ──
                 clearTimeout(timeoutId);
                 engineRef.current = engine;
-                console.log(`${attemptLabel}: ✅ Engine ready! node_count=${engine.node_count()}`);
+                console.log(`${attemptLabel}: [OK] Engine ready! node_count=${engine.node_count()}`);
 
                 if (addDemoShapes) {
                     engine.add_gradient_rect(20, 20, 600, 360, 0.12, 0.14, 0.22, 1.0, 0.20, 0.10, 0.30, 1.0, 135.0);

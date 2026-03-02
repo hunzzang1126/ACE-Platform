@@ -43,31 +43,31 @@ function buildRichStepDetail(
     const parts: string[] = [];
     const p = step.params;
 
-    if (p.x !== undefined && p.y !== undefined) parts.push(`📍 Position: (${p.x}, ${p.y})`);
-    if (p.width !== undefined && p.height !== undefined) parts.push(`📐 Size: ${p.width}×${p.height}`);
-    if (p.color) parts.push(`🎨 Color: ${p.color}`);
-    if (p.fill) parts.push(`🎨 Fill: ${p.fill}`);
-    if (p.radius !== undefined) parts.push(`⬜ Corner radius: ${p.radius}px`);
+    if (p.x !== undefined && p.y !== undefined) parts.push(`Position: (${p.x}, ${p.y})`);
+    if (p.width !== undefined && p.height !== undefined) parts.push(`Size: ${p.width}×${p.height}`);
+    if (p.color) parts.push(`Color: ${p.color}`);
+    if (p.fill) parts.push(`Fill: ${p.fill}`);
+    if (p.radius !== undefined) parts.push(`Corner radius: ${p.radius}px`);
     if (p.blur !== undefined || p.offset_x !== undefined) {
         const blur = p.blur ?? 0;
         const ox = p.offset_x ?? 0;
         const oy = p.offset_y ?? 0;
-        parts.push(`🌑 Shadow: blur ${blur}, offset (${ox}, ${oy})`);
+        parts.push(`Shadow: blur ${blur}, offset (${ox}, ${oy})`);
     }
-    if (p.opacity !== undefined) parts.push(`👁 Opacity: ${Number(p.opacity) * 100}%`);
+    if (p.opacity !== undefined) parts.push(`Opacity: ${Number(p.opacity) * 100}%`);
     if (p.text) {
         const txt = String(p.text);
-        parts.push(`📝 Text: "${txt.length > 40 ? txt.slice(0, 40) + '...' : txt}"`);
+        parts.push(`Text: "${txt.length > 40 ? txt.slice(0, 40) + '...' : txt}"`);
     }
-    if (p.font_size !== undefined) parts.push(`🔤 Font size: ${p.font_size}px`);
-    if (p.node_id !== undefined) parts.push(`🎯 Target: node #${p.node_id}`);
+    if (p.font_size !== undefined) parts.push(`Font size: ${p.font_size}px`);
+    if (p.node_id !== undefined) parts.push(`Target: node #${p.node_id}`);
 
     if (step.status === 'running') {
-        parts.push(parts.length > 0 ? '\n⏳ Executing...' : '⏳ Working on it...');
+        parts.push(parts.length > 0 ? '\nExecuting...' : 'Working on it...');
     }
 
     if (step.result) {
-        const icon = step.result.success ? '✅' : '❌';
+        const icon = step.result.success ? '[OK]' : '[Error]';
         parts.push(`${icon} ${step.result.message}`);
     }
 

@@ -130,8 +130,8 @@ export async function orchestrateResize(
     onProgress?.(progress);
 
     const message = totalFixesApplied > 0
-        ? `✓ Resized ${results.length} sizes, fixed ${totalFixesApplied} issues`
-        : `✓ All ${results.length} sizes resized — no issues found`;
+        ? `Done: Resized ${results.length} sizes, fixed ${totalFixesApplied} issues`
+        : `Done: All ${results.length} sizes resized — no issues found`;
 
     return {
         plan,

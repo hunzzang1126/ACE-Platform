@@ -217,7 +217,7 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                         disabled={smartCheckStatus === 'checking'}
                         title="Auto-fix sizing issues across all variants"
                     >
-                        {smartCheckStatus === 'checking' ? '⏳ Checking...' : '✓ Smart Check'}
+                        {smartCheckStatus === 'checking' ? 'Checking...' : 'Done: Smart Check'}
                     </button>
                 )}
             </div>
@@ -243,7 +243,7 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                             <div className="banner-card-header">
                                 <span className="banner-card-dims">
                                     {width} × {height}
-                                    {isMaster && <span className="banner-card-master"> ✓</span>}
+                                    {isMaster && <span className="banner-card-master">  M</span>}
                                 </span>
                             </div>
 
@@ -368,7 +368,7 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                             <div className="banner-card-footer">
                                 <div className="banner-card-actions">
                                     <input type="checkbox" className="banner-card-checkbox" />
-                                    <span className="banner-card-count">🎨 {variant.elements.length}</span>
+                                    <span className="banner-card-count"> {variant.elements.length}</span>
                                 </div>
                                 <span className="banner-card-zoom">{zoom}%</span>
                             </div>
@@ -411,20 +411,20 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                         className="banner-ctx-item"
                         onClick={handleExportAll}
                     >
-                        📦 Export All Sizes (PNG)
+                        Export All Sizes (PNG)
                     </button>
                     <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', margin: '4px 0' }} />
                     <button
                         className="banner-ctx-item"
                         onClick={() => { setCtxMenu(null); handleDoubleClick(ctxMenu.variantId); }}
                     >
-                        ✏️ Open in Editor
+                        Open in Editor
                     </button>
                     <button
                         className="banner-ctx-item banner-ctx-item--danger"
                         onClick={closeCtxMenu}
                     >
-                        ✕ Cancel
+                        x Cancel
                     </button>
                 </div>
             )}

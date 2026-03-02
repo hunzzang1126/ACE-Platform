@@ -166,7 +166,7 @@ export default function AnimationTestPage() {
             background: '#0d1117', fontFamily: 'Inter, system-ui, sans-serif', color: '#e6edf3',
         }}>
             <h1 style={{ fontSize: 22, fontWeight: 600, marginBottom: 12, letterSpacing: -0.5 }}>
-                🎬 ACE Engine — Animation
+                ACE Engine — Animation
             </h1>
 
             {/* Transport Controls */}
@@ -175,8 +175,8 @@ export default function AnimationTestPage() {
                 background: 'rgba(255,255,255,0.04)', padding: '8px 16px',
                 borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)',
             }}>
-                <ControlBtn onClick={handleToggle} label={playing ? '⏸' : '▶'} accent />
-                <ControlBtn onClick={handleStop} label="⏹" />
+                <ControlBtn onClick={handleToggle} label={playing ? 'Stop' : '▶'} accent />
+                <ControlBtn onClick={handleStop} label="Stop" />
                 <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
 
                 {/* Scrubber */}
@@ -231,9 +231,9 @@ export default function AnimationTestPage() {
                 overflow: 'hidden', background: '#16191f',
             }}>
                 {status === 'no-webgpu' ? (
-                    <div style={fallbackBox}>🚫 WebGPU not available – Chrome 113+</div>
+                    <div style={fallbackBox}>Error: WebGPU not available – Chrome 113+</div>
                 ) : status === 'error' ? (
-                    <div style={fallbackBox}>⚠️ {errorMsg}</div>
+                    <div style={fallbackBox}>[Warning] {errorMsg}</div>
                 ) : (
                     <div style={{ position: 'relative', width: WIDTH, height: HEIGHT }}>
                         <canvas ref={canvasRef} width={WIDTH} height={HEIGHT}
@@ -244,7 +244,7 @@ export default function AnimationTestPage() {
                                 alignItems: 'center', justifyContent: 'center',
                                 background: 'rgba(22,25,31,0.9)', color: '#adb5bd', fontSize: 14,
                             }}>
-                                ⚡ Loading ACE Engine...
+                                Loading ACE Engine...
                             </div>
                         )}
                     </div>
@@ -264,7 +264,7 @@ export default function AnimationTestPage() {
             </div>
 
             <div style={{ fontSize: 12, color: '#8b949e', marginTop: 12, textAlign: 'center', lineHeight: 1.6 }}>
-                <div>4 animated elements · Keyframes with cubic bezier easing · {playing ? '🔴 Playing' : '⏸ Paused'}</div>
+                <div>4 animated elements · Keyframes with cubic bezier easing · {playing ? 'Playing' : 'Stop Paused'}</div>
                 <div style={{ opacity: 0.5 }}>Keyframe animation + Bezier easing — all computed in Rust/WASM</div>
             </div>
         </div>

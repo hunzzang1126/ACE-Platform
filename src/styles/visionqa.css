@@ -14,7 +14,7 @@
 }
 
 .vqa-modal {
-    background: #fff;
+    background: var(--bg-surface);
     border-radius: 12px;
     width: 580px;
     max-height: 80vh;
@@ -41,19 +41,19 @@
     align-items: flex-start;
     justify-content: space-between;
     padding: 20px 24px 12px;
-    border-bottom: 1px solid #f1f3f5;
+    border-bottom: 1px solid var(--border);
 }
 
 .vqa-title {
     font-size: 18px;
     font-weight: 700;
-    color: #1a1a2e;
+    color: var(--text-primary);
     margin: 0;
 }
 
 .vqa-subtitle {
     font-size: 11px;
-    color: #9aa0a6;
+    color: var(--text-muted);
     margin-top: 2px;
     display: block;
 }
@@ -62,15 +62,15 @@
     background: none;
     border: none;
     font-size: 18px;
-    color: #9aa0a6;
+    color: var(--text-muted);
     cursor: pointer;
     padding: 4px 8px;
     border-radius: 4px;
 }
 
 .vqa-close:hover {
-    background: #f1f3f5;
-    color: #3c4043;
+    background: var(--border);
+    color: var(--text-secondary);
 }
 
 /* Overall Score */
@@ -79,7 +79,7 @@
     align-items: center;
     gap: 20px;
     padding: 20px 24px;
-    background: #fafbfc;
+    background: var(--bg-base);
 }
 
 .vqa-score-circle {
@@ -102,24 +102,24 @@
 
 .vqa-score-label {
     font-size: 10px;
-    color: #9aa0a6;
+    color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
 
 .vqa-summary-text {
     font-size: 14px;
-    color: #3c4043;
+    color: var(--text-secondary);
     margin: 0 0 4px;
 }
 
 .vqa-pass {
-    color: #34a853;
+    color: var(--success);
     font-weight: 600;
 }
 
 .vqa-warn {
-    color: #ea4335;
+    color: var(--error);
     font-weight: 600;
 }
 
@@ -130,15 +130,15 @@
 }
 
 .vqa-verdict--pass {
-    color: #34a853;
+    color: var(--success);
 }
 
 .vqa-verdict--warn {
-    color: #fbbc04;
+    color: var(--warning);
 }
 
 .vqa-verdict--fail {
-    color: #ea4335;
+    color: var(--error);
 }
 
 /* Variants */
@@ -147,7 +147,7 @@
 }
 
 .vqa-variant {
-    border: 1px solid #e8eaed;
+    border: 1px solid var(--border);
     border-radius: 8px;
     margin-bottom: 12px;
     overflow: hidden;
@@ -158,14 +158,14 @@
     align-items: center;
     justify-content: space-between;
     padding: 10px 14px;
-    background: #fafbfc;
-    border-bottom: 1px solid #f1f3f5;
+    background: var(--bg-base);
+    border-bottom: 1px solid var(--border);
 }
 
 .vqa-variant-name {
     font-size: 13px;
     font-weight: 600;
-    color: #3c4043;
+    color: var(--text-secondary);
 }
 
 .vqa-variant-score {
@@ -176,7 +176,7 @@
 .vqa-no-issues {
     padding: 12px 14px;
     font-size: 13px;
-    color: #34a853;
+    color: var(--success);
 }
 
 .vqa-issues {
@@ -207,26 +207,26 @@
     font-size: 11px;
     font-weight: 700;
     text-transform: uppercase;
-    color: #5f6368;
+    color: var(--text-muted);
     letter-spacing: 0.3px;
 }
 
 .vqa-issue-element {
     font-size: 11px;
-    color: #9aa0a6;
+    color: var(--text-muted);
     margin-left: auto;
 }
 
 .vqa-issue-desc {
     font-size: 13px;
-    color: #3c4043;
+    color: var(--text-secondary);
     margin: 0 0 2px;
     padding-left: 22px;
 }
 
 .vqa-issue-fix {
     font-size: 12px;
-    color: #1a73e8;
+    color: var(--accent);
     margin: 0;
     padding-left: 22px;
 }
@@ -249,7 +249,7 @@
     width: 48px;
     height: 48px;
     border: 4px solid rgba(255, 255, 255, 0.2);
-    border-top-color: #1a73e8;
+    border-top-color: var(--accent);
     border-radius: 50%;
     animation: vqaSpin 0.8s linear infinite;
 }
@@ -261,7 +261,7 @@
 }
 
 .vqa-loading-text {
-    color: #fff;
+    color: var(--bg-surface);
     font-size: 16px;
     font-weight: 600;
 }
@@ -277,8 +277,8 @@
     align-items: center;
     gap: 12px;
     padding: 12px 24px;
-    background: #f0f4ff;
-    border-bottom: 1px solid #d8e2f0;
+    background: var(--accent-muted);
+    border-bottom: 1px solid var(--border);
 }
 
 .vqa-fix-btn {
@@ -289,7 +289,7 @@
     border: none;
     border-radius: 8px;
     background: linear-gradient(135deg, #6C63FF, #8b5cf6);
-    color: #fff;
+    color: var(--bg-surface);
     font-size: 14px;
     font-weight: 700;
     cursor: pointer;
@@ -312,7 +312,7 @@
     width: 14px;
     height: 14px;
     border: 2px solid rgba(255, 255, 255, 0.3);
-    border-top-color: #fff;
+    border-top-color: var(--bg-surface);
     border-radius: 50%;
     animation: vqaSpin 0.8s linear infinite;
     display: inline-block;
@@ -320,21 +320,21 @@
 
 .vqa-fix-hint {
     font-size: 12px;
-    color: #5f6368;
+    color: var(--text-muted);
 }
 
 .vqa-fix-success {
     font-size: 14px;
     font-weight: 600;
-    color: #34a853;
+    color: var(--success);
 }
 
 .vqa-recheck-btn {
     padding: 6px 16px;
-    border: 1px solid #dadce0;
+    border: 1px solid var(--border);
     border-radius: 20px;
-    background: #fff;
-    color: #3c4043;
+    background: var(--bg-surface);
+    color: var(--text-secondary);
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
@@ -342,22 +342,22 @@
 }
 
 .vqa-recheck-btn:hover {
-    background: #1a73e8;
-    color: #fff;
-    border-color: #1a73e8;
+    background: var(--accent);
+    color: var(--bg-surface);
+    border-color: var(--accent);
 }
 
 /* Fix Details */
 .vqa-fix-details {
     padding: 12px 24px;
-    background: #f6fff6;
-    border-bottom: 1px solid #d4edda;
+    background: var(--success-muted);
+    border-bottom: 1px solid var(--border);
 }
 
 .vqa-fix-details-title {
     font-size: 12px;
     font-weight: 700;
-    color: #34a853;
+    color: var(--success);
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin: 0 0 8px;
@@ -369,7 +369,7 @@
     gap: 6px;
     padding: 4px 0;
     font-size: 13px;
-    color: #3c4043;
+    color: var(--text-secondary);
 }
 
 .vqa-fix-icon {
@@ -383,10 +383,10 @@
     align-items: center;
     gap: 6px;
     padding: 6px 16px;
-    border: 1px solid #dadce0;
+    border: 1px solid var(--border);
     border-radius: 20px;
-    background: #fff;
-    color: #3c4043;
+    background: var(--bg-surface);
+    color: var(--text-secondary);
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
@@ -396,7 +396,7 @@
 
 .banner-ai-qa-btn:hover {
     background: #8b5cf6;
-    color: #fff;
+    color: var(--bg-surface);
     border-color: #8b5cf6;
 }
 

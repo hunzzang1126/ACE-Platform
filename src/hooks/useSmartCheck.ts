@@ -133,13 +133,13 @@ export function useSmartCheck() {
             const totalFixed = orchestratorFixes + qaFixes;
             let message: string;
             if (totalFixed === 0 && issues.length === 0 && visionIssueCount === 0) {
-                message = `✓ All ${resizedCount + 1} sizes look great!`;
+                message = `Done: All ${resizedCount + 1} sizes look great!`;
             } else if (totalFixed > 0 && visionIssueCount === 0) {
-                message = `✓ Synced ${resizedCount} sizes, fixed ${totalFixed} issue${totalFixed !== 1 ? 's' : ''} — all clean!`;
+                message = `Done: Synced ${resizedCount} sizes, fixed ${totalFixed} issue${totalFixed !== 1 ? 's' : ''} — all clean!`;
             } else if (totalFixed > 0) {
-                message = `✓ Synced ${resizedCount} sizes, fixed ${totalFixed} issue${totalFixed !== 1 ? 's' : ''}. ${visionIssueCount} visual note${visionIssueCount !== 1 ? 's' : ''}.`;
+                message = `Done: Synced ${resizedCount} sizes, fixed ${totalFixed} issue${totalFixed !== 1 ? 's' : ''}. ${visionIssueCount} visual note${visionIssueCount !== 1 ? 's' : ''}.`;
             } else {
-                message = `✓ Synced ${resizedCount} sizes — no issues found.`;
+                message = `Done: Synced ${resizedCount} sizes — no issues found.`;
             }
 
             setResult({

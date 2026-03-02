@@ -227,7 +227,7 @@ export default function ExportTestPage() {
             background: '#0d1117', fontFamily: 'Inter, system-ui, sans-serif', color: '#e6edf3',
         }}>
             <h1 style={{ fontSize: 22, fontWeight: 600, marginBottom: 12, letterSpacing: -0.5 }}>
-                📦 ACE Engine — Video & Export
+                ACE Engine — Video & Export
             </h1>
 
             {/* Canvas */}
@@ -238,7 +238,7 @@ export default function ExportTestPage() {
                 {status === 'no-webgpu' ? (
                     <div style={fallbackBox}>🚫 WebGPU not available</div>
                 ) : status === 'error' ? (
-                    <div style={fallbackBox}>⚠️ {errorMsg}</div>
+                    <div style={fallbackBox}>[Warning] {errorMsg}</div>
                 ) : (
                     <div style={{ position: 'relative', width: WIDTH, height: HEIGHT }}>
                         <canvas ref={canvasRef} width={WIDTH} height={HEIGHT}
@@ -248,7 +248,7 @@ export default function ExportTestPage() {
                                 position: 'absolute', inset: 0, display: 'flex',
                                 alignItems: 'center', justifyContent: 'center',
                                 background: 'rgba(22,25,31,0.9)', color: '#adb5bd', fontSize: 14,
-                            }}>⚡ Loading...</div>
+                            }}>Loading...</div>
                         )}
                     </div>
                 )}
@@ -270,7 +270,7 @@ export default function ExportTestPage() {
                 borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)',
                 marginBottom: 12,
             }}>
-                <Btn onClick={handleToggle} label={playing ? '⏸' : '▶'} accent />
+                <Btn onClick={handleToggle} label={playing ? 'Stop' : '▶'} accent />
 
                 <span style={{ fontSize: 12, color: '#8b949e', fontFamily: 'monospace', minWidth: 80, textAlign: 'center' }}>
                     {currentTime.toFixed(2)}s / {DURATION}s
@@ -281,7 +281,7 @@ export default function ExportTestPage() {
                 {/* Export buttons */}
                 <Btn
                     onClick={handleExportMp4}
-                    label={exporting ? '⏳ Encoding...' : '🎬 Export MP4'}
+                    label={exporting ? 'Encoding...' : 'Export MP4'}
                     accent
                     disabled={exporting || status !== 'ready'}
                 />
@@ -304,8 +304,8 @@ export default function ExportTestPage() {
                         <span style={{ color: exportProgress.phase === 'error' ? '#f85149' : '#8b949e' }}>
                             {exportProgress.phase === 'encoding' && `Encoding frame ${exportProgress.currentFrame}/${exportProgress.totalFrames}`}
                             {exportProgress.phase === 'muxing' && 'Muxing MP4...'}
-                            {exportProgress.phase === 'done' && '✅ Export complete — file downloaded!'}
-                            {exportProgress.phase === 'error' && `❌ ${exportProgress.error}`}
+                            {exportProgress.phase === 'done' && '[OK] Export complete — file downloaded!'}
+                            {exportProgress.phase === 'error' && `[Error] ${exportProgress.error}`}
                         </span>
                         <span style={{ color: '#8b949e', fontFamily: 'monospace' }}>
                             {exportProgress.percent.toFixed(0)}%

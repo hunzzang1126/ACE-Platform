@@ -43,7 +43,7 @@ export function SizeSidebar({ variants, visibleIds, onToggleVisibility, onAddSiz
             {/* Quick Filters */}
             <div className="cs-sidebar-section">
                 <button className="cs-sidebar-section-header">
-                    <span>⚙ Quick filters</span>
+                    <span>Settings: Quick filters</span>
                     <span className="cs-sidebar-chevron">›</span>
                 </button>
             </div>

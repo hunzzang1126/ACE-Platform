@@ -90,7 +90,7 @@ export function TypewriterText({ text, speed = 15, style, showCursor = true }: {
 // ── Suggestion Card ──
 
 export function SuggestionCard({ suggestion, onAction }: { suggestion: Suggestion; onAction: (prompt: string) => void }) {
-    const icon = suggestion.type === 'improvement' ? '💡' : suggestion.type === 'warning' ? '⚠️' : '✨';
+    const icon = suggestion.type === 'improvement' ? '' : suggestion.type === 'warning' ? '[Warning]' : '';
     return (
         <div
             onClick={() => suggestion.action && onAction(suggestion.action.prompt)}

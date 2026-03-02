@@ -426,7 +426,7 @@ function analyzeScene(trackedNodes: SceneNodeInfo[]): string {
             const ax2 = a.x + a.width, ay2 = a.y + a.height;
             const bx2 = b.x + b.width, by2 = b.y + b.height;
             if (a.x < bx2 && ax2 > b.x && a.y < by2 && ay2 > b.y) {
-                issues.push(`⚠️ ${a.label} overlaps with ${b.label}`);
+                issues.push(`[Warning] ${a.label} overlaps with ${b.label}`);
             }
         }
     }

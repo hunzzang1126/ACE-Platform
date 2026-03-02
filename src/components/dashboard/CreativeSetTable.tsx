@@ -139,7 +139,7 @@ export function CreativeSetTable({ items, folders, onOpenSet, onOpenFolder }: Pr
                         />
                     </div>
                     <div className="table-cell name-cell" style={{ flex: 1 }}>
-                        <span className="item-icon folder-icon">📁</span>
+                        <span className="item-icon folder-icon"></span>
                         {editingId === folder.id ? (
                             <input
                                 ref={editRef}

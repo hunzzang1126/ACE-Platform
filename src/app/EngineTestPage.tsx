@@ -224,7 +224,7 @@ export default function EngineTestPage() {
             background: '#0d1117', fontFamily: 'Inter, system-ui, sans-serif', color: '#e6edf3',
         }}>
             <h1 style={{ fontSize: 22, fontWeight: 600, marginBottom: 12, letterSpacing: -0.5 }}>
-                ⚡ ACE Engine — Interactive Canvas
+                ACE Engine — Interactive Canvas
             </h1>
 
             {/* Toolbar */}
@@ -236,7 +236,7 @@ export default function EngineTestPage() {
                 <ToolbarBtn onClick={() => { engineRef.current?.undo(); syncState(); }} disabled={!canUndo} label="⟲ Undo" />
                 <ToolbarBtn onClick={() => { engineRef.current?.redo(); syncState(); }} disabled={!canRedo} label="⟳ Redo" />
                 <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
-                <ToolbarBtn onClick={() => { engineRef.current?.delete_selected(); syncState(); }} disabled={selection.length === 0} label="🗑 Delete" />
+                <ToolbarBtn onClick={() => { engineRef.current?.delete_selected(); syncState(); }} disabled={selection.length === 0} label=" Delete" />
                 <div style={{ flex: 1 }} />
                 <span style={{ fontSize: 11, color: '#8b949e', alignSelf: 'center' }}>
                     {nodeCount} nodes · {selection.length} selected
@@ -252,7 +252,7 @@ export default function EngineTestPage() {
                 {status === 'no-webgpu' ? (
                     <div style={fallbackBox}>🚫 WebGPU not available – Chrome 113+</div>
                 ) : status === 'error' ? (
-                    <div style={fallbackBox}>⚠️ {errorMsg}</div>
+                    <div style={fallbackBox}>[Warning] {errorMsg}</div>
                 ) : (
                     <div style={{ position: 'relative', width: WIDTH, height: HEIGHT }}>
                         <canvas ref={canvasRef} width={WIDTH} height={HEIGHT}
@@ -274,7 +274,7 @@ export default function EngineTestPage() {
                                 alignItems: 'center', justifyContent: 'center',
                                 background: 'rgba(22,25,31,0.9)', color: '#adb5bd', fontSize: 14,
                             }}>
-                                ⚡ Loading ACE Engine...
+                                Loading ACE Engine...
                             </div>
                         )}
                     </div>
@@ -282,7 +282,7 @@ export default function EngineTestPage() {
             </div>
 
             <div style={{ fontSize: 12, color: '#8b949e', marginTop: 12, textAlign: 'center', lineHeight: 1.6 }}>
-                <div>Click to select · Drag to move · Handles to resize · ⌘Z Undo · ⌘⇧Z Redo · ⌫ Delete</div>
+                <div>Click to select · Drag to move · Handles to resize · Cmd+Z Undo · Cmd+Shift+Z Redo · Del Delete</div>
                 <div style={{ opacity: 0.5 }}>Hit Testing + Selection + Undo/Redo — all in Rust/WASM</div>
             </div>
         </div>

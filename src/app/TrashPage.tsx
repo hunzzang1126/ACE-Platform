@@ -98,7 +98,7 @@ export function TrashPage() {
                             {trash.map((t: TrashedItem, idx: number) => (
                                 <div key={`${t.item.id}-${t.deletedAt}-${idx}`} className="table-row">
                                     <div className="table-cell name-cell" style={{ flex: 3 }}>
-                                        <span className="item-icon">🗑️</span>
+                                        <span className="item-icon"></span>
                                         <span className="item-name" style={{ cursor: 'default' }}>{t.item.name}</span>
                                     </div>
                                     <div className="table-cell" style={{ flex: 1 }}>

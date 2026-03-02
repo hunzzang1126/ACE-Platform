@@ -39,7 +39,7 @@ export function CreativeSetTopBar({ setName, variantCount }: Props) {
                 <button className="cs-topbar-btn outline">
                     CONTENT & STYLING
                 </button>
-                <button className="cs-topbar-btn icon" onClick={() => navigate('/')} title="Close">✕</button>
+                <button className="cs-topbar-btn icon" onClick={() => navigate('/')} title="Close">x</button>
             </div>
         </header>
     );

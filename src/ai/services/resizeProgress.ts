@@ -76,8 +76,8 @@ export function buildProgressMessage(progress: ResizeProgress): string {
             return `Validating designs...`;
         case 'done':
             return progress.totalFixed > 0
-                ? `✓ Resized ${total} sizes, fixed ${progress.totalFixed} issues`
-                : `✓ All ${total} sizes resized — no issues found`;
+                ? `Done: Resized ${total} sizes, fixed ${progress.totalFixed} issues`
+                : `Done: All ${total} sizes resized — no issues found`;
         case 'error':
             return `Error during resize`;
         default:

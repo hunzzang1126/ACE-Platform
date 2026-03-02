@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────
-// GlobalAiPanel — Fixed right sidebar AI Agent (⌘K)
+// GlobalAiPanel — Fixed right sidebar AI Agent (Cmd+K)
 // Docked to right edge, toggleable, no floating chat
 // ─────────────────────────────────────────────────
 
@@ -66,7 +66,7 @@ export function GlobalAiPanel() {
         : currentPage === 'editor' ? 'Creative Set'
             : 'Canvas Editor';
 
-    // ── ⌘K Toggle ────────────────────────────
+    // ── Cmd+K Toggle ────────────────────────────
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
             if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -200,14 +200,14 @@ export function GlobalAiPanel() {
             if (reply) {
                 setMessages(prev => [...prev, { role: 'assistant', content: reply, timestamp: Date.now() }]);
             } else if (hadError) {
-                setMessages(prev => [...prev, { role: 'assistant', content: `⚠️ ${hadError}`, timestamp: Date.now() }]);
+                setMessages(prev => [...prev, { role: 'assistant', content: `[Warning] ${hadError}`, timestamp: Date.now() }]);
             } else {
                 setMessages(prev => [...prev, { role: 'assistant', content: 'Request completed.', timestamp: Date.now() }]);
             }
             setLive(prev => ({ ...prev, phase: hadError ? 'error' : 'done' }));
         } catch (err) {
             const errMsg = String(err);
-            setMessages(prev => [...prev, { role: 'assistant', content: `⚠️ ${errMsg}`, timestamp: Date.now() }]);
+            setMessages(prev => [...prev, { role: 'assistant', content: `[Warning] ${errMsg}`, timestamp: Date.now() }]);
             setLive(prev => ({ ...prev, phase: 'error', error: errMsg }));
         }
     }, [input, config, buildContextSummary, navigate]);
@@ -230,7 +230,7 @@ export function GlobalAiPanel() {
             <button
                 onClick={() => { setOpen(!open); setTimeout(() => inputRef.current?.focus(), 150); }}
                 style={toggleBtnStyle}
-                title={open ? 'Close AI (⌘K)' : 'Open AI (⌘K)'}
+                title={open ? 'Close AI (Cmd+K)' : 'Open AI (Cmd+K)'}
             >
                 {open
                     ? <IcChevronRight size={14} color="#8b949e" />
@@ -324,7 +324,7 @@ export function GlobalAiPanel() {
                                         </span>
                                         {step.result && (
                                             <span style={{ fontSize: 10, color: step.result.success ? '#3fb950' : '#f85149', marginLeft: 4 }}>
-                                                {step.result.success ? '✓' : '✗'}
+                                                {step.result.success ? 'Done' : 'Fail'}
                                             </span>
                                         )}
                                     </div>

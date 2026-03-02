@@ -114,7 +114,7 @@ export const SmartAssetUploader: React.FC<SmartAssetUploaderProps> = ({
                     </div>
                 ) : (
                     <div className="smart-asset-uploader__prompt">
-                        <span className="smart-asset-uploader__icon">📷</span>
+                        <span className="smart-asset-uploader__icon"></span>
                         <span>Drop image here or click to upload</span>
                         <span className="smart-asset-uploader__hint">
                             AI will auto-tag, extract colors, and detect content

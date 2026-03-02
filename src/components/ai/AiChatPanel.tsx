@@ -105,10 +105,10 @@ export default function AiChatPanel({ aiService, engine, trackedNodes, onSendMes
             {/* Header */}
             <div style={headerStyle}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 16 }}>🤖</span>
+                    <span style={{ fontSize: 16 }}></span>
                     <span style={{ fontWeight: 600, fontSize: 14, letterSpacing: -0.3 }}>ACE AI Agent</span>
                 </div>
-                <button onClick={() => setShowSettings(!showSettings)} style={iconBtnStyle}>⚙️</button>
+                <button onClick={() => setShowSettings(!showSettings)} style={iconBtnStyle}>Settings</button>
             </div>
 
             {/* Settings Panel */}
@@ -151,7 +151,7 @@ export default function AiChatPanel({ aiService, engine, trackedNodes, onSendMes
                 {/* Empty state */}
                 {messages.length === 0 && live.phase === 'idle' && (
                     <div style={{ padding: '24px 16px', textAlign: 'center', color: '#8b949e' }}>
-                        <div style={{ fontSize: 28, marginBottom: 8 }}>🧠</div>
+                        <div style={{ fontSize: 28, marginBottom: 8 }}></div>
                         <div style={{ fontSize: 13, marginBottom: 16 }}>Ask me to create, modify, or animate elements on your canvas.</div>
 
                         {suggestions.map(s => (
@@ -187,7 +187,7 @@ export default function AiChatPanel({ aiService, engine, trackedNodes, onSendMes
                 {/* Error */}
                 {live.phase === 'error' && (
                     <div style={{ ...bubbleBase, background: 'rgba(248,81,73,0.1)', borderColor: 'rgba(248,81,73,0.3)', color: '#f85149' }}>
-                        ❌ {live.error}
+                        [Error] {live.error}
                     </div>
                 )}
 
@@ -201,7 +201,7 @@ export default function AiChatPanel({ aiService, engine, trackedNodes, onSendMes
                     value={input}
                     onChange={e => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder={aiService.isConfigured() ? "Ask anything... (⌘K)" : "Set API key in ⚙️ first"}
+                    placeholder={aiService.isConfigured() ? "Ask anything... (Cmd+K)" : "Set API key in Settings first"}
                     disabled={live.phase !== 'idle' && live.phase !== 'done' && live.phase !== 'error'}
                     style={inputFieldStyle}
                 />

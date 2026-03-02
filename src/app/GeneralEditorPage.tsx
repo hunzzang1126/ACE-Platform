@@ -164,7 +164,7 @@ export function GeneralEditorPage() {
 
             {smartCheckStatus === 'error' && smartCheckError && (
                 <div className="vqa-loading-overlay" onClick={resetSmartCheck}>
-                    <div className="vqa-loading-text">❌ {smartCheckError}</div>
+                    <div className="vqa-loading-text">[Error] {smartCheckError}</div>
                     <div className="vqa-loading-progress">Click to dismiss</div>
                 </div>
             )}

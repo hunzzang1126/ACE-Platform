@@ -85,16 +85,16 @@ export default function AiTestPage() {
                 {/* Toolbar */}
                 <div style={toolbarStyle}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 20 }}>🎨</span>
+                        <span style={{ fontSize: 20 }}></span>
                         <span style={{ fontWeight: 700, fontSize: 16, letterSpacing: -0.5 }}>ACE AI Agent</span>
                     </div>
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                        <ToolBtn label="⏮" onClick={handleUndo} title="Undo (⌘Z)" />
-                        <ToolBtn label="⏭" onClick={handleRedo} title="Redo (⌘⇧Z)" />
-                        <ToolBtn label={isPlaying ? '⏸' : '▶️'} onClick={handlePlayPause} title="Play/Pause" />
-                        <ToolBtn label="🗑" onClick={handleClear} title="Clear" />
+                        <ToolBtn label="Undo" onClick={handleUndo} title="Undo (Cmd+Z)" />
+                        <ToolBtn label="Redo" onClick={handleRedo} title="Redo (Cmd+Shift+Z)" />
+                        <ToolBtn label={isPlaying ? 'Stop' : 'Play'} onClick={handlePlayPause} title="Play/Pause" />
+                        <ToolBtn label="" onClick={handleClear} title="Clear" />
                         <span style={{ fontSize: 11, color: '#8b949e', marginLeft: 8 }}>
-                            {nodeCount} elements | {isReady ? '✅ Engine Ready' : '⏳ Loading...'}
+                            {nodeCount} elements | {isReady ? '[OK] Engine Ready' : 'Loading...'}
                         </span>
                     </div>
                 </div>
@@ -109,7 +109,7 @@ export default function AiTestPage() {
                     />
                     {!isReady && (
                         <div style={overlayStyle}>
-                            <div style={{ fontSize: 32, marginBottom: 8 }}>⚡</div>
+                            <div style={{ fontSize: 32, marginBottom: 8 }}></div>
                             <div>Initializing WebGPU Engine...</div>
                         </div>
                     )}

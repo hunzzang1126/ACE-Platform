@@ -183,7 +183,7 @@ export function DetailEditorPage() {
     }, []);
 
     // Delete selected overlay on Delete/Backspace
-    // Also ⌘D to duplicate overlay, Spacebar to toggle play
+    // Also Cmd+D to duplicate overlay, Spacebar to toggle play
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
             // Don't intercept when typing in inputs
@@ -253,9 +253,9 @@ export function DetailEditorPage() {
                     }}
                     title={isMaster ? 'Save and propagate to all sizes' : 'Save this variant'}
                 >
-                    {saveStatus === 'saving' ? '⏳ Saving...'
-                        : saveStatus === 'saved' ? '✓ Saved'
-                            : isMaster ? '💾 Save & Propagate' : '💾 Save'}
+                    {saveStatus === 'saving' ? 'Saving...'
+                        : saveStatus === 'saved' ? 'Done: Saved'
+                            : isMaster ? 'Save & Propagate' : 'Save'}
                 </button>
             </EditorTopBar>
             <div className="ed-body">

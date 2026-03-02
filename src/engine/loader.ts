@@ -32,10 +32,10 @@ export async function loadAceEngine(): Promise<any> {
                 await mod.default();
             }
             cachedModule = mod;
-            console.log('[loader] ✅ WASM module loaded and cached');
+            console.log('[loader] [OK] WASM module loaded and cached');
             return mod;
         } catch (err) {
-            console.error('[loader] ❌ WASM module load failed:', err);
+            console.error('[loader] [Error] WASM module load failed:', err);
             // DON'T cache a broken module — allow retry
             cachedModule = null;
             throw err;

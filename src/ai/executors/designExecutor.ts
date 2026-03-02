@@ -534,7 +534,7 @@ export function executeDesignTool(
 
                 const resultStr = typeof result === 'string' ? result : JSON.stringify(result ?? 'Done');
                 console.log(`[DashboardExecutor] Dynamic action "${description}" result:`, resultStr);
-                return { success: true, message: `✅ ${description}: ${resultStr}` };
+                return { success: true, message: `[OK] ${description}: ${resultStr}` };
             } catch (err) {
                 console.error(`[DashboardExecutor] Dynamic action failed:`, err);
                 return { success: false, message: `Failed to execute "${description}": ${err}` };
