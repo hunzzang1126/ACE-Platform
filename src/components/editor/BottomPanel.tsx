@@ -10,18 +10,8 @@ import type { OverlayElement } from '@/hooks/useOverlayElements';
 import { IcStop, IcPlay, IcPause, IcLoop } from '@/components/ui/Icons';
 import { IcClose } from '@/components/ui/Icons';
 import { useAnimPresetStore, ANIM_PRESETS, type AnimPresetType, presetLabel } from '@/hooks/useAnimationPresets';
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Engine = any;
-
-/** Unified layer item combining overlays and engine nodes */
-interface UnifiedLayer {
-    kind: 'overlay' | 'engine';
-    id: string;        // overlay string id or engine node id as string
-    globalZ: number;   // shared z-index for ordering
-    overlay?: OverlayElement;
-    node?: EngineNode;
-}
+import { useLayerDrag } from '@/hooks/useLayerDrag';
+import { type Engine, type UnifiedLayer, BAR_COLORS, nodeLabel, nodeIcon } from './bottomPanelHelpers';
 
 interface Props {
     variant: BannerVariant;
@@ -41,110 +31,6 @@ interface Props {
     onOverlayDuplicate?: (id: string) => string | null;
     onOverlayRename?: (id: string, name: string) => void;
     onOverlayDelete?: (id: string) => void;
-}
-
-// Color palette for timeline bars
-const BAR_COLORS = ['#4285f4', '#34a853', '#f9a825', '#ea4335', '#ab47bc', '#00acc1', '#ff7043'];
-
-/** Pretty label for node type */
-function nodeLabel(node: EngineNode): string {
-    const types: Record<string, string> = {
-        rect: 'Rectangle',
-        rounded_rect: 'Rounded Rect',
-        ellipse: 'Ellipse',
-    };
-    return `${types[node.type] || node.type} #${node.id + 1}`;
-}
-
-/** Type icon for node */
-function nodeIcon(type: string): string {
-    switch (type) {
-        case 'ellipse': return '○';
-        case 'rounded_rect': return '▢';
-        default: return '□';
-    }
-}
-
-// ── Custom drag-to-reorder hook ──
-// Uses mousedown/mousemove/mouseup for reliable drag (not HTML5 DnD).
-// Works for both overlay elements AND engine nodes via '.bp-drag-row'.
-function useLayerDrag(
-    totalCount: number,
-    onReorder?: (sourceId: string, targetIndex: number) => void,
-) {
-    const [dragState, setDragState] = useState<{
-        srcId: string;
-        srcIdx: number;
-        overIdx: number | null;
-        active: boolean;
-    } | null>(null);
-
-    // Ref to suppress click after drag
-    const justDragged = useRef(false);
-
-    const startDrag = useCallback((e: React.MouseEvent, id: string, idx: number) => {
-        // Only left mouse button
-        if (e.button !== 0) return;
-        e.preventDefault();
-        e.stopPropagation();
-
-        const startY = e.clientY;
-        let activated = false;
-        let currentOverIdx: number | null = null;
-
-        setDragState({ srcId: id, srcIdx: idx, overIdx: null, active: false });
-
-        const handleMove = (ev: MouseEvent) => {
-            const dy = ev.clientY - startY;
-
-            // Require 5px of movement before activating drag
-            if (!activated && Math.abs(dy) < 5) return;
-            activated = true;
-
-            // Query ALL draggable rows for hit-testing (overlays + engine)
-            const rows = document.querySelectorAll('.bp-layer-drag-row');
-            let bestIdx = idx;
-            let bestDist = Infinity;
-
-            rows.forEach((row, i) => {
-                const rect = row.getBoundingClientRect();
-                const centerY = rect.top + rect.height / 2;
-                const dist = Math.abs(ev.clientY - centerY);
-                if (dist < bestDist) {
-                    bestDist = dist;
-                    bestIdx = i;
-                }
-            });
-
-            if (bestIdx !== currentOverIdx) {
-                currentOverIdx = bestIdx;
-                setDragState({ srcId: id, srcIdx: idx, overIdx: bestIdx, active: true });
-            }
-        };
-
-        const handleUp = () => {
-            document.removeEventListener('mousemove', handleMove);
-            document.removeEventListener('mouseup', handleUp);
-            document.body.style.cursor = '';
-            document.body.style.userSelect = '';
-
-            if (activated && currentOverIdx !== null && currentOverIdx !== idx) {
-                onReorder?.(id, currentOverIdx);
-                // Suppress the next click (mouseup -> click would re-select)
-                justDragged.current = true;
-                setTimeout(() => { justDragged.current = false; }, 50);
-            }
-
-            setDragState(null);
-        };
-
-        document.body.style.cursor = 'grabbing';
-        document.body.style.userSelect = 'none';
-        document.addEventListener('mousemove', handleMove);
-        document.addEventListener('mouseup', handleUp);
-    }, [totalCount, onReorder]);
-
-    return { dragState, startDrag, justDragged };
 }
 
 export function BottomPanel({ variant, engine, nodes, selection, actions, overlayElements = [], selectedOverlayId, onOverlaySelect, onOverlayMoveUp, onOverlayMoveDown, onOverlayReorderTo, onOverlaySetZIndex, onOverlayToggleLock, onOverlayToggleVisibility, onOverlayDuplicate, onOverlayRename, onOverlayDelete }: Props) {
