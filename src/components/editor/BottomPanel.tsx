@@ -8,10 +8,12 @@ import type { BannerVariant } from '@/schema/design.types';
 import type { CanvasEngineActions, EngineNode } from '@/hooks/useCanvasEngine';
 import type { OverlayElement } from '@/hooks/useOverlayElements';
 import { IcStop, IcPlay, IcPause, IcLoop } from '@/components/ui/Icons';
-import { IcClose } from '@/components/ui/Icons';
-import { useAnimPresetStore, ANIM_PRESETS, type AnimPresetType, presetLabel } from '@/hooks/useAnimationPresets';
+import { useAnimPresetStore, presetLabel } from '@/hooks/useAnimationPresets';
 import { useLayerDrag } from '@/hooks/useLayerDrag';
-import { type Engine, type UnifiedLayer, BAR_COLORS, nodeLabel, nodeIcon } from './bottomPanelHelpers';
+import { type Engine, type UnifiedLayer, BAR_COLORS, nodeLabel } from './bottomPanelHelpers';
+import { OverlayLayerRow, EngineLayerRow } from './LayerRow';
+import { TimelineBar } from './TimelineBar';
+import { AnimDropdown } from './AnimDropdown';
 
 interface Props {
     variant: BannerVariant;
@@ -401,84 +403,42 @@ export function BottomPanel({ variant, engine, nodes, selection, actions, overla
                         const dropTargetClass = isDragOver(idx) ? 'bp-drop-target' : '';
 
                         if (layer.kind === 'overlay' && layer.overlay) {
-                            const el = layer.overlay;
-                            const isSelected = el.id === selectedOverlayId;
-                            const isLocked = el.locked ?? false;
-                            const isVisible = el.visible ?? true;
-                            const isRenaming = renamingId === el.id;
                             return (
-                                <div
-                                    key={el.id}
-                                    className={`bp-layer-row bp-layer-drag-row bp-overlay-row ${isSelected ? 'selected' : ''} ${isLocked ? 'locked' : ''} ${!isVisible ? 'hidden-layer' : ''} ${draggedClass} ${dropTargetClass}`}
-                                    onMouseDown={(e) => {
-                                        const tag = (e.target as HTMLElement).tagName;
-                                        if (tag === 'BUTTON' || tag === 'INPUT' || tag === 'SVG' || tag === 'PATH') return;
-                                        startDrag(e, el.id, idx);
-                                    }}
-                                    onClick={() => { if (justDragged.current) return; onOverlaySelect?.(el.id); }}
-                                >
-                                    <span className="bp-layer-icon">{el.type === 'text' ? 'T' : '🖼'}</span>
-                                    {isRenaming ? (
-                                        <input
-                                            className="bp-rename-input"
-                                            value={renameValue}
-                                            onChange={(e) => setRenameValue(e.target.value)}
-                                            onBlur={() => { onOverlayRename?.(el.id, renameValue); setRenamingId(null); }}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter') { onOverlayRename?.(el.id, renameValue); setRenamingId(null); }
-                                                if (e.key === 'Escape') setRenamingId(null);
-                                                e.stopPropagation();
-                                            }}
-                                            autoFocus
-                                            onClick={(e) => e.stopPropagation()}
-                                        />
-                                    ) : (
-                                        <span
-                                            className="bp-layer-name"
-                                            onDoubleClick={(e) => {
-                                                e.stopPropagation();
-                                                setRenamingId(el.id);
-                                                setRenameValue(el.name || (el.type === 'text' ? 'Text' : 'Image'));
-                                            }}
-                                        >
-                                            {el.name || (el.type === 'text' ? (el.content?.slice(0, 20) || 'Text') : (el.fileName || 'Image'))}
-                                        </span>
-                                    )}
-                                    <div className="bp-layer-actions">
-                                        <button className="bp-layer-action-btn" title={isLocked ? 'Unlock' : 'Lock'} onClick={(e) => { e.stopPropagation(); onOverlayToggleLock?.(el.id); }}>
-                                            {isLocked ? '🔒' : '🔓'}
-                                        </button>
-                                        <button className="bp-layer-action-btn" title={isVisible ? 'Hide' : 'Show'} onClick={(e) => { e.stopPropagation(); onOverlayToggleVisibility?.(el.id); }}>
-                                            {isVisible ? '👁' : '👁‍🗨'}
-                                        </button>
-                                        <button className="bp-layer-action-btn" title="Delete" onClick={(e) => { e.stopPropagation(); onOverlayDelete?.(el.id); }}>
-                                            <IcClose size={9} />
-                                        </button>
-                                    </div>
-                                </div>
+                                <OverlayLayerRow
+                                    key={layer.overlay.id}
+                                    el={layer.overlay}
+                                    isSelected={layer.overlay.id === selectedOverlayId}
+                                    isRenaming={renamingId === layer.overlay.id}
+                                    renameValue={renameValue}
+                                    draggedClass={draggedClass}
+                                    dropTargetClass={dropTargetClass}
+                                    onStartDrag={startDrag}
+                                    idx={idx}
+                                    justDragged={justDragged}
+                                    onSelect={(id) => onOverlaySelect?.(id)}
+                                    onRenameStart={(id, name) => { setRenamingId(id); setRenameValue(name); }}
+                                    onRenameChange={setRenameValue}
+                                    onRenameCommit={(id, val) => { onOverlayRename?.(id, val); setRenamingId(null); }}
+                                    onRenameCancel={() => setRenamingId(null)}
+                                    onToggleLock={onOverlayToggleLock}
+                                    onToggleVisibility={onOverlayToggleVisibility}
+                                    onDelete={onOverlayDelete}
+                                />
                             );
                         } else if (layer.kind === 'engine' && layer.node) {
-                            const node = layer.node;
-                            const isSelected = selection.includes(node.id);
                             return (
-                                <div
-                                    key={`eng-${node.id}`}
-                                    className={`bp-layer-row bp-layer-drag-row ${isSelected ? 'selected' : ''} ${draggedClass} ${dropTargetClass}`}
-                                    onMouseDown={(e) => {
-                                        const tag = (e.target as HTMLElement).tagName;
-                                        if (tag === 'BUTTON' || tag === 'SVG' || tag === 'PATH') return;
-                                        startDrag(e, String(node.id), idx);
-                                    }}
-                                    onClick={() => { if (justDragged.current) return; handleSelect(node.id); }}
-                                >
-                                    <span className="bp-layer-icon">{nodeIcon(node.type)}</span>
-                                    <span className="bp-layer-name">{nodeLabel(node)}</span>
-                                    <div className="bp-layer-actions">
-                                        <button className="bp-layer-action-btn" title="Delete" onClick={(e) => { e.stopPropagation(); handleDelete(node.id); }}>
-                                            <IcClose size={9} />
-                                        </button>
-                                    </div>
-                                </div>
+                                <EngineLayerRow
+                                    key={`eng-${layer.node.id}`}
+                                    node={layer.node}
+                                    isSelected={selection.includes(layer.node.id)}
+                                    draggedClass={draggedClass}
+                                    dropTargetClass={dropTargetClass}
+                                    onStartDrag={startDrag}
+                                    idx={idx}
+                                    justDragged={justDragged}
+                                    onSelect={handleSelect}
+                                    onDelete={handleDelete}
+                                />
                             );
                         }
                         return null;
@@ -494,9 +454,7 @@ export function BottomPanel({ variant, engine, nodes, selection, actions, overla
                     {unifiedLayers.map((layer, idx) => {
                         const draggedClass = isDragging(layer.id) ? 'bp-dragging' : '';
                         const dropTargetClass = isDragOver(idx) ? 'bp-drop-target' : '';
-                        const barColor = BAR_COLORS[idx % BAR_COLORS.length];
-
-                        // Per-element timing
+                        const barColor = BAR_COLORS[idx % BAR_COLORS.length] ?? '#4a9eff';
                         const config = animPresets.getPreset(layer.id);
                         const st = config.startTime;
                         const et = config.endTime < 0 ? duration : config.endTime;
@@ -505,100 +463,57 @@ export function BottomPanel({ variant, engine, nodes, selection, actions, overla
 
                         if (layer.kind === 'overlay' && layer.overlay) {
                             const el = layer.overlay;
-                            const isSelected = el.id === selectedOverlayId;
-                            const label = getBarLabel(el.id, el.type === 'text' ? 'Text' : 'Image');
                             return (
-                                <div
+                                <TimelineBar
                                     key={`tl-${el.id}`}
-                                    className={`bp-bar-row ${isSelected ? 'selected' : ''} ${draggedClass} ${dropTargetClass}`}
-                                    onClick={() => { if (justDragged.current) return; onOverlaySelect?.(el.id); }}
-                                >
-                                    <div
-                                        className="bp-bar bp-bar-draggable"
-                                        style={{ left: barLeft, width: barWidth, backgroundColor: barColor, opacity: 0.7, position: 'relative' }}
-                                        onMouseDown={(e) => {
-                                            // Only drag if not clicking the label button
-                                            const tag = (e.target as HTMLElement).tagName;
-                                            if (tag === 'BUTTON') return;
-                                            handleBarMouseDown(e, el.id, e.currentTarget);
-                                        }}
-                                        onMouseMove={(e) => {
-                                            const tag = (e.target as HTMLElement).tagName;
-                                            if (tag === 'BUTTON') { e.currentTarget.style.cursor = 'pointer'; return; }
-                                            e.currentTarget.style.cursor = getBarCursor(e);
-                                        }}
-                                    >
-                                        <div
-                                            className="bp-bar-handle bp-bar-handle-left"
-                                            title="Drag to resize start"
-                                        />
-                                        <button
-                                            className="bp-bar-anim-btn"
-                                            title="Click to set animation"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                const rect = e.currentTarget.getBoundingClientRect();
-                                                setAnimDropdown({ elementId: el.id, nodeId: -1, x: rect.left, y: rect.top });
-                                            }}
-                                        >
-                                            {config.anim !== 'none' && <span className="bp-anim-dot" />}
-                                            {label}
-                                        </button>
-                                        <div
-                                            className="bp-bar-handle bp-bar-handle-right"
-                                            title="Drag to resize end"
-                                        />
-                                    </div>
-                                    <div className="bp-bar-playhead" style={{ left: `${(currentTime / duration) * 100}%` }} />
-                                </div>
+                                    elementId={el.id}
+                                    label={getBarLabel(el.id, el.type === 'text' ? 'Text' : 'Image')}
+                                    isSelected={el.id === selectedOverlayId}
+                                    draggedClass={draggedClass}
+                                    dropTargetClass={dropTargetClass}
+                                    barLeft={barLeft}
+                                    barWidth={barWidth}
+                                    barColor={barColor}
+                                    currentTime={currentTime}
+                                    duration={duration}
+                                    hasAnim={config.anim !== 'none'}
+                                    opacityStyle={0.7}
+                                    justDragged={justDragged}
+                                    onSelect={() => onOverlaySelect?.(el.id)}
+                                    onBarMouseDown={handleBarMouseDown}
+                                    onBarCursor={getBarCursor}
+                                    onAnimClick={(e, elId, nId) => {
+                                        const rect = e.currentTarget.getBoundingClientRect();
+                                        setAnimDropdown({ elementId: elId, nodeId: nId, x: rect.left, y: rect.top });
+                                    }}
+                                    nodeId={-1}
+                                />
                             );
                         } else if (layer.kind === 'engine' && layer.node) {
-                            const node = layer.node;
-                            const isSelected = selection.includes(node.id);
-                            const label = getBarLabel(String(node.id), nodeLabel(node));
                             return (
-                                <div
-                                    key={`tl-eng-${node.id}`}
-                                    className={`bp-bar-row ${isSelected ? 'selected' : ''} ${draggedClass} ${dropTargetClass}`}
-                                    onClick={() => { if (justDragged.current) return; handleSelect(node.id); }}
-                                >
-                                    <div
-                                        className="bp-bar bp-bar-draggable"
-                                        style={{ left: barLeft, width: barWidth, backgroundColor: barColor, position: 'relative' }}
-                                        onMouseDown={(e) => {
-                                            const tag = (e.target as HTMLElement).tagName;
-                                            if (tag === 'BUTTON') return;
-                                            handleBarMouseDown(e, String(node.id), e.currentTarget);
-                                        }}
-                                        onMouseMove={(e) => {
-                                            const tag = (e.target as HTMLElement).tagName;
-                                            if (tag === 'BUTTON') { e.currentTarget.style.cursor = 'pointer'; return; }
-                                            e.currentTarget.style.cursor = getBarCursor(e);
-                                        }}
-                                    >
-                                        <div
-                                            className="bp-bar-handle bp-bar-handle-left"
-                                            title="Drag to resize start"
-                                        />
-                                        <button
-                                            className="bp-bar-anim-btn"
-                                            title="Click to set animation"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                const rect = e.currentTarget.getBoundingClientRect();
-                                                setAnimDropdown({ elementId: String(node.id), nodeId: node.id, x: rect.left, y: rect.top });
-                                            }}
-                                        >
-                                            {config.anim !== 'none' && <span className="bp-anim-dot" />}
-                                            {label}
-                                        </button>
-                                        <div
-                                            className="bp-bar-handle bp-bar-handle-right"
-                                            title="Drag to resize end"
-                                        />
-                                    </div>
-                                    <div className="bp-bar-playhead" style={{ left: `${(currentTime / duration) * 100}%` }} />
-                                </div>
+                                <TimelineBar
+                                    key={`tl-eng-${layer.node.id}`}
+                                    elementId={String(layer.node.id)}
+                                    label={getBarLabel(String(layer.node.id), nodeLabel(layer.node))}
+                                    isSelected={selection.includes(layer.node.id)}
+                                    draggedClass={draggedClass}
+                                    dropTargetClass={dropTargetClass}
+                                    barLeft={barLeft}
+                                    barWidth={barWidth}
+                                    barColor={barColor}
+                                    currentTime={currentTime}
+                                    duration={duration}
+                                    hasAnim={config.anim !== 'none'}
+                                    justDragged={justDragged}
+                                    onSelect={() => handleSelect(layer.node!.id)}
+                                    onBarMouseDown={handleBarMouseDown}
+                                    onBarCursor={getBarCursor}
+                                    onAnimClick={(e, elId, nId) => {
+                                        const rect = e.currentTarget.getBoundingClientRect();
+                                        setAnimDropdown({ elementId: elId, nodeId: nId, x: rect.left, y: rect.top });
+                                    }}
+                                    nodeId={layer.node.id}
+                                />
                             );
                         }
                         return null;
@@ -610,85 +525,15 @@ export function BottomPanel({ variant, engine, nodes, selection, actions, overla
             </div>
 
             {/* ── Animation preset dropdown ── */}
-            {animDropdown && (() => {
-                const dd = animDropdown; // local const for TS null-safety
-                return (
-                    <div
-                        className="bp-anim-dropdown-backdrop"
-                        onClick={() => setAnimDropdown(null)}
-                    >
-                        <div
-                            className="bp-anim-dropdown"
-                            style={{ left: dd.x, top: dd.y - 8 }}
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            <div className="bp-anim-dropdown-title">
-                                Animation
-                            </div>
-                            {ANIM_PRESETS.map((p) => {
-                                const config = animPresets.getPreset(dd.elementId);
-                                const isActive = config.anim === p.value;
-                                return (
-                                    <button
-                                        key={p.value}
-                                        className={`bp-anim-dropdown-item ${isActive ? 'active' : ''}`}
-                                        onClick={() => {
-                                            animPresets.setPreset(dd.elementId, { anim: p.value as AnimPresetType });
-                                            // Apply keyframes to engine if this is an engine node
-                                            if (dd.nodeId >= 0 && engine) {
-                                                try {
-                                                    // ── CLEAR existing keyframes for this node first ──
-                                                    engine.clear_node_keyframes(dd.nodeId);
-
-                                                    if (p.value !== 'none') {
-                                                        const animDur = 0.3;
-                                                        const st = 0;
-                                                        const et = animDur;
-                                                        const ease = 'ease_out';
-
-                                                        if (p.value === 'fade') {
-                                                            engine.add_keyframe(dd.nodeId, 'opacity', st, 0, ease);
-                                                            engine.add_keyframe(dd.nodeId, 'opacity', et, 1, ease);
-                                                        } else if (p.value.startsWith('slide-')) {
-                                                            const prop = p.value.includes('left') || p.value.includes('right') ? 'x' : 'y';
-                                                            const offset = p.value.includes('left') || p.value.includes('up') ? -200 : 200;
-                                                            engine.add_keyframe(dd.nodeId, prop, st, offset, ease);
-                                                            engine.add_keyframe(dd.nodeId, prop, et, 0, ease);
-                                                        } else if (p.value === 'scale') {
-                                                            engine.add_keyframe(dd.nodeId, 'scale_x', st, 0, ease);
-                                                            engine.add_keyframe(dd.nodeId, 'scale_x', et, 1, ease);
-                                                            engine.add_keyframe(dd.nodeId, 'scale_y', st, 0, ease);
-                                                            engine.add_keyframe(dd.nodeId, 'scale_y', et, 1, ease);
-                                                        } else if (p.value === 'ascend') {
-                                                            engine.add_keyframe(dd.nodeId, 'y', st, 100, ease);
-                                                            engine.add_keyframe(dd.nodeId, 'y', et, 0, ease);
-                                                            engine.add_keyframe(dd.nodeId, 'opacity', st, 0, ease);
-                                                            engine.add_keyframe(dd.nodeId, 'opacity', et, 1, ease);
-                                                        } else if (p.value === 'descend') {
-                                                            engine.add_keyframe(dd.nodeId, 'y', st, -100, ease);
-                                                            engine.add_keyframe(dd.nodeId, 'y', et, 0, ease);
-                                                            engine.add_keyframe(dd.nodeId, 'opacity', st, 0, ease);
-                                                            engine.add_keyframe(dd.nodeId, 'opacity', et, 1, ease);
-                                                        }
-                                                    }
-
-                                                    // Reset timeline to start and re-render
-                                                    engine.anim_stop?.();
-                                                    engine.anim_seek?.(0);
-                                                    engine.render_frame?.();
-                                                } catch { /* engine not ready */ }
-                                            }
-                                            setAnimDropdown(null);
-                                        }}
-                                    >
-                                        {p.label}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-                );
-            })()}
+            {animDropdown && (
+                <AnimDropdown
+                    dropdown={animDropdown}
+                    engine={engine}
+                    getPreset={animPresets.getPreset}
+                    setPreset={animPresets.setPreset}
+                    onClose={() => setAnimDropdown(null)}
+                />
+            )}
         </div>
     );
 }
