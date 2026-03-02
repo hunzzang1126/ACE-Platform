@@ -13,7 +13,7 @@
 
 import type { CreativeSet, BannerVariant } from '@/schema/design.types';
 import { getAspectCategory } from '@/schema/layoutRoles';
-import { resizeVariant, type VariantResizeResult } from './resizeSubAgent';
+import { analyzeVariantForResize, type VariantResizeResult, type ElementPatch } from './resizeSubAgent';
 import {
     createInitialProgress,
     updateVariantStatus,
@@ -39,7 +39,7 @@ export interface ResizePlan {
 export interface OrchestrateResult {
     plan: ResizePlan;
     results: VariantResizeResult[];
-    totalSyncDeltas: number;
+    allPatches: Array<{ variantId: string; patches: ElementPatch[] }>;
     totalFixesApplied: number;
     totalIssues: number;
     message: string;
@@ -88,21 +88,21 @@ export async function orchestrateResize(
                     return {
                         variantId: target.variantId,
                         label: target.label,
-                        syncDeltas: 0,
-                        fixesApplied: 0,
-                        issues: 0,
+                        patches: [],
+                        qaFixCount: 0,
+                        issueCount: 0,
                     };
                 }
 
-                // Execute resize (sync + smart layout + QA fix)
-                const result = resizeVariant(variant, master, creativeSet);
+                // Execute analysis (returns patches, doesn't mutate store)
+                const result = analyzeVariantForResize(variant, creativeSet);
 
                 // Update progress: done
                 const doneProgress = updateVariantStatus(
                     progress,
                     target.variantId,
                     'done',
-                    result.fixesApplied,
+                    result.qaFixCount,
                 );
                 Object.assign(progress, doneProgress);
                 progress.message = buildProgressMessage(progress);
@@ -121,9 +121,9 @@ export async function orchestrateResize(
     }
 
     // Phase 3: Aggregate results
-    const totalSyncDeltas = results.reduce((sum, r) => sum + r.syncDeltas, 0);
-    const totalFixesApplied = results.reduce((sum, r) => sum + r.fixesApplied, 0);
-    const totalIssues = results.reduce((sum, r) => sum + r.issues, 0);
+    const allPatches = results.map(r => ({ variantId: r.variantId, patches: r.patches }));
+    const totalFixesApplied = results.reduce((sum, r) => sum + r.qaFixCount + r.patches.length, 0);
+    const totalIssues = results.reduce((sum, r) => sum + r.issueCount, 0);
 
     progress.phase = 'done';
     progress.message = buildProgressMessage(progress);
@@ -136,7 +136,7 @@ export async function orchestrateResize(
     return {
         plan,
         results,
-        totalSyncDeltas,
+        allPatches,
         totalFixesApplied,
         totalIssues,
         message,

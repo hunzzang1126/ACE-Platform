@@ -44,13 +44,24 @@ export function useSmartCheck() {
             setError(null);
             setResult(null);
 
-            // Step 1: Orchestrate resize — re-sync ALL variants from master
+            // Step 1: Orchestrate resize — compute patches for ALL variants
             let resizedCount = 0;
             let orchestratorFixes = 0;
             try {
                 const orchResult = await orchestrateResize(creativeSet);
                 resizedCount = orchResult.results.length;
-                orchestratorFixes = orchResult.totalFixesApplied;
+
+                // Apply all patches through the store (safe mutation)
+                for (const { variantId, patches } of orchResult.allPatches) {
+                    for (const { elementId, patch } of patches) {
+                        try {
+                            updateVariantElement(variantId, elementId, patch);
+                            orchestratorFixes++;
+                        } catch {
+                            // Skip failed patches
+                        }
+                    }
+                }
             } catch (err) {
                 console.warn('[SmartCheck] Orchestrator failed, falling back to QA-only:', err);
             }
