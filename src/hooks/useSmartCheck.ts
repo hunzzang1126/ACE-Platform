@@ -2,12 +2,13 @@
 // useSmartCheck — One-click Smart Check hook
 // ─────────────────────────────────────────────────
 // Replaces the old useVisionQA. No report modal — just fix everything.
-// Flow: detect issues → auto-fix → toast result.
+// Flow: detect issues → auto-fix → (optional) vision verify → toast result.
 
 import { useState, useCallback } from 'react';
 import type { BannerVariant } from '@/schema/design.types';
 import { runSmartSizingQA } from '@/engine/smartSizingQA';
 import { generateFixes, type FixResult } from '@/engine/smartSizingFixer';
+import { runBatchVisionCheck } from '@/ai/visionSelfCheck';
 import { useDesignStore } from '@/stores/designStore';
 
 export type SmartCheckStatus = 'idle' | 'checking' | 'done' | 'error';
@@ -16,6 +17,7 @@ export interface SmartCheckResult {
     issueCount: number;
     fixCount: number;
     fixes: FixResult[];
+    visionIssueCount: number;
     message: string;
 }
 
@@ -32,47 +34,54 @@ export function useSmartCheck() {
             setError(null);
             setResult(null);
 
-            // Step 1: Detect issues (client-side, instant)
+            // Pass 1: Client-side rule check (instant)
             const issues = runSmartSizingQA(variants);
 
-            if (issues.length === 0) {
-                setResult({
-                    issueCount: 0,
-                    fixCount: 0,
-                    fixes: [],
-                    message: '✓ All sizes look great!',
-                });
-                setStatus('done');
-                return;
-            }
-
-            // Step 2: Generate fixes
-            const fixes = generateFixes(issues, variants);
-
-            // Step 3: Apply ALL fixes immediately (no report, just fix)
+            // Generate and apply fixes
             let applied = 0;
-            for (const fix of fixes) {
-                try {
-                    updateVariantElement(fix.variantId, fix.elementId, fix.patch);
-                    applied++;
-                } catch {
-                    // Skip failed individual fixes, continue with the rest
-                    console.warn(`[SmartCheck] Failed to apply fix for ${fix.elementName}`);
+            if (issues.length > 0) {
+                const fixes = generateFixes(issues, variants);
+                for (const fix of fixes) {
+                    try {
+                        updateVariantElement(fix.variantId, fix.elementId, fix.patch);
+                        applied++;
+                    } catch {
+                        console.warn(`[SmartCheck] Failed to apply fix for ${fix.elementName}`);
+                    }
                 }
             }
 
-            // Build result message
-            const unfixed = issues.length - applied;
-            let message: string;
-            if (applied > 0 && unfixed === 0) {
-                message = `✓ Fixed ${applied} issue${applied !== 1 ? 's' : ''} — all sizes are clean!`;
-            } else if (applied > 0) {
-                message = `✓ Fixed ${applied} issue${applied !== 1 ? 's' : ''}. ${unfixed} info notice${unfixed !== 1 ? 's' : ''} remaining.`;
-            } else {
-                message = `Found ${issues.length} notice${issues.length !== 1 ? 's' : ''} — no auto-fix needed.`;
+            // Pass 2: Vision API self-check (optional, skips if no API key)
+            let visionIssueCount = 0;
+            try {
+                const visionResults = await runBatchVisionCheck(variants);
+                for (const [, vr] of visionResults) {
+                    visionIssueCount += vr.issues.length;
+                }
+            } catch {
+                // Vision check is optional — silently skip on failure
             }
 
-            setResult({ issueCount: issues.length, fixCount: applied, fixes, message });
+            // Build result message
+            const totalIssues = issues.length + visionIssueCount;
+            let message: string;
+            if (totalIssues === 0) {
+                message = '✓ All sizes look great!';
+            } else if (applied > 0 && visionIssueCount === 0) {
+                message = `✓ Fixed ${applied} issue${applied !== 1 ? 's' : ''} — all sizes are clean!`;
+            } else if (applied > 0 && visionIssueCount > 0) {
+                message = `✓ Fixed ${applied} issue${applied !== 1 ? 's' : ''}. ${visionIssueCount} visual note${visionIssueCount !== 1 ? 's' : ''} detected.`;
+            } else {
+                message = `Found ${totalIssues} notice${totalIssues !== 1 ? 's' : ''} — no auto-fix needed.`;
+            }
+
+            setResult({
+                issueCount: issues.length,
+                fixCount: applied,
+                fixes: issues.length > 0 ? generateFixes(issues, variants) : [],
+                visionIssueCount,
+                message,
+            });
             setStatus('done');
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Smart Check failed');
@@ -88,3 +97,4 @@ export function useSmartCheck() {
 
     return { status, result, error, runSmartCheck, reset };
 }
+
