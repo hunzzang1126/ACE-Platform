@@ -12,6 +12,7 @@
 // ─────────────────────────────────────────────────
 
 import type { ElementConstraints } from '@/schema/constraints.types';
+import { resolveConstraints } from '@/schema/constraints.types';
 import type { LayoutRole, AspectCategory } from '@/schema/layoutRoles';
 import { getAspectCategory } from '@/schema/layoutRoles';
 
@@ -177,7 +178,7 @@ export function computeSmartConstraints(input: SmartLayoutInput): ElementConstra
     } else if (role === 'headline' || role === 'subline' || role === 'detail' || role === 'tnc') {
         const lines = rule.maxLines ?? input.lineCount ?? 1;
         height = textHeight(fontSize, lines);
-    } else if (role === 'cta' || role === 'button' as LayoutRole) {
+    } else if (role === 'cta') {
         height = clamp(Math.round(canvasH * 0.14), 28, 44);
     } else {
         height = input.elHeight ?? Math.round(canvasH * 0.1);
@@ -236,10 +237,9 @@ export function isOutOfBounds(
     canvasW: number,
     canvasH: number,
 ): boolean {
-    // Use resolveConstraints to get actual coordinates
-    const { resolveConstraints } = require('@/schema/constraints.types');
-    const { x, y, width, height } = resolveConstraints(constraints, canvasW, canvasH);
-    return x + width < 0 || y + height < 0 || x > canvasW || y > canvasH;
+    // Use the already-imported resolveConstraints to get actual coordinates
+    const resolved = resolveConstraints(constraints, canvasW, canvasH);
+    return resolved.x + resolved.width < 0 || resolved.y + resolved.height < 0 || resolved.x > canvasW || resolved.y > canvasH;
 }
 
 /**

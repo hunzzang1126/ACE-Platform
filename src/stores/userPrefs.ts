@@ -5,8 +5,6 @@
 // personalize outputs based on past behavior.
 // Persisted to localStorage.
 
-import { getAspectCategory } from '@/schema/layoutRoles';
-
 const STORAGE_KEY = 'ace-user-prefs';
 
 // ── Types ──
