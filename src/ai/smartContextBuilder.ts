@@ -17,6 +17,7 @@ import type { DesignElement, TextElement, ShapeElement, ButtonElement } from '@/
 import { getAspectCategory, type AspectCategory } from '@/schema/layoutRoles';
 import { loadUserPrefs, prefsToPromptSection } from '@/stores/userPrefs';
 import { buildDesignSystemPrompt } from '@/ai/prompts/bannerDesignPrompt';
+import { paletteToPromptSection, type BrandPalette } from '@/engine/brandPalette';
 
 // ── Types ──
 
@@ -47,6 +48,9 @@ export interface SmartContext {
 
     /** Auto-detected brand from current elements */
     brand?: BrandProfile;
+
+    /** Generated brand palette (from BrandConfig) */
+    generatedPalette?: BrandPalette;
 
     /** Recent user actions for conversational continuity */
     recentActions?: string[];
@@ -138,6 +142,11 @@ export function buildSmartContext(
         ctx.brand = detectBrand(active.elements);
     }
 
+    // ── Generated Palette (from BrandConfig) ──
+    if (creativeSet.brand?.generatedPalette) {
+        ctx.generatedPalette = creativeSet.brand.generatedPalette;
+    }
+
     // ── Recent Actions ──
     if (actionHistory.length > 0) {
         ctx.recentActions = getActionHistory();
@@ -208,6 +217,7 @@ export function contextToPromptSection(ctx: SmartContext): string {
 
     // ── Design System Guidelines ──
     if (ctx.activeVariant) {
+        // Use generated palette if available, otherwise detected brand
         const brandColors = ctx.brand
             ? { primary: ctx.brand.primaryColor, secondary: ctx.brand.secondaryColor }
             : undefined;
@@ -218,6 +228,12 @@ export function contextToPromptSection(ctx: SmartContext): string {
             ctx.activeVariant.aspectCategory,
             brandColors,
         ));
+
+        // Inject full generated palette if available
+        if (ctx.generatedPalette) {
+            lines.push('');
+            lines.push(paletteToPromptSection(ctx.generatedPalette));
+        }
     }
 
     return lines.join('\n');

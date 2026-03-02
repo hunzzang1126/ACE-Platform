@@ -75,6 +75,15 @@ export interface BrandConfig {
     accentColor?: string;
     fontFamily: string;
     logoUrl?: string;
+    /** Auto-generated OKLCH palette from primaryColor */
+    generatedPalette?: {
+        primary: string;
+        secondary: string;
+        accent: string;
+        background: string;
+        text: string;
+        surface: string;
+    };
 }
 
 /** 프로젝트 (여러 크리에이티브 셋을 포함) */
