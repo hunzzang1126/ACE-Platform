@@ -126,7 +126,7 @@ export function GeneralEditorPage() {
                         variants={creativeSet.variants}
                         visibleIds={visibleIds}
                         masterVariantId={creativeSet.masterVariantId}
-                        onRunSmartCheck={() => runSmartCheck(creativeSet.variants)}
+                        onRunSmartCheck={() => runSmartCheck(creativeSet)}
                         smartCheckStatus={smartCheckStatus}
                     />
                 </main>
