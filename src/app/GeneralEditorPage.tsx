@@ -1,15 +1,14 @@
 // ─────────────────────────────────────────────────
 // GeneralEditorPage – Layer 2 (Creative Set View)
 // ─────────────────────────────────────────────────
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useDesignStore } from '@/stores/designStore';
 import { CreativeSetTopBar } from '@/components/creativeset/CreativeSetTopBar';
 import { SizeSidebar } from '@/components/creativeset/SizeSidebar';
 import { BannerPreviewGrid } from '@/components/creativeset/BannerPreviewGrid';
 import { AddSizeModal } from '@/components/creativeset/AddSizeModal';
-import { VisionQAReport } from '@/components/creativeset/VisionQAReport';
-import { useVisionQA } from '@/hooks/useVisionQA';
+import { useSmartCheck } from '@/hooks/useSmartCheck';
 import type { BannerPreset } from '@/schema/design.types';
 import { v4 as uuid } from 'uuid';
 import type { DesignElement } from '@/schema/elements.types';
@@ -23,8 +22,16 @@ export function GeneralEditorPage() {
     // Modal state
     const [showAddSizeModal, setShowAddSizeModal] = useState(false);
 
-    // Vision QA
-    const { status: qaStatus, report: qaReport, fixResult: qaFixResult, error: qaError, progress: qaProgress, runQA, autoFix, reset: resetQA } = useVisionQA();
+    // Smart Check (one-click auto-fix)
+    const { status: smartCheckStatus, result: smartCheckResult, error: smartCheckError, runSmartCheck, reset: resetSmartCheck } = useSmartCheck();
+
+    // Auto-dismiss toast after 4 seconds
+    useEffect(() => {
+        if (smartCheckStatus === 'done' || smartCheckStatus === 'error') {
+            const timer = setTimeout(resetSmartCheck, 4000);
+            return () => clearTimeout(timer);
+        }
+    }, [smartCheckStatus, resetSmartCheck]);
 
     // Visible size toggles — all visible by default
     const [visibleIds, setVisibleIds] = useState<Set<string>>(new Set());
@@ -119,8 +126,8 @@ export function GeneralEditorPage() {
                         variants={creativeSet.variants}
                         visibleIds={visibleIds}
                         masterVariantId={creativeSet.masterVariantId}
-                        onRunAIQA={() => runQA(creativeSet.id, creativeSet.masterVariantId, creativeSet.variants)}
-                        qaStatus={qaStatus}
+                        onRunSmartCheck={() => runSmartCheck(creativeSet.variants)}
+                        smartCheckStatus={smartCheckStatus}
                     />
                 </main>
             </div>
@@ -134,35 +141,31 @@ export function GeneralEditorPage() {
                 />
             )}
 
-            {/* Vision QA Loading Overlay */}
-            {(qaStatus === 'capturing' || qaStatus === 'analyzing') && (
+            {/* Smart Check Toast */}
+            {smartCheckStatus === 'checking' && (
                 <div className="vqa-loading-overlay">
                     <div className="vqa-loading-spinner" />
-                    <div className="vqa-loading-text">
-                        {qaStatus === 'capturing' ? 'Capturing screenshots...' : '🤖 AI is analyzing your designs...'}
-                    </div>
-                    <div className="vqa-loading-progress">{qaProgress}</div>
+                    <div className="vqa-loading-text">Checking all sizes...</div>
                 </div>
             )}
 
-            {/* Vision QA Report Modal */}
-            {(qaStatus === 'done' || qaStatus === 'fixing' || qaStatus === 'fixed') && qaReport && (
-                <VisionQAReport
-                    report={qaReport}
-                    qaStatus={qaStatus}
-                    fixResult={qaFixResult}
-                    fixProgress={qaProgress}
-                    onAutoFix={() => autoFix(creativeSet.id, creativeSet.masterVariantId, creativeSet.variants)}
-                    onRecheck={() => runQA(creativeSet.id, creativeSet.masterVariantId, creativeSet.variants)}
-                    onClose={resetQA}
-                />
+            {smartCheckStatus === 'done' && smartCheckResult && (
+                <div
+                    className="vqa-loading-overlay"
+                    onClick={resetSmartCheck}
+                    style={{ cursor: 'pointer' }}
+                >
+                    <div className="vqa-loading-text" style={{ fontSize: 18 }}>
+                        {smartCheckResult.message}
+                    </div>
+                    <div className="vqa-loading-progress">Click to dismiss</div>
+                </div>
             )}
 
-            {/* Vision QA Error */}
-            {qaStatus === 'error' && qaError && (
-                <div className="vqa-loading-overlay" onClick={resetQA}>
-                    <div className="vqa-loading-text">❌ {qaError}</div>
-                    <div className="vqa-loading-progress">Click anywhere to dismiss</div>
+            {smartCheckStatus === 'error' && smartCheckError && (
+                <div className="vqa-loading-overlay" onClick={resetSmartCheck}>
+                    <div className="vqa-loading-text">❌ {smartCheckError}</div>
+                    <div className="vqa-loading-progress">Click to dismiss</div>
                 </div>
             )}
         </div>

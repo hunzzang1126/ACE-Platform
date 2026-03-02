@@ -8,7 +8,7 @@ import type { BannerVariant } from '@/schema/design.types';
 import { resolveConstraints } from '@/schema/constraints.types';
 import { computeAnimStyle, type AnimPresetType } from '@/hooks/useAnimationPresets';
 import { loadVideoBlob } from '@/stores/videoStorage';
-import type { QAStatus } from '@/hooks/useVisionQA';
+import type { SmartCheckStatus } from '@/hooks/useSmartCheck';
 
 interface ContextMenuState {
     x: number;
@@ -59,8 +59,8 @@ interface Props {
     variants: BannerVariant[];
     visibleIds: Set<string>;
     masterVariantId: string;
-    onRunAIQA?: () => void;
-    qaStatus?: QAStatus;
+    onRunSmartCheck?: () => void;
+    smartCheckStatus?: SmartCheckStatus;
 }
 
 // Max preview card dimension in px
@@ -76,7 +76,7 @@ function getPreviewScale(w: number, h: number) {
     return Math.min(scaleW, scaleH, 1);
 }
 
-export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRunAIQA, qaStatus }: Props) {
+export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRunSmartCheck, smartCheckStatus }: Props) {
     const navigate = useNavigate();
     const [currentTime, setCurrentTime] = useState(0);
     const rafRef = useRef<number>(0);
@@ -209,15 +209,15 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                         Add animations in the editor to preview here
                     </span>
                 )}
-                {/* AI QA Button */}
-                {onRunAIQA && (
+                {/* Smart Check Button */}
+                {onRunSmartCheck && (
                     <button
                         className="banner-ai-qa-btn"
-                        onClick={onRunAIQA}
-                        disabled={qaStatus === 'capturing' || qaStatus === 'analyzing'}
-                        title="Run AI Vision QA on all sizes"
+                        onClick={onRunSmartCheck}
+                        disabled={smartCheckStatus === 'checking'}
+                        title="Auto-fix sizing issues across all variants"
                     >
-                        🤖 AI QA
+                        {smartCheckStatus === 'checking' ? '⏳ Checking...' : '✓ Smart Check'}
                     </button>
                 )}
             </div>
