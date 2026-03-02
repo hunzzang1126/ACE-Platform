@@ -10,6 +10,7 @@ import { runSmartSizingQA } from '@/engine/smartSizingQA';
 import { generateFixes, type FixResult } from '@/engine/smartSizingFixer';
 import { runBatchVisionCheck } from '@/ai/visionSelfCheck';
 import { orchestrateResize } from '@/ai/services/resizeOrchestrator';
+import { resolveAllRoleDefaults } from '@/engine/bannerRoleResolver';
 import { useDesignStore } from '@/stores/designStore';
 
 export type SmartCheckStatus = 'idle' | 'checking' | 'done' | 'error';
@@ -66,10 +67,28 @@ export function useSmartCheck() {
                 console.warn('[SmartCheck] Orchestrator failed, falling back to QA-only:', err);
             }
 
-            // Step 2: Re-read variants (may have been mutated by orchestrator)
+            // Step 2: Role Resolver — apply role-based defaults to all variants
+            let rolePatches = 0;
+            for (const variant of creativeSet.variants) {
+                const patches = resolveAllRoleDefaults(
+                    variant.elements,
+                    variant.preset.width,
+                    variant.preset.height,
+                );
+                for (const { elementId, patch } of patches) {
+                    try {
+                        updateVariantElement(variant.id, elementId, patch);
+                        rolePatches++;
+                    } catch {
+                        // Skip failed patches
+                    }
+                }
+            }
+
+            // Step 3: Re-read variants (may have been updated by orchestrator + role resolver)
             const variants = creativeSet.variants;
 
-            // Step 3: QA + auto-fix (catch anything orchestrator missed)
+            // Step 4: QA + auto-fix (catch anything previous steps missed)
             const issues = runSmartSizingQA(variants);
             let qaFixes = 0;
             if (issues.length > 0) {
