@@ -228,7 +228,17 @@ export function useFabricCanvas(
             fc.on('selection:updated', () => syncState());
             fc.on('selection:cleared', () => syncState());
             fc.on('object:modified', () => { pushUndo(); syncState(); });
-            fc.on('object:added', () => { if (!skipHistory.current) pushUndo(); syncState(); });
+            fc.on('object:added', (opt) => {
+                // Auto-assign __aceId to objects w/o one (PencilBrush paths, loadFromJSON)
+                const obj = opt.target;
+                if (obj && !(obj as any).__aceId && !isArtboard(obj)) {
+                    (obj as any).__aceId = nextId();
+                    (obj as any).__aceZIndex = fc.getObjects().filter(o => !isArtboard(o)).length;
+                    patchAceProps(obj);
+                }
+                if (!skipHistory.current) pushUndo();
+                syncState();
+            });
             fc.on('object:removed', () => { pushUndo(); syncState(); });
 
             // ── Zoom with Ctrl+Wheel ──
@@ -534,7 +544,7 @@ export function useFabricCanvas(
 
     // ── Undo / Redo ──
     const restoreArtboardFlags = useCallback((fc: Canvas) => {
-        // After loadFromJSON, re-apply behavioral flags on artboard
+        // After loadFromJSON, re-apply behavioral flags on artboard and ensure all objects have aceId
         fc.getObjects().forEach((obj) => {
             if ((obj as any).__aceArtboard) {
                 obj.set({
@@ -546,7 +556,13 @@ export function useFabricCanvas(
                     lockMovementY: true,
                     hoverCursor: 'default',
                 });
+            } else if (!(obj as any).__aceId) {
+                // Ensure every non-artboard object has a unique ID
+                (obj as any).__aceId = nextId();
+                (obj as any).__aceZIndex = 0;
             }
+            // Re-patch toObject for all objects after deserialization
+            patchAceProps(obj);
         });
     }, []);
 
