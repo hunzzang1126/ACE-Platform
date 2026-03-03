@@ -4,7 +4,7 @@
 import { create } from 'zustand';
 
 export type EditorLayer = 'dashboard' | 'general' | 'detail';
-export type EditorTool = 'select' | 'shape' | 'text' | 'image' | 'video' | 'hand' | 'zoom';
+export type EditorTool = 'select' | 'shape' | 'text' | 'image' | 'video' | 'pen' | 'hand' | 'zoom';
 
 interface EditorState {
     /** 현재 활성 레이어 (3-Layer Flow) */

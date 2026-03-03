@@ -65,6 +65,9 @@ export interface CanvasEngineActions {
     addKeyframe: (nodeId: number, property: string, time: number, value: number, easing: string) => void;
     // Duplicate
     duplicateSelected: () => number | null;
+    // Undo / Redo
+    undo: () => void;
+    redo: () => void;
     // Alignment to canvas
     alignToCanvas: (id: number, alignment: 'left' | 'center-h' | 'right' | 'top' | 'center-v' | 'bottom') => void;
     // Canvas dimensions (for alignment)

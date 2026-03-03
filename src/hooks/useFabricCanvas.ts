@@ -5,7 +5,7 @@
 // ─────────────────────────────────────────────────
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Canvas, Rect, Ellipse, Shadow, type FabricObject } from 'fabric';
+import { Canvas, Rect, Ellipse, Shadow, PencilBrush, type FabricObject } from 'fabric';
 import { useEditorStore } from '@/stores/editorStore';
 import type { EngineNode, CanvasEngineState, CanvasEngineActions, UseCanvasEngineResult } from './canvasTypes';
 
@@ -513,6 +513,63 @@ export function useFabricCanvas(
     const setHueRotate = useCallback((_id: number, _deg: number) => { }, []);
     const addKeyframe = useCallback((_nodeId: number, _property: string, _time: number, _value: number, _easing: string) => { }, []);
 
+    // ── Undo / Redo ──
+    const undo = useCallback(() => {
+        const fc = fabricRef.current;
+        if (!fc || undoStack.current.length === 0) return;
+        // Push current state to redo
+        redoStack.current.push(JSON.stringify(fc.toJSON()));
+        const prev = undoStack.current.pop()!;
+        skipHistory.current = true;
+        fc.loadFromJSON(prev).then(() => {
+            // Re-add artboard if missing
+            const hasArtboard = fc.getObjects().some(isArtboard);
+            if (!hasArtboard) {
+                const ab = new Rect({
+                    left: 0, top: 0, width, height,
+                    fill: '#ffffff', selectable: false, evented: false,
+                    hasControls: false, hasBorders: false,
+                    lockMovementX: true, lockMovementY: true,
+                    hoverCursor: 'default',
+                    shadow: new Shadow({ color: 'rgba(0,0,0,0.3)', blur: 20, offsetX: 0, offsetY: 4 }),
+                });
+                (ab as any).__aceArtboard = true;
+                fc.add(ab);
+                fc.sendObjectToBack(ab);
+            }
+            fc.renderAll();
+            skipHistory.current = false;
+            syncState();
+        });
+    }, [width, height, syncState]);
+
+    const redo = useCallback(() => {
+        const fc = fabricRef.current;
+        if (!fc || redoStack.current.length === 0) return;
+        undoStack.current.push(JSON.stringify(fc.toJSON()));
+        const next = redoStack.current.pop()!;
+        skipHistory.current = true;
+        fc.loadFromJSON(next).then(() => {
+            const hasArtboard = fc.getObjects().some(isArtboard);
+            if (!hasArtboard) {
+                const ab = new Rect({
+                    left: 0, top: 0, width, height,
+                    fill: '#ffffff', selectable: false, evented: false,
+                    hasControls: false, hasBorders: false,
+                    lockMovementX: true, lockMovementY: true,
+                    hoverCursor: 'default',
+                    shadow: new Shadow({ color: 'rgba(0,0,0,0.3)', blur: 20, offsetX: 0, offsetY: 4 }),
+                });
+                (ab as any).__aceArtboard = true;
+                fc.add(ab);
+                fc.sendObjectToBack(ab);
+            }
+            fc.renderAll();
+            skipHistory.current = false;
+            syncState();
+        });
+    }, [width, height, syncState]);
+
     // ── Duplicate ──
     const duplicateSelected = useCallback((): number | null => {
         const fc = fabricRef.current;
@@ -573,6 +630,60 @@ export function useFabricCanvas(
         return () => { fc.off('mouse:down', handler); };
     }, [activeTool, status, addRect, setTool]);
 
+    // ── Pen tool activation ──
+    useEffect(() => {
+        const fc = fabricRef.current;
+        if (!fc || status !== 'ready') return;
+
+        if (activeTool === 'pen') {
+            fc.isDrawingMode = true;
+            fc.freeDrawingBrush = new PencilBrush(fc);
+            fc.freeDrawingBrush.color = '#333333';
+            fc.freeDrawingBrush.width = 2;
+        } else {
+            fc.isDrawingMode = false;
+        }
+        fc.renderAll();
+    }, [activeTool, status]);
+
+    // ── Keyboard shortcuts ──
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => {
+            const tag = (e.target as HTMLElement)?.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+            if ((e.target as HTMLElement)?.isContentEditable) return;
+
+            // Cmd+Z / Ctrl+Z → undo
+            if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
+                e.preventDefault();
+                undo();
+                return;
+            }
+            // Cmd+Shift+Z / Ctrl+Y → redo
+            if ((e.metaKey || e.ctrlKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) {
+                e.preventDefault();
+                redo();
+                return;
+            }
+            // Tool shortcuts (single key, no modifiers)
+            if (!e.metaKey && !e.ctrlKey && !e.altKey) {
+                switch (e.key.toLowerCase()) {
+                    case 'v': setTool('select'); break;
+                    case 's': setTool('shape'); break;
+                    case 't': setTool('text'); break;
+                    case 'p': setTool('pen'); break;
+                    case 'h': setTool('hand'); break;
+                    case 'z': setTool('zoom'); break;
+                }
+            }
+        };
+        window.addEventListener('keydown', handler);
+        return () => window.removeEventListener('keydown', handler);
+    }, [undo, redo, setTool]);
+
+    // NOTE: the following shape-tool useEffect was closed above, remove duplicate closure
+
+
     const retryInit = useCallback(() => {
         if (fabricRef.current) {
             fabricRef.current.dispose();
@@ -595,6 +706,7 @@ export function useFabricCanvas(
         setShadow, removeShadow, setBlendMode,
         setBrightness, setContrast, setSaturation, setHueRotate,
         addKeyframe, duplicateSelected,
+        undo, redo,
         alignToCanvas,
         canvasWidth: width, canvasHeight: height,
     };
