@@ -18,15 +18,19 @@ export function Section({ label, children }: { label: string; children: React.Re
 
 // ── Scrub Field: drag the label horizontally to adjust value ──
 
-export function ScrubField({ label, value, min, max, unit, onChange }: {
+export function ScrubField({ label, value, min, max, step = 1, unit, onChange }: {
     label: string;
     value: number;
     min: number;
     max: number;
+    step?: number;
     unit?: string;
     onChange: (v: number) => void;
 }) {
-    const [localVal, setLocalVal] = useState(String(value));
+    const isDecimal = step < 1;
+    const fmt = (v: number) => isDecimal ? v.toFixed(1) : String(Math.round(v));
+
+    const [localVal, setLocalVal] = useState(fmt(value));
     const [isFocused, setIsFocused] = useState(false);
     const scrubbing = useRef(false);
     const scrubStartX = useRef(0);
@@ -34,15 +38,15 @@ export function ScrubField({ label, value, min, max, unit, onChange }: {
 
     // Sync external value when not editing
     useEffect(() => {
-        if (!isFocused && !scrubbing.current) setLocalVal(String(value));
+        if (!isFocused && !scrubbing.current) setLocalVal(fmt(value));
     }, [value, isFocused]);
 
     // Commit typed value
     const handleCommit = useCallback(() => {
         setIsFocused(false);
-        const parsed = parseInt(localVal);
+        const parsed = parseFloat(localVal);
         if (!isNaN(parsed) && parsed >= min && parsed <= max) onChange(parsed);
-        else setLocalVal(String(value));
+        else setLocalVal(fmt(value));
     }, [localVal, onChange, value, min, max]);
 
     // ── Scrub handlers ──
@@ -55,8 +59,10 @@ export function ScrubField({ label, value, min, max, unit, onChange }: {
         const handleMove = (ev: MouseEvent) => {
             if (!scrubbing.current) return;
             const dx = ev.clientX - scrubStartX.current;
-            const newVal = Math.min(max, Math.max(min, Math.round(scrubStartVal.current + dx)));
-            setLocalVal(String(newVal));
+            const raw = scrubStartVal.current + dx * step;
+            const snapped = Math.round(raw / step) * step;
+            const newVal = Math.min(max, Math.max(min, snapped));
+            setLocalVal(fmt(newVal));
             onChange(newVal);
         };
 
@@ -72,7 +78,7 @@ export function ScrubField({ label, value, min, max, unit, onChange }: {
         document.body.style.userSelect = 'none';
         document.addEventListener('mousemove', handleMove);
         document.addEventListener('mouseup', handleUp);
-    }, [value, min, max, onChange]);
+    }, [value, min, max, step, onChange]);
 
     return (
         <div className="pp-scrub-row">
@@ -88,11 +94,12 @@ export function ScrubField({ label, value, min, max, unit, onChange }: {
                 type="number"
                 min={min}
                 max={max}
+                step={step}
                 value={localVal}
                 onFocus={() => setIsFocused(true)}
                 onChange={(e) => {
                     setLocalVal(e.target.value);
-                    const parsed = parseInt(e.target.value);
+                    const parsed = parseFloat(e.target.value);
                     if (!isNaN(parsed) && parsed >= min && parsed <= max) onChange(parsed);
                 }}
                 onBlur={handleCommit}

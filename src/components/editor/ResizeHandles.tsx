@@ -34,7 +34,7 @@ export function ResizeHandles({ el, onResizeStart }: {
                         position: 'absolute',
                         width: HANDLE_SIZE,
                         height: HANDLE_SIZE,
-                        background: '#fff',
+                        background: '#e6edf3',
                         border: '1px solid #4a9eff',
                         borderRadius: 2,
                         cursor,

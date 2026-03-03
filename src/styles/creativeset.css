@@ -8,7 +8,7 @@
     flex-direction: column;
     height: 100%;
     width: 100%;
-    background: #f5f6f8;
+    background: var(--bg-base);
     color: var(--text-primary);
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     overflow: hidden;
@@ -25,7 +25,7 @@
     overflow-y: auto;
     overflow-x: hidden;
     padding: 24px;
-    background: #eef0f3;
+    background: var(--bg-surface);
     min-width: 0;
 }
 
@@ -363,14 +363,14 @@
 }
 
 .banner-play-all-btn.playing {
-    background: #e8453c;
+    background: var(--error);
     color: var(--bg-surface);
-    border-color: #e8453c;
+    border-color: var(--error);
 }
 
 .banner-play-all-btn.playing:hover {
-    background: #c5221f;
-    border-color: #c5221f;
+    background: var(--error);
+    border-color: var(--error);
 }
 
 .banner-play-progress {
@@ -542,7 +542,7 @@
     padding: 8px 16px;
     background: none;
     border: none;
-    color: #c9d1d9;
+    color: var(--text-secondary);
     font-size: 13px;
     font-weight: 500;
     cursor: pointer;
@@ -557,12 +557,12 @@
 }
 
 .banner-ctx-item--danger {
-    color: #8b949e;
+    color: var(--text-muted);
 }
 
 .banner-ctx-item--danger:hover {
     background: rgba(255, 100, 100, 0.1);
-    color: #f85149;
+    color: var(--error);
 }
 
 /* ── Empty Banner State ── */

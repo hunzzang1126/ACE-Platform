@@ -250,7 +250,7 @@ export default function EngineTestPage() {
                 cursor: isDragging.current ? 'grabbing' : 'default',
             }}>
                 {status === 'no-webgpu' ? (
-                    <div style={fallbackBox}>🚫 WebGPU not available – Chrome 113+</div>
+                    <div style={fallbackBox}>[!] WebGPU not available – Chrome 113+</div>
                 ) : status === 'error' ? (
                     <div style={fallbackBox}>[Warning] {errorMsg}</div>
                 ) : (

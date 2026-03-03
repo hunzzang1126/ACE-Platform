@@ -142,7 +142,7 @@ export default function EffectsTestPage() {
                         overflow: 'hidden', background: '#16191f',
                     }}>
                         {status === 'no-webgpu' ? (
-                            <div style={fallbackBox}>🚫 WebGPU not available</div>
+                            <div style={fallbackBox}>[!] WebGPU not available</div>
                         ) : status === 'error' ? (
                             <div style={fallbackBox}>[Warning] {errorMsg}</div>
                         ) : (

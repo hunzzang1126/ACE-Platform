@@ -95,7 +95,7 @@ export function WebGPUCanvas({ width, height, rects }: Props) {
     if (status === 'no-webgpu') {
         return (
             <div style={fallbackStyle}>
-                <div style={{ fontSize: 32, marginBottom: 8 }}>🚫</div>
+                <div style={{ fontSize: 32, marginBottom: 8 }}>[!]</div>
                 <strong>WebGPU not available</strong>
                 <div style={{ fontSize: 11, marginTop: 4, opacity: 0.6 }}>Chrome 113+ or Edge 113+</div>
             </div>

@@ -139,6 +139,28 @@ export function PropertyPanel({ nodes = [], selection = [], actions, selectedOve
                             </button>
                         ))}
                     </div>
+
+                    {/* Letter Spacing */}
+                    <ScrubField
+                        label="Letter Spacing"
+                        value={selectedOverlay.letterSpacing ?? 0}
+                        min={-5}
+                        max={20}
+                        step={0.5}
+                        unit="px"
+                        onChange={(v) => onOverlayUpdate?.(selectedOverlay.id, { letterSpacing: v })}
+                    />
+
+                    {/* Line Height */}
+                    <ScrubField
+                        label="Line Height"
+                        value={selectedOverlay.lineHeight ?? 1.4}
+                        min={0.5}
+                        max={4}
+                        step={0.1}
+                        unit="x"
+                        onChange={(v) => onOverlayUpdate?.(selectedOverlay.id, { lineHeight: v })}
+                    />
                 </Section>
 
                 {/* Canvas Alignment */}
