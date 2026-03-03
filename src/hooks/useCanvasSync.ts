@@ -225,18 +225,18 @@ export function useCanvasSync(
             } else if (el.type === 'image') {
                 const img = el as ImageElement;
                 const { x, y, w, h } = constraintsToAbsolute(img.constraints, canvasW, canvasH);
-                overlayElements.push({
-                    id: img.id,
-                    type: 'image',
-                    x, y, w, h,
-                    name: img.name,
-                    src: img.src || '',
-                    objectFit: (img.fit === 'cover' || img.fit === 'contain' || img.fit === 'fill') ? img.fit : 'cover',
-                    opacity: img.opacity ?? 1,
-                    visible: img.visible !== false,
-                    locked: img.locked ?? false,
-                    zIndex: img.zIndex ?? 1,
-                });
+
+                // Restore image as Fabric-native Image (async — may appear slightly after shapes)
+                if (img.src) {
+                    engine.add_image(x, y, img.src, w, h, img.name).then((nodeId: number) => {
+                        if (img.opacity !== undefined && img.opacity !== 1) {
+                            try { engine.set_opacity(nodeId, img.opacity); } catch { /* ok */ }
+                        }
+                    });
+                }
+
+                restoredShapes++;
+                console.log(`[useCanvasSync] Restored image: "${img.name}" at ${x},${y} ${w}x${h}`);
 
                 // Restore animation preset
                 if (el.animation && el.animation.preset !== 'none') {

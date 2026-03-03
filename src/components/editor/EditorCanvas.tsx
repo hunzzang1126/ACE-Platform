@@ -98,31 +98,14 @@ export function EditorCanvas({
     }, [canvasRef]);
 
     // ── Click on canvas area to trigger overlay tools ──
+    // Text/Image/Shape creation now handled natively by Fabric in useFabricCanvas.
+    // Only video tool still uses overlay system.
     const handleCanvasAreaMouseDown = useCallback((e: React.MouseEvent) => {
-        // Only handle direct clicks on the canvas-area container
         const target = e.target as HTMLElement;
         const isCanvasEl = target.tagName === 'CANVAS' || target.classList.contains('ed-canvas-area');
         if (!isCanvasEl) return;
 
-        // Text tool → add text at click position
-        if (activeTool === 'text') {
-            e.preventDefault();
-            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            onAddText?.(x, y);
-            setTool('select');
-            return;
-        }
-        // Image tool
-        if (activeTool === 'image') {
-            e.preventDefault();
-            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-            onTriggerImageUpload?.(e.clientX - rect.left, e.clientY - rect.top);
-            setTool('select');
-            return;
-        }
-        // Video tool
+        // Video tool → overlay
         if (activeTool === 'video') {
             e.preventDefault();
             const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
@@ -135,32 +118,20 @@ export function EditorCanvas({
         if (activeTool === 'select') {
             onOverlaySelect?.(null);
         }
-    }, [activeTool, onAddText, onTriggerImageUpload, onTriggerVideoUpload, onOverlaySelect, setTool]);
+    }, [activeTool, onTriggerVideoUpload, onOverlaySelect, setTool]);
 
-    // ── Overlay element mousedown (drag) ──
+    // ── Video overlay element mousedown (drag) ──
     const handleOverlayMouseDown = useCallback((e: React.MouseEvent, el: OverlayElement) => {
         e.stopPropagation();
         if (el.locked) return;
-        actions.deselectAll(); // Clear Fabric selection when overlay is selected
+        actions.deselectAll();
         onOverlaySelect?.(el.id);
         isDraggingOverlay.current = true;
         dragOverlayId.current = el.id;
         dragStart.current = { x: e.clientX, y: e.clientY, elX: el.x, elY: el.y };
     }, [onOverlaySelect, actions]);
 
-    // ── Overlay double-click for text editing ──
-    const handleTextDoubleClick = useCallback((_e: React.MouseEvent, el: OverlayElement) => {
-        if (el.type === 'text') {
-            onOverlayUpdate?.(el.id, { editing: true });
-        }
-    }, [onOverlayUpdate]);
-
-    // ── Text blur → save content ──
-    const handleTextBlur = useCallback((el: OverlayElement, newText: string) => {
-        onOverlayUpdate?.(el.id, { content: newText, editing: false });
-    }, [onOverlayUpdate]);
-
-    // ── Resize handle mousedown ──
+    // ── Resize handle mousedown (video overlays only) ──
     const handleResizeMouseDown = useCallback((e: React.MouseEvent, el: OverlayElement, dir: HandleDir) => {
         e.stopPropagation();
         e.preventDefault();
@@ -287,9 +258,8 @@ export function EditorCanvas({
                 }}
             />
 
-            {/* ── Overlay elements (text/image/video — HTML) ──
-                 Positioned absolute within the canvas area.
-                 TODO Phase 3: migrate text/image to Fabric objects */}
+            {/* ── Video overlay elements (HTML — requires <video> tag) ──
+                 Text and Image are now Fabric-native objects. */}
             <div
                 className="ed-overlay-layer"
                 style={{
@@ -300,7 +270,7 @@ export function EditorCanvas({
                     overflow: 'visible',
                 }}
             >
-                {overlayElements.map((el) => {
+                {overlayElements.filter(el => el.type === 'video').map((el) => {
                     const isSelected = el.id === selectedOverlayId;
                     const isVisible = el.visible ?? true;
                     if (!isVisible) return null;
@@ -310,162 +280,62 @@ export function EditorCanvas({
                     const isInteracting = isBeingDragged || isBeingResized;
                     const animStyle = (animIsPlaying && !isInteracting) ? getAnimStyle(el.id) : {};
 
-                    if (el.type === 'text') {
-                        return (
-                            <div
-                                key={el.id}
-                                onMouseDown={(e) => handleOverlayMouseDown(e, el)}
-                                onDoubleClick={(e) => handleTextDoubleClick(e, el)}
-                                style={{
-                                    position: 'absolute',
-                                    left: el.x,
-                                    top: el.y,
-                                    width: el.w,
-                                    minHeight: el.h,
-                                    fontSize: el.fontSize,
-                                    fontFamily: el.fontFamily,
-                                    fontWeight: el.fontWeight,
-                                    color: el.color,
-                                    textAlign: el.textAlign,
-                                    lineHeight: el.lineHeight ?? 1.4,
-                                    letterSpacing: el.letterSpacing ? `${el.letterSpacing}px` : undefined,
-                                    opacity: el.opacity,
-                                    zIndex: el.zIndex + 10,
-                                    outline: isSelected ? '2px solid #4a9eff' : 'none',
-                                    padding: '4px 6px',
-                                    cursor: el.locked ? 'not-allowed' : (activeTool === 'select' ? 'move' : 'default'),
-                                    userSelect: el.editing ? 'text' : 'none',
-                                    pointerEvents: (activeTool === 'select' || el.editing) ? 'auto' : 'none',
-                                    boxSizing: 'border-box',
-                                    ...animStyle,
-                                }}
-                            >
-                                {el.editing ? (
-                                    <div
-                                        contentEditable
-                                        suppressContentEditableWarning
-                                        style={{
-                                            outline: 'none',
-                                            minHeight: '1em',
-                                            background: 'rgba(0,0,0,0.3)',
-                                            borderRadius: 2,
-                                            padding: 2,
-                                        }}
-                                        onBlur={(e) => handleTextBlur(el, e.currentTarget.textContent || '')}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Escape' || (e.key === 'Enter' && !e.shiftKey)) {
-                                                e.preventDefault();
-                                                (e.target as HTMLElement).blur();
-                                            }
-                                            e.stopPropagation();
-                                        }}
-                                        autoFocus
-                                    >
-                                        {el.content}
-                                    </div>
-                                ) : (
-                                    <span>{el.content}</span>
-                                )}
-                                {isSelected && !el.editing && !el.locked && <ResizeHandles el={el} onResizeStart={handleResizeMouseDown} />}
-                            </div>
-                        );
-                    }
-                    if (el.type === 'image') {
-                        return (
-                            <div
-                                key={el.id}
-                                onMouseDown={(e) => handleOverlayMouseDown(e, el)}
-                                style={{
-                                    position: 'absolute',
-                                    left: el.x,
-                                    top: el.y,
-                                    width: el.w,
-                                    height: el.h,
-                                    opacity: el.opacity,
-                                    zIndex: el.zIndex + 10,
-                                    outline: isSelected ? '2px solid #4a9eff' : 'none',
-                                    cursor: el.locked ? 'not-allowed' : (activeTool === 'select' ? 'move' : 'default'),
-                                    pointerEvents: activeTool === 'select' ? 'auto' : 'none',
-                                    overflow: isSelected ? 'visible' : 'hidden',
-                                    borderRadius: 2,
-                                    ...animStyle,
-                                }}
-                            >
-                                <img
-                                    src={el.src}
-                                    alt={el.fileName || 'image'}
-                                    style={{
-                                        width: '100%',
-                                        height: '100%',
-                                        objectFit: el.objectFit || 'cover',
-                                        pointerEvents: 'none',
-                                        display: 'block',
-                                    }}
-                                    draggable={false}
-                                />
-                                {isSelected && !el.locked && <ResizeHandles el={el} onResizeStart={handleResizeMouseDown} />}
-                            </div>
-                        );
-                    }
-                    if (el.type === 'video') {
-                        return (
-                            <div
-                                key={el.id}
-                                onMouseDown={(e) => handleOverlayMouseDown(e, el)}
-                                style={{
-                                    position: 'absolute',
-                                    left: el.x,
-                                    top: el.y,
-                                    width: el.w,
-                                    height: el.h,
-                                    opacity: el.opacity,
-                                    zIndex: el.zIndex + 10,
-                                    outline: isSelected ? '2px solid #4a9eff' : 'none',
-                                    cursor: el.locked ? 'not-allowed' : (activeTool === 'select' ? 'move' : 'default'),
-                                    pointerEvents: activeTool === 'select' ? 'auto' : 'none',
-                                    overflow: isSelected ? 'visible' : 'hidden',
-                                    borderRadius: 2,
-                                    background: '#000',
-                                    ...animStyle,
-                                }}
-                            >
-                                <video
-                                    ref={(videoEl) => {
-                                        if (videoEl) {
-                                            videoRefsMap.current.set(el.id, videoEl);
-                                            if (!animIsPlaying) {
-                                                videoEl.pause();
-                                                videoEl.currentTime = 0;
-                                            }
-                                        } else {
-                                            videoRefsMap.current.delete(el.id);
+                    return (
+                        <div
+                            key={el.id}
+                            onMouseDown={(e) => handleOverlayMouseDown(e, el)}
+                            style={{
+                                position: 'absolute',
+                                left: el.x,
+                                top: el.y,
+                                width: el.w,
+                                height: el.h,
+                                opacity: el.opacity,
+                                zIndex: el.zIndex + 10,
+                                outline: isSelected ? '2px solid #4a9eff' : 'none',
+                                cursor: el.locked ? 'not-allowed' : (activeTool === 'select' ? 'move' : 'default'),
+                                pointerEvents: activeTool === 'select' ? 'auto' : 'none',
+                                overflow: isSelected ? 'visible' : 'hidden',
+                                borderRadius: 2,
+                                background: '#000',
+                                ...animStyle,
+                            }}
+                        >
+                            <video
+                                ref={(videoEl) => {
+                                    if (videoEl) {
+                                        videoRefsMap.current.set(el.id, videoEl);
+                                        if (!animIsPlaying) {
+                                            videoEl.pause();
+                                            videoEl.currentTime = 0;
                                         }
-                                    }}
-                                    src={el.videoSrc}
-                                    poster={el.posterSrc}
-                                    muted={el.muted ?? true}
-                                    playsInline
-                                    preload="metadata"
-                                    onLoadedData={(e) => {
-                                        const vid = e.currentTarget;
-                                        if (!useAnimPresetStore.getState().isPlaying) {
-                                            vid.pause();
-                                            vid.currentTime = 0;
-                                        }
-                                    }}
-                                    style={{
-                                        width: '100%',
-                                        height: '100%',
-                                        objectFit: el.objectFit || 'cover',
-                                        pointerEvents: 'none',
-                                        display: 'block',
-                                    }}
-                                />
-                                {isSelected && !el.locked && <ResizeHandles el={el} onResizeStart={handleResizeMouseDown} />}
-                            </div>
-                        );
-                    }
-                    return null;
+                                    } else {
+                                        videoRefsMap.current.delete(el.id);
+                                    }
+                                }}
+                                src={el.videoSrc}
+                                poster={el.posterSrc}
+                                muted={el.muted ?? true}
+                                playsInline
+                                preload="metadata"
+                                onLoadedData={(e) => {
+                                    const vid = e.currentTarget;
+                                    if (!useAnimPresetStore.getState().isPlaying) {
+                                        vid.pause();
+                                        vid.currentTime = 0;
+                                    }
+                                }}
+                                style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    objectFit: el.objectFit || 'cover',
+                                    pointerEvents: 'none',
+                                    display: 'block',
+                                }}
+                            />
+                            {isSelected && !el.locked && <ResizeHandles el={el} onResizeStart={handleResizeMouseDown} />}
+                        </div>
+                    );
                 })}
             </div>
 
