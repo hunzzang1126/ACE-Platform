@@ -43,6 +43,7 @@ export interface CanvasEngineActions {
     addRoundedRect: (x?: number, y?: number) => number | null;
     deleteSelected: () => void;
     selectNode: (id: number) => void;
+    deselectAll: () => void;
     setNodePosition: (id: number, x: number, y: number) => void;
     setNodeSize: (id: number, w: number, h: number) => void;
     setNodeOpacity: (id: number, opacity: number) => void;

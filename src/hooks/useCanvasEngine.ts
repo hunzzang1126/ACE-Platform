@@ -325,6 +325,13 @@ export function useCanvasEngine(
         syncState();
     }, [syncState]);
 
+    const deselectAll = useCallback(() => {
+        const engine = engineRef.current;
+        if (!engine) return;
+        engine.deselect_all();
+        syncState();
+    }, [syncState]);
+
     const setNodePosition = useCallback((id: number, x: number, y: number) => {
         const engine = engineRef.current;
         if (!engine) return;
@@ -557,7 +564,7 @@ export function useCanvasEngine(
         actions: {
             onMouseDown, onMouseMove, onMouseUp,
             addRect, addEllipse, addRoundedRect,
-            deleteSelected, selectNode,
+            deleteSelected, selectNode, deselectAll,
             setNodePosition, setNodeSize, setNodeOpacity, setFillColor,
             bringToFront, sendToBack, bringForward, sendBackward,
             setShadow, removeShadow, setBlendMode,

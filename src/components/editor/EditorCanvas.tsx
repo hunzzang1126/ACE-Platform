@@ -164,81 +164,108 @@ export function EditorCanvas({
             return;
         }
 
-        // Deselect overlay if clicking artboard with select tool
+        // ── Select tool: deselect overlay, then let engine handle hit-testing ──
         if (activeTool === 'select') {
             onOverlaySelect?.(null);
         }
 
-        // Pass to engine (shape tool & select tool)
+        // Pass to engine (shape tool + select tool hit-testing)
         actions.onMouseDown(e);
     }, [activeTool, panX, panY, zoom, actions, onAddText, onTriggerImageUpload, onTriggerVideoUpload, onOverlaySelect, setTool]);
 
-    // ── Mouse move (pan + engine drag + overlay resize) ──
+    // ── Click on outer canvas-area (gray area outside artboard) → deselect all ──
+    const handleCanvasAreaClick = useCallback((e: React.MouseEvent) => {
+        // Only if clicking directly on the canvas-area (not on children like artboard)
+        if (e.target === e.currentTarget) {
+            onOverlaySelect?.(null);
+            actions.deselectAll();
+        }
+    }, [onOverlaySelect, actions]);
+
+    // ── Mouse move (pan + engine) ──
     const handleMouseMove = useCallback((e: React.MouseEvent) => {
         if (isPanning.current) {
             setPanX(e.clientX - panStart.current.x);
             setPanY(e.clientY - panStart.current.y);
             return;
         }
-
-        // Overlay resizing
-        if (isResizingOverlay.current && resizeOverlayId.current) {
-            const dx = (e.clientX - resizeStart.current.mx) / zoom;
-            const dy = (e.clientY - resizeStart.current.my) / zoom;
-            const dir = resizeDir.current;
-            let { x, y, w, h } = resizeStart.current;
-
-            if (dir.includes('e')) { w = Math.max(20, resizeStart.current.w + dx); }
-            if (dir.includes('w')) {
-                const newW = Math.max(20, resizeStart.current.w - dx);
-                x = resizeStart.current.x + resizeStart.current.w - newW;
-                w = newW;
-            }
-            if (dir.includes('s')) { h = Math.max(20, resizeStart.current.h + dy); }
-            if (dir.includes('n')) {
-                const newH = Math.max(20, resizeStart.current.h - dy);
-                y = resizeStart.current.y + resizeStart.current.h - newH;
-                h = newH;
-            }
-
-            onOverlayUpdate?.(resizeOverlayId.current, { x, y, w, h });
-            return;
+        // Only pass to engine if not dragging/resizing overlays
+        if (!isDraggingOverlay.current && !isResizingOverlay.current) {
+            actions.onMouseMove(e);
         }
-
-        // Overlay dragging
-        if (isDraggingOverlay.current && dragOverlayId.current) {
-            const dx = (e.clientX - dragStart.current.x) / zoom;
-            const dy = (e.clientY - dragStart.current.y) / zoom;
-            onOverlayUpdate?.(dragOverlayId.current, {
-                x: dragStart.current.elX + dx,
-                y: dragStart.current.elY + dy,
-            });
-            return;
-        }
-
-        actions.onMouseMove(e);
-    }, [zoom, actions, onOverlayUpdate]);
+    }, [actions]);
 
     // ── Mouse up ──
     const handleMouseUp = useCallback(() => {
         isPanning.current = false;
-        isDraggingOverlay.current = false;
-        dragOverlayId.current = null;
-        isResizingOverlay.current = false;
-        resizeOverlayId.current = null;
         actions.onMouseUp();
     }, [actions]);
+
+    // ── Document-level drag/resize tracking (never loses mouse) ──
+    useEffect(() => {
+        const handleDocMove = (e: MouseEvent) => {
+            // Overlay resizing
+            if (isResizingOverlay.current && resizeOverlayId.current) {
+                const dx = (e.clientX - resizeStart.current.mx) / zoom;
+                const dy = (e.clientY - resizeStart.current.my) / zoom;
+                const dir = resizeDir.current;
+                let { x, y, w, h } = resizeStart.current;
+
+                if (dir.includes('e')) { w = Math.max(10, resizeStart.current.w + dx); }
+                if (dir.includes('w')) {
+                    const newW = Math.max(10, resizeStart.current.w - dx);
+                    x = resizeStart.current.x + resizeStart.current.w - newW;
+                    w = newW;
+                }
+                if (dir.includes('s')) { h = Math.max(10, resizeStart.current.h + dy); }
+                if (dir.includes('n')) {
+                    const newH = Math.max(10, resizeStart.current.h - dy);
+                    y = resizeStart.current.y + resizeStart.current.h - newH;
+                    h = newH;
+                }
+
+                onOverlayUpdate?.(resizeOverlayId.current, { x, y, w, h });
+                return;
+            }
+
+            // Overlay dragging
+            if (isDraggingOverlay.current && dragOverlayId.current) {
+                const dx = (e.clientX - dragStart.current.x) / zoom;
+                const dy = (e.clientY - dragStart.current.y) / zoom;
+                onOverlayUpdate?.(dragOverlayId.current, {
+                    x: dragStart.current.elX + dx,
+                    y: dragStart.current.elY + dy,
+                });
+            }
+        };
+
+        const handleDocUp = () => {
+            isDraggingOverlay.current = false;
+            dragOverlayId.current = null;
+            isResizingOverlay.current = false;
+            resizeOverlayId.current = null;
+        };
+
+        document.addEventListener('mousemove', handleDocMove);
+        document.addEventListener('mouseup', handleDocUp);
+        return () => {
+            document.removeEventListener('mousemove', handleDocMove);
+            document.removeEventListener('mouseup', handleDocUp);
+        };
+    }, [zoom, onOverlayUpdate]);
 
     // ── Overlay element mousedown (drag) ──
     const handleOverlayMouseDown = useCallback((e: React.MouseEvent, el: OverlayElement) => {
         e.stopPropagation();
         if (el.locked) return; // Don't drag locked elements
+        // ── Clear engine selection to prevent dual-select ──
+        actions.deselectAll();
         onOverlaySelect?.(el.id);
         // Start dragging
         isDraggingOverlay.current = true;
         dragOverlayId.current = el.id;
         dragStart.current = { x: e.clientX, y: e.clientY, elX: el.x, elY: el.y };
-    }, [onOverlaySelect]);
+    }, [onOverlaySelect, actions]);
 
     // ── Overlay resize handle mousedown ──
     const handleResizeMouseDown = useCallback((e: React.MouseEvent, el: OverlayElement, dir: string) => {
@@ -272,8 +299,7 @@ export function EditorCanvas({
         const handler = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
                 onOverlaySelect?.(null);
-                // Also deselect engine nodes
-                try { actions.selectNode?.(-1); } catch { /* ok */ }
+                actions.deselectAll();
             }
         };
         window.addEventListener('keydown', handler);
@@ -289,7 +315,7 @@ export function EditorCanvas({
     const totalCount = state.nodeCount + overlayElements.length;
 
     return (
-        <div className="ed-canvas-area" onWheel={handleWheel}>
+        <div className="ed-canvas-area" onWheel={handleWheel} onMouseDown={handleCanvasAreaClick}>
             {/* Loading / Error States */}
             {state.status === 'loading' && (
                 <div style={overlayMessage}>
