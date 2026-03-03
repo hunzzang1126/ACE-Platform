@@ -2,7 +2,7 @@
 // EditorCanvas — Renders WASM WebGPU canvas + overlay elements
 // Supports zoom/pan, text overlays, image overlays
 // ─────────────────────────────────────────────────
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import type { BannerVariant } from '@/schema/design.types';
 import type { CanvasEngineState, CanvasEngineActions } from '@/hooks/useCanvasEngine';
 import type { OverlayElement } from '@/hooks/useOverlayElements';
@@ -41,6 +41,41 @@ export function EditorCanvas({
     const animCurrentTime = useAnimPresetStore((s) => s.currentTime);
     const animIsPlaying = useAnimPresetStore((s) => s.isPlaying);
     const getAnimStyle = useAnimPresetStore((s) => s.getAnimStyle);
+
+    // ── Video refs map (for timeline sync) ──
+    const videoRefsMap = useRef<Map<string, HTMLVideoElement>>(new Map());
+
+    // ── Sync videos with animation timeline ──
+    useEffect(() => {
+        const store = useAnimPresetStore.getState();
+        videoRefsMap.current.forEach((videoEl, elId) => {
+            const config = store.getPreset(elId);
+            const barStart = config.startTime;
+            const barEnd = config.endTime < 0 ? Infinity : config.endTime;
+
+            // Compute video-local time
+            const localTime = Math.max(0, animCurrentTime - barStart);
+            const inRange = animCurrentTime >= barStart && animCurrentTime <= barEnd;
+
+            try {
+                if (animIsPlaying && inRange) {
+                    // Seek if drifted more than 0.3s
+                    if (Math.abs(videoEl.currentTime - localTime) > 0.3) {
+                        videoEl.currentTime = localTime;
+                    }
+                    if (videoEl.paused) videoEl.play().catch(() => { });
+                } else {
+                    if (!videoEl.paused) videoEl.pause();
+                    // Seek to correct frame when scrubbing or stopped
+                    if (inRange) {
+                        videoEl.currentTime = localTime;
+                    } else if (animCurrentTime < barStart) {
+                        videoEl.currentTime = 0;
+                    }
+                }
+            } catch { /* video not ready */ }
+        });
+    }, [animCurrentTime, animIsPlaying]);
 
     // ── Zoom & Pan state ──
     const [zoom, setZoom] = useState(1);
@@ -450,14 +485,17 @@ export function EditorCanvas({
                                         overflow: isSelected ? 'visible' : 'hidden',
                                         borderRadius: 2,
                                         background: '#000',
+                                        ...animStyle,
                                     }}
                                 >
                                     <video
+                                        ref={(videoEl) => {
+                                            if (videoEl) videoRefsMap.current.set(el.id, videoEl);
+                                            else videoRefsMap.current.delete(el.id);
+                                        }}
                                         src={el.videoSrc}
                                         poster={el.posterSrc}
                                         muted={el.muted ?? true}
-                                        loop={el.loop ?? true}
-                                        autoPlay={el.autoplay ?? true}
                                         playsInline
                                         style={{
                                             width: '100%',
