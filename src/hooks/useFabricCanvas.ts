@@ -97,6 +97,7 @@ export function useFabricCanvas(
     const undoStack = useRef<string[]>([]);
     const redoStack = useRef<string[]>([]);
     const skipHistory = useRef(false);
+    const syncPending = useRef(false);
 
     const activeTool = useEditorStore((s) => s.activeTool);
     const setTool = useEditorStore((s) => s.setTool);
@@ -108,8 +109,9 @@ export function useFabricCanvas(
         return fc.getObjects().filter(o => !isArtboard(o));
     }, []);
 
-    // ── Sync state from Fabric canvas ──
-    const syncState = useCallback(() => {
+    // ── Sync state — RAF-debounced to prevent render cascades ──
+    const doSync = useCallback(() => {
+        syncPending.current = false;
         const objs = getUserObjects();
         const engineNodes: EngineNode[] = objs.map(fabricToEngineNode);
         setNodes(engineNodes);
@@ -125,6 +127,13 @@ export function useFabricCanvas(
         setCanUndo(undoStack.current.length > 0);
         setCanRedo(redoStack.current.length > 0);
     }, [getUserObjects]);
+
+    const syncState = useCallback(() => {
+        if (!syncPending.current) {
+            syncPending.current = true;
+            requestAnimationFrame(doSync);
+        }
+    }, [doSync]);
 
     const pushUndo = useCallback(() => {
         const fc = fabricRef.current;
@@ -166,7 +175,8 @@ export function useFabricCanvas(
             (fc as any).selectionBorderColor = '#4a9eff';
             (fc as any).selectionLineWidth = 1;
 
-            // ── Add artboard background rect ──
+            // ── Add artboard background rect (skip undo history) ──
+            skipHistory.current = true;
             const artboard = new Rect({
                 left: 0,
                 top: 0,
@@ -195,6 +205,7 @@ export function useFabricCanvas(
             vpt[4] = (cw - width) / 2;
             vpt[5] = (ch - height) / 2;
             fc.setViewportTransform(vpt);
+            skipHistory.current = false;
 
             // Events
             fc.on('selection:created', () => syncState());
