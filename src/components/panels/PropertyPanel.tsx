@@ -292,7 +292,7 @@ export function PropertyPanel({ nodes = [], selection = [], actions, selectedOve
         );
     }
 
-    // ── Engine shape selected ──
+    // ── Engine node selected (shape, text, image, path) ──
     if (hasShape && selectedNode && actions) {
         // Convert engine node fill (0..1 floats) to hex for the color picker
         const fillR = selectedNode.fill_r ?? 0.5;
@@ -307,24 +307,87 @@ export function PropertyPanel({ nodes = [], selection = [], actions, selectedOve
             actions.setFillColor(selectedNode.id, r, g, b, 1.0);
         };
 
+        const nodeTitle = selectedNode.name
+            || (selectedNode.type === 'text' ? 'Text'
+                : selectedNode.type === 'image' ? 'Image'
+                    : selectedNode.type === 'path' ? 'Path'
+                        : selectedNode.type === 'ellipse' ? 'Ellipse'
+                            : selectedNode.type === 'rounded_rect' ? 'Rounded Rect'
+                                : 'Rectangle');
+
+        const isTextNode = selectedNode.type === 'text';
+
         return (
             <aside className="pp-root">
                 <div className="pp-header">
-                    <span className="pp-title">
-                        {selectedNode.type === 'ellipse' ? 'Ellipse' :
-                            selectedNode.type === 'rounded_rect' ? 'Rounded Rect' : 'Rectangle'}
-                    </span>
+                    <span className="pp-title">{nodeTitle}</span>
                     <span className="pp-subtitle">ID: {selectedNode.id}</span>
                 </div>
 
-                {/* Fill Color */}
-                <Section label="Fill">
-                    <ColorPicker
-                        label="Color"
-                        color={currentFillHex}
-                        onChange={handleColorChange}
-                    />
-                </Section>
+                {/* Typography — text nodes only */}
+                {isTextNode && (
+                    <Section label="Typography">
+                        <select
+                            className="pp-select"
+                            value={selectedNode.fontFamily || 'Inter, sans-serif'}
+                            onChange={(e) => actions.updateText?.(selectedNode.id, { fontFamily: e.target.value })}
+                        >
+                            {FONT_FAMILIES.map((f) => (
+                                <option key={f} value={f}>{f.split(',')[0]}</option>
+                            ))}
+                        </select>
+
+                        <select
+                            className="pp-select"
+                            value={selectedNode.fontWeight || '400'}
+                            onChange={(e) => actions.updateText?.(selectedNode.id, { fontWeight: e.target.value })}
+                        >
+                            {FONT_WEIGHTS.map((fw) => (
+                                <option key={fw.value} value={fw.value}>{fw.label}</option>
+                            ))}
+                        </select>
+
+                        <ScrubField
+                            label="Font Size"
+                            value={selectedNode.fontSize ?? 18}
+                            min={1}
+                            max={999}
+                            unit="px"
+                            onChange={(v) => actions.updateText?.(selectedNode.id, { fontSize: v })}
+                        />
+
+                        <ColorPicker
+                            label="Text Color"
+                            color={selectedNode.color || '#000000'}
+                            onChange={(c) => actions.updateText?.(selectedNode.id, { color: c })}
+                        />
+
+                        <div className="pp-align-row">
+                            {(['left', 'center', 'right'] as const).map((align) => (
+                                <button
+                                    key={align}
+                                    className={`pp-align-btn ${(selectedNode.textAlign || 'left') === align ? 'active' : ''}`}
+                                    onClick={() => actions.updateText?.(selectedNode.id, { textAlign: align })}
+                                >
+                                    {align === 'left' && <IcAlignLeft size={14} />}
+                                    {align === 'center' && <IcAlignCenterH size={14} />}
+                                    {align === 'right' && <IcAlignRight size={14} />}
+                                </button>
+                            ))}
+                        </div>
+                    </Section>
+                )}
+
+                {/* Fill Color — shapes only */}
+                {!isTextNode && selectedNode.type !== 'image' && (
+                    <Section label="Fill">
+                        <ColorPicker
+                            label="Color"
+                            color={currentFillHex}
+                            onChange={handleColorChange}
+                        />
+                    </Section>
+                )}
 
                 {/* Alignment */}
                 <Section label="Align to Canvas">
