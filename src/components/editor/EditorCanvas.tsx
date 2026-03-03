@@ -490,13 +490,30 @@ export function EditorCanvas({
                                 >
                                     <video
                                         ref={(videoEl) => {
-                                            if (videoEl) videoRefsMap.current.set(el.id, videoEl);
-                                            else videoRefsMap.current.delete(el.id);
+                                            if (videoEl) {
+                                                videoRefsMap.current.set(el.id, videoEl);
+                                                // Immediately pause on mount — timeline controls playback
+                                                if (!animIsPlaying) {
+                                                    videoEl.pause();
+                                                    videoEl.currentTime = 0;
+                                                }
+                                            } else {
+                                                videoRefsMap.current.delete(el.id);
+                                            }
                                         }}
                                         src={el.videoSrc}
                                         poster={el.posterSrc}
                                         muted={el.muted ?? true}
                                         playsInline
+                                        preload="metadata"
+                                        onLoadedData={(e) => {
+                                            // Prevent auto-play: pause immediately when data loads
+                                            const vid = e.currentTarget;
+                                            if (!useAnimPresetStore.getState().isPlaying) {
+                                                vid.pause();
+                                                vid.currentTime = 0;
+                                            }
+                                        }}
                                         style={{
                                             width: '100%',
                                             height: '100%',

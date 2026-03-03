@@ -329,11 +329,28 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                                                     )}
                                                     {el.type === 'video' && (
                                                         <video
+                                                            ref={(videoEl) => {
+                                                                if (!videoEl) return;
+                                                                // Sync video with preview timeline
+                                                                const start = el.animation?.startTime ?? 0;
+                                                                const end = start + (el.animation?.duration ?? TIMELINE_DURATION);
+                                                                const localT = Math.max(0, currentTime - start);
+                                                                const inRange = currentTime >= start && currentTime <= end;
+                                                                try {
+                                                                    if (isPlaying && inRange) {
+                                                                        if (Math.abs(videoEl.currentTime - localT) > 0.3) {
+                                                                            videoEl.currentTime = localT;
+                                                                        }
+                                                                        if (videoEl.paused) videoEl.play().catch(() => { });
+                                                                    } else {
+                                                                        if (!videoEl.paused) videoEl.pause();
+                                                                        videoEl.currentTime = inRange ? localT : 0;
+                                                                    }
+                                                                } catch { /* not ready */ }
+                                                            }}
                                                             src={videoUrls[el.id] || el.videoSrc}
                                                             poster={el.posterSrc || undefined}
-                                                            autoPlay
                                                             muted
-                                                            loop
                                                             playsInline
                                                             style={{
                                                                 width: '100%',
