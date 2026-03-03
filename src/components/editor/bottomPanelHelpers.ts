@@ -22,12 +22,17 @@ export const BAR_COLORS = ['#4285f4', '#34a853', '#f9a825', '#ea4335', '#ab47bc'
 
 /** Pretty label for node type */
 export function nodeLabel(node: EngineNode): string {
+    // Prefer custom name from fabricToEngineNode
+    if (node.name) return node.name;
     const types: Record<string, string> = {
         rect: 'Rectangle',
         rounded_rect: 'Rounded Rect',
         ellipse: 'Ellipse',
+        text: 'Text',
+        image: 'Image',
+        path: 'Path',
     };
-    return `${types[node.type] || node.type} #${node.id + 1}`;
+    return `${types[node.type] || node.type} #${node.id}`;
 }
 
 /** Type icon for node */
@@ -35,6 +40,9 @@ export function nodeIcon(type: string): string {
     switch (type) {
         case 'ellipse': return '○';
         case 'rounded_rect': return '▢';
+        case 'text': return 'T';
+        case 'image': return '🖼';
+        case 'path': return '✒';
         default: return '□';
     }
 }
