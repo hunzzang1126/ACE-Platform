@@ -128,9 +128,12 @@ export function useFabricCanvas(
     const doSync = useCallback(() => {
         syncPending.current = false;
         const objs = getUserObjects();
-        const engineNodes: EngineNode[] = objs.map(fabricToEngineNode);
+        // Filter out objects w/o valid aceId to prevent duplicate key=engine-0
+        const engineNodes: EngineNode[] = objs
+            .map(fabricToEngineNode)
+            .filter(n => n.id > 0);
         setNodes(engineNodes);
-        setNodeCount(objs.length);
+        setNodeCount(engineNodes.length);
 
         const fc = fabricRef.current;
         if (fc) {
