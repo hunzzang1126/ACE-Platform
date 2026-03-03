@@ -267,6 +267,19 @@ export function EditorCanvas({
         });
     }, [onOverlayUpdate]);
 
+    // ── Escape key to deselect all ──
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                onOverlaySelect?.(null);
+                // Also deselect engine nodes
+                try { actions.selectNode?.(-1); } catch { /* ok */ }
+            }
+        };
+        window.addEventListener('keydown', handler);
+        return () => window.removeEventListener('keydown', handler);
+    }, [onOverlaySelect, actions]);
+
     // ── Zoom controls ──
     const zoomIn = useCallback(() => setZoom((z) => Math.min(5, z + 0.25)), []);
     const zoomOut = useCallback(() => setZoom((z) => Math.max(0.1, z - 0.25)), []);
@@ -351,197 +364,199 @@ export function EditorCanvas({
                         }}
                     />
 
-                    {/* ── Overlay elements (text + images) ── */}
-                    {overlayElements.map((el) => {
-                        const isSelected = el.id === selectedOverlayId;
-                        const isVisible = el.visible ?? true;
-                        if (!isVisible) return null; // Hidden layers
+                    {/* ── Overlay elements — extends beyond canvas bounds ── */}
+                    <div className="ed-overlay-layer">
+                        {overlayElements.map((el) => {
+                            const isSelected = el.id === selectedOverlayId;
+                            const isVisible = el.visible ?? true;
+                            if (!isVisible) return null; // Hidden layers
 
-                        // Animation styles during playback:
-                        // - Apply animation CSS only while playing, so elements
-                        //   stay at their design positions for editing when stopped
-                        // - Suppress animation for the element being actively dragged/resized
-                        //   so it moves freely in all directions
-                        const isBeingDragged = isDraggingOverlay.current && dragOverlayId.current === el.id;
-                        const isBeingResized = isResizingOverlay.current && resizeOverlayId.current === el.id;
-                        const isInteracting = isBeingDragged || isBeingResized;
-                        const animStyle = (animIsPlaying && !isInteracting) ? getAnimStyle(el.id) : {};
+                            // Animation styles during playback:
+                            // - Apply animation CSS only while playing, so elements
+                            //   stay at their design positions for editing when stopped
+                            // - Suppress animation for the element being actively dragged/resized
+                            //   so it moves freely in all directions
+                            const isBeingDragged = isDraggingOverlay.current && dragOverlayId.current === el.id;
+                            const isBeingResized = isResizingOverlay.current && resizeOverlayId.current === el.id;
+                            const isInteracting = isBeingDragged || isBeingResized;
+                            const animStyle = (animIsPlaying && !isInteracting) ? getAnimStyle(el.id) : {};
 
-                        if (el.type === 'text') {
-                            return (
-                                <div
-                                    key={el.id}
-                                    onMouseDown={(e) => handleOverlayMouseDown(e, el)}
-                                    onDoubleClick={(e) => handleTextDoubleClick(e, el)}
-                                    style={{
-                                        position: 'absolute',
-                                        left: el.x,
-                                        top: el.y,
-                                        width: el.w,
-                                        minHeight: el.h,
-                                        fontSize: el.fontSize,
-                                        fontFamily: el.fontFamily,
-                                        fontWeight: el.fontWeight,
-                                        color: el.color,
-                                        textAlign: el.textAlign,
-                                        lineHeight: el.lineHeight ?? 1.4,
-                                        letterSpacing: el.letterSpacing ? `${el.letterSpacing}px` : undefined,
-                                        opacity: el.opacity,
-                                        zIndex: el.zIndex + 10,
-                                        outline: isSelected ? '2px solid #4a9eff' : 'none',
-                                        padding: '4px 6px',
-                                        cursor: el.locked ? 'not-allowed' : (activeTool === 'select' ? 'move' : 'default'),
-                                        userSelect: el.editing ? 'text' : 'none',
-                                        pointerEvents: (activeTool === 'select' || el.editing) ? 'auto' : 'none',
-                                        boxSizing: 'border-box',
-                                        ...animStyle,
-                                    }}
-                                >
-                                    {el.editing ? (
-                                        <div
-                                            contentEditable
-                                            suppressContentEditableWarning
+                            if (el.type === 'text') {
+                                return (
+                                    <div
+                                        key={el.id}
+                                        onMouseDown={(e) => handleOverlayMouseDown(e, el)}
+                                        onDoubleClick={(e) => handleTextDoubleClick(e, el)}
+                                        style={{
+                                            position: 'absolute',
+                                            left: el.x,
+                                            top: el.y,
+                                            width: el.w,
+                                            minHeight: el.h,
+                                            fontSize: el.fontSize,
+                                            fontFamily: el.fontFamily,
+                                            fontWeight: el.fontWeight,
+                                            color: el.color,
+                                            textAlign: el.textAlign,
+                                            lineHeight: el.lineHeight ?? 1.4,
+                                            letterSpacing: el.letterSpacing ? `${el.letterSpacing}px` : undefined,
+                                            opacity: el.opacity,
+                                            zIndex: el.zIndex + 10,
+                                            outline: isSelected ? '2px solid #4a9eff' : 'none',
+                                            padding: '4px 6px',
+                                            cursor: el.locked ? 'not-allowed' : (activeTool === 'select' ? 'move' : 'default'),
+                                            userSelect: el.editing ? 'text' : 'none',
+                                            pointerEvents: (activeTool === 'select' || el.editing) ? 'auto' : 'none',
+                                            boxSizing: 'border-box',
+                                            ...animStyle,
+                                        }}
+                                    >
+                                        {el.editing ? (
+                                            <div
+                                                contentEditable
+                                                suppressContentEditableWarning
+                                                style={{
+                                                    outline: 'none',
+                                                    minHeight: '1em',
+                                                    background: 'rgba(0,0,0,0.3)',
+                                                    borderRadius: 2,
+                                                    padding: 2,
+                                                }}
+                                                onBlur={(e) => handleTextBlur(el, e.currentTarget.textContent || '')}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Escape' || (e.key === 'Enter' && !e.shiftKey)) {
+                                                        e.preventDefault();
+                                                        (e.target as HTMLElement).blur();
+                                                    }
+                                                    e.stopPropagation();
+                                                }}
+                                                autoFocus
+                                            >
+                                                {el.content}
+                                            </div>
+                                        ) : (
+                                            <span>{el.content}</span>
+                                        )}
+                                        {/* Resize handles */}
+                                        {isSelected && !el.editing && !el.locked && <ResizeHandles el={el} onResizeStart={handleResizeMouseDown} />}
+                                    </div>
+                                );
+                            }
+                            if (el.type === 'image') {
+                                return (
+                                    <div
+                                        key={el.id}
+                                        onMouseDown={(e) => handleOverlayMouseDown(e, el)}
+                                        style={{
+                                            position: 'absolute',
+                                            left: el.x,
+                                            top: el.y,
+                                            width: el.w,
+                                            height: el.h,
+                                            opacity: el.opacity,
+                                            zIndex: el.zIndex + 10,
+                                            outline: isSelected ? '2px solid #4a9eff' : 'none',
+                                            cursor: el.locked ? 'not-allowed' : (activeTool === 'select' ? 'move' : 'default'),
+                                            pointerEvents: activeTool === 'select' ? 'auto' : 'none',
+                                            overflow: isSelected ? 'visible' : 'hidden',
+                                            borderRadius: 2,
+                                            ...animStyle,
+                                        }}
+                                    >
+                                        <img
+                                            src={el.src}
+                                            alt={el.fileName || 'image'}
                                             style={{
-                                                outline: 'none',
-                                                minHeight: '1em',
-                                                background: 'rgba(0,0,0,0.3)',
-                                                borderRadius: 2,
-                                                padding: 2,
+                                                width: '100%',
+                                                height: '100%',
+                                                objectFit: el.objectFit || 'cover',
+                                                pointerEvents: 'none',
+                                                display: 'block',
                                             }}
-                                            onBlur={(e) => handleTextBlur(el, e.currentTarget.textContent || '')}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Escape' || (e.key === 'Enter' && !e.shiftKey)) {
-                                                    e.preventDefault();
-                                                    (e.target as HTMLElement).blur();
+                                            draggable={false}
+                                        />
+                                        {/* Resize handles */}
+                                        {isSelected && !el.locked && <ResizeHandles el={el} onResizeStart={handleResizeMouseDown} />}
+                                    </div>
+                                );
+                            }
+                            if (el.type === 'video') {
+                                return (
+                                    <div
+                                        key={el.id}
+                                        onMouseDown={(e) => handleOverlayMouseDown(e, el)}
+                                        style={{
+                                            position: 'absolute',
+                                            left: el.x,
+                                            top: el.y,
+                                            width: el.w,
+                                            height: el.h,
+                                            opacity: el.opacity,
+                                            zIndex: el.zIndex + 10,
+                                            outline: isSelected ? '2px solid #4a9eff' : 'none',
+                                            cursor: el.locked ? 'not-allowed' : (activeTool === 'select' ? 'move' : 'default'),
+                                            pointerEvents: activeTool === 'select' ? 'auto' : 'none',
+                                            overflow: isSelected ? 'visible' : 'hidden',
+                                            borderRadius: 2,
+                                            background: '#000',
+                                            ...animStyle,
+                                        }}
+                                    >
+                                        <video
+                                            ref={(videoEl) => {
+                                                if (videoEl) {
+                                                    videoRefsMap.current.set(el.id, videoEl);
+                                                    // Immediately pause on mount — timeline controls playback
+                                                    if (!animIsPlaying) {
+                                                        videoEl.pause();
+                                                        videoEl.currentTime = 0;
+                                                    }
+                                                } else {
+                                                    videoRefsMap.current.delete(el.id);
                                                 }
-                                                e.stopPropagation();
                                             }}
-                                            autoFocus
-                                        >
-                                            {el.content}
-                                        </div>
-                                    ) : (
-                                        <span>{el.content}</span>
-                                    )}
-                                    {/* Resize handles */}
-                                    {isSelected && !el.editing && !el.locked && <ResizeHandles el={el} onResizeStart={handleResizeMouseDown} />}
-                                </div>
-                            );
-                        }
-                        if (el.type === 'image') {
-                            return (
-                                <div
-                                    key={el.id}
-                                    onMouseDown={(e) => handleOverlayMouseDown(e, el)}
-                                    style={{
-                                        position: 'absolute',
-                                        left: el.x,
-                                        top: el.y,
-                                        width: el.w,
-                                        height: el.h,
-                                        opacity: el.opacity,
-                                        zIndex: el.zIndex + 10,
-                                        outline: isSelected ? '2px solid #4a9eff' : 'none',
-                                        cursor: el.locked ? 'not-allowed' : (activeTool === 'select' ? 'move' : 'default'),
-                                        pointerEvents: activeTool === 'select' ? 'auto' : 'none',
-                                        overflow: isSelected ? 'visible' : 'hidden',
-                                        borderRadius: 2,
-                                        ...animStyle,
-                                    }}
-                                >
-                                    <img
-                                        src={el.src}
-                                        alt={el.fileName || 'image'}
-                                        style={{
-                                            width: '100%',
-                                            height: '100%',
-                                            objectFit: el.objectFit || 'cover',
-                                            pointerEvents: 'none',
-                                            display: 'block',
-                                        }}
-                                        draggable={false}
-                                    />
-                                    {/* Resize handles */}
-                                    {isSelected && !el.locked && <ResizeHandles el={el} onResizeStart={handleResizeMouseDown} />}
-                                </div>
-                            );
-                        }
-                        if (el.type === 'video') {
-                            return (
-                                <div
-                                    key={el.id}
-                                    onMouseDown={(e) => handleOverlayMouseDown(e, el)}
-                                    style={{
-                                        position: 'absolute',
-                                        left: el.x,
-                                        top: el.y,
-                                        width: el.w,
-                                        height: el.h,
-                                        opacity: el.opacity,
-                                        zIndex: el.zIndex + 10,
-                                        outline: isSelected ? '2px solid #4a9eff' : 'none',
-                                        cursor: el.locked ? 'not-allowed' : (activeTool === 'select' ? 'move' : 'default'),
-                                        pointerEvents: activeTool === 'select' ? 'auto' : 'none',
-                                        overflow: isSelected ? 'visible' : 'hidden',
-                                        borderRadius: 2,
-                                        background: '#000',
-                                        ...animStyle,
-                                    }}
-                                >
-                                    <video
-                                        ref={(videoEl) => {
-                                            if (videoEl) {
-                                                videoRefsMap.current.set(el.id, videoEl);
-                                                // Immediately pause on mount — timeline controls playback
-                                                if (!animIsPlaying) {
-                                                    videoEl.pause();
-                                                    videoEl.currentTime = 0;
+                                            src={el.videoSrc}
+                                            poster={el.posterSrc}
+                                            muted={el.muted ?? true}
+                                            playsInline
+                                            preload="metadata"
+                                            onLoadedData={(e) => {
+                                                // Prevent auto-play: pause immediately when data loads
+                                                const vid = e.currentTarget;
+                                                if (!useAnimPresetStore.getState().isPlaying) {
+                                                    vid.pause();
+                                                    vid.currentTime = 0;
                                                 }
-                                            } else {
-                                                videoRefsMap.current.delete(el.id);
-                                            }
-                                        }}
-                                        src={el.videoSrc}
-                                        poster={el.posterSrc}
-                                        muted={el.muted ?? true}
-                                        playsInline
-                                        preload="metadata"
-                                        onLoadedData={(e) => {
-                                            // Prevent auto-play: pause immediately when data loads
-                                            const vid = e.currentTarget;
-                                            if (!useAnimPresetStore.getState().isPlaying) {
-                                                vid.pause();
-                                                vid.currentTime = 0;
-                                            }
-                                        }}
-                                        style={{
-                                            width: '100%',
-                                            height: '100%',
-                                            objectFit: el.objectFit || 'cover',
-                                            pointerEvents: 'none',
-                                            display: 'block',
-                                        }}
-                                    />
-                                    {/* Resize handles */}
-                                    {isSelected && !el.locked && <ResizeHandles el={el} onResizeStart={handleResizeMouseDown} />}
-                                </div>
-                            );
-                        }
-                        return null;
-                    })}
+                                            }}
+                                            style={{
+                                                width: '100%',
+                                                height: '100%',
+                                                objectFit: el.objectFit || 'cover',
+                                                pointerEvents: 'none',
+                                                display: 'block',
+                                            }}
+                                        />
+                                        {/* Resize handles */}
+                                        {isSelected && !el.locked && <ResizeHandles el={el} onResizeStart={handleResizeMouseDown} />}
+                                    </div>
+                                );
+                            }
+                            return null;
+                        })}
 
-                    {/* Selection overlay (Canvas 2D) */}
-                    <canvas
-                        ref={overlayRef}
-                        width={width}
-                        height={height}
-                        style={{
-                            position: 'absolute',
-                            top: 0, left: 0,
-                            width: '100%', height: '100%',
-                            pointerEvents: 'none',
-                        }}
-                    />
+                        {/* Selection overlay (Canvas 2D) */}
+                        <canvas
+                            ref={overlayRef}
+                            width={width}
+                            height={height}
+                            style={{
+                                position: 'absolute',
+                                top: 0, left: 0,
+                                width: '100%', height: '100%',
+                                pointerEvents: 'none',
+                            }}
+                        />
+                    </div>{/* end overlay-layer */}
                 </div>
             </div>
 

@@ -299,6 +299,24 @@
     position: relative;
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
     transform: translate(-50%, -50%);
+    overflow: visible;
+    /* Visible canvas boundary — like BannerFlow/Figma */
+    outline: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+/* Interaction surface — extends far beyond canvas bounds */
+.ed-overlay-layer {
+    position: absolute;
+    top: -2000px;
+    left: -2000px;
+    right: -2000px;
+    bottom: -2000px;
+    pointer-events: none;
+}
+
+/* Elements on the overlay layer are interactive */
+.ed-overlay-layer>* {
+    pointer-events: auto;
 }
 
 /* ── Elements on canvas ── */
