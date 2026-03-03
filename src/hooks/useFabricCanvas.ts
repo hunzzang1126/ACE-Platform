@@ -790,12 +790,32 @@ export function useFabricCanvas(
             } else if (activeTool === 'text') {
                 addText(pointer.x, pointer.y);
                 setTool('select');
+            } else if (activeTool === 'image') {
+                // Open file dialog for image upload
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'image/*';
+                input.style.display = 'none';
+                input.onchange = () => {
+                    const file = input.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        const dataUrl = reader.result as string;
+                        addImage(pointer.x, pointer.y, dataUrl);
+                    };
+                    reader.readAsDataURL(file);
+                    document.body.removeChild(input);
+                };
+                document.body.appendChild(input);
+                input.click();
+                setTool('select');
             }
         };
 
         fc.on('mouse:down', handler);
         return () => { fc.off('mouse:down', handler); };
-    }, [activeTool, status, addRect, addText, setTool]);
+    }, [activeTool, status, addRect, addText, addImage, setTool]);
 
     // ── Pen tool activation ──
     useEffect(() => {
@@ -960,6 +980,62 @@ function createEngineShim(fc: Canvas, syncState: () => void, artboardW: number, 
             return id;
         },
         add_gradient_rect: () => 0,
+
+        // ── Text (Fabric Textbox) ──
+        add_text: (x: number, y: number, content: string, opts?: {
+            fontSize?: number; fontFamily?: string; fontWeight?: string;
+            color?: string; textAlign?: string; lineHeight?: number;
+            width?: number; name?: string;
+        }) => {
+            const id = nextId();
+            const tb = new Textbox(content || 'Text', {
+                left: x,
+                top: y,
+                width: opts?.width ?? 200,
+                fontSize: opts?.fontSize ?? 18,
+                fontFamily: opts?.fontFamily ?? 'Inter, system-ui, sans-serif',
+                fontWeight: opts?.fontWeight ?? '400',
+                fill: opts?.color ?? '#000000',
+                textAlign: (opts?.textAlign as any) ?? 'left',
+                lineHeight: opts?.lineHeight ?? 1.4,
+                editable: true,
+            });
+            (tb as any).__aceId = id;
+            (tb as any).__aceName = opts?.name || `Text #${id}`;
+            (tb as any).__aceZIndex = userObjects().length;
+            patchAceProps(tb);
+            fc.add(tb);
+            fc.renderAll();
+            return id;
+        },
+
+        // ── Image (Fabric Image) ── async
+        add_image: async (x: number, y: number, src: string, w?: number, h?: number, name?: string): Promise<number> => {
+            const id = nextId();
+            try {
+                const img = await FabricImage.fromURL(src, { crossOrigin: 'anonymous' });
+                const natW = img.width ?? 200;
+                const natH = img.height ?? 200;
+                const targetW = w ?? Math.min(natW, artboardW * 0.6);
+                const targetH = h ?? (natH * (targetW / natW));
+                img.set({
+                    left: x,
+                    top: y,
+                    scaleX: targetW / natW,
+                    scaleY: targetH / natH,
+                });
+                (img as any).__aceId = id;
+                (img as any).__aceName = name || `Image #${id}`;
+                (img as any).__aceZIndex = userObjects().length;
+                patchAceProps(img);
+                fc.add(img);
+                fc.renderAll();
+                syncState();
+            } catch (err) {
+                console.error('[EngineShim] Failed to load image:', err);
+            }
+            return id;
+        },
 
         select: (id: number) => {
             const obj = findById(id);

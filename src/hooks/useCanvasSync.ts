@@ -193,28 +193,29 @@ export function useCanvasSync(
             } else if (el.type === 'text') {
                 const text = el as TextElement;
                 const { x, y, w, h } = constraintsToAbsolute(text.constraints, canvasW, canvasH);
-                overlayElements.push({
-                    id: text.id,
-                    type: 'text',
-                    x, y, w, h,
-                    name: text.name,
-                    content: text.content || '',
-                    fontFamily: text.fontFamily || 'Inter',
+
+                // Restore text as Fabric-native Textbox (not HTML overlay)
+                const nodeId = engine.add_text(x, y, text.content || '', {
                     fontSize: text.fontSize || 16,
+                    fontFamily: text.fontFamily || 'Inter',
                     fontWeight: String(text.fontWeight || 400),
                     color: text.color || '#000000',
                     textAlign: text.textAlign || 'left',
                     lineHeight: text.lineHeight,
-                    letterSpacing: text.letterSpacing,
-                    opacity: text.opacity ?? 1,
-                    visible: text.visible !== false,
-                    locked: text.locked ?? false,
-                    zIndex: text.zIndex ?? 1,
+                    width: w,
+                    name: text.name,
                 });
+
+                if (text.opacity !== undefined && text.opacity !== 1) {
+                    try { engine.set_opacity(nodeId, text.opacity); } catch { /* ok */ }
+                }
+
+                restoredShapes++;
+                console.log(`[useCanvasSync] Restored text: "${text.name}" (id=${nodeId}) at ${x},${y}`);
 
                 // Restore animation preset for this text element
                 if (el.animation && el.animation.preset !== 'none') {
-                    useAnimPresetStore.getState().setPreset(text.id, {
+                    useAnimPresetStore.getState().setPreset(`engine-${nodeId}`, {
                         anim: el.animation.preset,
                         animDuration: el.animation.duration,
                         startTime: el.animation.startTime,
