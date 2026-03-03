@@ -5,7 +5,7 @@
 // ─────────────────────────────────────────────────
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Canvas, Rect, Ellipse, Shadow, PencilBrush, type FabricObject } from 'fabric';
+import { Canvas, Rect, Ellipse, Shadow, PencilBrush, Textbox, FabricImage, type FabricObject } from 'fabric';
 import { useEditorStore } from '@/stores/editorStore';
 import type { EngineNode, CanvasEngineState, CanvasEngineActions, UseCanvasEngineResult } from './canvasTypes';
 
@@ -49,13 +49,34 @@ function isArtboard(obj: FabricObject): boolean {
 // ── Extract EngineNode from Fabric object ──
 function fabricToEngineNode(obj: FabricObject): EngineNode {
     const id = (obj as any).__aceId ?? 0;
-    const isEllipse = obj.type === 'ellipse';
+    const objType = obj.type;
     const fill = typeof obj.fill === 'string' ? obj.fill : '#808080';
     const [r, g, b] = hexToRgb01(fill);
     const br = (obj as any).rx ?? 0;
-    return {
+
+    // Determine ACE type from Fabric type
+    let aceType: EngineNode['type'] = 'rect';
+    let name = `Rectangle #${id}`;
+    if (objType === 'ellipse') {
+        aceType = 'ellipse';
+        name = `Ellipse #${id}`;
+    } else if (objType === 'textbox' || objType === 'i-text') {
+        aceType = 'text';
+        name = (obj as any).__aceName || `Text #${id}`;
+    } else if (objType === 'image') {
+        aceType = 'image';
+        name = (obj as any).__aceName || `Image #${id}`;
+    } else if (objType === 'path') {
+        aceType = 'path';
+        name = `Path #${id}`;
+    } else if (br > 0) {
+        aceType = 'rounded_rect';
+        name = `Rounded Rect #${id}`;
+    }
+
+    const node: EngineNode = {
         id,
-        type: isEllipse ? 'ellipse' : (br > 0 ? 'rounded_rect' : 'rect'),
+        type: aceType,
         x: obj.left ?? 0,
         y: obj.top ?? 0,
         w: (obj.width ?? 0) * (obj.scaleX ?? 1),
@@ -67,11 +88,33 @@ function fabricToEngineNode(obj: FabricObject): EngineNode {
         fill_b: b,
         fill_a: 1,
         border_radius: br,
+        name,
     };
+
+    // Text-specific properties
+    if (aceType === 'text' && obj instanceof Textbox) {
+        node.content = obj.text ?? '';
+        node.fontSize = obj.fontSize ?? 16;
+        node.fontFamily = obj.fontFamily ?? 'Inter';
+        node.fontWeight = String(obj.fontWeight ?? '400');
+        node.color = typeof obj.fill === 'string' ? obj.fill : '#000000';
+        node.textAlign = obj.textAlign ?? 'left';
+        node.lineHeight = obj.lineHeight ?? 1.4;
+    }
+
+    // Image-specific properties
+    if (aceType === 'image') {
+        const imgEl = (obj as any)._element;
+        if (imgEl?.src) {
+            node.src = imgEl.src;
+        }
+    }
+
+    return node;
 }
 
 // ── Custom properties to include in serialization ──
-const ACE_CUSTOM_PROPS = ['__aceId', '__aceZIndex', '__aceArtboard'];
+const ACE_CUSTOM_PROPS = ['__aceId', '__aceZIndex', '__aceArtboard', '__aceName'];
 
 // Patch a Fabric object to include ACE custom props in toObject()
 function patchAceProps(obj: FabricObject): void {
@@ -81,6 +124,7 @@ function patchAceProps(obj: FabricObject): void {
         data.__aceId = (this as any).__aceId;
         data.__aceZIndex = (this as any).__aceZIndex;
         if ((this as any).__aceArtboard) data.__aceArtboard = true;
+        if ((this as any).__aceName) data.__aceName = (this as any).__aceName;
         return data;
     };
 }
@@ -409,6 +453,99 @@ export function useFabricCanvas(
         return id;
     }, [width, height, syncState, getUserObjects]);
 
+    // ── Text creation ──
+    const addText = useCallback((x: number, y: number, content?: string, opts?: {
+        fontSize?: number; fontFamily?: string; fontWeight?: string;
+        color?: string; textAlign?: string; lineHeight?: number;
+        width?: number;
+    }): number | null => {
+        const fc = fabricRef.current;
+        if (!fc) return null;
+        const id = nextId();
+        const tb = new Textbox(content || 'Type here...', {
+            left: x,
+            top: y,
+            width: opts?.width ?? 200,
+            fontSize: opts?.fontSize ?? 18,
+            fontFamily: opts?.fontFamily ?? 'Inter, system-ui, sans-serif',
+            fontWeight: opts?.fontWeight ?? '400',
+            fill: opts?.color ?? '#000000',
+            textAlign: (opts?.textAlign as any) ?? 'left',
+            lineHeight: opts?.lineHeight ?? 1.4,
+            editable: true,
+            splitByGrapheme: false,
+        });
+        (tb as any).__aceId = id;
+        (tb as any).__aceName = `Text #${id}`;
+        (tb as any).__aceZIndex = getUserObjects().length;
+        patchAceProps(tb);
+        fc.add(tb);
+        fc.setActiveObject(tb);
+        fc.renderAll();
+        syncState();
+        return id;
+    }, [syncState, getUserObjects]);
+
+    // ── Text update ──
+    const updateText = useCallback((id: number, updates: Partial<{
+        content: string; fontSize: number; fontFamily: string;
+        fontWeight: string; color: string; textAlign: string;
+        lineHeight: number; letterSpacing: number;
+    }>) => {
+        const obj = findById(id);
+        if (!obj || !(obj instanceof Textbox)) return;
+        if (updates.content !== undefined) obj.set('text', updates.content);
+        if (updates.fontSize !== undefined) obj.set('fontSize', updates.fontSize);
+        if (updates.fontFamily !== undefined) obj.set('fontFamily', updates.fontFamily);
+        if (updates.fontWeight !== undefined) obj.set('fontWeight', updates.fontWeight);
+        if (updates.color !== undefined) obj.set('fill', updates.color);
+        if (updates.textAlign !== undefined) obj.set('textAlign', updates.textAlign as any);
+        if (updates.lineHeight !== undefined) obj.set('lineHeight', updates.lineHeight);
+        if (updates.letterSpacing !== undefined) obj.set('charSpacing', updates.letterSpacing * 10);
+        fabricRef.current?.renderAll();
+        syncState();
+    }, [findById, syncState]);
+
+    // ── Text content getter ──
+    const getTextContent = useCallback((id: number): string | null => {
+        const obj = findById(id);
+        if (!obj || !(obj instanceof Textbox)) return null;
+        return obj.text ?? null;
+    }, [findById]);
+
+    // ── Image creation ──
+    const addImage = useCallback(async (x: number, y: number, src: string, w?: number, h?: number): Promise<number | null> => {
+        const fc = fabricRef.current;
+        if (!fc) return null;
+        const id = nextId();
+        try {
+            const img = await FabricImage.fromURL(src, { crossOrigin: 'anonymous' });
+            const natW = img.width ?? 200;
+            const natH = img.height ?? 200;
+            const targetW = w ?? Math.min(natW, width * 0.6);
+            const scale = targetW / natW;
+            const targetH = h ?? (natH * scale);
+            img.set({
+                left: x,
+                top: y,
+                scaleX: targetW / natW,
+                scaleY: targetH / natH,
+            });
+            (img as any).__aceId = id;
+            (img as any).__aceName = `Image #${id}`;
+            (img as any).__aceZIndex = getUserObjects().length;
+            patchAceProps(img);
+            fc.add(img);
+            fc.setActiveObject(img);
+            fc.renderAll();
+            syncState();
+            return id;
+        } catch (err) {
+            console.error('[Fabric] Failed to load image:', err);
+            return null;
+        }
+    }, [width, syncState, getUserObjects]);
+
     // ── Delete ──
     const deleteSelected = useCallback(() => {
         const fc = fabricRef.current;
@@ -646,16 +783,19 @@ export function useFabricCanvas(
         if (!fc || status !== 'ready') return;
 
         const handler = (opt: any) => {
+            const pointer = fc.getScenePoint(opt.e);
             if (activeTool === 'shape') {
-                const pointer = fc.getScenePoint(opt.e);
                 addRect(pointer.x - 60, pointer.y - 40);
+                setTool('select');
+            } else if (activeTool === 'text') {
+                addText(pointer.x, pointer.y);
                 setTool('select');
             }
         };
 
         fc.on('mouse:down', handler);
         return () => { fc.off('mouse:down', handler); };
-    }, [activeTool, status, addRect, setTool]);
+    }, [activeTool, status, addRect, addText, setTool]);
 
     // ── Pen tool activation ──
     useEffect(() => {
@@ -727,6 +867,7 @@ export function useFabricCanvas(
     const actions: CanvasEngineActions = {
         onMouseDown, onMouseMove, onMouseUp,
         addRect, addEllipse, addRoundedRect,
+        addText, updateText, getTextContent, addImage,
         deleteSelected, selectNode, deselectAll,
         setNodePosition, setNodeSize, setNodeOpacity, setFillColor,
         bringToFront, sendToBack, bringForward, sendBackward,

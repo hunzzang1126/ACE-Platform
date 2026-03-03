@@ -10,7 +10,7 @@ export interface SelectionBounds { x: number; y: number; w: number; h: number }
 /** Node info returned by engine.get_all_nodes() */
 export interface EngineNode {
     id: number;
-    type: 'rect' | 'rounded_rect' | 'ellipse';
+    type: 'rect' | 'rounded_rect' | 'ellipse' | 'text' | 'image' | 'path';
     x: number;
     y: number;
     w: number;
@@ -22,6 +22,20 @@ export interface EngineNode {
     fill_b: number;
     fill_a: number;
     border_radius: number;
+    // Text fields (when type === 'text')
+    content?: string;
+    fontSize?: number;
+    fontFamily?: string;
+    fontWeight?: string;
+    color?: string;
+    textAlign?: string;
+    lineHeight?: number;
+    letterSpacing?: number;
+    // Image fields (when type === 'image')
+    src?: string;
+    objectFit?: 'cover' | 'contain' | 'fill';
+    // Name (for layer panel display)
+    name?: string;
 }
 
 export interface CanvasEngineState {
@@ -38,9 +52,25 @@ export interface CanvasEngineActions {
     onMouseDown: (e: React.MouseEvent) => void;
     onMouseMove: (e: React.MouseEvent) => void;
     onMouseUp: () => void;
+    // Shape creation
     addRect: (x?: number, y?: number) => number | null;
     addEllipse: (x?: number, y?: number) => number | null;
     addRoundedRect: (x?: number, y?: number) => number | null;
+    // Text creation + manipulation
+    addText: (x: number, y: number, content?: string, opts?: {
+        fontSize?: number; fontFamily?: string; fontWeight?: string;
+        color?: string; textAlign?: string; lineHeight?: number;
+        width?: number;
+    }) => number | null;
+    updateText: (id: number, updates: Partial<{
+        content: string; fontSize: number; fontFamily: string;
+        fontWeight: string; color: string; textAlign: string;
+        lineHeight: number; letterSpacing: number;
+    }>) => void;
+    getTextContent: (id: number) => string | null;
+    // Image creation
+    addImage: (x: number, y: number, src: string, w?: number, h?: number) => Promise<number | null>;
+    // Common actions
     deleteSelected: () => void;
     selectNode: (id: number) => void;
     deselectAll: () => void;

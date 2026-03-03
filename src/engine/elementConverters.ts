@@ -154,7 +154,7 @@ export function engineNodeToShapeElement(
     const fill = rgbFloatToHex(node.fill_r ?? 0.5, node.fill_g ?? 0.5, node.fill_b ?? 0.5);
 
     const coverage = (node.w * node.h) / (canvasW * canvasH);
-    let name = `Shape ${node.id}`;
+    let name = node.name || `Shape ${node.id}`;
     if (coverage > 0.7) name = 'Background';
     else if (node.w > node.h * 3) name = 'Banner Strip';
     else if (Math.abs(node.w - node.h) < 10) name = 'Square Shape';
@@ -175,6 +175,60 @@ export function engineNodeToShapeElement(
         borderRadius: node.border_radius ?? 0,
         animation,
     } as ShapeElement;
+}
+
+export function engineNodeToTextElement(
+    node: EngineNode,
+    canvasW: number,
+    canvasH: number,
+): TextElement {
+    const constraints = absoluteToConstraints(node.x, node.y, node.w, node.h, canvasW, canvasH);
+    const animation = getAnimationForElement(`engine-${node.id}`);
+
+    return {
+        id: `engine-${node.id}`,
+        name: node.name || `Text ${node.id}`,
+        type: 'text',
+        constraints,
+        content: node.content ?? '',
+        fontFamily: node.fontFamily ?? 'Inter',
+        fontSize: node.fontSize ?? 16,
+        fontWeight: parseInt(node.fontWeight ?? '400', 10) || 400,
+        fontStyle: 'normal',
+        color: node.color ?? '#000000',
+        textAlign: node.textAlign ?? 'left',
+        lineHeight: node.lineHeight ?? 1.4,
+        letterSpacing: node.letterSpacing ?? 0,
+        autoShrink: true,
+        opacity: node.opacity ?? 1,
+        visible: true,
+        locked: false,
+        zIndex: node.z_index ?? 1,
+        animation,
+    } as TextElement;
+}
+
+export function engineNodeToImageElement(
+    node: EngineNode,
+    canvasW: number,
+    canvasH: number,
+): ImageElement {
+    const constraints = absoluteToConstraints(node.x, node.y, node.w, node.h, canvasW, canvasH);
+    const animation = getAnimationForElement(`engine-${node.id}`);
+
+    return {
+        id: `engine-${node.id}`,
+        name: node.name || `Image ${node.id}`,
+        type: 'image',
+        constraints,
+        src: node.src ?? '',
+        fit: node.objectFit ?? 'cover',
+        opacity: node.opacity ?? 1,
+        visible: true,
+        locked: false,
+        zIndex: node.z_index ?? 1,
+        animation,
+    } as ImageElement;
 }
 
 export function overlayToDesignElement(

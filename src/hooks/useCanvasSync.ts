@@ -18,6 +18,8 @@ import {
     rgbFloatToHex,
     hexToRgbFloat,
     engineNodeToShapeElement,
+    engineNodeToTextElement,
+    engineNodeToImageElement,
     overlayToDesignElement,
     getAnimationForElement,
 } from '@/engine/elementConverters';
@@ -50,13 +52,19 @@ export function useCanvasSync(
         const engine = engineRef.current;
         const elements: DesignElement[] = [];
 
-        // 1. Convert engine nodes → ShapeElements (now with real colors)
+        // 1. Convert engine nodes → DesignElements based on type
         if (engine) {
             try {
                 const raw = engine.get_all_nodes();
                 const nodes: EngineNode[] = JSON.parse(raw);
                 for (const node of nodes) {
-                    elements.push(engineNodeToShapeElement(node, canvasW, canvasH));
+                    if (node.type === 'text') {
+                        elements.push(engineNodeToTextElement(node, canvasW, canvasH));
+                    } else if (node.type === 'image') {
+                        elements.push(engineNodeToImageElement(node, canvasW, canvasH));
+                    } else {
+                        elements.push(engineNodeToShapeElement(node, canvasW, canvasH));
+                    }
                 }
             } catch (err) {
                 console.warn('[useCanvasSync] Failed to read engine nodes:', err);
@@ -97,9 +105,15 @@ export function useCanvasSync(
 
         const elements: DesignElement[] = [];
 
-        // 1. Convert cached engine nodes → ShapeElements
+        // 1. Convert cached engine nodes → DesignElements by type
         for (const node of cachedNodes) {
-            elements.push(engineNodeToShapeElement(node, canvasW, canvasH));
+            if (node.type === 'text') {
+                elements.push(engineNodeToTextElement(node, canvasW, canvasH));
+            } else if (node.type === 'image') {
+                elements.push(engineNodeToImageElement(node, canvasW, canvasH));
+            } else {
+                elements.push(engineNodeToShapeElement(node, canvasW, canvasH));
+            }
         }
 
         // Save ALL overlays — including hidden ones (visibility is a property, not a delete)
