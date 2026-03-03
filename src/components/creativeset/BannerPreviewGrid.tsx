@@ -61,6 +61,7 @@ interface Props {
     masterVariantId: string;
     onRunSmartCheck?: () => void;
     smartCheckStatus?: SmartCheckStatus;
+    externalPlaying?: boolean;
 }
 
 // Max preview card dimension in px
@@ -76,7 +77,7 @@ function getPreviewScale(w: number, h: number) {
     return Math.min(scaleW, scaleH, 1);
 }
 
-export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRunSmartCheck, smartCheckStatus }: Props) {
+export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRunSmartCheck, smartCheckStatus, externalPlaying }: Props) {
     const navigate = useNavigate();
     const [currentTime, setCurrentTime] = useState(0);
     const rafRef = useRef<number>(0);
@@ -120,10 +121,13 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
         );
     }, [visibleVariants]);
 
-    // ── Auto-loop: starts automatically when animations exist ──
+    // ── Animation loop: runs when playing (external or auto) ──
+    // Use external play control if provided, otherwise auto-detect
+    const isPlaying = externalPlaying ?? hasAnyAnimation;
+
     useEffect(() => {
-        if (!hasAnyAnimation) {
-            setCurrentTime(0);
+        if (!isPlaying) {
+            if (!hasAnyAnimation) setCurrentTime(0);
             return;
         }
         startTimeRef.current = performance.now() / 1000;
@@ -137,9 +141,7 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
         rafRef.current = requestAnimationFrame(frame);
 
         return () => cancelAnimationFrame(rafRef.current);
-    }, [hasAnyAnimation]);
-
-    const isPlaying = hasAnyAnimation;
+    }, [isPlaying, hasAnyAnimation]);
 
     const handleDoubleClick = useCallback((variantId: string) => {
         navigate(`/editor/detail/${variantId}`);

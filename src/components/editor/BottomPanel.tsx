@@ -85,6 +85,26 @@ export function BottomPanel({ variant, engine, nodes, selection, actions, overla
         setBarDrag({ elementId, mode, startX: e.clientX, origStart, origEnd });
     }, [animPresets, duration]);
 
+    // ── Auto-duration: set duration = max of all bar endTimes ──
+    const recalcDuration = useCallback(() => {
+        const store = useAnimPresetStore.getState();
+        const allIds = [
+            ...overlayElements.map(el => el.id),
+            ...nodes.map(n => String(n.id)),
+        ];
+        let maxEnd = 0.5; // minimum 0.5s
+        for (const id of allIds) {
+            const cfg = store.getPreset(id);
+            const et = cfg.endTime < 0 ? duration : cfg.endTime;
+            if (et > maxEnd) maxEnd = et;
+        }
+        const newDuration = Math.round(maxEnd * 10) / 10; // round to 0.1s
+        if (Math.abs(newDuration - duration) > 0.05) {
+            setDuration(newDuration);
+            try { engine?.set_duration(newDuration); } catch { /* ok */ }
+        }
+    }, [overlayElements, nodes, duration, engine]);
+
     useEffect(() => {
         if (!barDrag) return;
         const container = timelineBarsRef.current ?? timelineScrollRef.current;
@@ -108,7 +128,8 @@ export function BottomPanel({ variant, engine, nodes, selection, actions, overla
             } else if (barDrag.mode === 'resize-left') {
                 newStart = Math.max(0, Math.min(barDrag.origStart + dt, barDrag.origEnd - MIN_BAR));
             } else if (barDrag.mode === 'resize-right') {
-                newEnd = Math.min(duration, Math.max(barDrag.origEnd + dt, barDrag.origStart + MIN_BAR));
+                // Allow extending beyond current duration (auto-duration will recalculate)
+                newEnd = Math.max(barDrag.origStart + MIN_BAR, barDrag.origEnd + dt);
             }
 
             animPresets.setTiming(barDrag.elementId, newStart, newEnd);
@@ -118,6 +139,8 @@ export function BottomPanel({ variant, engine, nodes, selection, actions, overla
             setBarDrag(null);
             document.body.style.cursor = '';
             document.body.style.userSelect = '';
+            // ── Auto-duration: recalculate from max bar endTime ──
+            recalcDuration();
         };
 
         document.body.style.cursor = barDrag.mode === 'move' ? 'grabbing' : 'ew-resize';

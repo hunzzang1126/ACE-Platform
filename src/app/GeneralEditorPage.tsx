@@ -22,6 +22,22 @@ export function GeneralEditorPage() {
     // Modal state
     const [showAddSizeModal, setShowAddSizeModal] = useState(false);
 
+    // ── Preview playback state ──
+    const [previewPlaying, setPreviewPlaying] = useState(false);
+    const togglePreviewPlay = useCallback(() => setPreviewPlaying(p => !p), []);
+
+    // Spacebar shortcut for play/stop
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => {
+            if (e.code === 'Space' && !['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement).tagName)) {
+                e.preventDefault();
+                setPreviewPlaying(p => !p);
+            }
+        };
+        window.addEventListener('keydown', handler);
+        return () => window.removeEventListener('keydown', handler);
+    }, []);
+
     // Smart Check (one-click auto-fix)
     const { status: smartCheckStatus, result: smartCheckResult, error: smartCheckError, runSmartCheck, reset: resetSmartCheck } = useSmartCheck();
 
@@ -111,6 +127,8 @@ export function GeneralEditorPage() {
                     visibleIds={visibleIds}
                     onToggleVisibility={toggleVisibility}
                     onAddSizeClick={() => setShowAddSizeModal(true)}
+                    isPlaying={previewPlaying}
+                    onTogglePlay={togglePreviewPlay}
                 />
                 <main className="cs-main">
                     {/* Quick action bar */}
@@ -128,6 +146,7 @@ export function GeneralEditorPage() {
                         masterVariantId={creativeSet.masterVariantId}
                         onRunSmartCheck={() => runSmartCheck(creativeSet)}
                         smartCheckStatus={smartCheckStatus}
+                        externalPlaying={previewPlaying}
                     />
                 </main>
             </div>

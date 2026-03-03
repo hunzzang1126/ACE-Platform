@@ -959,3 +959,43 @@
 .modal-add-btn:disabled {
     cursor: not-allowed;
 }
+/* ── Playback Controls in Sidebar ── */
+.cs-sidebar-playback {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+}
+
+.cs-play-btn {
+    flex: 1;
+    padding: 6px 0;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.3px;
+}
+
+.cs-play-btn:hover {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+}
+
+.cs-play-btn--active {
+    background: var(--accent-gradient);
+    border-color: transparent;
+    color: #fff;
+    box-shadow: 0 0 8px var(--accent-glow);
+}
+
+.cs-play-hint {
+    font-size: 10px;
+    color: var(--text-muted);
+    white-space: nowrap;
+}

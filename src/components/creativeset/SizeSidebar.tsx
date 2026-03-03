@@ -9,6 +9,8 @@ interface Props {
     visibleIds: Set<string>;
     onToggleVisibility: (id: string) => void;
     onAddSizeClick: () => void;
+    isPlaying?: boolean;
+    onTogglePlay?: () => void;
 }
 
 interface StatusCounts {
@@ -19,7 +21,7 @@ interface StatusCounts {
     approved: number;
 }
 
-export function SizeSidebar({ variants, visibleIds, onToggleVisibility, onAddSizeClick }: Props) {
+export function SizeSidebar({ variants, visibleIds, onToggleVisibility, onAddSizeClick, isPlaying = false, onTogglePlay }: Props) {
     const [sizesExpanded, setSizesExpanded] = useState(true);
     const [statusExpanded, setStatusExpanded] = useState(true);
 
@@ -38,6 +40,20 @@ export function SizeSidebar({ variants, visibleIds, onToggleVisibility, onAddSiz
                 <button className="cs-sidebar-add-btn" onClick={onAddSizeClick}>
                     + ADD SIZE
                 </button>
+            </div>
+
+            {/* Playback Controls */}
+            <div className="cs-sidebar-section">
+                <div className="cs-sidebar-playback">
+                    <button
+                        className={`cs-play-btn ${isPlaying ? 'cs-play-btn--active' : ''}`}
+                        onClick={onTogglePlay}
+                        title={isPlaying ? 'Stop preview (Space)' : 'Play preview (Space)'}
+                    >
+                        {isPlaying ? 'Stop' : 'Play'}
+                    </button>
+                    <span className="cs-play-hint">Space</span>
+                </div>
             </div>
 
             {/* Quick Filters */}
