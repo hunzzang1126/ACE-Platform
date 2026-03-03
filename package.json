@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^2.10.1",
+    "fabric": "^6.9.1",
     "immer": "^10.1.1",
     "mp4-muxer": "^5.2.2",
     "pixi.js": "^8.6.6",

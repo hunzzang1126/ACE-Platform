@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────
-// DetailEditorPage – Layer 3 (Real Editor with WASM engine)
-// Owns the useCanvasEngine hook, passes state down to all panels
+// DetailEditorPage – Layer 3 (Real Editor with Fabric.js canvas)
+// Owns the useFabricCanvas hook, passes state down to all panels
 // ─────────────────────────────────────────────────
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
@@ -11,7 +11,7 @@ import { EditorToolbar } from '@/components/editor/EditorToolbar';
 import { EditorCanvas } from '@/components/editor/EditorCanvas';
 import { PropertyPanel } from '@/components/panels/PropertyPanel';
 import { BottomPanel } from '@/components/editor/BottomPanel';
-import { useCanvasEngine } from '@/hooks/useCanvasEngine';
+import { useFabricCanvas } from '@/hooks/useFabricCanvas';
 import { useOverlayElements } from '@/hooks/useOverlayElements';
 import { useCanvasSync } from '@/hooks/useCanvasSync';
 
@@ -48,7 +48,7 @@ export function DetailEditorPage() {
         actions,
         syncState,
         retryInit,
-    } = useCanvasEngine(width, height, false);
+    } = useFabricCanvas(width, height, false);
 
     // ── Overlay elements (text + images) ──
     const overlay = useOverlayElements(width, height);
