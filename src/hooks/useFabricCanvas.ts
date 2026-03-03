@@ -1108,16 +1108,85 @@ function createEngineShim(fc: Canvas, syncState: () => void, artboardW: number, 
         set_hue_rotate: () => { },
         add_keyframe: () => { },
 
-        anim_toggle: () => {
-            const store = (window as any).__animStore;
-            if (store) store.getState().toggle();
+        // ── Animation state machine ──
+        // The actual animation is CSS-based (useAnimPresetStore).
+        // These methods provide timing state for BottomPanel to poll.
+        _animState: {
+            playing: false,
+            time: 0,
+            duration: 5.0,
+            looping: false,
+            speed: 1.0,
+            startTs: 0,       // performance.now() when started
+            startOffset: 0,   // time offset when play was pressed
+            rafId: 0,
         },
+
+        anim_play() {
+            const s = this._animState;
+            if (s.playing) return;
+            s.playing = true;
+            s.startTs = performance.now();
+            s.startOffset = s.time;
+            const tick = () => {
+                if (!s.playing) return;
+                const elapsed = (performance.now() - s.startTs) / 1000 * s.speed;
+                s.time = s.startOffset + elapsed;
+                if (s.time >= s.duration) {
+                    if (s.looping) {
+                        s.time = s.time % s.duration;
+                        s.startTs = performance.now();
+                        s.startOffset = s.time;
+                    } else {
+                        s.time = s.duration;
+                        s.playing = false;
+                        return;
+                    }
+                }
+                s.rafId = requestAnimationFrame(tick);
+            };
+            s.rafId = requestAnimationFrame(tick);
+        },
+        anim_pause() {
+            this._animState.playing = false;
+            cancelAnimationFrame(this._animState.rafId);
+        },
+        anim_stop() {
+            this._animState.playing = false;
+            this._animState.time = 0;
+            cancelAnimationFrame(this._animState.rafId);
+        },
+        anim_seek(t: number) {
+            this._animState.time = Math.max(0, Math.min(t, this._animState.duration));
+            if (this._animState.playing) {
+                this._animState.startTs = performance.now();
+                this._animState.startOffset = this._animState.time;
+            }
+        },
+        anim_time(): number { return this._animState.time; },
+        anim_playing(): boolean { return this._animState.playing; },
+        anim_duration(): number { return this._animState.duration; },
+        anim_looping(): boolean { return this._animState.looping; },
+        set_duration(d: number) { this._animState.duration = d; },
+        set_looping(v: boolean) { this._animState.looping = v; },
+        anim_set_speed(s: number) { this._animState.speed = s; },
+        anim_toggle() {
+            if (this._animState.playing) {
+                this.anim_pause();
+            } else {
+                this.anim_play();
+            }
+        },
+
+        render_frame: () => { fc.renderAll(); },
         can_undo: () => false,
         can_redo: () => false,
         start_move: () => { },
         start_resize: () => { },
         update_drag: () => { },
         end_drag: () => { },
-        free: () => { },
+        free: () => {
+            cancelAnimationFrame(0); // cleanup
+        },
     };
 }
