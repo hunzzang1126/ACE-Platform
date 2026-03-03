@@ -70,6 +70,21 @@ function fabricToEngineNode(obj: FabricObject): EngineNode {
     };
 }
 
+// ── Custom properties to include in serialization ──
+const ACE_CUSTOM_PROPS = ['__aceId', '__aceZIndex', '__aceArtboard'];
+
+// Patch a Fabric object to include ACE custom props in toObject()
+function patchAceProps(obj: FabricObject): void {
+    const original = obj.toObject.bind(obj);
+    obj.toObject = function (additionalProps?: string[]) {
+        const data = original(additionalProps);
+        data.__aceId = (this as any).__aceId;
+        data.__aceZIndex = (this as any).__aceZIndex;
+        if ((this as any).__aceArtboard) data.__aceArtboard = true;
+        return data;
+    };
+}
+
 /**
  * useFabricCanvas — Fabric.js canvas engine hook.
  * Canvas fills the viewport, artboard is a background rect.
@@ -138,7 +153,7 @@ export function useFabricCanvas(
     const pushUndo = useCallback(() => {
         const fc = fabricRef.current;
         if (!fc || skipHistory.current) return;
-        undoStack.current.push(JSON.stringify(fc.toJSON()));
+        undoStack.current.push(JSON.stringify(fc.toObject(ACE_CUSTOM_PROPS)));
         redoStack.current = [];
         setCanUndo(true);
         setCanRedo(false);
@@ -198,6 +213,7 @@ export function useFabricCanvas(
                 }),
             });
             (artboard as any).__aceArtboard = true;
+            patchAceProps(artboard);
             fc.add(artboard);
 
             // Center the artboard in the viewport
@@ -324,6 +340,7 @@ export function useFabricCanvas(
         });
         (rect as any).__aceId = id;
         (rect as any).__aceZIndex = getUserObjects().length;
+        patchAceProps(rect);
         fc.add(rect);
         fc.setActiveObject(rect);
         fc.renderAll();
@@ -348,6 +365,7 @@ export function useFabricCanvas(
         });
         (rect as any).__aceId = id;
         (rect as any).__aceZIndex = getUserObjects().length;
+        patchAceProps(rect);
         fc.add(rect);
         fc.setActiveObject(rect);
         fc.renderAll();
@@ -370,6 +388,7 @@ export function useFabricCanvas(
         });
         (el as any).__aceId = id;
         (el as any).__aceZIndex = getUserObjects().length;
+        patchAceProps(el);
         fc.add(el);
         fc.setActiveObject(el);
         fc.renderAll();
@@ -514,61 +533,50 @@ export function useFabricCanvas(
     const addKeyframe = useCallback((_nodeId: number, _property: string, _time: number, _value: number, _easing: string) => { }, []);
 
     // ── Undo / Redo ──
+    const restoreArtboardFlags = useCallback((fc: Canvas) => {
+        // After loadFromJSON, re-apply behavioral flags on artboard
+        fc.getObjects().forEach((obj) => {
+            if ((obj as any).__aceArtboard) {
+                obj.set({
+                    selectable: false,
+                    evented: false,
+                    hasControls: false,
+                    hasBorders: false,
+                    lockMovementX: true,
+                    lockMovementY: true,
+                    hoverCursor: 'default',
+                });
+            }
+        });
+    }, []);
+
     const undo = useCallback(() => {
         const fc = fabricRef.current;
         if (!fc || undoStack.current.length === 0) return;
-        // Push current state to redo
-        redoStack.current.push(JSON.stringify(fc.toJSON()));
+        redoStack.current.push(JSON.stringify(fc.toObject(ACE_CUSTOM_PROPS)));
         const prev = undoStack.current.pop()!;
         skipHistory.current = true;
         fc.loadFromJSON(prev).then(() => {
-            // Re-add artboard if missing
-            const hasArtboard = fc.getObjects().some(isArtboard);
-            if (!hasArtboard) {
-                const ab = new Rect({
-                    left: 0, top: 0, width, height,
-                    fill: '#ffffff', selectable: false, evented: false,
-                    hasControls: false, hasBorders: false,
-                    lockMovementX: true, lockMovementY: true,
-                    hoverCursor: 'default',
-                    shadow: new Shadow({ color: 'rgba(0,0,0,0.3)', blur: 20, offsetX: 0, offsetY: 4 }),
-                });
-                (ab as any).__aceArtboard = true;
-                fc.add(ab);
-                fc.sendObjectToBack(ab);
-            }
+            restoreArtboardFlags(fc);
             fc.renderAll();
             skipHistory.current = false;
             syncState();
         });
-    }, [width, height, syncState]);
+    }, [syncState, restoreArtboardFlags]);
 
     const redo = useCallback(() => {
         const fc = fabricRef.current;
         if (!fc || redoStack.current.length === 0) return;
-        undoStack.current.push(JSON.stringify(fc.toJSON()));
+        undoStack.current.push(JSON.stringify(fc.toObject(ACE_CUSTOM_PROPS)));
         const next = redoStack.current.pop()!;
         skipHistory.current = true;
         fc.loadFromJSON(next).then(() => {
-            const hasArtboard = fc.getObjects().some(isArtboard);
-            if (!hasArtboard) {
-                const ab = new Rect({
-                    left: 0, top: 0, width, height,
-                    fill: '#ffffff', selectable: false, evented: false,
-                    hasControls: false, hasBorders: false,
-                    lockMovementX: true, lockMovementY: true,
-                    hoverCursor: 'default',
-                    shadow: new Shadow({ color: 'rgba(0,0,0,0.3)', blur: 20, offsetX: 0, offsetY: 4 }),
-                });
-                (ab as any).__aceArtboard = true;
-                fc.add(ab);
-                fc.sendObjectToBack(ab);
-            }
+            restoreArtboardFlags(fc);
             fc.renderAll();
             skipHistory.current = false;
             syncState();
         });
-    }, [width, height, syncState]);
+    }, [syncState, restoreArtboardFlags]);
 
     // ── Duplicate ──
     const duplicateSelected = useCallback((): number | null => {
@@ -756,6 +764,7 @@ function createEngineShim(fc: Canvas, syncState: () => void, artboardW: number, 
             });
             (rect as any).__aceId = id;
             (rect as any).__aceZIndex = userObjects().length;
+            patchAceProps(rect);
             fc.add(rect);
             fc.renderAll();
             return id;
@@ -770,6 +779,7 @@ function createEngineShim(fc: Canvas, syncState: () => void, artboardW: number, 
             });
             (rect as any).__aceId = id;
             (rect as any).__aceZIndex = userObjects().length;
+            patchAceProps(rect);
             fc.add(rect);
             fc.renderAll();
             return id;
@@ -784,6 +794,7 @@ function createEngineShim(fc: Canvas, syncState: () => void, artboardW: number, 
             });
             (el as any).__aceId = id;
             (el as any).__aceZIndex = userObjects().length;
+            patchAceProps(el);
             fc.add(el);
             fc.renderAll();
             return id;
