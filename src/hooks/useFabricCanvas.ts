@@ -5,7 +5,7 @@
 // ─────────────────────────────────────────────────
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Canvas, Rect, Ellipse, Shadow, PencilBrush, Textbox, FabricImage, type FabricObject } from 'fabric';
+import { Canvas, Rect, Ellipse, Shadow, PencilBrush, Textbox, FabricImage, Gradient, type FabricObject } from 'fabric';
 import { useEditorStore } from '@/stores/editorStore';
 import type { EngineNode, CanvasEngineState, CanvasEngineActions, UseCanvasEngineResult } from './canvasTypes';
 
@@ -979,7 +979,36 @@ function createEngineShim(fc: Canvas, syncState: () => void, artboardW: number, 
             fc.renderAll();
             return id;
         },
-        add_gradient_rect: () => 0,
+        add_gradient_rect: (x: number, y: number, w: number, h: number, r1: number, g1: number, b1: number, _a1: number, r2: number, g2: number, b2: number, _a2: number, angle_deg: number) => {
+            const id = nextId();
+            // Convert angle to gradient coordinates
+            const rad = (angle_deg * Math.PI) / 180;
+            const cos = Math.cos(rad);
+            const sin = Math.sin(rad);
+            const rect = new Rect({
+                left: x, top: y, width: w, height: h,
+                fill: new Gradient({
+                    type: 'linear',
+                    coords: {
+                        x1: 0.5 - cos * 0.5,
+                        y1: 0.5 - sin * 0.5,
+                        x2: 0.5 + cos * 0.5,
+                        y2: 0.5 + sin * 0.5,
+                    },
+                    colorStops: [
+                        { offset: 0, color: rgbToHex(r1, g1, b1) },
+                        { offset: 1, color: rgbToHex(r2, g2, b2) },
+                    ],
+                    gradientUnits: 'percentage',
+                }),
+            });
+            (rect as any).__aceId = id;
+            (rect as any).__aceZIndex = userObjects().length;
+            patchAceProps(rect);
+            fc.add(rect);
+            fc.renderAll();
+            return id;
+        },
 
         // ── Text (Fabric Textbox) ──
         add_text: (x: number, y: number, content: string, opts?: {
@@ -1060,11 +1089,12 @@ function createEngineShim(fc: Canvas, syncState: () => void, artboardW: number, 
             fc.renderAll();
         },
         clear_scene: () => {
-            // Remove all user objects, keep artboard
             const toRemove = userObjects();
             toRemove.forEach((o) => fc.remove(o));
             fc.renderAll();
         },
+        // Alias: AI executor calls engine.clear()
+        clear() { this.clear_scene(); },
 
         set_position: (id: number, x: number, y: number) => {
             const obj = findById(id);
