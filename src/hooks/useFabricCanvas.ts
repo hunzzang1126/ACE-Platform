@@ -169,26 +169,41 @@ export function useFabricCanvas(
     }, []);
 
     // ── Sync state — RAF-debounced to prevent render cascades ──
+    // Stale-check: only update React state if data actually changed
+    const prevNodesJson = useRef('');
+    const prevSelJson = useRef('');
+
     const doSync = useCallback(() => {
         syncPending.current = false;
         const objs = getUserObjects();
-        // Filter out objects w/o valid aceId to prevent duplicate key=engine-0
         const engineNodes: EngineNode[] = objs
             .map(fabricToEngineNode)
             .filter(n => n.id > 0);
-        setNodes(engineNodes);
-        setNodeCount(engineNodes.length);
+
+        // Only update nodes if they actually changed (prevents render cascades)
+        const nodesJson = JSON.stringify(engineNodes);
+        if (nodesJson !== prevNodesJson.current) {
+            prevNodesJson.current = nodesJson;
+            setNodes(engineNodes);
+            setNodeCount(engineNodes.length);
+        }
 
         const fc = fabricRef.current;
         if (fc) {
             const active = fc.getActiveObjects();
             const selectedIds = active.map((o) => (o as any).__aceId ?? 0).filter((id: number) => id > 0);
-            setSelection(selectedIds);
+            const selJson = JSON.stringify(selectedIds);
+            if (selJson !== prevSelJson.current) {
+                prevSelJson.current = selJson;
+                setSelection(selectedIds);
+            }
         }
 
-        setCanUndo(undoStack.current.length > 0);
-        setCanRedo(redoStack.current.length > 0);
-    }, [getUserObjects]);
+        const hasUndo = undoStack.current.length > 0;
+        const hasRedo = redoStack.current.length > 0;
+        if (hasUndo !== canUndo) setCanUndo(hasUndo);
+        if (hasRedo !== canRedo) setCanRedo(hasRedo);
+    }, [getUserObjects, canUndo, canRedo]);
 
     const syncState = useCallback(() => {
         if (!syncPending.current) {
