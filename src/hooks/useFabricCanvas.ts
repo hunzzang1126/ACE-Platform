@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────
 // useFabricCanvas — Fabric.js-based canvas engine
-// Drop-in replacement for useCanvasEngine (WASM WebGPU)
-// Handles shapes, selection, drag, resize, effects natively
+// Full-viewport canvas with artboard as background rect
+// Handles shapes, selection, drag, resize, zoom/pan natively
 // ─────────────────────────────────────────────────
 
 import { useEffect, useRef, useState, useCallback } from 'react';
@@ -41,6 +41,11 @@ function rgbToHex(r: number, g: number, b: number): string {
     return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 }
 
+// ── Check if object is the artboard background ──
+function isArtboard(obj: FabricObject): boolean {
+    return (obj as any).__aceArtboard === true;
+}
+
 // ── Extract EngineNode from Fabric object ──
 function fabricToEngineNode(obj: FabricObject): EngineNode {
     const id = (obj as any).__aceId ?? 0;
@@ -67,7 +72,8 @@ function fabricToEngineNode(obj: FabricObject): EngineNode {
 
 /**
  * useFabricCanvas — Fabric.js canvas engine hook.
- * Same interface as useCanvasEngine for drop-in replacement.
+ * Canvas fills the viewport, artboard is a background rect.
+ * Shapes can extend beyond the artboard freely.
  */
 export function useFabricCanvas(
     width: number,
@@ -75,10 +81,10 @@ export function useFabricCanvas(
     _addDemoShapes = false,
 ): UseCanvasEngineResult {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
-    const overlayRef = useRef<HTMLCanvasElement | null>(null); // unused, for interface compat
+    const overlayRef = useRef<HTMLCanvasElement | null>(null); // unused, interface compat
     const fabricRef = useRef<Canvas | null>(null);
-    // engineRef points to a compatibility shim for save/restore
     const engineRef = useRef<any>(null);
+    const containerRef = useRef<HTMLElement | null>(null);
 
     const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'no-webgpu'>('loading');
     const [errorMsg, setErrorMsg] = useState('');
@@ -88,7 +94,6 @@ export function useFabricCanvas(
     const [nodeCount, setNodeCount] = useState(0);
     const [nodes, setNodes] = useState<EngineNode[]>([]);
 
-    // Undo/redo stacks
     const undoStack = useRef<string[]>([]);
     const redoStack = useRef<string[]>([]);
     const skipHistory = useRef(false);
@@ -96,27 +101,31 @@ export function useFabricCanvas(
     const activeTool = useEditorStore((s) => s.activeTool);
     const setTool = useEditorStore((s) => s.setTool);
 
+    // ── Get user-created objects (exclude artboard background) ──
+    const getUserObjects = useCallback((): FabricObject[] => {
+        const fc = fabricRef.current;
+        if (!fc) return [];
+        return fc.getObjects().filter(o => !isArtboard(o));
+    }, []);
+
     // ── Sync state from Fabric canvas ──
     const syncState = useCallback(() => {
-        const fc = fabricRef.current;
-        if (!fc) return;
-
-        // Build nodes from Fabric objects
-        const objs = fc.getObjects();
+        const objs = getUserObjects();
         const engineNodes: EngineNode[] = objs.map(fabricToEngineNode);
         setNodes(engineNodes);
         setNodeCount(objs.length);
 
-        // Selection
-        const active = fc.getActiveObjects();
-        const selectedIds = active.map((o) => (o as any).__aceId ?? 0).filter((id: number) => id > 0);
-        setSelection(selectedIds);
+        const fc = fabricRef.current;
+        if (fc) {
+            const active = fc.getActiveObjects();
+            const selectedIds = active.map((o) => (o as any).__aceId ?? 0).filter((id: number) => id > 0);
+            setSelection(selectedIds);
+        }
 
         setCanUndo(undoStack.current.length > 0);
         setCanRedo(redoStack.current.length > 0);
-    }, []);
+    }, [getUserObjects]);
 
-    // ── Push undo snapshot ──
     const pushUndo = useCallback(() => {
         const fc = fabricRef.current;
         if (!fc || skipHistory.current) return;
@@ -135,11 +144,17 @@ export function useFabricCanvas(
             return;
         }
 
+        // Find the container (ed-canvas-area) to get viewport dimensions
+        const container = el.parentElement;
+        containerRef.current = container;
+        const cw = container?.clientWidth ?? 1200;
+        const ch = container?.clientHeight ?? 700;
+
         try {
             const fc = new Canvas(el, {
-                width,
-                height,
-                backgroundColor: '#ffffff',
+                width: cw,
+                height: ch,
+                backgroundColor: '#16191f', // Dark workspace background
                 selection: true,
                 preserveObjectStacking: true,
                 stopContextMenu: true,
@@ -151,6 +166,36 @@ export function useFabricCanvas(
             (fc as any).selectionBorderColor = '#4a9eff';
             (fc as any).selectionLineWidth = 1;
 
+            // ── Add artboard background rect ──
+            const artboard = new Rect({
+                left: 0,
+                top: 0,
+                width,
+                height,
+                fill: '#ffffff',
+                selectable: false,
+                evented: false,
+                hasControls: false,
+                hasBorders: false,
+                lockMovementX: true,
+                lockMovementY: true,
+                hoverCursor: 'default',
+                shadow: new Shadow({
+                    color: 'rgba(0,0,0,0.3)',
+                    blur: 20,
+                    offsetX: 0,
+                    offsetY: 4,
+                }),
+            });
+            (artboard as any).__aceArtboard = true;
+            fc.add(artboard);
+
+            // Center the artboard in the viewport
+            const vpt = fc.viewportTransform!;
+            vpt[4] = (cw - width) / 2;
+            vpt[5] = (ch - height) / 2;
+            fc.setViewportTransform(vpt);
+
             // Events
             fc.on('selection:created', () => syncState());
             fc.on('selection:updated', () => syncState());
@@ -159,13 +204,59 @@ export function useFabricCanvas(
             fc.on('object:added', () => { if (!skipHistory.current) pushUndo(); syncState(); });
             fc.on('object:removed', () => { pushUndo(); syncState(); });
 
-            fabricRef.current = fc;
+            // ── Zoom with Ctrl+Wheel ──
+            fc.on('mouse:wheel', (opt) => {
+                const e = opt.e as WheelEvent;
+                if (e.ctrlKey || e.metaKey) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const delta = e.deltaY > 0 ? -0.08 : 0.08;
+                    let newZoom = (fc.getZoom() || 1) + delta;
+                    newZoom = Math.max(0.1, Math.min(5, newZoom));
+                    const point = fc.getScenePoint(e);
+                    fc.zoomToPoint(point, newZoom);
+                    fc.renderAll();
+                }
+            });
 
-            // Create engine compatibility shim
-            engineRef.current = createEngineShim(fc, syncState);
+            // ── Pan with Alt+drag or middle mouse ──
+            let isPanning = false;
+            let lastPanX = 0;
+            let lastPanY = 0;
+
+            fc.on('mouse:down', (opt) => {
+                const e = opt.e as MouseEvent;
+                if (e.altKey || e.button === 1) {
+                    isPanning = true;
+                    lastPanX = e.clientX;
+                    lastPanY = e.clientY;
+                    fc.setCursor('grabbing');
+                    e.preventDefault();
+                }
+            });
+            fc.on('mouse:move', (opt) => {
+                if (!isPanning) return;
+                const e = opt.e as MouseEvent;
+                const vpt = fc.viewportTransform!;
+                vpt[4] += e.clientX - lastPanX;
+                vpt[5] += e.clientY - lastPanY;
+                lastPanX = e.clientX;
+                lastPanY = e.clientY;
+                fc.setViewportTransform(vpt);
+                fc.renderAll();
+            });
+            fc.on('mouse:up', () => {
+                if (isPanning) {
+                    isPanning = false;
+                    fc.setCursor('default');
+                }
+            });
+
+            fabricRef.current = fc;
+            engineRef.current = createEngineShim(fc, syncState, width, height);
 
             setStatus('ready');
-            console.log('[Fabric] Canvas ready:', width, '×', height);
+            console.log('[Fabric] Canvas ready:', width, '×', height, '(viewport:', cw, '×', ch, ')');
         } catch (err) {
             console.error('[Fabric] Init error:', err);
             setErrorMsg(String(err));
@@ -181,6 +272,25 @@ export function useFabricCanvas(
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [width, height]);
+
+    // ── ResizeObserver: keep Fabric canvas = viewport size ──
+    useEffect(() => {
+        const fc = fabricRef.current;
+        const container = containerRef.current;
+        if (!fc || !container) return;
+
+        const ro = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                const { width: cw, height: ch } = entry.contentRect;
+                if (cw > 0 && ch > 0) {
+                    fc.setDimensions({ width: cw, height: ch });
+                    fc.renderAll();
+                }
+            }
+        });
+        ro.observe(container);
+        return () => ro.disconnect();
+    }, [status]);
 
     // ── Helper: find object by ACE id ──
     const findById = useCallback((id: number): FabricObject | undefined => {
@@ -202,13 +312,13 @@ export function useFabricCanvas(
             opacity: 0.9,
         });
         (rect as any).__aceId = id;
-        (rect as any).__aceZIndex = fc.getObjects().length;
+        (rect as any).__aceZIndex = getUserObjects().length;
         fc.add(rect);
         fc.setActiveObject(rect);
         fc.renderAll();
         syncState();
         return id;
-    }, [width, height, syncState]);
+    }, [width, height, syncState, getUserObjects]);
 
     const addRoundedRect = useCallback((x?: number, y?: number): number | null => {
         const fc = fabricRef.current;
@@ -226,13 +336,13 @@ export function useFabricCanvas(
             ry: 12,
         });
         (rect as any).__aceId = id;
-        (rect as any).__aceZIndex = fc.getObjects().length;
+        (rect as any).__aceZIndex = getUserObjects().length;
         fc.add(rect);
         fc.setActiveObject(rect);
         fc.renderAll();
         syncState();
         return id;
-    }, [width, height, syncState]);
+    }, [width, height, syncState, getUserObjects]);
 
     const addEllipse = useCallback((x?: number, y?: number): number | null => {
         const fc = fabricRef.current;
@@ -248,19 +358,19 @@ export function useFabricCanvas(
             opacity: 0.9,
         });
         (el as any).__aceId = id;
-        (el as any).__aceZIndex = fc.getObjects().length;
+        (el as any).__aceZIndex = getUserObjects().length;
         fc.add(el);
         fc.setActiveObject(el);
         fc.renderAll();
         syncState();
         return id;
-    }, [width, height, syncState]);
+    }, [width, height, syncState, getUserObjects]);
 
     // ── Delete ──
     const deleteSelected = useCallback(() => {
         const fc = fabricRef.current;
         if (!fc) return;
-        const active = fc.getActiveObjects();
+        const active = fc.getActiveObjects().filter(o => !isArtboard(o));
         active.forEach((obj) => fc.remove(obj));
         fc.discardActiveObject();
         fc.renderAll();
@@ -333,7 +443,11 @@ export function useFabricCanvas(
         const fc = fabricRef.current;
         const obj = findById(id);
         if (!fc || !obj) return;
+        // Send to back but keep above artboard
         fc.sendObjectToBack(obj);
+        // Move artboard to absolute bottom
+        const artboard = fc.getObjects().find(isArtboard);
+        if (artboard) fc.sendObjectToBack(artboard);
         fc.renderAll();
         syncState();
     }, [findById, syncState]);
@@ -352,6 +466,9 @@ export function useFabricCanvas(
         const obj = findById(id);
         if (!fc || !obj) return;
         fc.sendObjectBackwards(obj);
+        // Ensure artboard stays at bottom
+        const artboard = fc.getObjects().find(isArtboard);
+        if (artboard) fc.sendObjectToBack(artboard);
         fc.renderAll();
         syncState();
     }, [findById, syncState]);
@@ -378,23 +495,19 @@ export function useFabricCanvas(
         fabricRef.current?.renderAll();
     }, [findById]);
 
-    // Blend mode, brightness, contrast, saturation, hue — applied via CSS filter on the canvas
-    // For now, these are stubs; can be enhanced with Fabric filters
-    const setBlendMode = useCallback((_id: number, _mode: string) => { /* stub */ }, []);
-    const setBrightness = useCallback((_id: number, _v: number) => { /* stub */ }, []);
-    const setContrast = useCallback((_id: number, _v: number) => { /* stub */ }, []);
-    const setSaturation = useCallback((_id: number, _v: number) => { /* stub */ }, []);
-    const setHueRotate = useCallback((_id: number, _deg: number) => { /* stub */ }, []);
-
-    // ── Keyframe (stub — animation stays in Zustand store) ──
-    const addKeyframe = useCallback((_nodeId: number, _property: string, _time: number, _value: number, _easing: string) => { /* stub */ }, []);
+    const setBlendMode = useCallback((_id: number, _mode: string) => { }, []);
+    const setBrightness = useCallback((_id: number, _v: number) => { }, []);
+    const setContrast = useCallback((_id: number, _v: number) => { }, []);
+    const setSaturation = useCallback((_id: number, _v: number) => { }, []);
+    const setHueRotate = useCallback((_id: number, _deg: number) => { }, []);
+    const addKeyframe = useCallback((_nodeId: number, _property: string, _time: number, _value: number, _easing: string) => { }, []);
 
     // ── Duplicate ──
     const duplicateSelected = useCallback((): number | null => {
         const fc = fabricRef.current;
         if (!fc) return null;
         const active = fc.getActiveObject();
-        if (!active) return null;
+        if (!active || isArtboard(active)) return null;
 
         const id = nextId();
         active.clone().then((cloned: FabricObject) => {
@@ -427,11 +540,8 @@ export function useFabricCanvas(
         syncState();
     }, [width, height, findById, syncState]);
 
-    // ── Mouse handlers (tool-aware) ──
-    const onMouseDown = useCallback((_e: React.MouseEvent) => {
-        // Fabric handles its own mouse interaction natively
-        // This is only for shape tool clicks
-    }, []);
+    // ── Mouse handlers (stubs — Fabric handles natively) ──
+    const onMouseDown = useCallback((_e: React.MouseEvent) => { }, []);
     const onMouseMove = useCallback((_e: React.MouseEvent) => { }, []);
     const onMouseUp = useCallback(() => { }, []);
 
@@ -452,7 +562,6 @@ export function useFabricCanvas(
         return () => { fc.off('mouse:down', handler); };
     }, [activeTool, status, addRect, setTool]);
 
-    // ── Retry ──
     const retryInit = useCallback(() => {
         if (fabricRef.current) {
             fabricRef.current.dispose();
@@ -460,7 +569,6 @@ export function useFabricCanvas(
         }
         setStatus('loading');
         setErrorMsg('');
-        // Re-init will happen via useEffect
     }, []);
 
     const state: CanvasEngineState = {
@@ -492,19 +600,16 @@ export function useFabricCanvas(
 }
 
 // ── Engine Compatibility Shim ──
-// This object mimics the WASM engine API so useCanvasSync can call
-// the same methods (add_rect, get_all_nodes, etc.) without changes.
-function createEngineShim(fc: Canvas, syncState: () => void) {
+function createEngineShim(fc: Canvas, syncState: () => void, artboardW: number, artboardH: number) {
     const findById = (id: number) => fc.getObjects().find((o) => (o as any).__aceId === id);
+    const userObjects = () => fc.getObjects().filter(o => !isArtboard(o));
 
     return {
-        // ── Node queries ──
         get_all_nodes: () => {
-            const objs = fc.getObjects();
-            const nodes = objs.map(fabricToEngineNode);
+            const nodes = userObjects().map(fabricToEngineNode);
             return JSON.stringify(nodes);
         },
-        node_count: () => fc.getObjects().length,
+        node_count: () => userObjects().length,
         get_selection: () => {
             const active = fc.getActiveObjects();
             return JSON.stringify(active.map((o) => (o as any).__aceId ?? 0));
@@ -519,7 +624,6 @@ function createEngineShim(fc: Canvas, syncState: () => void) {
         rubber_band_rect: () => 'null',
         hit_test: () => JSON.stringify({ type: 'none' }),
 
-        // ── Shape creation (same API as WASM engine) ──
         add_rect: (x: number, y: number, w: number, h: number, r: number, g: number, b: number, a: number) => {
             const id = nextId();
             const rect = new Rect({
@@ -528,7 +632,7 @@ function createEngineShim(fc: Canvas, syncState: () => void) {
                 opacity: a,
             });
             (rect as any).__aceId = id;
-            (rect as any).__aceZIndex = fc.getObjects().length;
+            (rect as any).__aceZIndex = userObjects().length;
             fc.add(rect);
             fc.renderAll();
             return id;
@@ -542,7 +646,7 @@ function createEngineShim(fc: Canvas, syncState: () => void) {
                 rx: radius, ry: radius,
             });
             (rect as any).__aceId = id;
-            (rect as any).__aceZIndex = fc.getObjects().length;
+            (rect as any).__aceZIndex = userObjects().length;
             fc.add(rect);
             fc.renderAll();
             return id;
@@ -556,14 +660,13 @@ function createEngineShim(fc: Canvas, syncState: () => void) {
                 opacity: a,
             });
             (el as any).__aceId = id;
-            (el as any).__aceZIndex = fc.getObjects().length;
+            (el as any).__aceZIndex = userObjects().length;
             fc.add(el);
             fc.renderAll();
             return id;
         },
-        add_gradient_rect: () => 0, // stub
+        add_gradient_rect: () => 0,
 
-        // ── Manipulation ──
         select: (id: number) => {
             const obj = findById(id);
             if (obj) { fc.setActiveObject(obj); fc.renderAll(); }
@@ -581,14 +684,18 @@ function createEngineShim(fc: Canvas, syncState: () => void) {
         },
         deselect_all: () => { fc.discardActiveObject(); fc.renderAll(); },
         delete_selected: () => {
-            const active = fc.getActiveObjects();
+            const active = fc.getActiveObjects().filter(o => !isArtboard(o));
             active.forEach((o) => fc.remove(o));
             fc.discardActiveObject();
             fc.renderAll();
         },
-        clear_scene: () => { fc.clear(); fc.backgroundColor = '#ffffff'; fc.renderAll(); },
+        clear_scene: () => {
+            // Remove all user objects, keep artboard
+            const toRemove = userObjects();
+            toRemove.forEach((o) => fc.remove(o));
+            fc.renderAll();
+        },
 
-        // ── Transform ──
         set_position: (id: number, x: number, y: number) => {
             const obj = findById(id);
             if (obj) { obj.set({ left: x, top: y }); obj.setCoords(); fc.renderAll(); }
@@ -631,20 +738,16 @@ function createEngineShim(fc: Canvas, syncState: () => void) {
         set_hue_rotate: () => { },
         add_keyframe: () => { },
 
-        // ── Animation stubs (handled by Zustand store) ──
         anim_toggle: () => {
             const store = (window as any).__animStore;
             if (store) store.getState().toggle();
         },
         can_undo: () => false,
         can_redo: () => false,
-
-        // ── Drag stubs (Fabric handles natively) ──
         start_move: () => { },
         start_resize: () => { },
         update_drag: () => { },
         end_drag: () => { },
-
         free: () => { },
     };
 }
