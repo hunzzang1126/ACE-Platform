@@ -71,10 +71,11 @@ export function useCanvasSync(
             }
         }
 
-        // Save ALL overlays — including hidden ones (visibility is a property, not a delete)
-        for (const oel of overlayElements) {
-            elements.push(overlayToDesignElement(oel, canvasW, canvasH));
-        }
+        // ★ Only save canvas-native elements (Fabric objects).
+        // Video overlays are HTML-based and NOT on the Fabric canvas —
+        // do NOT include them in saved design data.
+        // (Previously: saved ALL overlay elements including video, causing
+        //  video to appear in preview cards even though it's not on canvas.)
 
         // 3. Sort by zIndex
         elements.sort((a, b) => a.zIndex - b.zIndex);
@@ -116,10 +117,7 @@ export function useCanvasSync(
             }
         }
 
-        // Save ALL overlays — including hidden ones (visibility is a property, not a delete)
-        for (const oel of overlayElements) {
-            elements.push(overlayToDesignElement(oel, canvasW, canvasH));
-        }
+        // ★ Only save canvas-native elements — no video overlays
 
         // 3. Sort by zIndex
         elements.sort((a, b) => a.zIndex - b.zIndex);
