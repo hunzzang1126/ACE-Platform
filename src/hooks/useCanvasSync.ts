@@ -193,26 +193,32 @@ export function useCanvasSync(
 
             } else if (el.type === 'text') {
                 const text = el as TextElement;
-                const { x, y, w, h } = constraintsToAbsolute(text.constraints, canvasW, canvasH);
+                const { x, y, w } = constraintsToAbsolute(text.constraints, canvasW, canvasH);
 
-                // Restore text as Fabric-native Textbox (not HTML overlay)
-                const nodeId = engine.add_text(x, y, text.content || '', {
-                    fontSize: text.fontSize || 16,
-                    fontFamily: text.fontFamily || 'Inter',
-                    fontWeight: String(text.fontWeight || 400),
-                    color: text.color || '#000000',
-                    textAlign: text.textAlign || 'left',
-                    lineHeight: text.lineHeight,
-                    width: w,
-                    name: text.name,
-                });
+                // Convert stored hex color → r,g,b floats for engine
+                const [tr, tg, tb] = hexToRgbFloat(text.color || '#ffffff');
+
+                // IMPORTANT: engine.add_text takes POSITIONAL args, not an options object:
+                // (x, y, content, fontSize, fontFamily, fontWeight, r, g, b, a, width, textAlign, name?)
+                const nodeId = engine.add_text(
+                    x,
+                    y,
+                    text.content || '',
+                    text.fontSize || 16,
+                    text.fontFamily || 'Inter, system-ui, sans-serif',
+                    String(text.fontWeight || 400),
+                    tr, tg, tb, 1.0,
+                    w > 0 ? w : canvasW * 0.85,
+                    text.textAlign || 'left',
+                    text.name,
+                );
 
                 if (text.opacity !== undefined && text.opacity !== 1) {
                     try { engine.set_opacity(nodeId, text.opacity); } catch { /* ok */ }
                 }
 
                 restoredShapes++;
-                console.log(`[useCanvasSync] Restored text: "${text.name}" (id=${nodeId}) at ${x},${y}`);
+                console.log(`[useCanvasSync] Restored text: "${text.name}" (id=${nodeId}) at ${x},${y} fontSize=${text.fontSize} color=${text.color}`);
 
                 // Restore animation preset for this text element
                 if (el.animation && el.animation.preset !== 'none') {
