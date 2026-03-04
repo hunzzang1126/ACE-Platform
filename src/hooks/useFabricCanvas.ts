@@ -951,7 +951,7 @@ function createEngineShim(fc: Canvas, syncState: () => void, artboardW: number, 
         rubber_band_rect: () => 'null',
         hit_test: () => JSON.stringify({ type: 'none' }),
 
-        add_rect: (x: number, y: number, w: number, h: number, r: number, g: number, b: number, a: number) => {
+        add_rect: (x: number, y: number, w: number, h: number, r: number, g: number, b: number, a: number, name?: string) => {
             const id = nextId();
             const rect = new Rect({
                 left: x, top: y, width: w, height: h,
@@ -959,13 +959,15 @@ function createEngineShim(fc: Canvas, syncState: () => void, artboardW: number, 
                 opacity: a,
             });
             (rect as any).__aceId = id;
+            (rect as any).__aceName = name || `Rectangle #${id}`;
             (rect as any).__aceZIndex = userObjects().length;
             patchAceProps(rect);
             fc.add(rect);
             fc.renderAll();
+            syncState();
             return id;
         },
-        add_rounded_rect: (x: number, y: number, w: number, h: number, r: number, g: number, b: number, a: number, radius: number) => {
+        add_rounded_rect: (x: number, y: number, w: number, h: number, r: number, g: number, b: number, a: number, radius: number, name?: string) => {
             const id = nextId();
             const rect = new Rect({
                 left: x, top: y, width: w, height: h,
@@ -974,10 +976,12 @@ function createEngineShim(fc: Canvas, syncState: () => void, artboardW: number, 
                 rx: radius, ry: radius,
             });
             (rect as any).__aceId = id;
+            (rect as any).__aceName = name || `Rounded Rect #${id}`;
             (rect as any).__aceZIndex = userObjects().length;
             patchAceProps(rect);
             fc.add(rect);
             fc.renderAll();
+            syncState();
             return id;
         },
         add_ellipse: (cx: number, cy: number, rx: number, ry: number, r: number, g: number, b: number, a: number) => {

@@ -175,57 +175,87 @@ export function useAutoDesign(options: AutoDesignOptions) {
             setState(s => ({ ...s, progress: 'Clearing canvas...' }));
             try { engine.clear_scene?.(); } catch { /* some engines may not have this */ }
 
-            // Step 3: Execute render_banner
+            // Step 3: Execute render_banner — robust element rendering
             setState(s => ({ ...s, progress: `Rendering ${params.elements.length} elements...` }));
 
             let createdCount = 0;
+
+            // Helper: parse a color_hex string → normalized r,g,b (0.0-1.0 floats)
+            function parseHexToRgb(hex: string): [number, number, number] {
+                const clean = hex.replace('#', '');
+                if (clean.length === 3) {
+                    const r = parseInt(clean[0]! + clean[0]!, 16) / 255;
+                    const g = parseInt(clean[1]! + clean[1]!, 16) / 255;
+                    const b = parseInt(clean[2]! + clean[2]!, 16) / 255;
+                    return [r, g, b];
+                }
+                const r = parseInt(clean.slice(0, 2), 16) / 255;
+                const g = parseInt(clean.slice(2, 4), 16) / 255;
+                const b = parseInt(clean.slice(4, 6), 16) / 255;
+                return [Number.isNaN(r) ? 1 : r, Number.isNaN(g) ? 1 : g, Number.isNaN(b) ? 1 : b];
+            }
+
+            // Helper: get shape r,g,b from element (may use color_hex fallback)
+            function getShapeRgb(el: Record<string, unknown>): [number, number, number] {
+                if (el.color_hex) return parseHexToRgb(el.color_hex as string);
+                return [
+                    typeof el.r === 'number' ? el.r : 0.5,
+                    typeof el.g === 'number' ? el.g : 0.5,
+                    typeof el.b === 'number' ? el.b : 0.5,
+                ];
+            }
+
+            // Helper: get text color
+            function getTextRgb(el: Record<string, unknown>): [number, number, number] {
+                if (el.color_hex) return parseHexToRgb(el.color_hex as string);
+                // If AI sent r,g,b for text color too
+                if (typeof el.r === 'number') {
+                    return [el.r, typeof el.g === 'number' ? el.g : 1, typeof el.b === 'number' ? el.b : 1];
+                }
+                return [1, 1, 1]; // default: white text
+            }
+
             for (const el of params.elements) {
                 const type = (el.type as string) ?? 'rect';
+                const x = typeof el.x === 'number' ? el.x : 0;
+                const y = typeof el.y === 'number' ? el.y : 0;
+                const w = typeof el.w === 'number' ? el.w : canvasW * 0.5;
+                const h = typeof el.h === 'number' ? el.h : canvasH * 0.1;
+                const a = typeof el.a === 'number' ? el.a : 1.0;
+                const name = (el.name as string) || undefined;
+
                 try {
                     if (type === 'text') {
-                        const colorHex = (el.color_hex as string) ?? '#ffffff';
-                        const match = colorHex.replace('#', '').match(/.{2}/g);
-                        const [rr, gg, bb] = match
-                            ? [parseInt(match[0]!, 16) / 255, parseInt(match[1]!, 16) / 255, parseInt(match[2]!, 16) / 255]
-                            : [1, 1, 1];
+                        const [tr, tg, tb] = getTextRgb(el);
+                        const content = (el.content as string) || 'Text';
+                        const fontSize = typeof el.font_size === 'number' ? el.font_size : 18;
+                        const fontWeight = (el.font_weight as string) || '700';
+                        const textAlign = (el.text_align as string) || 'center';
+                        const maxW = w > 0 ? w : canvasW * 0.85;
                         engine.add_text(
-                            (el.x as number) ?? 0,
-                            (el.y as number) ?? 0,
-                            (el.content as string) ?? '',
-                            (el.font_size as number) ?? 18,
+                            x, y, content,
+                            fontSize,
                             'Inter, system-ui, sans-serif',
-                            (el.font_weight as string) ?? '400',
-                            rr, gg, bb, 1.0,
-                            (el.w as number) ?? 200,
-                            (el.text_align as string) ?? 'left',
-                        );
-                        createdCount++;
-                    } else if (type === 'rect') {
-                        engine.add_rect(
-                            (el.x as number) ?? 0, (el.y as number) ?? 0,
-                            (el.w as number) ?? 100, (el.h as number) ?? 100,
-                            (el.r as number) ?? 0.5, (el.g as number) ?? 0.5, (el.b as number) ?? 0.5,
-                            (el.a as number) ?? 1.0,
+                            fontWeight,
+                            tr, tg, tb, 1.0,
+                            maxW,
+                            textAlign,
+                            name,
                         );
                         createdCount++;
                     } else if (type === 'rounded_rect') {
-                        engine.add_rounded_rect(
-                            (el.x as number) ?? 0, (el.y as number) ?? 0,
-                            (el.w as number) ?? 100, (el.h as number) ?? 100,
-                            (el.r as number) ?? 0.5, (el.g as number) ?? 0.5, (el.b as number) ?? 0.5,
-                            (el.a as number) ?? 1.0,
-                            (el.radius as number) ?? 8,
-                        );
+                        const [sr, sg, sb] = getShapeRgb(el);
+                        const radius = typeof el.radius === 'number' ? el.radius : 8;
+                        engine.add_rounded_rect(x, y, w, h, sr, sg, sb, a, radius, name);
                         createdCount++;
                     } else if (type === 'ellipse') {
-                        const w = (el.w as number) ?? 100;
-                        const h = (el.h as number) ?? 100;
-                        engine.add_ellipse(
-                            ((el.x as number) ?? 0) + w / 2, ((el.y as number) ?? 0) + h / 2,
-                            w / 2, h / 2,
-                            (el.r as number) ?? 0.5, (el.g as number) ?? 0.5, (el.b as number) ?? 0.5,
-                            (el.a as number) ?? 1.0,
-                        );
+                        const [sr, sg, sb] = getShapeRgb(el);
+                        engine.add_ellipse(x + w / 2, y + h / 2, w / 2, h / 2, sr, sg, sb, a);
+                        createdCount++;
+                    } else {
+                        // Default: rect
+                        const [sr, sg, sb] = getShapeRgb(el);
+                        engine.add_rect(x, y, w, h, sr, sg, sb, a, name);
                         createdCount++;
                     }
                 } catch {
