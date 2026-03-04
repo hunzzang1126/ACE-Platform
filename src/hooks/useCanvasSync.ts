@@ -71,11 +71,10 @@ export function useCanvasSync(
             }
         }
 
-        // ★ Only save canvas-native elements (Fabric objects).
-        // Video overlays are HTML-based and NOT on the Fabric canvas —
-        // do NOT include them in saved design data.
-        // (Previously: saved ALL overlay elements including video, causing
-        //  video to appear in preview cards even though it's not on canvas.)
+        // Save video overlays — they are HTML-based but still need persistence
+        for (const oel of overlayElements) {
+            elements.push(overlayToDesignElement(oel, canvasW, canvasH));
+        }
 
         // 3. Sort by zIndex
         elements.sort((a, b) => a.zIndex - b.zIndex);
@@ -117,7 +116,10 @@ export function useCanvasSync(
             }
         }
 
-        // ★ Only save canvas-native elements — no video overlays
+        // Save video overlays for persistence
+        for (const oel of overlayElements) {
+            elements.push(overlayToDesignElement(oel, canvasW, canvasH));
+        }
 
         // 3. Sort by zIndex
         elements.sort((a, b) => a.zIndex - b.zIndex);

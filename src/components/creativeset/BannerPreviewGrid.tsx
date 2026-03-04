@@ -274,10 +274,11 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                                     }}
                                 >
                                     {/* Render elements sorted: shapes first, text/buttons on top */}
+                                    {/* ★ Exclude video — it's an HTML overlay, not a Fabric canvas object */}
                                     {[...variant.elements]
+                                        .filter((el) => el.type !== 'video')
                                         .sort((a, b) => {
-                                            // Shapes always behind text/buttons
-                                            const order = { shape: 0, video: 1, image: 2, text: 3, button: 4 } as Record<string, number>;
+                                            const order = { shape: 0, image: 1, text: 2, button: 3 } as Record<string, number>;
                                             return (order[a.type] ?? 1) - (order[b.type] ?? 1);
                                         })
                                         .map((el, sortedIdx) => {
@@ -312,7 +313,6 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                                                         ...(el.type === 'text' ? { color: el.color, fontSize: el.fontSize, fontFamily: el.fontFamily, fontWeight: el.fontWeight, display: 'flex', alignItems: 'flex-start', justifyContent: el.textAlign === 'center' ? 'center' : 'flex-start', overflow: 'visible', whiteSpace: 'normal' as const, wordBreak: 'break-word' as const, lineHeight: 1.2, textAlign: el.textAlign as 'left' | 'center' | 'right' } : {}),
                                                         ...(el.type === 'button' ? { backgroundColor: el.backgroundColor, borderRadius: el.borderRadius ?? 0, color: el.color, fontSize: el.fontSize, fontFamily: el.fontFamily, fontWeight: el.fontWeight, display: 'flex', alignItems: 'center', justifyContent: 'center' } : {}),
                                                         ...(el.type === 'image' ? { overflow: 'hidden' } : {}),
-                                                        ...(el.type === 'video' ? { overflow: 'hidden' } : {}),
                                                     }}
                                                 >
                                                     {el.type === 'text' && el.content}
@@ -326,40 +326,6 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                                                                 height: '100%',
                                                                 objectFit: el.fit || 'cover',
                                                                 display: 'block',
-                                                            }}
-                                                        />
-                                                    )}
-                                                    {el.type === 'video' && (
-                                                        <video
-                                                            ref={(videoEl) => {
-                                                                if (!videoEl) return;
-                                                                // Sync video with preview timeline
-                                                                const start = el.animation?.startTime ?? 0;
-                                                                const end = start + (el.animation?.duration ?? TIMELINE_DURATION);
-                                                                const localT = Math.max(0, currentTime - start);
-                                                                const inRange = currentTime >= start && currentTime <= end;
-                                                                try {
-                                                                    if (isPlaying && inRange) {
-                                                                        if (Math.abs(videoEl.currentTime - localT) > 0.3) {
-                                                                            videoEl.currentTime = localT;
-                                                                        }
-                                                                        if (videoEl.paused) videoEl.play().catch(() => { });
-                                                                    } else {
-                                                                        if (!videoEl.paused) videoEl.pause();
-                                                                        videoEl.currentTime = inRange ? localT : 0;
-                                                                    }
-                                                                } catch { /* not ready */ }
-                                                            }}
-                                                            src={videoUrls[el.id] || el.videoSrc}
-                                                            poster={el.posterSrc || undefined}
-                                                            muted
-                                                            playsInline
-                                                            style={{
-                                                                width: '100%',
-                                                                height: '100%',
-                                                                objectFit: el.fit || 'cover',
-                                                                display: 'block',
-                                                                pointerEvents: 'none',
                                                             }}
                                                         />
                                                     )}
