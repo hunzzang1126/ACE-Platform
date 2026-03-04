@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Canvas, Rect, Ellipse, Shadow, PencilBrush, Textbox, FabricImage, Gradient, type FabricObject } from 'fabric';
 import { useEditorStore } from '@/stores/editorStore';
+import { useAnimPresetStore } from './useAnimationPresets';
 import type { EngineNode, CanvasEngineState, CanvasEngineActions, UseCanvasEngineResult } from './canvasTypes';
 
 // ── Unique ID generator ──
@@ -1152,18 +1153,18 @@ function createEngineShim(fc: Canvas, syncState: () => void, artboardW: number, 
         set_saturation: () => { },
         set_hue_rotate: () => { },
         add_keyframe: () => { },
+        clear_node_keyframes: () => { },
 
         // ── Animation state machine ──
-        // The actual animation is CSS-based (useAnimPresetStore).
-        // These methods provide timing state for BottomPanel to poll.
+        // Drives timeline time AND applies transforms to Fabric objects.
         _animState: {
             playing: false,
             time: 0,
             duration: 5.0,
             looping: false,
             speed: 1.0,
-            startTs: 0,       // performance.now() when started
-            startOffset: 0,   // time offset when play was pressed
+            startTs: 0,
+            startOffset: 0,
             rafId: 0,
         },
 
@@ -1173,6 +1174,21 @@ function createEngineShim(fc: Canvas, syncState: () => void, artboardW: number, 
             s.playing = true;
             s.startTs = performance.now();
             s.startOffset = s.time;
+
+            // Snapshot original positions before animation starts
+            const objs = fc.getObjects().filter(o => !isArtboard(o));
+            for (const obj of objs) {
+                if (!(obj as any).__aceOrigPos) {
+                    (obj as any).__aceOrigPos = {
+                        left: obj.left ?? 0,
+                        top: obj.top ?? 0,
+                        opacity: obj.opacity ?? 1,
+                        scaleX: obj.scaleX ?? 1,
+                        scaleY: obj.scaleY ?? 1,
+                    };
+                }
+            }
+
             const tick = () => {
                 if (!s.playing) return;
                 const elapsed = (performance.now() - s.startTs) / 1000 * s.speed;
@@ -1185,21 +1201,124 @@ function createEngineShim(fc: Canvas, syncState: () => void, artboardW: number, 
                     } else {
                         s.time = s.duration;
                         s.playing = false;
+                        // Restore positions when animation ends
+                        this._restoreOriginalPositions();
                         return;
                     }
                 }
+
+                // ★ Apply animation transforms to Fabric objects
+                this._applyAnimationFrame(s.time);
+
                 s.rafId = requestAnimationFrame(tick);
             };
             s.rafId = requestAnimationFrame(tick);
         },
+
+        /** Apply animation presets to all Fabric objects at given time */
+        _applyAnimationFrame(currentTime: number) {
+            const presets = useAnimPresetStore.getState().presets;
+
+            const objs = fc.getObjects().filter(o => !isArtboard(o));
+            let needsRender = false;
+
+            for (const obj of objs) {
+                const aceId = (obj as any).__aceId;
+                if (!aceId) continue;
+
+                const key = String(aceId);
+                const config = presets[key];
+                if (!config || config.anim === 'none') continue;
+
+                const orig = (obj as any).__aceOrigPos;
+                if (!orig) continue;
+
+                // Compute animation progress
+                const animStart = config.startTime ?? 0;
+                const animEnd = animStart + (config.animDuration ?? 0.3);
+                let progress: number;
+                if (currentTime <= animStart) {
+                    progress = 0;
+                } else if (currentTime >= animEnd) {
+                    progress = 1;
+                } else {
+                    progress = (currentTime - animStart) / (animEnd - animStart);
+                }
+                // Ease-out
+                const inv = 1 - progress;
+                const t = 1 - inv * inv * inv;
+
+                // Apply transforms based on preset type
+                switch (config.anim) {
+                    case 'fade':
+                        obj.set({ opacity: t * orig.opacity });
+                        break;
+                    case 'slide-left':
+                        obj.set({ left: orig.left + (-300 * (1 - t)) });
+                        break;
+                    case 'slide-right':
+                        obj.set({ left: orig.left + (300 * (1 - t)) });
+                        break;
+                    case 'slide-up':
+                        obj.set({ top: orig.top + (-300 * (1 - t)) });
+                        break;
+                    case 'slide-down':
+                        obj.set({ top: orig.top + (300 * (1 - t)) });
+                        break;
+                    case 'scale':
+                        obj.set({ scaleX: orig.scaleX * t, scaleY: orig.scaleY * t });
+                        break;
+                    case 'ascend':
+                        obj.set({
+                            top: orig.top + (200 * (1 - t)),
+                            opacity: t * orig.opacity,
+                        });
+                        break;
+                    case 'descend':
+                        obj.set({
+                            top: orig.top + (-200 * (1 - t)),
+                            opacity: t * orig.opacity,
+                        });
+                        break;
+                }
+                needsRender = true;
+            }
+
+            if (needsRender) {
+                fc.renderAll();
+            }
+        },
+
+        /** Restore all objects to their original positions */
+        _restoreOriginalPositions() {
+            const objs = fc.getObjects().filter(o => !isArtboard(o));
+            for (const obj of objs) {
+                const orig = (obj as any).__aceOrigPos;
+                if (orig) {
+                    obj.set({
+                        left: orig.left,
+                        top: orig.top,
+                        opacity: orig.opacity,
+                        scaleX: orig.scaleX,
+                        scaleY: orig.scaleY,
+                    });
+                    delete (obj as any).__aceOrigPos;
+                }
+            }
+            fc.renderAll();
+        },
+
         anim_pause() {
             this._animState.playing = false;
             cancelAnimationFrame(this._animState.rafId);
+            // Keep objects at current animated positions (don't restore)
         },
         anim_stop() {
             this._animState.playing = false;
             this._animState.time = 0;
             cancelAnimationFrame(this._animState.rafId);
+            // Restore to original positions
+            this._restoreOriginalPositions();
         },
         anim_seek(t: number) {
             this._animState.time = Math.max(0, Math.min(t, this._animState.duration));
@@ -1207,6 +1326,8 @@ function createEngineShim(fc: Canvas, syncState: () => void, artboardW: number, 
                 this._animState.startTs = performance.now();
                 this._animState.startOffset = this._animState.time;
             }
+            // Apply frame at seek position
+            this._applyAnimationFrame(this._animState.time);
         },
         anim_time(): number { return this._animState.time; },
         anim_playing(): boolean { return this._animState.playing; },
