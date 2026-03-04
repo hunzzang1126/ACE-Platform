@@ -8,7 +8,8 @@
 // ─────────────────────────────────────────────────
 
 import { AgentContext, type AgentMessage, type ToolCallRecord, type SceneNodeInfo } from './agentContext';
-import { getToolsForClaude } from './agentTools';
+import { ALL_TOOLS } from './agentTools';
+import { toClaudeTools } from './aceToolDef';
 import { executeToolCall, type ExecutionResult } from './commandExecutor';
 import { DASHBOARD_TOOL_NAMES } from './dashboardTools';
 import { buildSmartContext, pushAction, type SmartContext } from './smartContextBuilder';
@@ -210,7 +211,7 @@ export class AiService {
         executorOverride?: ToolExecutorOverride,
     ): Promise<void> {
         const messages = this.buildClaudeMessages();
-        const tools = getToolsForClaude();
+        const tools = toClaudeTools(ALL_TOOLS);
 
         let rounds = 0;
         let finished = false;
@@ -361,7 +362,7 @@ export class AiService {
     private async callClaude(
         systemPrompt: string,
         messages: ClaudeMessage[],
-        tools: ReturnType<typeof getToolsForClaude>,
+        tools: ReturnType<typeof toClaudeTools>,
         progress: LiveProgress,
     ): Promise<ClaudeResponse | null> {
         const { apiKey, model } = this.config;
