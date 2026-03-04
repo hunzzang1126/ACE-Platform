@@ -94,6 +94,8 @@ const RENDER_BANNER_SCHEMA = {
     },
 };
 
+import { callAnthropicApi } from '@/services/anthropicClient';
+
 interface RenderBannerParams {
     elements: Record<string, unknown>[];
 }
@@ -116,23 +118,7 @@ async function callAutoDesignApi(
         messages: [{ role: 'user', content: prompt }],
     };
 
-    const res = await fetch('/api/anthropic/v1/messages', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify(body),
-        signal,
-    });
-
-    if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(`API error (${res.status}): ${errText.slice(0, 200)}`);
-    }
-
-    const data = await res.json() as {
+    const data = await callAnthropicApi(apiKey, body, signal) as {
         content: Array<{ type: string; name?: string; input?: unknown }>;
         stop_reason: string;
     };
@@ -142,6 +128,7 @@ async function callAutoDesignApi(
 
     return toolUse.input as RenderBannerParams;
 }
+
 
 // ── Hook ──────────────────────────────────────────
 

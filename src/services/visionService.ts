@@ -94,7 +94,7 @@ Focus on:
 Return ONLY the JSON object. No markdown, no explanation outside JSON.`;
 }
 
-// ── API Call ────────────────────────────────────────
+import { callAnthropicApi } from '@/services/anthropicClient';
 
 const CLAUDE_MODEL = 'claude-3-5-sonnet-20241022';
 
@@ -116,10 +116,6 @@ export async function callVisionCheck(
     elements: Array<{ name: string; role?: string; type: string }>,
     apiKey: string,
 ): Promise<VisionResult> {
-    if (!apiKey?.trim()) {
-        throw new Error('Vision check requires an Anthropic API key.');
-    }
-
     // Strip data URL prefix if present
     const pureBase64 = base64Png.startsWith('data:')
         ? base64Png.split(',')[1] ?? base64Png
@@ -151,22 +147,7 @@ export async function callVisionCheck(
         ],
     };
 
-    const response = await fetch('/api/anthropic/v1/messages', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(`Vision API error (${response.status}): ${errText.slice(0, 200)}`);
-    }
-
-    const data = await response.json() as {
+    const data = await callAnthropicApi(apiKey, body) as {
         content: Array<{ type: string; text?: string }>;
     };
 
@@ -181,3 +162,4 @@ export async function callVisionCheck(
     const parsed = JSON.parse(jsonMatch[0]) as VisionResult;
     return parsed;
 }
+
