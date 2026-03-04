@@ -995,6 +995,7 @@ function createEngineShim(fc: Canvas, syncState: () => void, artboardW: number, 
             fc.renderAll();
             return id;
         },
+
         add_gradient_rect: (x: number, y: number, w: number, h: number, r1: number, g1: number, b1: number, _a1: number, r2: number, g2: number, b2: number, _a2: number, angle_deg: number) => {
             const id = nextId();
             // Convert angle to gradient coordinates
@@ -1026,31 +1027,34 @@ function createEngineShim(fc: Canvas, syncState: () => void, artboardW: number, 
             return id;
         },
 
-        // ── Text (Fabric Textbox) ──
-        add_text: (x: number, y: number, content: string, opts?: {
-            fontSize?: number; fontFamily?: string; fontWeight?: string;
-            color?: string; textAlign?: string; lineHeight?: number;
-            width?: number; name?: string;
-        }) => {
+        // ── Text (Fabric Textbox) — positional args for AI tool compatibility ──
+        add_text: (
+            x: number, y: number, content: string,
+            fontSize: number, fontFamily: string, fontWeight: string,
+            r: number, g: number, b: number, _a: number,
+            width: number, textAlign: string,
+            name?: string,
+        ) => {
             const id = nextId();
             const tb = new Textbox(content || 'Text', {
                 left: x,
                 top: y,
-                width: opts?.width ?? 200,
-                fontSize: opts?.fontSize ?? 18,
-                fontFamily: opts?.fontFamily ?? 'Inter, system-ui, sans-serif',
-                fontWeight: opts?.fontWeight ?? '400',
-                fill: opts?.color ?? '#000000',
-                textAlign: (opts?.textAlign as any) ?? 'left',
-                lineHeight: opts?.lineHeight ?? 1.4,
+                width: width > 0 ? width : 200,
+                fontSize: fontSize || 18,
+                fontFamily: fontFamily || 'Inter, system-ui, sans-serif',
+                fontWeight: fontWeight || '400',
+                fill: rgbToHex(r, g, b),
+                textAlign: (textAlign as any) || 'left',
+                lineHeight: 1.4,
                 editable: true,
             });
             (tb as any).__aceId = id;
-            (tb as any).__aceName = opts?.name || `Text #${id}`;
+            (tb as any).__aceName = name || `Text #${id}`;
             (tb as any).__aceZIndex = userObjects().length;
             patchAceProps(tb);
             fc.add(tb);
             fc.renderAll();
+            syncState();
             return id;
         },
 
