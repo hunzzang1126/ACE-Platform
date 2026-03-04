@@ -238,9 +238,10 @@ export function smartReposition(
     }
 
     // For CTA buttons, keep reasonable fixed size
+    // Min: 40×20px (always tappable), Max: 50% canvas width
     if (role === 'cta') {
-        const ctaW = Math.min(absW, Math.max(120, Math.round(targetW * 0.5)));
-        const ctaH = Math.min(absH, Math.max(36, Math.round(targetH * 0.12)));
+        const ctaW = Math.min(absW, Math.max(40, Math.round(targetW * 0.5)));
+        const ctaH = Math.min(absH, Math.max(20, Math.round(targetH * 0.12)));
         return {
             horizontal,
             vertical,
@@ -291,6 +292,21 @@ export function smartReposition(
 }
 
 /**
+ * Role-based minimum font sizes (px).
+ * Mirrors Yoga's minWidth/minHeight concept — no element should
+ * shrink below usability thresholds.
+ */
+const MIN_FONT_BY_ROLE: Partial<Record<ElementRole, number>> = {
+    background: 10,
+    logo: 8,
+    headline: 10,
+    subtext: 9,
+    cta: 10,
+    decoration: 7,
+    image: 10,
+};
+
+/**
  * Scale font-related properties for a text element
  */
 export function scaleFontSize(
@@ -311,14 +327,17 @@ export function scaleFontSize(
     const scaleH = targetH / masterH;
     const fontScale = Math.min(scaleW, scaleH, zone.maxFontScale);
 
+    // Use role-based floor (Yoga-inspired minWidth/minHeight concept)
+    const minFont = MIN_FONT_BY_ROLE[role] ?? 8;
+
     if (element.type === 'text') {
         return {
-            fontSize: Math.max(10, Math.round(element.fontSize * fontScale)),
+            fontSize: Math.max(minFont, Math.round(element.fontSize * fontScale)),
         };
     }
     if (element.type === 'button') {
         return {
-            fontSize: Math.max(10, Math.round(element.fontSize * fontScale)),
+            fontSize: Math.max(minFont, Math.round(element.fontSize * fontScale)),
         };
     }
     return {};
