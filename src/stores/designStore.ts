@@ -15,6 +15,9 @@ import type { CreativeSet, BannerVariant, BannerPreset } from '@/schema/design.t
 import type { DesignElement } from '@/schema/elements.types';
 import { createDefaultConstraints } from '@/schema/elements.types';
 import { smartSizeElements } from '@/engine/smartSizing';
+import { runSmartSizingQA } from '@/engine/smartSizingQA';
+import { generateFixes } from '@/engine/smartSizingFixer';
+
 
 // ── State Shape ──
 interface DesignState {
@@ -360,13 +363,30 @@ export const useDesignStore = create<DesignState>()(
                                     slaveW, slaveH,
                                 );
 
+                                // ── Phase 3A: Auto-QA sweep (Pencil-inspired) ──
+                                // Run layout QA on the adapted elements and auto-fix issues
+                                // (out-of-bounds, overlaps, clipped text) before saving.
+                                const slaveWithAdapted: BannerVariant = { ...slave, elements: adapted };
+                                const qaIssues = runSmartSizingQA([slaveWithAdapted]);
+                                let finalElements = adapted;
+                                if (qaIssues.length > 0) {
+                                    const fixes = generateFixes(qaIssues, [slaveWithAdapted]);
+                                    if (fixes.length > 0) {
+                                        // Apply patches on top of adapted elements
+                                        finalElements = adapted.map((el) => {
+                                            const fix = fixes.find(f => f.elementId === el.id);
+                                            return fix ? { ...el, ...fix.patch } as DesignElement : el;
+                                        });
+                                    }
+                                }
+
                                 // Preserve overridden elements
                                 const overridden = new Set(slave.overriddenElementIds);
-                                slave.elements = adapted.map((adaptedEl) => {
+                                slave.elements = finalElements.map((adaptedEl) => {
                                     if (overridden.has(adaptedEl.id)) {
                                         // Keep the overridden version
                                         const existing = slave.elements.find(e => e.id === adaptedEl.id);
-                                        return existing || adaptedEl;
+                                        return existing ?? adaptedEl;
                                     }
                                     return adaptedEl;
                                 });
