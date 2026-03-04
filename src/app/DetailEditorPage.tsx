@@ -11,6 +11,7 @@ import { EditorToolbar } from '@/components/editor/EditorToolbar';
 import { EditorCanvas } from '@/components/editor/EditorCanvas';
 import { PropertyPanel } from '@/components/panels/PropertyPanel';
 import { BottomPanel } from '@/components/editor/BottomPanel';
+import { SmartSizingVisionPanel } from '@/components/ai/SmartSizingVisionPanel';
 import { useFabricCanvas } from '@/hooks/useFabricCanvas';
 import { useOverlayElements } from '@/hooks/useOverlayElements';
 import { useCanvasSync } from '@/hooks/useCanvasSync';
@@ -23,6 +24,20 @@ export function DetailEditorPage() {
     const setActiveVariant = useEditorStore((s) => s.setActiveVariant);
 
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+
+    // Read Anthropic API key from localStorage (same source as GlobalAiPanel)
+    const [visionApiKey, setVisionApiKey] = useState<string>(() => {
+        try { return JSON.parse(localStorage.getItem('ace-ai-config') ?? '{}').apiKey ?? ''; }
+        catch { return ''; }
+    });
+    useEffect(() => {
+        const handler = () => {
+            try { setVisionApiKey(JSON.parse(localStorage.getItem('ace-ai-config') ?? '{}').apiKey ?? ''); }
+            catch { /* ignore */ }
+        };
+        window.addEventListener('storage', handler);
+        return () => window.removeEventListener('storage', handler);
+    }, []);
 
     useEffect(() => {
         setLayer('detail');
@@ -287,7 +302,7 @@ export function DetailEditorPage() {
                     onTriggerImageUpload={overlay.triggerImageUpload}
                     onTriggerVideoUpload={overlay.triggerVideoUpload}
                 />
-                {/* Right panel: Property editing — fixed-width wrapper to prevent jitter */}
+                {/* Right panel: Property editing + Vision Check */}
                 <aside className="ed-right-panel-wrapper">
                     <PropertyPanel
                         nodes={state.nodes}
@@ -297,6 +312,18 @@ export function DetailEditorPage() {
                         onOverlayUpdate={overlay.updateElement}
                         canvasWidth={width}
                         canvasHeight={height}
+                    />
+                    {/* AI Vision Feedback Loop — screenshot → Claude Vision → patches */}
+                    <SmartSizingVisionPanel
+                        fabricCanvas={(engineRef.current as any)?.__fabricCanvas ?? null}
+                        canvasW={width}
+                        canvasH={height}
+                        apiKey={visionApiKey}
+                        elements={state.nodes.map((n: any) => ({
+                            name: n.label ?? n.id,
+                            type: n.type ?? 'shape',
+                            role: n.role,
+                        }))}
                     />
                 </aside>
             </div>
