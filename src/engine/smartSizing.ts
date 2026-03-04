@@ -302,7 +302,7 @@ const MIN_FONT_BY_ROLE: Partial<Record<ElementRole, number>> = {
     headline: 10,
     subtext: 9,
     cta: 10,
-    decoration: 7,
+    decoration: 10,  // raised from 7 — was effectively dead since decoration is rarely assigned
     image: 10,
 };
 

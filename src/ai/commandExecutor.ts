@@ -374,9 +374,13 @@ function executeSetAnimPreset(
     const duration = (params.duration as number) ?? 0.4;
     const delay = (params.delay as number) ?? 0;
 
-    if (!Number.isFinite(nodeId)) {
-        return { success: false, message: 'set_animation_preset: node_id is required' };
+    if (!Number.isFinite(nodeId) || nodeId === 0) {
+        return {
+            success: false,
+            message: `set_animation_preset: node_id must be a valid number. Got: ${JSON.stringify(params.node_id)}. Use the ID returned by add_rect / add_text / similar tools.`,
+        };
     }
+
 
     // Store in local animation preset store
     const setPreset = useAnimPresetStore.getState().setPreset;

@@ -114,6 +114,31 @@ export function toOpenAiTools(tools: AnyToolDef[]): Array<{
 }
 
 /**
+ * Convert tool definitions to MCP (Model Context Protocol) format.
+ * MCP uses `inputSchema` instead of `parameters` / `input_schema`.
+ * Accepts both AceToolDef (new) and legacy ToolDefinition (old) formats.
+ */
+export function toMcpTools(tools: AnyToolDef[]): Array<{
+    name: string;
+    description: string;
+    inputSchema: { type: 'object'; properties: Record<string, unknown>; required?: string[] };
+}> {
+    return tools.map((t) => {
+        const schema = isLegacy(t) ? t.parameters : buildJsonSchema(t.params);
+        const s = schema as { type: string; properties: Record<string, unknown>; required?: string[] };
+        return {
+            name: t.name,
+            description: t.description,
+            inputSchema: {
+                type: 'object' as const,
+                properties: s.properties ?? {},
+                ...(s.required && s.required.length > 0 ? { required: s.required } : {}),
+            },
+        };
+    });
+}
+
+/**
  * Find a tool by name from a registry.
  */
 export function findTool(tools: AnyToolDef[], name: string): AnyToolDef | undefined {

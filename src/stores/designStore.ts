@@ -377,6 +377,13 @@ export const useDesignStore = create<DesignState>()(
                                             const fix = fixes.find(f => f.elementId === el.id);
                                             return fix ? { ...el, ...fix.patch } as DesignElement : el;
                                         });
+                                        // Notify canvas to re-render (A2 fix: GAP-4)
+                                        // Dispatch after Zustand state update tick
+                                        setTimeout(() => {
+                                            window.dispatchEvent(new CustomEvent('ace:canvas-refresh', {
+                                                detail: { variantId: slave.id, fixCount: fixes.length },
+                                            }));
+                                        }, 50);
                                     }
                                 }
 
