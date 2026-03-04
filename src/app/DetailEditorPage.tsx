@@ -12,6 +12,7 @@ import { EditorCanvas } from '@/components/editor/EditorCanvas';
 import { PropertyPanel } from '@/components/panels/PropertyPanel';
 import { BottomPanel } from '@/components/editor/BottomPanel';
 import { SmartSizingVisionPanel } from '@/components/ai/SmartSizingVisionPanel';
+import { AutoDesignPanel } from '@/components/ai/AutoDesignPanel';
 import { useFabricCanvas } from '@/hooks/useFabricCanvas';
 import { useOverlayElements } from '@/hooks/useOverlayElements';
 import { useCanvasSync } from '@/hooks/useCanvasSync';
@@ -324,6 +325,13 @@ export function DetailEditorPage() {
                             type: n.type ?? 'shape',
                             role: n.role,
                         }))}
+                    />
+                    {/* Auto-Design — prompt → Claude → full banner generation */}
+                    <AutoDesignPanel
+                        engine={engineRef.current}
+                        canvasW={width}
+                        canvasH={height}
+                        apiKey={visionApiKey}
                     />
                 </aside>
             </div>
