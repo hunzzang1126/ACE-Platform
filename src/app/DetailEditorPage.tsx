@@ -86,13 +86,17 @@ export function DetailEditorPage() {
             // Restore saved elements from designStore
             if (!restoredRef.current && engineRef.current) {
                 restoredRef.current = true;
-                const { overlayElements: restoredOverlays } = restoreFromStore(engineRef.current);
-                // Add restored overlay elements (text/image)
-                if (restoredOverlays.length > 0) {
-                    overlay.restoreElements(restoredOverlays);
-                }
-                // Sync engine state → React (update nodeCount, nodes for layer panel)
-                syncState();
+                const engine = engineRef.current;
+                // restoreFromStore is async (awaits video blob loads from IndexedDB)
+                (async () => {
+                    const { overlayElements: restoredOverlays } = await restoreFromStore(engine);
+                    // Add restored overlay elements (text/image/video) with resolved blob URLs
+                    if (restoredOverlays.length > 0) {
+                        overlay.restoreElements(restoredOverlays);
+                    }
+                    // Sync engine state → React (update nodeCount, nodes for layer panel)
+                    syncState();
+                })();
             }
         }
     }, [state.status, engineRef, handleSave, restoreFromStore, overlay, actions, syncState]);
@@ -126,13 +130,15 @@ export function DetailEditorPage() {
                 try { engine.clear_scene(); } catch { /* ok */ }
                 // Clear current overlays
                 overlay.clearOverlays();
-                // Re-restore everything from the updated store
-                const { overlayElements: restoredOverlays } = restoreFromStore(engine);
-                if (restoredOverlays.length > 0) {
-                    overlay.restoreElements(restoredOverlays);
-                }
-                syncState();
-                isDirtyRef.current = true;
+                // Re-restore everything from the updated store (async — waits for video blobs)
+                (async () => {
+                    const { overlayElements: restoredOverlays } = await restoreFromStore(engine);
+                    if (restoredOverlays.length > 0) {
+                        overlay.restoreElements(restoredOverlays);
+                    }
+                    syncState();
+                    isDirtyRef.current = true;
+                })();
             }
         }
     }, [creativeSet, variantId, state.status, engineRef, restoreFromStore, overlay, syncState]);

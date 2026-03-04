@@ -140,9 +140,9 @@ export function useCanvasSync(
      * Restore saved elements from designStore → engine + overlay
      * Returns overlay elements (text/image) that should be added to the overlay system
      */
-    const restoreFromStore = useCallback((
+    const restoreFromStore = useCallback(async (
         engine: Engine,
-    ): { restoredShapes: number; overlayElements: OverlayElement[] } => {
+    ): Promise<{ restoredShapes: number; overlayElements: OverlayElement[] }> => {
         if (!variantId || !creativeSet) {
             return { restoredShapes: 0, overlayElements: [] };
         }
@@ -157,6 +157,7 @@ export function useCanvasSync(
 
         let restoredShapes = 0;
         const overlayElements: OverlayElement[] = [];
+        const pendingBlobLoads: Promise<void>[] = [];
 
         for (const el of variant.elements) {
             if (el.type === 'shape') {
@@ -250,7 +251,7 @@ export function useCanvasSync(
             } else if (el.type === 'video') {
                 const vid = el as VideoElement;
                 const { x, y, w, h } = constraintsToAbsolute(vid.constraints, canvasW, canvasH);
-                overlayElements.push({
+                const oel: OverlayElement = {
                     id: vid.id,
                     type: 'video',
                     x, y, w, h,
@@ -266,19 +267,17 @@ export function useCanvasSync(
                     visible: vid.visible !== false,
                     locked: vid.locked ?? false,
                     zIndex: vid.zIndex ?? 1,
-                });
+                };
+                overlayElements.push(oel);
 
-                // ★ Async: restore blob URL from IndexedDB if current one is invalid
-                const vidId = vid.id;
-                const currentSrc = vid.videoSrc || '';
-                if (!currentSrc || currentSrc.startsWith('blob:')) {
-                    loadVideoBlob(vidId).then((freshUrl) => {
-                        if (freshUrl) {
-                            // Update the overlay element with a fresh blob URL
-                            const oel = overlayElements.find(o => o.id === vidId);
-                            if (oel) oel.videoSrc = freshUrl;
-                        }
-                    }).catch(() => {/* IndexedDB unavailable */ });
+                // ★ If videoSrc is empty or a stale blob, eagerly load a fresh blob URL
+                // We store a promise so we can await ALL of them before returning
+                if (!oel.videoSrc || oel.videoSrc.startsWith('blob:')) {
+                    pendingBlobLoads.push(
+                        loadVideoBlob(vid.id).then((freshUrl) => {
+                            if (freshUrl) oel.videoSrc = freshUrl; // safe — still modifying before restoreElements() is called
+                        }).catch(() => {/* IndexedDB unavailable */ })
+                    );
                 }
 
                 // Restore animation preset
@@ -291,6 +290,9 @@ export function useCanvasSync(
                 }
             }
         }
+
+        // Wait for all video blob URL loads to complete before returning
+        await Promise.all(pendingBlobLoads);
 
         console.log(`[useCanvasSync] Restored ${restoredShapes} shapes, ${overlayElements.length} overlays`);
         return { restoredShapes, overlayElements };
