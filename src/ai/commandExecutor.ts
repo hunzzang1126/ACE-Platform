@@ -465,7 +465,15 @@ function executeRenderBanner(
         } else {
             // shapes: rect, rounded_rect, gradient_rect, ellipse
             const shapeParams: Record<string, unknown> = { ...el };
-            // map render_banner's element type to the tool name convention
+            // Convenience: if AI provides 'fill' as hex, convert to r/g/b floats
+            if (typeof shapeParams.fill === 'string' && !('r' in shapeParams)) {
+                const [fr, fg, fb] = hexToRgb(shapeParams.fill as string);
+                shapeParams.r = fr;
+                shapeParams.g = fg;
+                shapeParams.b = fb;
+                delete shapeParams.fill;
+            }
+            // map render_banner element type to tool name
             const toolMap: Record<string, string> = {
                 rect: 'add_rect',
                 rounded_rect: 'add_rounded_rect',

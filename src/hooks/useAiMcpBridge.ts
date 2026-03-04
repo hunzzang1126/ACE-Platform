@@ -59,6 +59,8 @@ export function useAiMcpBridge({
 
         const poll = async () => {
             if (!active) return;
+            // Skip polling if engine is not yet connected
+            if (!engineRef.current) return;
 
             try {
                 const res = await fetch('/api/mcp/pending');
