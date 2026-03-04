@@ -94,9 +94,10 @@ Focus on:
 Return ONLY the JSON object. No markdown, no explanation outside JSON.`;
 }
 
-import { callAnthropicApi } from '@/services/anthropicClient';
+import { callAnthropicApi, DEFAULT_CLAUDE_MODEL } from '@/services/anthropicClient';
 
-const CLAUDE_MODEL = 'claude-3-5-sonnet-20241022';
+const CLAUDE_MODEL = DEFAULT_CLAUDE_MODEL;
+
 
 /**
  * Call Claude Vision to evaluate a banner screenshot.

@@ -94,7 +94,7 @@ const RENDER_BANNER_SCHEMA = {
     },
 };
 
-import { callAnthropicApi } from '@/services/anthropicClient';
+import { callAnthropicApi, DEFAULT_CLAUDE_MODEL } from '@/services/anthropicClient';
 
 interface RenderBannerParams {
     elements: Record<string, unknown>[];
@@ -110,7 +110,8 @@ async function callAutoDesignApi(
     const systemPrompt = buildSystemPrompt(canvasW, canvasH);
 
     const body = {
-        model: 'claude-3-5-sonnet-20241022',
+        model: DEFAULT_CLAUDE_MODEL,
+
         max_tokens: 2048,
         system: systemPrompt,
         tools: [RENDER_BANNER_SCHEMA],

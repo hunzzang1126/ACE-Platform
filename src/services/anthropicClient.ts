@@ -9,6 +9,9 @@
 // Mirrors the pattern in aiService.ts callClaude().
 // ─────────────────────────────────────────────────
 
+/** Must match aiService.ts DEFAULT_CONFIG.model */
+export const DEFAULT_CLAUDE_MODEL = 'claude-sonnet-4-20250514';
+
 export function getAnthropicUrl(): string {
     const isLocalDev =
         typeof window !== 'undefined' && window.location.hostname === 'localhost';
