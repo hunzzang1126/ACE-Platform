@@ -328,37 +328,52 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                                                             }}
                                                         />
                                                     )}
-                                                    {el.type === 'video' && (
-                                                        <video
-                                                            ref={(videoEl) => {
-                                                                if (!videoEl) return;
-                                                                const start = el.animation?.startTime ?? 0;
-                                                                const end = start + (el.animation?.duration ?? TIMELINE_DURATION);
-                                                                const localT = Math.max(0, currentTime - start);
-                                                                const inRange = currentTime >= start && currentTime <= end;
-                                                                try {
-                                                                    if (isPlaying && inRange) {
-                                                                        if (Math.abs(videoEl.currentTime - localT) > 0.3) videoEl.currentTime = localT;
-                                                                        if (videoEl.paused) videoEl.play().catch(() => { });
-                                                                    } else {
-                                                                        if (!videoEl.paused) videoEl.pause();
-                                                                        videoEl.currentTime = inRange ? localT : 0;
-                                                                    }
-                                                                } catch { /* not ready */ }
-                                                            }}
-                                                            src={videoUrls[el.id] || el.videoSrc}
-                                                            poster={el.posterSrc || undefined}
-                                                            muted
-                                                            playsInline
-                                                            style={{
-                                                                width: '100%',
-                                                                height: '100%',
-                                                                objectFit: el.fit || 'cover',
-                                                                display: 'block',
-                                                                pointerEvents: 'none',
-                                                            }}
-                                                        />
-                                                    )}
+                                                    {el.type === 'video' && (() => {
+                                                        const videoSrc = videoUrls[el.id] || el.videoSrc || '';
+                                                        return videoSrc ? (
+                                                            <video
+                                                                ref={(videoEl) => {
+                                                                    if (!videoEl) return;
+                                                                    const start = el.animation?.startTime ?? 0;
+                                                                    const end = start + (el.animation?.duration ?? TIMELINE_DURATION);
+                                                                    const localT = Math.max(0, currentTime - start);
+                                                                    const inRange = currentTime >= start && currentTime <= end;
+                                                                    try {
+                                                                        if (isPlaying && inRange) {
+                                                                            if (Math.abs(videoEl.currentTime - localT) > 0.3) videoEl.currentTime = localT;
+                                                                            if (videoEl.paused) videoEl.play().catch(() => { });
+                                                                        } else {
+                                                                            if (!videoEl.paused) videoEl.pause();
+                                                                            videoEl.currentTime = inRange ? localT : 0;
+                                                                        }
+                                                                    } catch { /* not ready */ }
+                                                                }}
+                                                                src={videoSrc}
+                                                                poster={el.posterSrc || undefined}
+                                                                muted
+                                                                playsInline
+                                                                style={{
+                                                                    width: '100%',
+                                                                    height: '100%',
+                                                                    objectFit: el.fit || 'cover',
+                                                                    display: 'block',
+                                                                    pointerEvents: 'none',
+                                                                }}
+                                                            />
+                                                        ) : el.posterSrc ? (
+                                                            // Fallback: show poster thumbnail while video URL loads from IndexedDB
+                                                            <img
+                                                                src={el.posterSrc}
+                                                                alt="video"
+                                                                style={{
+                                                                    width: '100%',
+                                                                    height: '100%',
+                                                                    objectFit: el.fit || 'cover',
+                                                                    display: 'block',
+                                                                }}
+                                                            />
+                                                        ) : null;
+                                                    })()}
                                                 </div>
                                             );
                                         })}

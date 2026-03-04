@@ -31,14 +31,11 @@ export function absoluteToConstraints(
     let vertical: ElementConstraints['vertical'];
     let size: ElementConstraints['size'];
 
-    // Horizontal constraint
+    // Horizontal constraint — avoid 'stretch' anchor which can produce corrupt
+    // marginLeft values after smartSizing propagation across different canvas sizes.
+    // Full-canvas elements use 'center' with offset 0 instead.
     if (coversWidth) {
-        horizontal = {
-            anchor: 'stretch',
-            offset: 0,
-            marginLeft: Math.round(x),
-            marginRight: Math.round(canvasW - x - w),
-        };
+        horizontal = { anchor: 'center', offset: 0 };
     } else if (relCenterX > 0.35 && relCenterX < 0.65) {
         horizontal = { anchor: 'center', offset: Math.round(centerX - canvasW / 2) };
     } else if (relCenterX <= 0.35) {
@@ -47,14 +44,9 @@ export function absoluteToConstraints(
         horizontal = { anchor: 'right', offset: Math.round(canvasW - x - w) };
     }
 
-    // Vertical constraint
+    // Vertical constraint — same approach, no 'stretch' anchor
     if (coversHeight) {
-        vertical = {
-            anchor: 'stretch',
-            offset: 0,
-            marginTop: Math.round(y),
-            marginBottom: Math.round(canvasH - y - h),
-        };
+        vertical = { anchor: 'center', offset: 0 };
     } else if (relCenterY > 0.35 && relCenterY < 0.65) {
         vertical = { anchor: 'center', offset: Math.round(centerY - canvasH / 2) };
     } else if (relCenterY <= 0.35) {
@@ -63,7 +55,7 @@ export function absoluteToConstraints(
         vertical = { anchor: 'bottom', offset: Math.round(canvasH - y - h) };
     }
 
-    // Size constraint
+    // Size constraint — relative for full-canvas, fixed otherwise
     if (coversWidth && coversHeight) {
         size = { widthMode: 'relative', heightMode: 'relative', width: 1, height: 1 };
     } else if (coversWidth) {
@@ -285,7 +277,10 @@ export function overlayToDesignElement(
         name: oel.name || 'Video',
         type: 'video',
         constraints,
-        videoSrc: oel.videoSrc || '',
+        // ★ Never persist blob: URLs — they expire after page reload.
+        // BannerPreviewGrid loads the actual video from IndexedDB via loadVideoBlob(el.id).
+        // posterSrc (base64) is the only persistent visual fallback.
+        videoSrc: '',
         posterSrc: oel.posterSrc,
         fileName: oel.fileName,
         fit: (oel.objectFit as 'cover' | 'contain' | 'fill') || 'cover',
