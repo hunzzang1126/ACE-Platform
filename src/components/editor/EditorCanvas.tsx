@@ -8,7 +8,9 @@ import type { CanvasEngineState, CanvasEngineActions } from '@/hooks/canvasTypes
 import type { OverlayElement } from '@/hooks/useOverlayElements';
 import { useAnimPresetStore } from '@/hooks/useAnimationPresets';
 import { useEditorStore } from '@/stores/editorStore';
+import { useAiMcpBridge } from '@/hooks/useAiMcpBridge';
 import { ResizeHandles, type HandleDir, overlayMessage, spinnerStyle, statusBarStyle, zoomBtnStyle } from './ResizeHandles';
+import type { SceneNodeInfo } from '@/ai/agentContext';
 
 interface Props {
     variant: BannerVariant;
@@ -42,6 +44,13 @@ export function EditorCanvas({
     const animCurrentTime = useAnimPresetStore((s) => s.currentTime);
     const animIsPlaying = useAnimPresetStore((s) => s.isPlaying);
     const getAnimStyle = useAnimPresetStore((s) => s.getAnimStyle);
+
+    // MCP bridge — receive tool calls from Claude Desktop
+    const mcpTrackedNodes = useRef<SceneNodeInfo[]>([]);
+    useAiMcpBridge({
+        engine: (engineRef?.current as any) ?? null,
+        trackedNodes: mcpTrackedNodes.current,
+    });
 
     // Video refs
     const videoRefsMap = useRef<Map<string, HTMLVideoElement>>(new Map());
