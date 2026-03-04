@@ -274,6 +274,7 @@ export function DetailEditorPage() {
                     variant={variant}
                     canvasRef={canvasRef}
                     overlayRef={overlayRef}
+                    engineRef={engineRef}
                     state={state}
                     actions={actions}
                     retryInit={retryInit}

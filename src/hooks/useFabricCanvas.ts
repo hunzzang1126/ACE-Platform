@@ -1345,6 +1345,11 @@ function createEngineShim(fc: Canvas, syncState: () => void, artboardW: number, 
         },
 
         render_frame: () => { fc.renderAll(); },
+        /** Returns [scaleX, 0, 0, scaleY, translateX, translateY] — Fabric's viewportTransform.
+         *  Used by EditorCanvas to sync HTML overlay elements with the artboard position. */
+        get_viewport_transform: (): number[] => {
+            return fc.viewportTransform ? [...fc.viewportTransform] : [1, 0, 0, 1, 0, 0];
+        },
         can_undo: () => false,
         can_redo: () => false,
         start_move: () => { },

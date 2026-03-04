@@ -14,6 +14,8 @@ interface Props {
     variant: BannerVariant;
     canvasRef: React.RefObject<HTMLCanvasElement | null>;
     overlayRef: React.RefObject<HTMLCanvasElement | null>;
+    /** Direct ref to the Fabric/engine instance — used for viewport transform sync */
+    engineRef?: React.RefObject<unknown>;
     state: CanvasEngineState;
     actions: CanvasEngineActions;
     retryInit?: () => void;
@@ -28,7 +30,7 @@ interface Props {
 }
 
 export function EditorCanvas({
-    variant, canvasRef, overlayRef, state, actions, retryInit,
+    variant, canvasRef, overlayRef, engineRef, state, actions, retryInit,
     overlayElements = [], selectedOverlayId, onOverlaySelect,
     onOverlayUpdate, onOverlayDelete, onAddText, onTriggerImageUpload, onTriggerVideoUpload,
 }: Props) {
@@ -191,23 +193,45 @@ export function EditorCanvas({
         return () => window.removeEventListener('keydown', handler);
     }, [onOverlaySelect, actions]);
 
-    // ── Zoom controls (read from Fabric) ──
+    // ── Viewport transform sync (zoom + pan offset) ──
+    // Fabric centers the artboard using viewportTransform[4/5] (panX/panY) and getZoom().
+    // HTML overlays MUST use the same transform so video elements align with the artboard.
     const [zoom, setZoomDisplay] = useState(1);
+    const [overlayTransform, setOverlayTransform] = useState('none');
+
     useEffect(() => {
-        // Poll Fabric zoom for status bar display
-        const iv = setInterval(() => {
-            const el = canvasRef.current;
-            if (el) {
-                // Read zoom from Fabric's viewportTransform
-                const wrapper = el.parentElement;
-                const fabricCanvas = wrapper?.querySelector('.upper-canvas') as HTMLCanvasElement;
-                if (fabricCanvas && (fabricCanvas as any)?.__fabric) {
-                    setZoomDisplay((fabricCanvas as any).__fabric.getZoom());
-                }
+        const syncViewport = () => {
+            // Prefer engineRef.current.get_viewport_transform() — most reliable
+            const engine = engineRef?.current as any;
+            if (engine?.get_viewport_transform) {
+                const vpt: number[] = engine.get_viewport_transform();
+                const z = vpt[0] ?? 1;
+                const tx = vpt[4] ?? 0;
+                const ty = vpt[5] ?? 0;
+                setZoomDisplay(z);
+                setOverlayTransform(`matrix(${z},0,0,${z},${tx},${ty})`);
+                return;
             }
-        }, 500);
+            // Fallback: read from Fabric's upper-canvas DOM element
+            const el = canvasRef.current;
+            if (!el) return;
+            const wrapper = el.parentElement;
+            const upper = wrapper?.querySelector('.upper-canvas') as HTMLCanvasElement;
+            const fc = (upper as any)?.__fabric;
+            if (!fc) return;
+            const vpt: number[] = fc.viewportTransform ?? [1, 0, 0, 1, 0, 0];
+            const z = vpt[0] ?? 1;
+            const tx = vpt[4] ?? 0;
+            const ty = vpt[5] ?? 0;
+            setZoomDisplay(z);
+            setOverlayTransform(`matrix(${z},0,0,${z},${tx},${ty})`);
+        };
+
+        // Poll at 60fps for smooth zoom/pan sync
+        const iv = setInterval(syncViewport, 16);
+        syncViewport(); // immediate on mount
         return () => clearInterval(iv);
-    }, [canvasRef]);
+    }, [canvasRef, engineRef]);
 
     const totalCount = state.nodeCount + overlayElements.length;
 
@@ -259,15 +283,20 @@ export function EditorCanvas({
             />
 
             {/* ── Video overlay elements (HTML — requires <video> tag) ──
-                 Text and Image are now Fabric-native objects. */}
+                 Text and Image are now Fabric-native objects.
+                 IMPORTANT: We apply the same viewport transform as Fabric so
+                 overlays align with the artboard regardless of zoom/pan. */}
             <div
                 className="ed-overlay-layer"
                 style={{
                     position: 'absolute',
                     top: 0, left: 0,
-                    width: '100%', height: '100%',
+                    width: width,
+                    height: height,
                     pointerEvents: 'none',
                     overflow: 'visible',
+                    transformOrigin: '0 0',
+                    transform: overlayTransform,
                 }}
             >
                 {overlayElements.filter(el => el.type === 'video').map((el) => {
