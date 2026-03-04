@@ -228,7 +228,13 @@ export function overlayToDesignElement(
     canvasW: number,
     canvasH: number,
 ): DesignElement {
-    const constraints = absoluteToConstraints(oel.x, oel.y, oel.w, oel.h, canvasW, canvasH);
+    // ★ Clamp overlay coordinates to canvas bounds before computing constraints.
+    // Mouse coordinates from ed-canvas-area can be larger than the logical canvas size.
+    const clampedX = Math.max(0, Math.min(oel.x, canvasW - 1));
+    const clampedY = Math.max(0, Math.min(oel.y, canvasH - 1));
+    const clampedW = Math.max(1, Math.min(oel.w, canvasW - clampedX));
+    const clampedH = Math.max(1, Math.min(oel.h, canvasH - clampedY));
+    const constraints = absoluteToConstraints(clampedX, clampedY, clampedW, clampedH, canvasW, canvasH);
     const animation = getAnimationForElement(oel.id);
 
     if (oel.type === 'text') {

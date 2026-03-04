@@ -250,7 +250,25 @@ export function useCanvasSync(
 
             } else if (el.type === 'video') {
                 const vid = el as VideoElement;
-                const { x, y, w, h } = constraintsToAbsolute(vid.constraints, canvasW, canvasH);
+                let { x, y, w, h } = constraintsToAbsolute(vid.constraints, canvasW, canvasH);
+
+                // ★ Guard: if constraints resolve to invalid position (off-canvas or zero size),
+                // fall back to full-canvas fill. This handles corrupt constraints from
+                // mismatched canvas sizes or bad mouse-coordinate saves.
+                const isOutOfCanvas = w <= 0 || h <= 0
+                    || x >= canvasW || y >= canvasH
+                    || x + w <= 0 || y + h <= 0;
+                if (isOutOfCanvas) {
+                    console.warn(`[useCanvasSync] Video "${vid.name}" resolved out-of-canvas (${x},${y} ${w}x${h}) — using full-canvas fallback`);
+                    x = 0; y = 0; w = canvasW; h = canvasH;
+                } else {
+                    // Clamp to canvas bounds (allow small overflow for edge cases)
+                    x = Math.max(0, Math.min(x, canvasW - 10));
+                    y = Math.max(0, Math.min(y, canvasH - 10));
+                    w = Math.min(w, canvasW - x);
+                    h = Math.min(h, canvasH - y);
+                }
+
                 const oel: OverlayElement = {
                     id: vid.id,
                     type: 'video',

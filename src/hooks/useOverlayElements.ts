@@ -206,10 +206,13 @@ export function useOverlayElements(canvasWidth = 300, canvasHeight = 250) {
     }, [canvasWidth, canvasHeight]);
 
     // ── Trigger file input for video ──
-    // Accepts optional (x, y); if omitted, centers on canvas
+    // Always places at canvas top-left (0,0) — mouse coords from ed-canvas-area
+    // are in workspace space and not reliable for canvas-relative positioning.
     const triggerVideoUpload = useCallback((x?: number, y?: number) => {
-        const cx = x ?? Math.round(canvasWidth * 0.1);
-        const cy = y ?? Math.round(canvasHeight * 0.1);
+        // Ignore x/y — always start at (0,0) within canvas
+        // addVideo will scale to fit 80% of canvas from there
+        const cx = 0;
+        const cy = 0;
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = 'video/*';
