@@ -5,6 +5,8 @@
 // on the WASM engine. Returns structured results.
 
 import type { SceneNodeInfo } from './agentContext';
+import type { AnimPresetType } from '@/hooks/useAnimationPresets';
+import { useAnimPresetStore } from '@/hooks/useAnimationPresets';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Engine = any;
@@ -267,6 +269,16 @@ export function executeToolCall(
                 return { success: ok, message: ok ? 'Redone' : 'Nothing to redo' };
             }
 
+            // ── Text ─────────────────────────────────
+            case 'add_text': {
+                return executeAddText(engine, params, trackedNodes);
+            }
+
+            // ── Animation Preset ─────────────────────
+            case 'set_animation_preset': {
+                return executeSetAnimPreset(engine, params, trackedNodes);
+            }
+
             // ── Compound ─────────────────────────────
             case 'create_layout': {
                 return executeCreateLayout(engine, params, trackedNodes);
@@ -281,12 +293,212 @@ export function executeToolCall(
                 return { success: true, message: analysis };
             }
 
+            case 'render_banner': {
+                return executeRenderBanner(engine, params, trackedNodes);
+            }
+
             default:
                 return { success: false, message: `Unknown tool: ${toolName}` };
         }
     } catch (err) {
         return { success: false, message: `Error executing ${toolName}: ${err}` };
     }
+}
+
+// ── Text Implementation ──────────────────────────
+
+/**
+ * Parse a hex color string (#rrggbb or #rgb) to RGB 0-1 components.
+ * Returns [0,0,0] for invalid inputs.
+ */
+function hexToRgb(hex: string): [number, number, number] {
+    const clean = hex.replace('#', '');
+    if (clean.length === 3) {
+        const r = parseInt(clean[0]! + clean[0]!, 16) / 255;
+        const g = parseInt(clean[1]! + clean[1]!, 16) / 255;
+        const b = parseInt(clean[2]! + clean[2]!, 16) / 255;
+        return [r, g, b];
+    }
+    if (clean.length === 6) {
+        const r = parseInt(clean.slice(0, 2), 16) / 255;
+        const g = parseInt(clean.slice(2, 4), 16) / 255;
+        const b = parseInt(clean.slice(4, 6), 16) / 255;
+        return [r, g, b];
+    }
+    return [0, 0, 0];
+}
+
+function executeAddText(
+    engine: Engine,
+    params: Record<string, unknown>,
+    trackedNodes: SceneNodeInfo[],
+): ExecutionResult {
+    const x = (params.x as number) ?? 0;
+    const y = (params.y as number) ?? 0;
+    const content = (params.content as string) ?? '';
+    const fontSize = (params.font_size as number) ?? 18;
+    const fontFamily = (params.font_family as string) ?? 'Inter, system-ui, sans-serif';
+    const fontWeight = (params.font_weight as string) ?? '400';
+    const colorHex = (params.color_hex as string) ?? '#000000';
+    const width = (params.width as number) ?? 200;
+    const textAlign = (params.text_align as string) ?? 'left';
+
+    if (!content.trim()) {
+        return { success: false, message: 'add_text: content cannot be empty' };
+    }
+
+    const [cr, cg, cb] = hexToRgb(colorHex);
+
+    // engine.add_text is exposed via useFabricCanvas engine object
+    const id = engine.add_text(
+        x, y, content, fontSize, fontFamily, fontWeight, cr, cg, cb, 1.0, width, textAlign,
+    ) as number;
+
+    trackedNodes.push(makeNodeInfo(id, 'text', x, y, width, fontSize * 1.4, colorHex, 1.0));
+    return {
+        success: true,
+        message: `Text "${content.slice(0, 40)}" created at (${x}, ${y}), font ${fontSize}px ${fontWeight}`,
+        nodeId: id,
+    };
+}
+
+// ── Animation Preset Implementation ──────────────
+
+function executeSetAnimPreset(
+    engine: Engine,
+    params: Record<string, unknown>,
+    trackedNodes: SceneNodeInfo[],
+): ExecutionResult {
+    const nodeId = (params.node_id as number);
+    const preset = (params.preset as AnimPresetType) ?? 'fade';
+    const duration = (params.duration as number) ?? 0.4;
+    const delay = (params.delay as number) ?? 0;
+
+    if (!Number.isFinite(nodeId)) {
+        return { success: false, message: 'set_animation_preset: node_id is required' };
+    }
+
+    // Store in local animation preset store
+    const setPreset = useAnimPresetStore.getState().setPreset;
+    setPreset(String(nodeId), { anim: preset, animDuration: duration, startTime: delay });
+
+    // Apply engine keyframes (shifted by delay)
+    if (engine && preset !== 'none') {
+        const easing = 'ease_out';
+        try {
+            switch (preset) {
+                case 'fade':
+                    engine.add_keyframe(nodeId, 'opacity', delay, 0, easing);
+                    engine.add_keyframe(nodeId, 'opacity', delay + duration, 1, easing);
+                    break;
+                case 'slide-left':
+                    engine.add_keyframe(nodeId, 'x', delay, -200, easing);
+                    engine.add_keyframe(nodeId, 'x', delay + duration, 0, easing);
+                    break;
+                case 'slide-right':
+                    engine.add_keyframe(nodeId, 'x', delay, 200, easing);
+                    engine.add_keyframe(nodeId, 'x', delay + duration, 0, easing);
+                    break;
+                case 'slide-up':
+                    engine.add_keyframe(nodeId, 'y', delay, -200, easing);
+                    engine.add_keyframe(nodeId, 'y', delay + duration, 0, easing);
+                    break;
+                case 'slide-down':
+                    engine.add_keyframe(nodeId, 'y', delay, 200, easing);
+                    engine.add_keyframe(nodeId, 'y', delay + duration, 0, easing);
+                    break;
+                case 'scale':
+                    engine.add_keyframe(nodeId, 'scale_x', delay, 0, easing);
+                    engine.add_keyframe(nodeId, 'scale_x', delay + duration, 1, easing);
+                    engine.add_keyframe(nodeId, 'scale_y', delay, 0, easing);
+                    engine.add_keyframe(nodeId, 'scale_y', delay + duration, 1, easing);
+                    break;
+                case 'ascend':
+                    engine.add_keyframe(nodeId, 'y', delay, 100, easing);
+                    engine.add_keyframe(nodeId, 'y', delay + duration, 0, easing);
+                    engine.add_keyframe(nodeId, 'opacity', delay, 0, easing);
+                    engine.add_keyframe(nodeId, 'opacity', delay + duration, 1, easing);
+                    break;
+                case 'descend':
+                    engine.add_keyframe(nodeId, 'y', delay, -100, easing);
+                    engine.add_keyframe(nodeId, 'y', delay + duration, 0, easing);
+                    engine.add_keyframe(nodeId, 'opacity', delay, 0, easing);
+                    engine.add_keyframe(nodeId, 'opacity', delay + duration, 1, easing);
+                    break;
+            }
+        } catch {
+            // Engine may not have all keyframe methods in all modes
+        }
+    }
+
+    const node = trackedNodes.find(n => n.id === nodeId);
+    if (node) node.animations.push(`${preset} +${delay}s`);
+
+    return {
+        success: true,
+        message: `Animation preset "${preset}" applied to node ${nodeId} (delay: ${delay}s, duration: ${duration}s)`,
+    };
+}
+
+// ── render_banner Implementation ─────────────────
+
+function executeRenderBanner(
+    engine: Engine,
+    params: Record<string, unknown>,
+    trackedNodes: SceneNodeInfo[],
+): ExecutionResult {
+    const elements = (params.elements as Record<string, unknown>[]) ?? [];
+    if (!Array.isArray(elements) || elements.length === 0) {
+        return { success: false, message: 'render_banner: elements array is required and cannot be empty' };
+    }
+
+    const createdIds: number[] = [];
+    const errors: string[] = [];
+
+    for (let i = 0; i < elements.length; i++) {
+        const el = elements[i]!;
+        const type = el.type as string ?? 'rect';
+        let result: ExecutionResult;
+
+        if (type === 'text') {
+            result = executeAddText(engine, el, trackedNodes);
+        } else {
+            // shapes: rect, rounded_rect, gradient_rect, ellipse
+            const shapeParams: Record<string, unknown> = { ...el };
+            // map render_banner's element type to the tool name convention
+            const toolMap: Record<string, string> = {
+                rect: 'add_rect',
+                rounded_rect: 'add_rounded_rect',
+                gradient_rect: 'add_gradient_rect',
+                ellipse: 'add_ellipse',
+            };
+            const toolName = toolMap[type] ?? 'add_rect';
+            result = executeToolCall(engine, toolName, shapeParams, trackedNodes);
+        }
+
+        if (result.success && result.nodeId !== undefined) {
+            createdIds.push(result.nodeId);
+            // Apply animation if specified
+            const anim = el.animation as string | undefined;
+            if (anim && anim !== 'none') {
+                executeSetAnimPreset(engine, {
+                    node_id: result.nodeId,
+                    preset: anim,
+                    duration: (el.anim_duration as number) ?? 0.4,
+                    delay: (el.anim_delay as number) ?? 0,
+                }, trackedNodes);
+            }
+        } else if (!result.success) {
+            errors.push(`Element[${i}] (${type}): ${result.message}`);
+        }
+    }
+
+    if (createdIds.length === 0) {
+        return { success: false, message: `render_banner failed. Errors: ${errors.join('; ')}` };
+    }
+
+    const msg = `Banner rendered: ${createdIds.length} elements created (IDs: ${createdIds.join(', ')})${errors.length > 0 ? `. Warnings: ${errors.join('; ')}` : ''}`;
+    return { success: true, message: msg, data: createdIds };
 }
 
 // ── Compound Implementations ─────────────────────

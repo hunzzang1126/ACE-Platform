@@ -19,9 +19,9 @@ export interface ToolDefinition {
 
 interface ToolParam {
     type: string;
-    description: string;
+    description?: string;
     enum?: string[];
-    items?: { type: string };
+    items?: { type: string; properties?: Record<string, ToolParam> };
     minimum?: number;
     maximum?: number;
     default?: unknown;
@@ -442,15 +442,99 @@ const analyze_scene: ToolDefinition = {
 
 // ── All Tools Registry ────────────────────────────
 
+// ── Text & Image ─────────────────────────────────
+
+const add_text: ToolDefinition = {
+    name: 'add_text',
+    description: 'Add a text element to the canvas. Returns the new element ID. Use for headlines, subtext, CTA labels, body copy.',
+    parameters: {
+        type: 'object',
+        properties: {
+            x: { type: 'number', description: 'X position (left edge)' },
+            y: { type: 'number', description: 'Y position (top edge)' },
+            content: { type: 'string', description: 'Text string to display' },
+            font_size: { type: 'number', description: 'Font size in pixels', minimum: 6, default: 18 },
+            font_family: { type: 'string', description: 'Font family e.g. "Inter", "Georgia", "system-ui"', default: 'Inter, system-ui, sans-serif' },
+            font_weight: { type: 'string', description: 'Font weight: "400" (normal), "700" (bold), "900" (black)', default: '400' },
+            color_hex: { type: 'string', description: 'Text color as hex e.g. "#ffffff" or "#1a1a2e"', default: '#000000' },
+            width: { type: 'number', description: 'Box width in pixels (text wraps inside). Default 200.', minimum: 20, default: 200 },
+            text_align: { type: 'string', description: 'Text alignment', enum: ['left', 'center', 'right'], default: 'left' },
+            line_height: { type: 'number', description: 'Line height multiplier (e.g. 1.2)', minimum: 0.8, default: 1.2 },
+        },
+        required: ['x', 'y', 'content'],
+    },
+    category: 'create',
+};
+
+const set_animation_preset: ToolDefinition = {
+    name: 'set_animation_preset',
+    description: 'Apply a named animation preset to an element (Fabric/overlay node). Presets define how elements enter the scene. Use to make banners dynamic.',
+    parameters: {
+        type: 'object',
+        properties: {
+            node_id: { type: 'number', description: 'Engine node ID returned by add_rect, add_text, etc.' },
+            preset: {
+                type: 'string',
+                description: 'Animation preset name',
+                enum: ['none', 'fade', 'slide-left', 'slide-right', 'slide-up', 'slide-down', 'scale', 'ascend', 'descend'],
+            },
+            duration: { type: 'number', description: 'Duration of the entrance animation in seconds', minimum: 0.1, default: 0.4 },
+            delay: { type: 'number', description: 'Start delay (stagger) in seconds from timeline start', minimum: 0, default: 0 },
+        },
+        required: ['node_id', 'preset'],
+    },
+    category: 'animation',
+};
+
+const render_banner: ToolDefinition = {
+    name: 'render_banner',
+    description: 'Create a complete banner layout in one call. Describe all elements declaratively. The engine sequences through the array and creates each element. Use this instead of multiple add_rect + add_text calls.',
+    parameters: {
+        type: 'object',
+        properties: {
+            elements: {
+                type: 'array',
+                description: 'Array of elements to create. Each element must have a "type" field.',
+                items: {
+                    type: 'object',
+                    properties: {
+                        type: { type: 'string', enum: ['rect', 'rounded_rect', 'gradient_rect', 'ellipse', 'text'], description: 'Element type' },
+                        x: { type: 'number' }, y: { type: 'number' },
+                        w: { type: 'number' }, h: { type: 'number' },
+                        r: { type: 'number', description: 'Red 0-1 (shapes)' },
+                        g: { type: 'number', description: 'Green 0-1 (shapes)' },
+                        b: { type: 'number', description: 'Blue 0-1 (shapes)' },
+                        a: { type: 'number', description: 'Alpha 0-1', default: 1 },
+                        radius: { type: 'number', description: 'Corner radius (rounded_rect only)' },
+                        content: { type: 'string', description: 'Text string (text only)' },
+                        font_size: { type: 'number', description: 'Font size px (text only)' },
+                        font_weight: { type: 'string', description: '400|700|900 (text only)' },
+                        color_hex: { type: 'string', description: 'Text color hex (text only)' },
+                        width: { type: 'number', description: 'Text box width (text only)' },
+                        animation: { type: 'string', description: 'Animation preset (optional)', enum: ['none', 'fade', 'slide-left', 'slide-right', 'slide-up', 'slide-down', 'scale', 'ascend', 'descend'] },
+                        anim_delay: { type: 'number', description: 'Animation stagger delay in seconds', default: 0 },
+                        anim_duration: { type: 'number', description: 'Animation duration in seconds', default: 0.4 },
+                    },
+                },
+            },
+        },
+        required: ['elements'],
+    },
+    category: 'compound',
+};
+
 export const ALL_TOOLS: ToolDefinition[] = [
     // Create
     add_rect, add_rounded_rect, add_ellipse, add_gradient_rect,
+    // Text
+    add_text,
     // Style
     set_opacity, set_blend_mode,
     // Effects
     set_shadow, remove_shadow, set_brightness, set_contrast, set_saturation, set_hue_rotate,
     // Animation
     add_keyframe, set_duration, set_looping, anim_play, anim_pause, anim_stop, anim_seek, anim_set_speed,
+    set_animation_preset,
     // Selection
     select_node, deselect_all,
     // Scene
@@ -458,10 +542,11 @@ export const ALL_TOOLS: ToolDefinition[] = [
     // Undo
     undo_action, redo_action,
     // Compound
-    create_layout, animate_all, analyze_scene,
+    create_layout, animate_all, analyze_scene, render_banner,
     // Dashboard (app-level)
     ...DASHBOARD_TOOLS,
 ];
+
 
 /**
  * Convert tool definitions to OpenAI function-calling format.

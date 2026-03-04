@@ -40,7 +40,7 @@ export interface ToolCallRecord {
  */
 export interface SceneNodeInfo {
     id: number;
-    type: 'rect' | 'rounded_rect' | 'ellipse' | 'gradient_rect' | 'unknown';
+    type: 'rect' | 'rounded_rect' | 'ellipse' | 'gradient_rect' | 'text' | 'unknown';
     x: number;
     y: number;
     width: number;
