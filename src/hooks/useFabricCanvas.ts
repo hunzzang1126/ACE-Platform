@@ -1120,6 +1120,46 @@ function createEngineShim(fc: Canvas, syncState: () => void, artboardW: number, 
         // Alias: AI executor calls engine.clear()
         clear() { this.clear_scene(); },
 
+        // ── Screenshot (artboard-only crop) ──────────────
+        // Returns base64 PNG data URL clipped to artboard bounds.
+        // Used by Vision Feedback Loop after each render pass.
+        get_screenshot: (): string => {
+            const artboard = fc.getObjects().find(isArtboard);
+            if (!artboard) return fc.toDataURL({ format: 'png', multiplier: 1 });
+            const zoom = fc.getZoom();
+            const vpt = fc.viewportTransform ?? [1, 0, 0, 1, 0, 0];
+            return fc.toDataURL({
+                format: 'png',
+                multiplier: 1,
+                left: Math.round(vpt[4]),
+                top: Math.round(vpt[5]),
+                width: Math.round(artboardW * zoom),
+                height: Math.round(artboardH * zoom),
+            });
+        },
+
+        // ── Find element by layer name ─────────────────────
+        find_by_name: (name: string): number | null => {
+            const obj = userObjects().find((o) => (o as any).__aceName === name);
+            return obj ? ((obj as any).__aceId as number) : null;
+        },
+
+        // ── Set font size (for text elements) ─────────────
+        set_font_size: (id: number, size: number) => {
+            const obj = findById(id);
+            if (obj && (obj as any).set && 'fontSize' in obj) {
+                obj.set({ fontSize: size } as any);
+                fc.renderAll();
+                syncState();
+            }
+        },
+
+        // ── Set fill by hex color string ───────────────────
+        set_fill_hex: (id: number, hex: string) => {
+            const obj = findById(id);
+            if (obj) { obj.set({ fill: hex }); fc.renderAll(); }
+        },
+
         set_position: (id: number, x: number, y: number) => {
             const obj = findById(id);
             if (obj) { obj.set({ left: x, top: y }); obj.setCoords(); fc.renderAll(); }

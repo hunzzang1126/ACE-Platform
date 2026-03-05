@@ -1,283 +1,278 @@
 // ─────────────────────────────────────────────────
-// useAutoDesign — AI Auto-Design hook
+// useAutoDesign — Auto-Design 2.0 Hook
 // ─────────────────────────────────────────────────
-// OpenPencil-inspired: user types a prompt → AI generates
-// a full banner layout using render_banner tool.
+// Orchestrates two design modes + Vision Feedback Loop:
 //
-// Flow:
-//   1. Build a structured prompt with canvas dimensions + user intent
-//   2. Call Claude API with render_banner as the primary tool
-//   3. Execute the returned render_banner call on the canvas
-//   4. Report creation result
+//  Mode A (From Scratch): canvas empty → render_banner
+//  Mode B (Asset-Context): 2-3 existing elements → rearrange_banner
+//
+// Both modes then run the Vision Loop (max 3 passes)
+// to correct overlap/readability/hierarchy issues.
 // ─────────────────────────────────────────────────
 
 import { useState, useCallback, useRef } from 'react';
-import { classifyRatio } from '@/engine/smartSizing';
+import {
+    callFromScratch,
+    callAssetContext,
+    type CanvasElementInfo,
+    type RenderElement,
+    type RearrangePatch,
+} from '@/services/autoDesignService';
+import { runVisionLoop } from '@/services/autoDesignLoop';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Engine = any;
 
+// ── Public Types ────────────────────────────────────
+
 export interface AutoDesignState {
     isGenerating: boolean;
+    phase: 'idle' | 'generating' | 'reviewing' | 'done' | 'error';
     progress: string;
     error: string | null;
     createdCount: number;
+    finalScore: number;
 }
 
-interface AutoDesignOptions {
+export interface AutoDesignOptions {
     engine: Engine | null;
     canvasW: number;
     canvasH: number;
     apiKey: string;
 }
 
-// ── System Prompt ──────────────────────────────────
+// ── Helper: read existing canvas elements ──────────
 
-function buildSystemPrompt(canvasW: number, canvasH: number): string {
-    const ratio = classifyRatio(canvasW, canvasH);
-    const ratioHints: Record<string, string> = {
-        'ultra-wide': 'Horizontal layout: logo LEFT, headline CENTER, CTA RIGHT. Single text line.',
-        'wide': 'Two-column: image left, text+CTA right.',
-        'landscape': 'Vertical stack: background, headline, subtext, CTA. Standard banner hierarchy.',
-        'square': 'Compact square: background fills, logo top-left, headline center, CTA bottom-center.',
-        'portrait': 'Tall vertical: logo top, hero image, headline, subtext, CTA bottom.',
-        'ultra-tall': 'Skyscraper: logo top, image, headline, subtext, CTA bottom with padding.',
-    };
-    const layoutHint = ratioHints[ratio] ?? 'Balanced layout for this size.';
-
-    return `You are an expert banner ad designer for a tool called ACE.
-Your job: generate a complete, professional banner ad layout by calling render_banner.
-
-Canvas: ${canvasW}×${canvasH}px (ratio: ${ratio})
-Layout pattern: ${layoutHint}
-
-RULES for render_banner:
-- background rect should always be first, covering full canvas (x:0, y:0, w:${canvasW}, h:${canvasH})
-- Use r/g/b floats (0.0–1.0) for shape colors
-- Use color_hex (#rrggbb) for text colors
-- Positions must be within canvas bounds (0 to ${canvasW}×${canvasH})
-- Add at least: background, headline text, CTA button shape, CTA label text
-- Optional: subtext, logo placeholder, decorative shapes
-- Apply animation presets: use "fade" for headline, "slide-left" for CTA, "slide-up" for subtext
-- Make it visually stunning: use bold colors, clear hierarchy, generous padding
-
-Call render_banner with the complete layout. Return ONLY the tool call with no explanatory text.`;
+function readCanvasElements(engine: Engine): CanvasElementInfo[] {
+    try {
+        const raw = engine.get_all_nodes() as string;
+        const nodes = JSON.parse(raw) as Array<{
+            id: number;
+            name?: string;
+            type?: string;
+            x: number;
+            y: number;
+            width: number;
+            height: number;
+        }>;
+        return nodes.map((n) => ({
+            id: n.id,
+            name: n.name ?? `Element #${n.id}`,
+            type: n.type ?? 'rect',
+            x: n.x ?? 0,
+            y: n.y ?? 0,
+            w: n.width ?? 100,
+            h: n.height ?? 100,
+        }));
+    } catch {
+        return [];
+    }
 }
 
-// ── Claude API Call ────────────────────────────────
+// ── Helper: hex → rgb floats ───────────────────────
 
-const RENDER_BANNER_SCHEMA = {
-    name: 'render_banner',
-    description: 'Create a full banner layout declaratively. Define all elements in one call.',
-    input_schema: {
-        type: 'object',
-        required: ['elements'],
-        properties: {
-            elements: {
-                type: 'array',
-                items: {
-                    type: 'object',
-                    properties: {
-                        type: { type: 'string', enum: ['rect', 'rounded_rect', 'ellipse', 'text'] },
-                        x: { type: 'number' }, y: { type: 'number' },
-                        w: { type: 'number' }, h: { type: 'number' },
-                        r: { type: 'number' }, g: { type: 'number' }, b: { type: 'number' }, a: { type: 'number' },
-                        radius: { type: 'number' },
-                        content: { type: 'string' },
-                        font_size: { type: 'number' }, font_weight: { type: 'string' },
-                        color_hex: { type: 'string' }, text_align: { type: 'string' },
-                        animation: { type: 'string' }, anim_delay: { type: 'number' }, anim_duration: { type: 'number' },
-                    },
-                },
-            },
-        },
-    },
-};
-
-import { callAnthropicApi, DEFAULT_CLAUDE_MODEL } from '@/services/anthropicClient';
-
-interface RenderBannerParams {
-    elements: Record<string, unknown>[];
+function hexToRgb(hex: string): [number, number, number] {
+    const clean = hex.replace('#', '');
+    if (clean.length === 3) {
+        return [
+            parseInt(clean[0]! + clean[0]!, 16) / 255,
+            parseInt(clean[1]! + clean[1]!, 16) / 255,
+            parseInt(clean[2]! + clean[2]!, 16) / 255,
+        ];
+    }
+    return [
+        parseInt(clean.slice(0, 2), 16) / 255,
+        parseInt(clean.slice(2, 4), 16) / 255,
+        parseInt(clean.slice(4, 6), 16) / 255,
+    ];
 }
 
-async function callAutoDesignApi(
-    prompt: string,
-    canvasW: number,
-    canvasH: number,
-    apiKey: string,
-    signal: AbortSignal,
-): Promise<RenderBannerParams | null> {
-    const systemPrompt = buildSystemPrompt(canvasW, canvasH);
+// ── Helper: render an element onto canvas ──────────
 
-    const body = {
-        model: DEFAULT_CLAUDE_MODEL,
+function renderElement(engine: Engine, el: RenderElement, canvasW: number, canvasH: number): boolean {
+    const x = el.x ?? 0;
+    const y = el.y ?? 0;
+    const w = el.w ?? canvasW * 0.5;
+    const h = el.h ?? canvasH * 0.1;
+    const a = el.a ?? 1.0;
+    const name = el.name;
 
-        max_tokens: 2048,
-        system: systemPrompt,
-        tools: [RENDER_BANNER_SCHEMA],
-        tool_choice: { type: 'any' },
-        messages: [{ role: 'user', content: prompt }],
-    };
+    try {
+        if (el.type === 'text') {
+            const [tr, tg, tb] = el.color_hex
+                ? hexToRgb(el.color_hex)
+                : [typeof el.r === 'number' ? el.r : 1, typeof el.g === 'number' ? el.g : 1, typeof el.b === 'number' ? el.b : 1];
+            engine.add_text(
+                x, y,
+                el.content || 'Text',
+                el.font_size ?? 18,
+                'Inter, system-ui, sans-serif',
+                el.font_weight ?? '700',
+                tr, tg, tb, 1.0,
+                w > 0 ? w : canvasW * 0.85,
+                el.text_align ?? 'center',
+                name,
+            );
+            return true;
+        }
 
-    const data = await callAnthropicApi(apiKey, body, signal) as {
-        content: Array<{ type: string; name?: string; input?: unknown }>;
-        stop_reason: string;
-    };
+        const sr = typeof el.r === 'number' ? el.r : (el.color_hex ? hexToRgb(el.color_hex)[0] : 0.5);
+        const sg = typeof el.g === 'number' ? el.g : (el.color_hex ? hexToRgb(el.color_hex)[1] : 0.5);
+        const sb = typeof el.b === 'number' ? el.b : (el.color_hex ? hexToRgb(el.color_hex)[2] : 0.5);
 
-    const toolUse = data.content.find(c => c.type === 'tool_use' && c.name === 'render_banner');
-    if (!toolUse?.input) return null;
-
-    return toolUse.input as RenderBannerParams;
+        if (el.type === 'rounded_rect') {
+            engine.add_rounded_rect(x, y, w, h, sr, sg, sb, a, el.radius ?? 8, name);
+        } else if (el.type === 'ellipse') {
+            engine.add_ellipse(x + w / 2, y + h / 2, w / 2, h / 2, sr, sg, sb, a);
+        } else {
+            engine.add_rect(x, y, w, h, sr, sg, sb, a, name);
+        }
+        return true;
+    } catch (err) {
+        console.warn('[useAutoDesign] Failed to render element:', el.name, err);
+        return false;
+    }
 }
 
+// ── Helper: apply asset-context rearrange patches ─
 
-// ── Hook ──────────────────────────────────────────
+function applyRearrangePatches(engine: Engine, patches: RearrangePatch[]): number {
+    let applied = 0;
+    for (const patch of patches) {
+        const id = engine.find_by_name?.(patch.elementName) as number | null;
+        if (id === null || id === undefined) {
+            console.warn('[useAutoDesign] Patch target not found:', patch.elementName);
+            continue;
+        }
+        if (patch.x !== undefined && patch.y !== undefined) {
+            engine.set_position(id, patch.x, patch.y);
+        }
+        if (patch.w !== undefined && patch.h !== undefined) {
+            engine.set_size(id, patch.w, patch.h);
+        }
+        if (patch.fontSize !== undefined) {
+            engine.set_font_size?.(id, patch.fontSize);
+        }
+        if (patch.fill) {
+            engine.set_fill_hex?.(id, patch.fill);
+        }
+        applied++;
+    }
+    return applied;
+}
+
+// ── Hook ────────────────────────────────────────────
 
 export function useAutoDesign(options: AutoDesignOptions) {
     const { engine, canvasW, canvasH, apiKey } = options;
 
     const [state, setState] = useState<AutoDesignState>({
         isGenerating: false,
+        phase: 'idle',
         progress: '',
         error: null,
         createdCount: 0,
+        finalScore: 0,
     });
 
     const abortRef = useRef<AbortController | null>(null);
 
     const generate = useCallback(async (prompt: string) => {
-        if (!engine || !apiKey?.trim()) {
-            setState(s => ({ ...s, error: !apiKey ? 'Set Anthropic API key first' : 'Canvas not ready' }));
+        if (!engine) {
+            setState(s => ({ ...s, error: 'Canvas not ready', phase: 'error' }));
             return;
         }
-
+        if (!apiKey?.trim()) {
+            setState(s => ({ ...s, error: 'Set Anthropic API key in AI Settings first', phase: 'error' }));
+            return;
+        }
         if (!prompt.trim()) {
-            setState(s => ({ ...s, error: 'Enter a description of what to create' }));
+            setState(s => ({ ...s, error: 'Enter a description of your banner', phase: 'error' }));
             return;
         }
 
-        // Cancel any previous request
         abortRef.current?.abort();
         abortRef.current = new AbortController();
+        const signal = abortRef.current.signal;
 
-        setState({ isGenerating: true, progress: 'Thinking...', error: null, createdCount: 0 });
+        setState({ isGenerating: true, phase: 'generating', progress: '✦ Thinking...', error: null, createdCount: 0, finalScore: 0 });
 
         try {
-            // Step 1: Call Claude to generate layout
-            setState(s => ({ ...s, progress: 'Generating banner layout...' }));
-            const params = await callAutoDesignApi(prompt, canvasW, canvasH, apiKey, abortRef.current.signal);
-
-            if (!params) {
-                throw new Error('AI did not return a banner layout. Please try again.');
-            }
-
-            // Step 2: Clear canvas
-            setState(s => ({ ...s, progress: 'Clearing canvas...' }));
-            try { engine.clear_scene?.(); } catch { /* some engines may not have this */ }
-
-            // Step 3: Execute render_banner — robust element rendering
-            setState(s => ({ ...s, progress: `Rendering ${params.elements.length} elements...` }));
+            // ── Detect Mode ──
+            const existingElements = readCanvasElements(engine);
+            const isAssetMode = existingElements.length >= 1;
 
             let createdCount = 0;
 
-            // Helper: parse a color_hex string → normalized r,g,b (0.0-1.0 floats)
-            function parseHexToRgb(hex: string): [number, number, number] {
-                const clean = hex.replace('#', '');
-                if (clean.length === 3) {
-                    const r = parseInt(clean[0]! + clean[0]!, 16) / 255;
-                    const g = parseInt(clean[1]! + clean[1]!, 16) / 255;
-                    const b = parseInt(clean[2]! + clean[2]!, 16) / 255;
-                    return [r, g, b];
+            if (isAssetMode) {
+                // ── Mode B: Asset-Context ──────────────────────────
+                setState(s => ({ ...s, progress: `🎨 Reading ${existingElements.length} element${existingElements.length > 1 ? 's' : ''} on canvas...` }));
+
+                // Get screenshot of current state for context
+                let screenshot = '';
+                try { screenshot = engine.get_screenshot() as string; } catch { /* ok, vision will still work */ }
+
+                setState(s => ({ ...s, progress: '🤖 AI reorganizing layout...' }));
+                const result = await callAssetContext(prompt, screenshot, existingElements, canvasW, canvasH, apiKey, signal);
+
+                // Apply patches to existing elements
+                const patched = applyRearrangePatches(engine, result.patches);
+
+                // Add any new elements AI suggested
+                for (const el of (result.additions ?? [])) {
+                    if (renderElement(engine, el, canvasW, canvasH)) createdCount++;
                 }
-                const r = parseInt(clean.slice(0, 2), 16) / 255;
-                const g = parseInt(clean.slice(2, 4), 16) / 255;
-                const b = parseInt(clean.slice(4, 6), 16) / 255;
-                return [Number.isNaN(r) ? 1 : r, Number.isNaN(g) ? 1 : g, Number.isNaN(b) ? 1 : b];
-            }
 
-            // Helper: get shape r,g,b from element (may use color_hex fallback)
-            function getShapeRgb(el: Record<string, unknown>): [number, number, number] {
-                if (el.color_hex) return parseHexToRgb(el.color_hex as string);
-                return [
-                    typeof el.r === 'number' ? el.r : 0.5,
-                    typeof el.g === 'number' ? el.g : 0.5,
-                    typeof el.b === 'number' ? el.b : 0.5,
-                ];
-            }
+                console.log(`[useAutoDesign] Asset-context: patched=${patched}, added=${createdCount}`);
+                createdCount = patched + createdCount;
 
-            // Helper: get text color
-            function getTextRgb(el: Record<string, unknown>): [number, number, number] {
-                if (el.color_hex) return parseHexToRgb(el.color_hex as string);
-                // If AI sent r,g,b for text color too
-                if (typeof el.r === 'number') {
-                    return [el.r, typeof el.g === 'number' ? el.g : 1, typeof el.b === 'number' ? el.b : 1];
+            } else {
+                // ── Mode A: From Scratch ───────────────────────────
+                setState(s => ({ ...s, progress: '✦ Generating banner layout...' }));
+                const result = await callFromScratch(prompt, canvasW, canvasH, apiKey, signal);
+
+                // Clear canvas first
+                try { engine.clear_scene?.(); } catch { /* ok */ }
+
+                // Render all elements
+                setState(s => ({ ...s, progress: `🎨 Rendering ${result.elements.length} elements...` }));
+                for (const el of result.elements) {
+                    if (renderElement(engine, el, canvasW, canvasH)) createdCount++;
                 }
-                return [1, 1, 1]; // default: white text
+
+                console.log(`[useAutoDesign] From-scratch: rendered=${createdCount}`);
             }
 
-            for (const el of params.elements) {
-                const type = (el.type as string) ?? 'rect';
-                const x = typeof el.x === 'number' ? el.x : 0;
-                const y = typeof el.y === 'number' ? el.y : 0;
-                const w = typeof el.w === 'number' ? el.w : canvasW * 0.5;
-                const h = typeof el.h === 'number' ? el.h : canvasH * 0.1;
-                const a = typeof el.a === 'number' ? el.a : 1.0;
-                const name = (el.name as string) || undefined;
+            // ── Vision Feedback Loop ───────────────────────────
+            setState(s => ({ ...s, phase: 'reviewing' }));
 
-                try {
-                    if (type === 'text') {
-                        const [tr, tg, tb] = getTextRgb(el);
-                        const content = (el.content as string) || 'Text';
-                        const fontSize = typeof el.font_size === 'number' ? el.font_size : 18;
-                        const fontWeight = (el.font_weight as string) || '700';
-                        const textAlign = (el.text_align as string) || 'center';
-                        const maxW = w > 0 ? w : canvasW * 0.85;
-                        engine.add_text(
-                            x, y, content,
-                            fontSize,
-                            'Inter, system-ui, sans-serif',
-                            fontWeight,
-                            tr, tg, tb, 1.0,
-                            maxW,
-                            textAlign,
-                            name,
-                        );
-                        createdCount++;
-                    } else if (type === 'rounded_rect') {
-                        const [sr, sg, sb] = getShapeRgb(el);
-                        const radius = typeof el.radius === 'number' ? el.radius : 8;
-                        engine.add_rounded_rect(x, y, w, h, sr, sg, sb, a, radius, name);
-                        createdCount++;
-                    } else if (type === 'ellipse') {
-                        const [sr, sg, sb] = getShapeRgb(el);
-                        engine.add_ellipse(x + w / 2, y + h / 2, w / 2, h / 2, sr, sg, sb, a);
-                        createdCount++;
-                    } else {
-                        // Default: rect
-                        const [sr, sg, sb] = getShapeRgb(el);
-                        engine.add_rect(x, y, w, h, sr, sg, sb, a, name);
-                        createdCount++;
-                    }
-                } catch {
-                    // Skip failed elements, continue with others
-                }
-            }
+            const loopResult = await runVisionLoop(
+                engine,
+                canvasW,
+                canvasH,
+                apiKey,
+                signal,
+                (msg) => setState(s => ({ ...s, progress: msg })),
+            );
 
             setState({
                 isGenerating: false,
+                phase: 'done',
                 progress: '',
                 error: null,
                 createdCount,
+                finalScore: loopResult.finalScore,
             });
 
         } catch (err) {
             if ((err as Error).name === 'AbortError') {
-                setState(s => ({ ...s, isGenerating: false, progress: '', error: null }));
+                setState({ isGenerating: false, phase: 'idle', progress: '', error: null, createdCount: 0, finalScore: 0 });
                 return;
             }
             setState(s => ({
                 ...s,
                 isGenerating: false,
+                phase: 'error',
                 progress: '',
                 error: err instanceof Error ? err.message : 'Auto-Design failed. Please retry.',
             }));
@@ -286,7 +281,7 @@ export function useAutoDesign(options: AutoDesignOptions) {
 
     const cancel = useCallback(() => {
         abortRef.current?.abort();
-        setState(s => ({ ...s, isGenerating: false, progress: '', error: null }));
+        setState(s => ({ ...s, isGenerating: false, phase: 'idle', progress: '', error: null }));
     }, []);
 
     return { state, generate, cancel };
