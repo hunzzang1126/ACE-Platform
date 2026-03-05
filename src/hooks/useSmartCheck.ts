@@ -20,6 +20,7 @@ import type { CreativeSet, BannerVariant } from '@/schema/design.types';
 import type { DesignElement } from '@/schema/elements.types';
 import { resolveConstraints } from '@/schema/constraints.types';
 import { runSmartSizingQA } from '@/engine/smartSizingQA';
+import { classifyRatio } from '@/engine/smartSizing';
 import { useDesignStore } from '@/stores/designStore';
 
 export type SmartCheckStatus = 'idle' | 'checking' | 'done' | 'error';
@@ -239,6 +240,50 @@ export function useSmartCheck() {
                         }
                     }
                 }
+
+                // ── Heuristic fixes for social sizes ──
+                const slaveRatio = classifyRatio(tW, tH);
+                const isSocial = slaveRatio === 'square' || slaveRatio === 'portrait' || slaveRatio === 'ultra-tall';
+
+                const freshVariant2 = useDesignStore.getState().creativeSet?.variants.find(
+                    v => v.id === slave.id
+                );
+                if (freshVariant2 && isSocial) {
+                    for (const el of freshVariant2.elements) {
+                        // Skip overridden elements
+                        if (slave.overriddenElementIds?.includes(el.id)) continue;
+
+                        const bounds = resolveConstraints(el.constraints, tW, tH);
+                        const patch: Record<string, unknown> = {};
+
+                        // Enforce minimum font size (readability)
+                        if ((el.type === 'text' || el.type === 'button') && 'fontSize' in el) {
+                            const minFont = Math.max(10, Math.round(Math.min(tW, tH) * 0.03));
+                            const fontSize = (el as DesignElement & { fontSize: number }).fontSize;
+                            if (fontSize < minFont) {
+                                patch.fontSize = minFont;
+                            }
+                        }
+
+                        // Center-align text horizontally for social
+                        if (el.type === 'text' || el.type === 'button') {
+                            const centerX = Math.round((tW - bounds.width) / 2);
+                            if (Math.abs(bounds.x - centerX) > 8) {
+                                patch.constraints = {
+                                    ...el.constraints,
+                                    horizontal: { anchor: 'left' as const, offset: centerX },
+                                };
+                            }
+                        }
+
+                        if (Object.keys(patch).length > 0) {
+                            try {
+                                updateVariantElement(slave.id, el.id, patch);
+                                totalPatched++;
+                            } catch { /* skip */ }
+                        }
+                    }
+                }
             }
 
             // Yield to UI
@@ -252,11 +297,11 @@ export function useSmartCheck() {
             const resizedCount = slaves.length;
             let message: string;
             if (totalPatched === 0 && issues.length === 0) {
-                message = `✅ All ${resizedCount} sizes already look great!`;
+                message = `All ${resizedCount} sizes already look great.`;
             } else if (issues.length === 0) {
-                message = `✅ Synced ${resizedCount} sizes proportionally — no issues found`;
+                message = `Synced ${resizedCount} sizes proportionally — no issues found.`;
             } else {
-                message = `✅ Synced ${resizedCount} sizes. ${totalClipped > 0 ? `Clipped ${totalClipped} out-of-bounds element${totalClipped !== 1 ? 's' : ''}. ` : ''}${issues.length} minor QA note${issues.length !== 1 ? 's' : ''} remain.`;
+                message = `Synced ${resizedCount} sizes. ${totalClipped > 0 ? `Clipped ${totalClipped} out-of-bounds. ` : ''}${issues.length} QA note${issues.length !== 1 ? 's' : ''} remain.`;
             }
 
             setResult({
