@@ -1211,6 +1211,27 @@ function createEngineShim(fc: Canvas, syncState: () => void, artboardW: number, 
             return obj ? ((obj as any).__aceId as number) : null;
         },
 
+        // ── Send element to front (highest zIndex) ─────────
+        send_to_front: (id: number): void => {
+            const obj = findById(id);
+            if (obj) {
+                fc.bringObjectToFront(obj);
+                (obj as any).__aceZIndex = userObjects().length - 1;
+                fc.renderAll();
+                syncState();
+            }
+        },
+
+        // ── Find all element IDs of a given type ───────────
+        find_all_by_type: (type: string): number[] => {
+            return userObjects()
+                .filter((o) => {
+                    const n = fabricToEngineNode(o);
+                    return n.type === type;
+                })
+                .map((o) => (o as any).__aceId as number);
+        },
+
         // ── Set font size (for text elements) ─────────────
         set_font_size: (id: number, size: number) => {
             const obj = findById(id);

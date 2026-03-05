@@ -218,6 +218,18 @@ export function useAutoDesign(options: AutoDesignOptions) {
                     if (renderElement(engine, el, canvasW, canvasH)) createdCount++;
                 }
 
+                // ★ After generation: bring all image elements to front
+                // so user's uploaded assets are always visible above AI shapes/backgrounds
+                try {
+                    const imageIds: number[] = engine.find_all_by_type?.('image') ?? [];
+                    for (const imgId of imageIds) {
+                        engine.send_to_front?.(imgId);
+                    }
+                    if (imageIds.length > 0) {
+                        console.log(`[useAutoDesign] Brought ${imageIds.length} image(s) to front`);
+                    }
+                } catch { /* optional */ }
+
                 console.log(`[useAutoDesign] Asset-context: patched=${patched}, added=${createdCount}`);
                 createdCount = patched + createdCount;
 

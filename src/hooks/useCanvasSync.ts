@@ -231,7 +231,20 @@ export function useCanvasSync(
 
             } else if (el.type === 'image') {
                 const img = el as ImageElement;
-                const { x, y, w, h } = constraintsToAbsolute(img.constraints, canvasW, canvasH);
+                let { x, y, w, h } = constraintsToAbsolute(img.constraints, canvasW, canvasH);
+
+                // ★ Guard: if constraints resolve to invalid position, fall back to center.
+                // This handles corrupt constraints or mismatched canvas sizes.
+                const isOutOfCanvas = w <= 0 || h <= 0
+                    || x >= canvasW || y >= canvasH
+                    || x + w <= 0 || y + h <= 0;
+                if (isOutOfCanvas) {
+                    console.warn(`[useCanvasSync] Image "${img.name}" resolved out-of-canvas (${x},${y} ${w}x${h}) — centering`);
+                    w = Math.min(canvasW * 0.5, img.naturalWidth ?? canvasW * 0.5);
+                    h = Math.min(canvasH * 0.5, img.naturalHeight ?? canvasH * 0.5);
+                    x = Math.round((canvasW - w) / 2);
+                    y = Math.round((canvasH - h) / 2);
+                }
 
                 // Restore image as Fabric-native Image (async — may appear slightly after shapes)
                 if (img.src) {
@@ -240,6 +253,8 @@ export function useCanvasSync(
                             try { engine.set_opacity(nodeId, img.opacity); } catch { /* ok */ }
                         }
                     });
+                } else {
+                    console.warn(`[useCanvasSync] Image "${img.name}" has empty src — skipping restore (data may have been stripped from localStorage)`);
                 }
 
                 restoredShapes++;
