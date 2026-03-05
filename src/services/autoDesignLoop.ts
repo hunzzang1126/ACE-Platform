@@ -148,7 +148,7 @@ export async function runVisionLoop(
 
     for (let pass = 0; pass < MAX_PASSES; pass++) {
         // ── 1. Screenshot ──
-        onProgress(`📸 Reviewing layout (pass ${pass + 1}/${MAX_PASSES})...`);
+        onProgress(`Reviewing layout (pass ${pass + 1}/${MAX_PASSES})...`);
 
         let screenshot: string;
         try {
@@ -215,19 +215,19 @@ export async function runVisionLoop(
         console.log(`[VisionLoop] Pass ${pass + 1}: score=${lastScore}, fixes=${fixes.length}, reasoning="${reviewResult.reasoning}"`);
 
         if (fixes.length === 0) {
-            onProgress(`✅ Score ${lastScore}/100 — Layout approved!`);
+            onProgress(`Score ${lastScore}/100 — Layout approved.`);
             break;
         }
 
         // ── 4. Apply fixes ──
-        onProgress(`🔧 Applying ${fixes.length} fix${fixes.length > 1 ? 'es' : ''} (score: ${lastScore}/100)...`);
+        onProgress(`Applying ${fixes.length} fix${fixes.length > 1 ? 'es' : ''} (score: ${lastScore}/100)...`);
 
         for (const fix of fixes) {
             if (applyFix(engine, fix)) totalFixes++;
         }
 
         if (lastScore >= PASS_SCORE) {
-            onProgress(`✅ Score ${lastScore}/100 — Layout approved!`);
+            onProgress(`Score ${lastScore}/100 — Layout approved.`);
             break;
         }
 

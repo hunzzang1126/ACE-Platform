@@ -206,13 +206,13 @@ export function useAutoDesign(options: AutoDesignOptions) {
 
             if (isAssetMode) {
                 // ── Mode B: Asset-Context ──────────────────────────
-                setState(s => ({ ...s, progress: `🎨 Reading ${existingElements.length} element${existingElements.length > 1 ? 's' : ''} on canvas...` }));
+                setState(s => ({ ...s, progress: `Reading ${existingElements.length} element${existingElements.length > 1 ? 's' : ''} on canvas...` }));
 
                 // Get screenshot of current state for context
                 let screenshot = '';
                 try { screenshot = engine.get_screenshot() as string; } catch { /* ok, vision will still work */ }
 
-                setState(s => ({ ...s, progress: '🤖 AI reorganizing layout...' }));
+                setState(s => ({ ...s, progress: 'AI reorganizing layout...' }));
                 const result = await callAssetContext(prompt, screenshot, existingElements, canvasW, canvasH, apiKey, signal);
 
                 // Apply patches to existing elements
@@ -228,17 +228,27 @@ export function useAutoDesign(options: AutoDesignOptions) {
 
             } else {
                 // ── Mode A: From Scratch ───────────────────────────
-                setState(s => ({ ...s, progress: '✦ Generating banner layout...' }));
+                setState(s => ({ ...s, progress: 'Generating banner layout...' }));
                 const result = await callFromScratch(prompt, canvasW, canvasH, apiKey, signal);
 
                 // Clear canvas first
                 try { engine.clear_scene?.(); } catch { /* ok */ }
 
                 // Render all elements
-                setState(s => ({ ...s, progress: `🎨 Rendering ${result.elements.length} elements...` }));
+                setState(s => ({ ...s, progress: `Rendering ${result.elements.length} elements...` }));
                 for (const el of result.elements) {
                     if (renderElement(engine, el, canvasW, canvasH)) createdCount++;
                 }
+
+                // Auto-group CTA: cta_button + cta_label → 'CTA' group
+                try {
+                    const btnId = engine.find_by_name?.('cta_button');
+                    const lblId = engine.find_by_name?.('cta_label');
+                    if (btnId && lblId && btnId > 0 && lblId > 0) {
+                        engine.group_elements([btnId, lblId], 'CTA');
+                        console.log('[useAutoDesign] CTA auto-grouped');
+                    }
+                } catch { /* group is optional */ }
 
                 console.log(`[useAutoDesign] From-scratch: rendered=${createdCount}`);
             }

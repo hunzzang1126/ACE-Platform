@@ -5,7 +5,7 @@
 // ─────────────────────────────────────────────────
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Canvas, Rect, Ellipse, Shadow, PencilBrush, Textbox, FabricImage, Gradient, type FabricObject } from 'fabric';
+import { Canvas, Rect, Ellipse, Shadow, PencilBrush, Textbox, FabricImage, Gradient, Group, type FabricObject } from 'fabric';
 import { useEditorStore } from '@/stores/editorStore';
 import { useAnimPresetStore } from './useAnimationPresets';
 import type { EngineNode, CanvasEngineState, CanvasEngineActions, UseCanvasEngineResult } from './canvasTypes';
@@ -1094,6 +1094,45 @@ function createEngineShim(fc: Canvas, syncState: () => void, artboardW: number, 
                 console.error('[EngineShim] Failed to load image:', err);
             }
             return id;
+        },
+
+        // ── Grouping ─────────────────────────────────────
+        group_elements: (ids: number[], name?: string): number => {
+            const objects = ids.map(findById).filter(Boolean) as FabricObject[];
+            if (objects.length < 2) return -1;
+
+            const gid = nextId();
+            const group = new Group(objects, {
+                // Fabric Group auto-calculates position from children
+            });
+            // Remove individual objects from canvas (they're now in the group)
+            objects.forEach(o => fc.remove(o));
+            (group as any).__aceId = gid;
+            (group as any).__aceName = name || `Group #${gid}`;
+            (group as any).__aceZIndex = userObjects().length;
+            patchAceProps(group);
+            fc.add(group);
+            fc.setActiveObject(group);
+            fc.renderAll();
+            syncState();
+            console.log(`[EngineShim] Grouped ${ids.length} objects → id=${gid} name="${name}"`);
+            return gid;
+        },
+
+        ungroup: (id: number) => {
+            const obj = findById(id);
+            if (!obj || !(obj instanceof Group)) return;
+            const items = (obj as Group).getObjects();
+            fc.remove(obj);
+            items.forEach((item, i) => {
+                (item as any).__aceId = nextId();
+                (item as any).__aceZIndex = userObjects().length + i;
+                patchAceProps(item);
+                fc.add(item);
+            });
+            fc.renderAll();
+            syncState();
+            console.log(`[EngineShim] Ungrouped id=${id}, ${items.length} objects released`);
         },
 
         select: (id: number) => {
