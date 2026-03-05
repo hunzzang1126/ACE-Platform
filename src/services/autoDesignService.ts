@@ -170,30 +170,51 @@ const REARRANGE_BANNER_TOOL = {
 function buildFromScratchPrompt(canvasW: number, canvasH: number): string {
     const ratio = classifyRatio(canvasW, canvasH);
     const layoutGuides: Record<string, string> = {
-        'ultra-wide': 'Horizontal: logo LEFT, headline CENTER, CTA RIGHT.',
-        'wide': 'Two-column: image left, text+CTA right.',
-        'landscape': 'Stack: bg fills canvas, headline top-center, CTA bottom-center.',
-        'square': 'Compact: bg fills, logo top-left, headline center, CTA bottom-center.',
-        'portrait': 'Vertical: logo top, hero area, headline, CTA bottom with 20px padding.',
-        'ultra-tall': 'Skyscraper: logo top, image, headline, CTA bottom.',
+        'ultra-wide': 'Horizontal flow: headline LEFT, CTA RIGHT.',
+        'wide': 'Background + headline top + CTA bottom-right.',
+        'landscape': 'Background + headline center-top + CTA center-bottom.',
+        'square': 'Background + headline center + CTA near bottom.',
+        'portrait': 'Background + headline upper-third + CTA lower-third.',
+        'ultra-tall': 'Background + headline top-third + CTA bottom-third.',
     };
-    const guide = layoutGuides[ratio] ?? 'Balanced layout.';
+    const guide = layoutGuides[ratio] ?? 'Background + headline + CTA.';
+    const pad = 16;
+    const ctaH = Math.round(canvasH * 0.12);
+    const headlineY = Math.round(canvasH * 0.3);
+    const ctaY = Math.round(canvasH * 0.72);
 
-    return `You are an expert banner ad designer creating a ${canvasW}×${canvasH}px banner.
-Layout guide for this ratio (${ratio}): ${guide}
+    return `You are a professional banner ad designer. Create a ${canvasW}x${canvasH}px banner.
+Layout (${ratio}): ${guide}
 
-RULES — must follow exactly:
-1. Background rect: x=0, y=0, w=${canvasW}, h=${canvasH} — always first
-2. Keep ALL elements within canvas bounds (0 to ${canvasW} wide, 0 to ${canvasH} tall)
-3. Minimum 16px padding from canvas edges for text
-4. NO elements overlapping each other (check y positions!)
-5. Maximum 5 elements total (quality over quantity)
-6. Text colors: use color_hex (#rrggbb). Shape colors: use r/g/b floats (0.0–1.0)
-7. CTA button: use rounded_rect type with radius 8–12
-8. Font sizes: headline 24–48px, subtext 14–20px, CTA label 14–18px font_weight "700"
-9. Give every element a descriptive name: "background", "headline", "cta_button", "cta_label"
+YOU MUST FOLLOW THESE RULES — violations will cause visual bugs:
 
-Return ONLY the render_banner tool call. No text outside the tool call.`;
+1. ELEMENT COUNT: Exactly 4 elements total:
+   [0] background  — rect, x=0,y=0,w=${canvasW},h=${canvasH}
+   [1] headline    — text, x=${pad},y=${headlineY},w=${canvasW - pad * 2}
+   [2] cta_button  — rounded_rect, y≈${ctaY},h=${ctaH},radius=10
+   [3] cta_label   — text inside/on cta_button
+
+2. NO OVERLAP RULE: Each element must NOT overlap any other.
+   - headline bottom edge = y + estimated_height
+   - cta_button top edge must be > headline bottom + 12px gap
+   - All elements: x ≥ ${pad}, right edge ≤ ${canvasW - pad}
+
+3. BOUNDS: All elements must fit 100% inside canvas (0 to ${canvasW} wide, 0 to ${canvasH} tall)
+
+4. COLORS:
+   - Shapes: use r/g/b floats 0.0–1.0
+   - Text: use color_hex only (e.g. "#ffffff")
+   - Background and CTA button must have DIFFERENT colors
+   - Text must have HIGH contrast against background
+
+5. TYPOGRAPHY:
+   - headline font_size: ${Math.round(canvasH * 0.14)}–${Math.round(canvasH * 0.18)}px, font_weight "800"
+   - cta_label font_size: ${Math.round(canvasH * 0.07)}px, font_weight "700"
+   - text_align: "center" for both
+
+6. NAMES: Give exact names: "background", "headline", "cta_button", "cta_label"
+
+Return ONLY the render_banner tool call with exactly 4 elements. No extra text.`;
 }
 
 function buildAssetContextPrompt(
@@ -203,27 +224,27 @@ function buildAssetContextPrompt(
     userPrompt: string,
 ): string {
     const elementList = elements
-        .map(e => `  - "${e.name}" (${e.type}, pos: ${e.x},${e.y}, size: ${e.w}×${e.h})`)
+        .map(e => `  - "${e.name}" (${e.type}, at ${e.x},${e.y}, size ${e.w}x${e.h})`)
         .join('\n');
+    const tooMany = elements.length >= 4;
 
-    return `You are an expert banner ad designer. The user has placed ${elements.length} elements on a ${canvasW}×${canvasH}px canvas.
+    return `You are a professional banner ad designer. Reorganize a ${canvasW}x${canvasH}px banner.
 
-Existing elements:
+EXISTING elements on canvas:
 ${elementList}
 
-User's style directive: "${userPrompt}"
+User directive: "${userPrompt}"
 
-Your job: reorganize these elements into a polished, professional banner ad layout.
-
-RULES:
-1. Use rearrange_banner to move/resize/recolor existing elements
-2. Add NEW text or shape elements via "additions" if needed (headline, CTA button, labels)
-3. Keep ALL elements within canvas: x 0–${canvasW}, y 0–${canvasH}
-4. No overlapping — check positions carefully
-5. Images/videos: reposition and size them as hero areas (never overlap text)
-6. Add at minimum: a headline text and a CTA button if not already present
-7. Background: if no background exists, add one in additions (rect full-canvas)
-8. Give new elements descriptive names
+CRITICAL RULES:
+1. Use rearrange_banner "patches" to REPOSITION/RESIZE/RECOLOR existing elements.
+2. ${tooMany
+            ? `DO NOT add any new elements via "additions" — canvas already has ${elements.length} elements. Just reorganize what's there.`
+            : 'You may add 1-2 new text elements max via "additions" (headline or CTA label only — no new shapes).'
+        }
+3. NO OVERLAP: Check all positions carefully. Stack elements vertically with ≥12px gap.
+4. BOUNDS: All elements must stay within canvas: x 0–${canvasW}, y 0–${canvasH}.
+5. Patches must reference EXACT element names from the list above.
+6. Images/videos: keep them as backgrounds (x=0,y=0) or hero areas — never overlap text.
 
 Return ONLY the rearrange_banner tool call.`;
 }
