@@ -1232,6 +1232,30 @@ function createEngineShim(fc: Canvas, syncState: () => void, artboardW: number, 
                 .map((o) => (o as any).__aceId as number);
         },
 
+        // ── Remove a single element from canvas ────────────
+        remove_element: (id: number): void => {
+            const obj = findById(id);
+            if (obj) {
+                fc.remove(obj);
+                fc.renderAll();
+            }
+        },
+
+        // ── Get data src for an image element ──────────────
+        get_image_src: (id: number): string => {
+            const obj = findById(id);
+            if (!obj || obj.type !== 'image') return '';
+            return (obj as any)._element?.src ?? '';
+        },
+
+        // ── Get display size for any element ──────────────
+        get_element_bounds: (id: number): { x: number; y: number; w: number; h: number } | null => {
+            const obj = findById(id);
+            if (!obj) return null;
+            const n = fabricToEngineNode(obj);
+            return { x: n.x, y: n.y, w: n.w, h: n.h };
+        },
+
         // ── Set font size (for text elements) ─────────────
         set_font_size: (id: number, size: number) => {
             const obj = findById(id);
@@ -1254,7 +1278,18 @@ function createEngineShim(fc: Canvas, syncState: () => void, artboardW: number, 
         },
         set_size: (id: number, w: number, h: number) => {
             const obj = findById(id);
-            if (obj) { obj.set({ width: w, height: h, scaleX: 1, scaleY: 1 }); obj.setCoords(); fc.renderAll(); }
+            if (!obj) return;
+            if (obj.type === 'image') {
+                // Fabric Images: size is controlled by scaleX/scaleY, not width/height
+                const natW = (obj as any).width ?? w;
+                const natH = (obj as any).height ?? h;
+                const scale = Math.min(w / Math.max(natW, 1), h / Math.max(natH, 1));
+                obj.set({ scaleX: scale, scaleY: scale });
+            } else {
+                obj.set({ width: w, height: h, scaleX: 1, scaleY: 1 });
+            }
+            obj.setCoords();
+            fc.renderAll();
         },
         set_opacity: (id: number, v: number) => {
             const obj = findById(id);

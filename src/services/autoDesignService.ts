@@ -236,6 +236,7 @@ function buildAssetContextPrompt(
     canvasH: number,
     elements: CanvasElementInfo[],
     userPrompt: string,
+    hasImages = false,
 ): string {
     const elementList = elements
         .map(e => `  - "${e.name}" (${e.type}, at ${e.x},${e.y}, size ${e.w}x${e.h})`)
@@ -283,7 +284,7 @@ function buildAssetContextPrompt(
     const ctaFinalY = isLandscape ? ctaY : Math.min(ctaY, canvasH - ctaH - pad);
 
     const imageNames = elements.filter(e => e.type === 'image').map(e => `"${e.name}"`).join(', ');
-    const hasImages = elements.some(e => e.type === 'image');
+    const hasImagesOnCanvas = hasImages || elements.some(e => e.type === 'image');
 
     return `You are a world-class banner ad designer. Create a COMPLETE, polished ${canvasW}x${canvasH}px design.
 
@@ -301,7 +302,7 @@ ${hasImages ? `   - Move image(s) [${imageNames}] to hero position: x=${imgX}, y
 2. ADDITIONS (you MUST add these — no exceptions):
    a) BACKGROUND: full-canvas rect (x=0, y=0, w=${canvasW}, h=${canvasH}) with a strong brand color
       → name: "background", place this FIRST (lowest zIndex)
-${hasImages ? `   b) OVERLAY: semi-transparent dark rect over image area for text contrast
+${hasImagesOnCanvas ? `   b) OVERLAY: semi-transparent dark rect over image area for text contrast
       → x=${isLandscape ? 0 : 0}, y=${isLandscape ? 0 : Math.round(canvasH * 0.48)}, w=${isLandscape ? Math.round(canvasW * 0.55) : canvasW}, h=${isLandscape ? canvasH : Math.round(canvasH * 0.52)}
       → r=0, g=0, b=0, a=0.45, name: "overlay"` : ''}
    c) HEADLINE: bold text centered in text zone
@@ -366,8 +367,9 @@ export async function callAssetContext(
     canvasW: number,
     canvasH: number,
     signal: AbortSignal,
+    hasImages = false,
 ): Promise<AssetContextResult> {
-    const systemPrompt = buildAssetContextPrompt(canvasW, canvasH, elements, prompt);
+    const systemPrompt = buildAssetContextPrompt(canvasW, canvasH, elements, prompt, hasImages);
 
     // Strip data URL prefix
     const pureBase64 = screenshot.startsWith('data:')

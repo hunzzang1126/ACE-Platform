@@ -203,34 +203,66 @@ export function useAutoDesign(options: AutoDesignOptions) {
                 // ── Mode B: Asset-Context ──────────────────────────
                 setState(s => ({ ...s, progress: `Reading ${existingElements.length} element${existingElements.length > 1 ? 's' : ''} on canvas...` }));
 
-                // Get screenshot of current state for context
+                // ★ Snapshot all image elements BEFORE AI runs
+                // We'll remove them, let AI build the layout, then re-add images LAST
+                // so they're always on top of the generated background/shapes
+                const imageSnapshots: Array<{ src: string; name: string; x: number; y: number; w: number; h: number }> = [];
+                try {
+                    const imageIds: number[] = engine.find_all_by_type?.('image') ?? [];
+                    for (const imgId of imageIds) {
+                        const src: string = engine.get_image_src?.(imgId) ?? '';
+                        const bounds = engine.get_element_bounds?.(imgId) as { x: number; y: number; w: number; h: number } | null;
+                        const name: string = existingElements.find(e => e.id === imgId)?.name ?? `Image ${imgId}`;
+                        if (src) {
+                            imageSnapshots.push({ src, name, x: bounds?.x ?? 0, y: bounds?.y ?? 0, w: bounds?.w ?? 100, h: bounds?.h ?? 100 });
+                        }
+                        engine.remove_element?.(imgId);
+                    }
+                } catch { /* ok */ }
+
+                // Get screenshot of layout (without images — cleaner for AI to analyze text/shape positions)
                 let screenshot = '';
-                try { screenshot = engine.get_screenshot() as string; } catch { /* ok, vision will still work */ }
+                try { screenshot = engine.get_screenshot() as string; } catch { /* ok */ }
 
-                setState(s => ({ ...s, progress: 'AI reorganizing layout...' }));
-                const result = await callAssetContext(prompt, screenshot, existingElements, canvasW, canvasH, signal);
+                setState(s => ({ ...s, progress: 'AI building professional layout...' }));
 
-                // Apply patches to existing elements
+                // Pass image info to AI via updated element list (images removed from canvas but shown in prompt as context)
+                const elementsForAI = existingElements.filter(e => e.type !== 'image');
+
+                const result = await callAssetContext(prompt, screenshot, elementsForAI, canvasW, canvasH, signal, imageSnapshots.length > 0);
+
+                // Apply patches to existing non-image elements
                 const patched = applyRearrangePatches(engine, result.patches);
 
-                // Add any new elements AI suggested
+                // Add all new elements (background, overlay, text, CTA, etc.)
+                setState(s => ({ ...s, progress: 'Rendering layout...' }));
                 for (const el of (result.additions ?? [])) {
                     if (renderElement(engine, el, canvasW, canvasH)) createdCount++;
                 }
 
-                // ★ After generation: bring all image elements to front
-                // so user's uploaded assets are always visible above AI shapes/backgrounds
-                try {
-                    const imageIds: number[] = engine.find_all_by_type?.('image') ?? [];
-                    for (const imgId of imageIds) {
-                        engine.send_to_front?.(imgId);
+                // ★ Re-add images LAST — they get the highest zIndex, always on top
+                // Position them at the hero area defined in the prompt
+                const isLandscape = canvasW > canvasH * 1.2;
+                for (const snap of imageSnapshots) {
+                    let heroX: number, heroY: number, heroW: number, heroH: number;
+                    if (isLandscape) {
+                        heroW = Math.round(canvasW * 0.45);
+                        heroH = canvasH;
+                        heroX = canvasW - heroW;
+                        heroY = 0;
+                    } else {
+                        heroW = canvasW;
+                        heroH = Math.round(canvasH * 0.5);
+                        heroX = 0;
+                        heroY = 0;
                     }
-                    if (imageIds.length > 0) {
-                        console.log(`[useAutoDesign] Brought ${imageIds.length} image(s) to front`);
-                    }
-                } catch { /* optional */ }
+                    try {
+                        setState(s => ({ ...s, progress: `Adding image "${snap.name}"...` }));
+                        await engine.add_image(heroX, heroY, snap.src, heroW, heroH, snap.name);
+                    } catch { /* ok */ }
+                }
 
-                console.log(`[useAutoDesign] Asset-context: patched=${patched}, added=${createdCount}`);
+                console.log(`[useAutoDesign] Asset-context: patched=${patched}, added=${createdCount}, images-readded=${imageSnapshots.length}`);
                 createdCount = patched + createdCount;
 
             } else {
