@@ -291,8 +291,8 @@ export function EditorCanvas({
                 }}
             />
 
-            {/* ── Video overlay elements (HTML — requires <video> tag) ──
-                 Text and Image are now Fabric-native objects.
+            {/* ── Overlay elements (HTML — image + video) ──
+                 Text is Fabric-native. Images and videos from toolbar use overlay system.
                  IMPORTANT: We apply the same viewport transform as Fabric so
                  overlays align with the artboard regardless of zoom/pan. */}
             <div
@@ -308,6 +308,55 @@ export function EditorCanvas({
                     transform: overlayTransform,
                 }}
             >
+                {/* Image overlays */}
+                {overlayElements.filter(el => el.type === 'image').map((el) => {
+                    const isSelected = el.id === selectedOverlayId;
+                    const isVisible = el.visible ?? true;
+                    if (!isVisible) return null;
+
+                    const isBeingDragged = isDraggingOverlay.current && dragOverlayId.current === el.id;
+                    const isBeingResized = isResizingOverlay.current && resizeOverlayId.current === el.id;
+                    const isInteracting = isBeingDragged || isBeingResized;
+                    const animStyle = (animIsPlaying && !isInteracting) ? getAnimStyle(el.id) : {};
+
+                    return (
+                        <div
+                            key={el.id}
+                            onMouseDown={(e) => handleOverlayMouseDown(e, el)}
+                            style={{
+                                position: 'absolute',
+                                left: el.x,
+                                top: el.y,
+                                width: el.w,
+                                height: el.h,
+                                opacity: el.opacity,
+                                zIndex: el.zIndex + 10,
+                                outline: isSelected ? '2px solid #4a9eff' : 'none',
+                                cursor: el.locked ? 'not-allowed' : (activeTool === 'select' ? 'move' : 'default'),
+                                pointerEvents: activeTool === 'select' ? 'auto' : 'none',
+                                overflow: isSelected ? 'visible' : 'hidden',
+                                borderRadius: 2,
+                                ...animStyle,
+                            }}
+                        >
+                            <img
+                                src={el.src}
+                                alt={el.name}
+                                draggable={false}
+                                style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    objectFit: el.objectFit || 'cover',
+                                    pointerEvents: 'none',
+                                    display: 'block',
+                                }}
+                            />
+                            {isSelected && !el.locked && <ResizeHandles el={el} onResizeStart={handleResizeMouseDown} />}
+                        </div>
+                    );
+                })}
+
+                {/* Video overlays */}
                 {overlayElements.filter(el => el.type === 'video').map((el) => {
                     const isSelected = el.id === selectedOverlayId;
                     const isVisible = el.visible ?? true;
