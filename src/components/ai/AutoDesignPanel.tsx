@@ -91,10 +91,8 @@ export function AutoDesignPanel({ engine, canvasW, canvasH, apiKey }: Props) {
     const isAssetMode = elementCount >= 1;
     const hasKey = !!apiKey?.trim();
 
-    // Asset mode: prompt is optional (AI can reorganize without style directive)
-    // Scratch mode: prompt is required
-    const canRun = hasKey && !!engine && !state.isGenerating &&
-        (isAssetMode || prompt.trim().length > 0);
+    // Both modes: just need engine + API key. Prompt is optional.
+    const canRun = hasKey && !!engine && !state.isGenerating;
 
     const handleGenerate = useCallback(() => generate(prompt || 'Clean, professional layout'), [generate, prompt]);
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -153,11 +151,7 @@ export function AutoDesignPanel({ engine, canvasW, canvasH, apiKey }: Props) {
                     </div>
                 ) : (
                     <div style={styles.dropContent}>
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ opacity: 0.4 }}>
-                            <rect x="1" y="1" width="14" height="14" rx="2" stroke="#8b949e" strokeWidth="1.2" />
-                            <circle cx="5.5" cy="5.5" r="1.5" fill="#8b949e" />
-                            <path d="M1 10.5L5 7l3 3 2.5-2.5L15 10.5" stroke="#8b949e" strokeWidth="1.2" strokeLinejoin="round" />
-                        </svg>
+                        <span style={{ fontSize: 16, color: '#484f58', lineHeight: 1 }}>+</span>
                         <span style={styles.dropText}>Drop image or click to upload</span>
                     </div>
                 )}

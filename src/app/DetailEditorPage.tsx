@@ -11,7 +11,7 @@ import { EditorToolbar } from '@/components/editor/EditorToolbar';
 import { EditorCanvas } from '@/components/editor/EditorCanvas';
 import { PropertyPanel } from '@/components/panels/PropertyPanel';
 import { BottomPanel } from '@/components/editor/BottomPanel';
-import { SmartSizingVisionPanel } from '@/components/ai/SmartSizingVisionPanel';
+// Vision check is now integrated into Auto-Design flow (autoDesignLoop.ts)
 import { AutoDesignPanel } from '@/components/ai/AutoDesignPanel';
 import { useFabricCanvas } from '@/hooks/useFabricCanvas';
 import { useOverlayElements } from '@/hooks/useOverlayElements';
@@ -314,19 +314,7 @@ export function DetailEditorPage() {
                         canvasWidth={width}
                         canvasHeight={height}
                     />
-                    {/* AI Vision Feedback Loop — screenshot → Claude Vision → patches */}
-                    <SmartSizingVisionPanel
-                        fabricCanvas={(engineRef.current as any)?.__fabricCanvas ?? null}
-                        canvasW={width}
-                        canvasH={height}
-                        apiKey={visionApiKey}
-                        elements={state.nodes.map((n: any) => ({
-                            name: n.label ?? n.id,
-                            type: n.type ?? 'shape',
-                            role: n.role,
-                        }))}
-                    />
-                    {/* Auto-Design — prompt → Claude → full banner generation */}
+                    {/* Auto-Design — prompt → Claude → full banner generation + auto vision */}
                     <AutoDesignPanel
                         engine={engineRef.current}
                         canvasW={width}
