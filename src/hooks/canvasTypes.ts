@@ -34,6 +34,8 @@ export interface EngineNode {
     // Image fields (when type === 'image')
     src?: string;
     objectFit?: 'cover' | 'contain' | 'fill';
+    naturalWidth?: number;
+    naturalHeight?: number;
     // Name (for layer panel display)
     name?: string;
 }

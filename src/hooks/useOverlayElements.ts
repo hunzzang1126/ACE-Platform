@@ -26,6 +26,8 @@ export interface OverlayElement {
     src?: string;        // data URL or object URL
     fileName?: string;
     objectFit?: 'cover' | 'contain' | 'fill';
+    naturalWidth?: number;
+    naturalHeight?: number;
     // Video-specific
     videoSrc?: string;   // object URL for video
     muted?: boolean;

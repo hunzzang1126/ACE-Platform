@@ -109,6 +109,9 @@ function fabricToEngineNode(obj: FabricObject): EngineNode {
         if (imgEl?.src) {
             node.src = imgEl.src;
         }
+        // Capture natural dimensions for aspect ratio preservation
+        if (imgEl?.naturalWidth) node.naturalWidth = imgEl.naturalWidth;
+        if (imgEl?.naturalHeight) node.naturalHeight = imgEl.naturalHeight;
     }
 
     return node;
@@ -1073,13 +1076,32 @@ function createEngineShim(fc: Canvas, syncState: () => void, artboardW: number, 
                 const img = await FabricImage.fromURL(src, imgOptions);
                 const natW = img.width ?? 200;
                 const natH = img.height ?? 200;
-                const targetW = w ?? Math.min(natW, artboardW * 0.7);
-                const targetH = h ?? (natH * (targetW / Math.max(natW, 1)));
+
+                let targetW: number;
+                let targetH: number;
+
+                if (w != null && h != null) {
+                    // Both dimensions provided (restore path) — use UNIFORM scale
+                    // to preserve aspect ratio. Fit within the bounding box.
+                    const uniformScale = Math.min(w / Math.max(natW, 1), h / Math.max(natH, 1));
+                    targetW = natW * uniformScale;
+                    targetH = natH * uniformScale;
+                } else if (w != null) {
+                    // Only width provided — auto-calculate height
+                    targetW = w;
+                    targetH = natH * (targetW / Math.max(natW, 1));
+                } else {
+                    // No dimensions — use natural size clamped to artboard
+                    targetW = Math.min(natW, artboardW * 0.7);
+                    targetH = natH * (targetW / Math.max(natW, 1));
+                }
+
+                const uniformScaleVal = targetW / Math.max(natW, 1);
                 img.set({
                     left: x,
                     top: y,
-                    scaleX: targetW / Math.max(natW, 1),
-                    scaleY: targetH / Math.max(natH, 1),
+                    scaleX: uniformScaleVal,
+                    scaleY: uniformScaleVal,
                 });
                 (img as any).__aceId = id;
                 (img as any).__aceName = name || `Image #${id}`;

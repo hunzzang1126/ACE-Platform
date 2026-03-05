@@ -54,6 +54,9 @@ export interface ImageElement extends BaseElement {
     src: string;
     /** object-fit 스타일 */
     fit: 'cover' | 'contain' | 'fill' | 'none';
+    /** Original image natural dimensions — for aspect ratio preservation */
+    naturalWidth?: number;
+    naturalHeight?: number;
     /** 크롭 영역 (0~1 비율) */
     cropRect?: { x: number; y: number; w: number; h: number };
     /** 이미지 필터 */
