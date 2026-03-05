@@ -205,11 +205,11 @@ export function useCanvasSync(
                     y,
                     text.content || '',
                     text.fontSize || 16,
-                    text.fontFamily || 'Inter, system-ui, sans-serif',
+                    text.fontFamily || 'Inter',
                     String(text.fontWeight || 400),
                     tr, tg, tb, 1.0,
                     w > 0 ? w : canvasW * 0.85,
-                    text.textAlign || 'left',
+                    text.textAlign || 'center',
                     text.name,
                 );
 

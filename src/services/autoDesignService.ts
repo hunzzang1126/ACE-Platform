@@ -240,25 +240,93 @@ function buildAssetContextPrompt(
     const elementList = elements
         .map(e => `  - "${e.name}" (${e.type}, at ${e.x},${e.y}, size ${e.w}x${e.h})`)
         .join('\n');
-    const tooMany = elements.length >= 4;
 
-    return `You are a professional banner ad designer. Reorganize a ${canvasW}x${canvasH}px banner.
+    const ratio = classifyRatio(canvasW, canvasH);
+    const zones = LAYOUT_ZONES[ratio];
 
-EXISTING elements on canvas:
+    // Compute layout zones for this canvas
+    const hlX = Math.round(zones.headline.x * canvasW);
+    const hlY = Math.round(zones.headline.y * canvasH);
+    const hlW = Math.round(zones.headline.w * canvasW);
+    const ctaX = Math.round(zones.cta.x * canvasW);
+    const ctaY = Math.round(zones.cta.y * canvasH);
+    const ctaW = Math.round(zones.cta.w * canvasW);
+    const ctaH = Math.round(zones.cta.h * canvasH);
+    const pad = Math.max(10, Math.round(Math.min(canvasW, canvasH) * 0.05));
+    const hlFontSize = Math.max(18, Math.round(canvasH * 0.1));
+    const subFontSize = Math.max(12, Math.round(canvasH * 0.055));
+    const ctaFontSize = Math.max(12, Math.round(canvasH * 0.06));
+
+    // Image placement: right side for landscape, center for portrait/near-square
+    const isLandscape = canvasW > canvasH * 1.2;
+    let imgX: number, imgY: number, imgW: number, imgH: number;
+    if (isLandscape) {
+        // Right 45% of canvas
+        imgW = Math.round(canvasW * 0.45);
+        imgH = canvasH;
+        imgX = canvasW - imgW;
+        imgY = 0;
+    } else {
+        // Upper 50% of canvas
+        imgW = canvasW;
+        imgH = Math.round(canvasH * 0.5);
+        imgX = 0;
+        imgY = 0;
+    }
+
+    // Text zone: left side for landscape, bottom for portrait
+    const textAreaY = isLandscape ? Math.round(canvasH * 0.15) : Math.round(canvasH * 0.52);
+    const textAreaX = isLandscape ? pad : pad;
+    const textAreaW = isLandscape ? Math.round(canvasW * 0.5) : canvasW - 2 * pad;
+    const subY = textAreaY + hlFontSize + 12;
+    const ctaFinalX = isLandscape ? textAreaX : ctaX;
+    const ctaFinalY = isLandscape ? ctaY : Math.min(ctaY, canvasH - ctaH - pad);
+
+    const imageNames = elements.filter(e => e.type === 'image').map(e => `"${e.name}"`).join(', ');
+    const hasImages = elements.some(e => e.type === 'image');
+
+    return `You are a world-class banner ad designer. Create a COMPLETE, polished ${canvasW}x${canvasH}px design.
+
+EXISTING ELEMENTS (keep their names exact for patches):
 ${elementList}
 
-User directive: "${userPrompt}"
+User request: "${userPrompt}"
 
-CRITICAL RULES:
-1. Use rearrange_banner "patches" to REPOSITION/RESIZE/RECOLOR existing elements.
-2. ${tooMany
-            ? `DO NOT add any new elements via "additions" — canvas already has ${elements.length} elements. Just reorganize what's there.`
-            : 'You may add 1-2 new text elements max via "additions" (headline or CTA label only — no new shapes).'
-        }
-3. NO OVERLAP: Check all positions carefully. Stack elements vertically with ≥12px gap.
-4. BOUNDS: All elements must stay within canvas: x 0–${canvasW}, y 0–${canvasH}.
-5. Patches must reference EXACT element names from the list above.
-6. Images/videos: keep them as backgrounds (x=0,y=0) or hero areas — never overlap text.
+YOUR TASK: Transform this into a PROFESSIONAL banner by:
+
+1. PATCHES (modify existing elements):
+${hasImages ? `   - Move image(s) [${imageNames}] to hero position: x=${imgX}, y=${imgY}, w=${imgW}, h=${imgH}` : ''}
+   - Reposition any text/shapes as needed
+
+2. ADDITIONS (you MUST add these — no exceptions):
+   a) BACKGROUND: full-canvas rect (x=0, y=0, w=${canvasW}, h=${canvasH}) with a strong brand color
+      → name: "background", place this FIRST (lowest zIndex)
+${hasImages ? `   b) OVERLAY: semi-transparent dark rect over image area for text contrast
+      → x=${isLandscape ? 0 : 0}, y=${isLandscape ? 0 : Math.round(canvasH * 0.48)}, w=${isLandscape ? Math.round(canvasW * 0.55) : canvasW}, h=${isLandscape ? canvasH : Math.round(canvasH * 0.52)}
+      → r=0, g=0, b=0, a=0.45, name: "overlay"` : ''}
+   c) HEADLINE: bold text centered in text zone
+      → x=${textAreaX}, y=${textAreaY}, w=${textAreaW}
+      → font_size=${hlFontSize}, font_weight="800", text_align="${isLandscape ? 'left' : 'center'}"
+      → color_hex="#FFFFFF", name: "headline"
+   d) SUBHEADLINE: supporting text below headline
+      → x=${textAreaX}, y=${subY}, w=${textAreaW}
+      → font_size=${subFontSize}, font_weight="500", text_align="${isLandscape ? 'left' : 'center'}"
+      → color_hex="#E0E0E0", name: "subheadline"
+   e) CTA BUTTON: rounded rect button
+      → x=${ctaFinalX}, y=${ctaFinalY}, w=${ctaW}, h=${ctaH}, radius=8
+      → bright contrasting accent color (NOT same as background), name: "cta_button"
+   f) CTA LABEL: text centered on CTA button
+      → x=${ctaFinalX}, y=${ctaFinalY + Math.round((ctaH - ctaFontSize) / 2)}, w=${ctaW}
+      → font_size=${ctaFontSize}, font_weight="700", text_align="center"
+      → color_hex="#FFFFFF", name: "cta_label"
+
+STRICT RULES:
+- Generate REAL ad copy based on the image context and user prompt (no lorem ipsum)
+- Background and CTA must have STRONGLY CONTRASTING colors (e.g. dark navy bg + orange CTA)
+- ALL elements must be within canvas bounds: x: 0–${canvasW}, y: 0–${canvasH}
+- Minimum ${pad}px padding from canvas edges for text
+- Additions array order matters — background must be FIRST, then overlay, then text on top
+- The image element zIndex is already managed — do not try to reorder it via patches
 
 Return ONLY the rearrange_banner tool call.`;
 }

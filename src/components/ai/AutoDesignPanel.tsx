@@ -65,7 +65,9 @@ export function AutoDesignPanel({ engine, canvasW, canvasH }: Props) {
         const x = Math.round(canvasW * 0.1);
         const y = Math.round(canvasH * 0.1);
         const maxW = Math.round(canvasW * 0.8);
-        await engine.add_image(x, y, dataUrl, maxW, undefined, file.name.replace(/\.[^.]+$/, ''));
+        const nodeId = await engine.add_image(x, y, dataUrl, maxW, undefined, file.name.replace(/\.[^.]+$/, ''));
+        // Bring image to front so it's always visible (not hidden under shapes)
+        try { engine.send_to_front?.(nodeId); } catch { /* ok */ }
         setUploadedAssets(prev => [...prev, dataUrl]);
     }, [engine, canvasW, canvasH]);
 
