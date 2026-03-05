@@ -412,10 +412,31 @@ export const useDesignStore = create<DesignState>()(
             {
                 name: 'ace-design-store',
                 // Persist all creative sets and active ID
-                partialize: (state) => ({
-                    allCreativeSets: state.allCreativeSets,
-                    activeCreativeSetId: state.activeCreativeSetId,
-                }),
+                // NOTE: Strip large image src data URLs to avoid QuotaExceededError
+                // (localStorage limit is ~5MB; a single image data URL can be 100KB+)
+                partialize: (state) => {
+                    const stripped = JSON.parse(JSON.stringify(state.allCreativeSets)) as typeof state.allCreativeSets;
+                    for (const csId of Object.keys(stripped)) {
+                        const cs = stripped[csId];
+                        if (!cs) continue;
+                        for (const variant of cs.variants) {
+                            variant.elements = variant.elements.map((el) => {
+                                // Strip large data URLs from image elements to keep localStorage small
+                                if (el.type === 'image' && 'src' in el) {
+                                    const src = (el as { src?: string }).src ?? '';
+                                    if (src.startsWith('data:') && src.length > 10_000) {
+                                        return { ...el, src: '' } as typeof el;
+                                    }
+                                }
+                                return el;
+                            });
+                        }
+                    }
+                    return {
+                        allCreativeSets: stripped,
+                        activeCreativeSetId: state.activeCreativeSetId,
+                    };
+                },
                 // On rehydration, restore the creativeSet computed field
                 onRehydrateStorage: () => (state) => {
                     if (state && state.activeCreativeSetId) {
@@ -433,7 +454,18 @@ export const useDesignStore = create<DesignState>()(
                         }
                     },
                     setItem: (name, value) => {
-                        localStorage.setItem(name, JSON.stringify(value));
+                        try {
+                            localStorage.setItem(name, JSON.stringify(value));
+                        } catch (e) {
+                            // QuotaExceededError — localStorage is full
+                            console.warn('[designStore] localStorage full, clearing and retrying...', e);
+                            try {
+                                localStorage.clear();
+                                localStorage.setItem(name, JSON.stringify(value));
+                            } catch (e2) {
+                                console.error('[designStore] Still cannot save after clear:', e2);
+                            }
+                        }
                     },
                     removeItem: (name) => {
                         localStorage.removeItem(name);

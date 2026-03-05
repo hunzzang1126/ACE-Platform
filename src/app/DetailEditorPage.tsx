@@ -70,10 +70,20 @@ export function DetailEditorPage() {
     // ── Save handler (manual) ──
     const handleSave = useCallback(() => {
         setSaveStatus('saving');
-        const result = saveToStore(engineRef, overlay.overlayElements);
-        console.log('[DetailEditor] Save result:', result);
-        isDirtyRef.current = false; // Saved — no longer dirty
-        setSaveStatus('saved');
+        try {
+            const result = saveToStore(engineRef, overlay.overlayElements);
+            console.log('[DetailEditor] Save result:', result);
+            isDirtyRef.current = false; // Saved — no longer dirty
+            if (result.success) {
+                setSaveStatus('saved');
+            } else {
+                console.warn('[DetailEditor] Save returned unsuccessful:', result.message);
+                setSaveStatus('idle');
+            }
+        } catch (err) {
+            console.error('[DetailEditor] Save error:', err);
+            setSaveStatus('idle');
+        }
         setTimeout(() => setSaveStatus('idle'), 2000);
     }, [saveToStore, engineRef, overlay.overlayElements]);
 
@@ -103,7 +113,8 @@ export function DetailEditorPage() {
                 })();
             }
         }
-    }, [state.status, engineRef, handleSave, restoreFromStore, overlay, actions, syncState]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [state.status, engineRef, handleSave, restoreFromStore, overlay.restoreElements, syncState]);
 
     // ── Live re-render when AI tools add elements to designStore ──
     // Watches element count for the active variant; when it changes, re-sync canvas
@@ -145,7 +156,7 @@ export function DetailEditorPage() {
                 })();
             }
         }
-    }, [creativeSet, variantId, state.status, engineRef, restoreFromStore, overlay, syncState]);
+    }, [creativeSet, variantId, state.status, engineRef, restoreFromStore, overlay.clearOverlays, overlay.restoreElements, syncState]);
 
     // ── Keep latest refs for auto-save (avoids stale closure) ──
     const saveFromCachedRef = useRef(saveFromCachedNodes);
