@@ -1,13 +1,13 @@
 // ─────────────────────────────────────────────────
 // AutoDesignPanel — Auto-Design 2.0 UI
 // ─────────────────────────────────────────────────
-// Two modes:
-//   - From Scratch: empty canvas → full layout
-//   - Asset-Context: existing elements → AI reorganizes
-// Both run Vision Feedback Loop after initial placement.
+// - Asset Upload Zone: drop/click to add images to canvas
+// - From Scratch: empty canvas → full layout
+// - Asset-Context: existing elements → AI reorganizes
+// - Vision Feedback Loop: 3-pass quality review
 // ─────────────────────────────────────────────────
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useAutoDesign } from '@/hooks/useAutoDesign';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -30,10 +30,13 @@ const EXAMPLE_PROMPTS = [
 export function AutoDesignPanel({ engine, canvasW, canvasH, apiKey }: Props) {
     const [prompt, setPrompt] = useState('');
     const [elementCount, setElementCount] = useState(0);
+    const [isDragging, setIsDragging] = useState(false);
+    const [uploadedAssets, setUploadedAssets] = useState<string[]>([]);  // preview thumbnails
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const { state, generate, cancel } = useAutoDesign({ engine, canvasW, canvasH, apiKey });
 
-    // Detect how many elements exist on canvas (for mode badge)
+    // Detect how many elements exist on canvas
     useEffect(() => {
         if (!engine) return;
         const refresh = () => {
@@ -43,12 +46,53 @@ export function AutoDesignPanel({ engine, canvasW, canvasH, apiKey }: Props) {
             } catch { setElementCount(0); }
         };
         refresh();
-        const id = setInterval(refresh, 2000);
+        const id = setInterval(refresh, 1500);
         return () => clearInterval(id);
     }, [engine]);
 
-    const isAssetMode = elementCount >= 1;
+    // ── Image upload → canvas ──────────────────────────
+    const placeImageOnCanvas = useCallback(async (file: File) => {
+        if (!engine) return;
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+        // Place image centered on canvas
+        const x = Math.round(canvasW * 0.1);
+        const y = Math.round(canvasH * 0.1);
+        const maxW = Math.round(canvasW * 0.8);
+        const maxH = Math.round(canvasH * 0.8);
+        await engine.add_image(x, y, dataUrl, maxW, maxH, file.name.replace(/\.[^.]+$/, ''));
+        setUploadedAssets(prev => [...prev, dataUrl]);
+    }, [engine, canvasW, canvasH]);
 
+    const handleFiles = useCallback((files: FileList | File[]) => {
+        const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+        imageFiles.forEach(f => placeImageOnCanvas(f));
+    }, [placeImageOnCanvas]);
+
+    const handleDrop = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+        if (e.dataTransfer.files.length > 0) handleFiles(e.dataTransfer.files);
+    }, [handleFiles]);
+
+    const handleDragOver = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(true);
+    }, []);
+
+    const handleDragLeave = useCallback(() => setIsDragging(false), []);
+
+    const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files?.length) handleFiles(e.target.files);
+        e.target.value = '';
+    }, [handleFiles]);
+
+    // ── Generate ───────────────────────────────────────
+    const isAssetMode = elementCount >= 1;
     const handleGenerate = useCallback(() => generate(prompt), [generate, prompt]);
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); handleGenerate(); }
@@ -58,8 +102,8 @@ export function AutoDesignPanel({ engine, canvasW, canvasH, apiKey }: Props) {
     const canRun = hasKey && !!engine && prompt.trim().length > 0 && !state.isGenerating;
 
     const placeholderText = isAssetMode
-        ? `Describe the style (${elementCount} elements detected)...\ne.g. "Make this a bold summer sale banner — orange, energetic"`
-        : `e.g. Summer sale — orange background, '50% OFF' headline, Shop Now button...`;
+        ? `Describe the style for your ${elementCount} asset${elementCount > 1 ? 's' : ''}...\ne.g. "Bold summer sale, orange energy, Shop Now CTA"`
+        : `e.g. Summer sale — orange bg, '50% OFF' headline, Shop Now button...`;
 
     return (
         <div style={styles.panel}>
@@ -69,15 +113,51 @@ export function AutoDesignPanel({ engine, canvasW, canvasH, apiKey }: Props) {
                     <span style={styles.title}>✨ Auto-Design</span>
                     {isAssetMode && (
                         <span style={styles.modeBadge}>
-                            🎨 {elementCount} element{elementCount > 1 ? 's' : ''} detected
+                            🎨 {elementCount} element{elementCount > 1 ? 's' : ''}
                         </span>
                     )}
                 </div>
                 <span style={styles.subtitle}>
                     {isAssetMode
-                        ? 'AI will reorganize your elements → Vision review'
-                        : 'Describe your banner — AI creates it'}
+                        ? 'AI reorganizes your assets + Vision review'
+                        : 'Drop assets below, then describe your banner'}
                 </span>
+            </div>
+
+            {/* ── Asset Upload Zone ────────────────────── */}
+            <div
+                style={{
+                    ...styles.dropZone,
+                    borderColor: isDragging ? '#58a6ff' : '#30363d',
+                    background: isDragging ? 'rgba(88,166,255,0.08)' : '#0d1117',
+                }}
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onClick={() => fileInputRef.current?.click()}
+            >
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    style={{ display: 'none' }}
+                    onChange={handleFileInput}
+                />
+                {uploadedAssets.length > 0 ? (
+                    <div style={styles.thumbRow}>
+                        {uploadedAssets.slice(-3).map((src, i) => (
+                            <img key={i} src={src} style={styles.thumb} alt={`asset ${i + 1}`} />
+                        ))}
+                        <span style={styles.dropHintSmall}>+ Drop more</span>
+                    </div>
+                ) : (
+                    <div style={styles.dropContent}>
+                        <span style={styles.dropIcon}>🖼</span>
+                        <span style={styles.dropText}>Drop logo / image here</span>
+                        <span style={styles.dropSub}>or click to browse</span>
+                    </div>
+                )}
             </div>
 
             {/* Prompt input */}
@@ -100,7 +180,7 @@ export function AutoDesignPanel({ engine, canvasW, canvasH, apiKey }: Props) {
                 <div style={styles.inputHint}>⌘↵ to generate</div>
             </div>
 
-            {/* Example prompts (only when idle + no result) */}
+            {/* Example prompts — only when idle + empty canvas + no assets */}
             {!state.isGenerating && !state.createdCount && !isAssetMode && (
                 <div style={styles.examples}>
                     <div style={styles.examplesLabel}>Try:</div>
@@ -114,7 +194,7 @@ export function AutoDesignPanel({ engine, canvasW, canvasH, apiKey }: Props) {
                 </div>
             )}
 
-            {/* Progress — generating phase */}
+            {/* Progress — generating */}
             {state.isGenerating && state.phase === 'generating' && (
                 <div style={{ ...styles.progressRow, borderColor: '#1f6feb' }}>
                     <span style={styles.spinner} />
@@ -122,7 +202,7 @@ export function AutoDesignPanel({ engine, canvasW, canvasH, apiKey }: Props) {
                 </div>
             )}
 
-            {/* Progress — vision review phase */}
+            {/* Progress — vision review (orange) */}
             {state.isGenerating && state.phase === 'reviewing' && (
                 <div style={{ ...styles.progressRow, borderColor: '#f78166', background: '#1a1008' }}>
                     <span style={{ ...styles.spinner, borderTopColor: '#f78166', borderColor: 'rgba(247,129,102,0.3)' }} />
@@ -131,10 +211,10 @@ export function AutoDesignPanel({ engine, canvasW, canvasH, apiKey }: Props) {
             )}
 
             {/* Success */}
-            {!state.isGenerating && state.phase === 'done' && state.createdCount >= 0 && (
+            {!state.isGenerating && state.phase === 'done' && (
                 <div style={styles.successBlock}>
-                    ✅ Done! {state.finalScore > 0 && <span style={{ opacity: 0.75 }}>Score: {state.finalScore}/100</span>}
-                    <span style={{ opacity: 0.7, marginLeft: 6 }}>Edit freely or generate again.</span>
+                    ✅ Done!{state.finalScore > 0 && <span style={{ opacity: 0.7, marginLeft: 4 }}>Score: {state.finalScore}/100</span>}
+                    <span style={{ opacity: 0.6, marginLeft: 4 }}>Edit or regenerate.</span>
                 </div>
             )}
 
@@ -155,15 +235,10 @@ export function AutoDesignPanel({ engine, canvasW, canvasH, apiKey }: Props) {
                 onClick={state.isGenerating ? cancel : handleGenerate}
                 disabled={!state.isGenerating && !canRun}
             >
-                {state.isGenerating ? (
-                    <>✕ Cancel</>
-                ) : state.phase === 'done' ? (
-                    '↻ Regenerate'
-                ) : isAssetMode ? (
-                    '✨ Redesign with AI'
-                ) : (
-                    '✨ Generate Banner'
-                )}
+                {state.isGenerating ? '✕ Cancel'
+                    : state.phase === 'done' ? '↻ Regenerate'
+                        : isAssetMode ? '✨ Redesign with AI'
+                            : '✨ Generate Banner'}
             </button>
 
             {!hasKey && (
@@ -192,6 +267,21 @@ const styles: Record<string, React.CSSProperties> = {
         borderRadius: 4, padding: '1px 6px',
     },
     subtitle: { color: '#8b949e', fontSize: 11 },
+    // Drop Zone
+    dropZone: {
+        border: '1.5px dashed', borderRadius: 8,
+        padding: '10px', minHeight: 64,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: 'pointer', transition: 'all 0.15s ease', userSelect: 'none',
+    },
+    dropContent: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 },
+    dropIcon: { fontSize: 20 },
+    dropText: { fontSize: 12, color: '#8b949e', fontWeight: 500 },
+    dropSub: { fontSize: 10, color: '#484f58' },
+    thumbRow: { display: 'flex', alignItems: 'center', gap: 6 },
+    thumb: { width: 40, height: 40, objectFit: 'cover', borderRadius: 4, border: '1px solid #30363d' },
+    dropHintSmall: { fontSize: 10, color: '#484f58', marginLeft: 4 },
+    // Input
     inputWrapper: { position: 'relative' },
     textarea: {
         width: '100%', boxSizing: 'border-box',
@@ -220,7 +310,7 @@ const styles: Record<string, React.CSSProperties> = {
         background: '#0f2a0f', border: '1px solid #238636',
         borderRadius: 6, padding: '7px 10px',
         color: '#3fb950', fontSize: 11, fontWeight: 600,
-        display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4,
+        display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 2,
     },
     errorBlock: {
         background: '#2d0f0f', border: '1px solid #f85149',

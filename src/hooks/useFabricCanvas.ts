@@ -1066,24 +1066,30 @@ function createEngineShim(fc: Canvas, syncState: () => void, artboardW: number, 
         add_image: async (x: number, y: number, src: string, w?: number, h?: number, name?: string): Promise<number> => {
             const id = nextId();
             try {
-                const img = await FabricImage.fromURL(src, { crossOrigin: 'anonymous' });
+                // data: URLs must NOT have crossOrigin set — CORS doesn't apply
+                // and 'anonymous' flag causes browsers to reject them
+                const isDataUrl = src.startsWith('data:');
+                const imgOptions = isDataUrl ? {} : { crossOrigin: 'anonymous' as const };
+                const img = await FabricImage.fromURL(src, imgOptions);
                 const natW = img.width ?? 200;
                 const natH = img.height ?? 200;
-                const targetW = w ?? Math.min(natW, artboardW * 0.6);
-                const targetH = h ?? (natH * (targetW / natW));
+                const targetW = w ?? Math.min(natW, artboardW * 0.7);
+                const targetH = h ?? (natH * (targetW / Math.max(natW, 1)));
                 img.set({
                     left: x,
                     top: y,
-                    scaleX: targetW / natW,
-                    scaleY: targetH / natH,
+                    scaleX: targetW / Math.max(natW, 1),
+                    scaleY: targetH / Math.max(natH, 1),
                 });
                 (img as any).__aceId = id;
                 (img as any).__aceName = name || `Image #${id}`;
                 (img as any).__aceZIndex = userObjects().length;
                 patchAceProps(img);
                 fc.add(img);
+                fc.setActiveObject(img);
                 fc.renderAll();
                 syncState();
+                console.log(`[EngineShim] Image added: id=${id} name="${name}" at (${x},${y}) size=${Math.round(targetW)}x${Math.round(targetH)}`);
             } catch (err) {
                 console.error('[EngineShim] Failed to load image:', err);
             }
