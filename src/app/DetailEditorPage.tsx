@@ -123,27 +123,28 @@ export function DetailEditorPage() {
     }, [state.status, engineRef, handleSave, restoreFromStore, overlay.restoreElements, syncState]);
 
     // ── Live re-render when AI tools add elements to designStore ──
-    // Watches element count for the active variant; when it changes, re-sync canvas
+    // Uses a targeted Zustand selector for element count to avoid infinite loop
+    // (depending on full creativeSet causes re-fire on every state update)
+    const storeElementCount = useDesignStore((s) => {
+        if (!s.creativeSet || !variantId) return -1;
+        const v = s.creativeSet.variants.find((v) => v.id === variantId);
+        return v ? v.elements.length : -1;
+    });
     const lastElementCountRef = useRef(-1);
     useEffect(() => {
         if (state.status !== 'ready' || !restoredRef.current) return;
-        if (!variantId || !creativeSet) return;
-
-        const currentVariant = creativeSet.variants.find((v) => v.id === variantId);
-        if (!currentVariant) return;
-
-        const currentCount = currentVariant.elements.length;
+        if (storeElementCount < 0) return;
 
         // Skip initial render (handled by restoreFromStore above)
         if (lastElementCountRef.current === -1) {
-            lastElementCountRef.current = currentCount;
+            lastElementCountRef.current = storeElementCount;
             return;
         }
 
         // Only re-sync if count changed (from AI add_text/add_shape calls)
         // BUT skip when our own save caused the change (prevents infinite loop)
-        if (currentCount !== lastElementCountRef.current) {
-            lastElementCountRef.current = currentCount;
+        if (storeElementCount !== lastElementCountRef.current) {
+            lastElementCountRef.current = storeElementCount;
 
             // If the change was triggered by our own save, skip re-sync
             if (isSavingRef.current) {
@@ -151,7 +152,7 @@ export function DetailEditorPage() {
                 return;
             }
 
-            console.log(`[DetailEditor] Store elements changed (${currentCount}), re-syncing canvas...`);
+            console.log(`[DetailEditor] Store elements changed (${storeElementCount}), re-syncing canvas...`);
 
             const engine = engineRef.current;
             if (engine) {
@@ -170,7 +171,7 @@ export function DetailEditorPage() {
                 })();
             }
         }
-    }, [creativeSet, variantId, state.status, engineRef, restoreFromStore, overlay.clearOverlays, overlay.restoreElements, syncState]);
+    }, [storeElementCount, variantId, state.status, engineRef, restoreFromStore, overlay.clearOverlays, overlay.restoreElements, syncState]);
 
     // ── Keep latest refs for auto-save (avoids stale closure) ──
     const saveFromCachedRef = useRef(saveFromCachedNodes);
