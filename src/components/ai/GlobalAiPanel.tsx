@@ -215,6 +215,8 @@ export function GlobalAiPanel() {
     const saveConfig = useCallback((newConfig: AiConfig) => {
         setConfig(newConfig);
         localStorage.setItem('ace-ai-config', JSON.stringify(newConfig));
+        // Dispatch custom event for same-tab consumers (storage event only fires cross-tab)
+        window.dispatchEvent(new CustomEvent('ace-ai-config-changed'));
         const svc = new AiService([]);
         svc.updateConfig(newConfig);
         serviceRef.current = svc;

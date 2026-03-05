@@ -36,8 +36,13 @@ export function DetailEditorPage() {
             try { setVisionApiKey(JSON.parse(localStorage.getItem('ace-ai-config') ?? '{}').apiKey ?? ''); }
             catch { /* ignore */ }
         };
+        // Listen for cross-tab storage changes AND same-tab custom event
         window.addEventListener('storage', handler);
-        return () => window.removeEventListener('storage', handler);
+        window.addEventListener('ace-ai-config-changed', handler);
+        return () => {
+            window.removeEventListener('storage', handler);
+            window.removeEventListener('ace-ai-config-changed', handler);
+        };
     }, []);
 
     useEffect(() => {
