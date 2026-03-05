@@ -83,7 +83,7 @@ export function detectElementRole(
  * Each zone defines where an element role should be placed
  * within a specific size category. Values are 0-1 (relative).
  */
-interface LayoutZone {
+export interface LayoutZone {
     x: number;      // left edge (0-1)
     y: number;      // top edge (0-1)
     w: number;      // width (0-1)
@@ -120,7 +120,7 @@ type LayoutMap = Record<ElementRole, LayoutZone>;
  * │ CTA  │
  * └──────┘
  */
-const LAYOUT_ZONES: Record<SizeCategory, LayoutMap> = {
+export const LAYOUT_ZONES: Record<SizeCategory, LayoutMap> = {
     'ultra-wide': {
         background: { x: 0, y: 0, w: 1, h: 1, maxFontScale: 1 },
         logo: { x: 0.02, y: 0.1, w: 0.15, h: 0.8, maxFontScale: 0.5 },
@@ -148,24 +148,27 @@ const LAYOUT_ZONES: Record<SizeCategory, LayoutMap> = {
         cta: { x: 0.25, y: 0.72, w: 0.50, h: 0.20, maxFontScale: 1 },
         decoration: { x: 0, y: 0, w: 1, h: 1, maxFontScale: 0.8 },
     },
+    // Social sizes (1:1, 4:5) — everything center-aligned
     'square': {
         background: { x: 0, y: 0, w: 1, h: 1, maxFontScale: 1 },
-        logo: { x: 0.05, y: 0.03, w: 0.25, h: 0.10, maxFontScale: 0.9 },
-        image: { x: 0.05, y: 0.05, w: 0.90, h: 0.40, maxFontScale: 1 },
-        headline: { x: 0.08, y: 0.48, w: 0.84, h: 0.18, maxFontScale: 1 },
-        subtext: { x: 0.08, y: 0.66, w: 0.84, h: 0.12, maxFontScale: 0.8 },
-        cta: { x: 0.25, y: 0.82, w: 0.50, h: 0.12, maxFontScale: 1 },
+        logo: { x: 0.30, y: 0.03, w: 0.40, h: 0.08, maxFontScale: 0.9 },
+        image: { x: 0.05, y: 0.05, w: 0.90, h: 0.38, maxFontScale: 1 },
+        headline: { x: 0.10, y: 0.46, w: 0.80, h: 0.18, maxFontScale: 1 },
+        subtext: { x: 0.10, y: 0.65, w: 0.80, h: 0.10, maxFontScale: 0.8 },
+        cta: { x: 0.20, y: 0.80, w: 0.60, h: 0.12, maxFontScale: 1 },
         decoration: { x: 0, y: 0, w: 1, h: 1, maxFontScale: 0.9 },
     },
+    // Portrait / 4:5 / 9:16 — logo top, content center, CTA bottom
     'portrait': {
         background: { x: 0, y: 0, w: 1, h: 1, maxFontScale: 1 },
-        logo: { x: 0.05, y: 0.02, w: 0.30, h: 0.08, maxFontScale: 0.8 },
-        image: { x: 0, y: 0.05, w: 1, h: 0.40, maxFontScale: 1 },
-        headline: { x: 0.06, y: 0.48, w: 0.88, h: 0.15, maxFontScale: 0.9 },
-        subtext: { x: 0.06, y: 0.64, w: 0.88, h: 0.10, maxFontScale: 0.7 },
+        logo: { x: 0.25, y: 0.03, w: 0.50, h: 0.06, maxFontScale: 0.8 },
+        image: { x: 0.05, y: 0.10, w: 0.90, h: 0.35, maxFontScale: 1 },
+        headline: { x: 0.08, y: 0.48, w: 0.84, h: 0.15, maxFontScale: 0.9 },
+        subtext: { x: 0.08, y: 0.64, w: 0.84, h: 0.10, maxFontScale: 0.7 },
         cta: { x: 0.15, y: 0.78, w: 0.70, h: 0.10, maxFontScale: 0.9 },
         decoration: { x: 0, y: 0, w: 1, h: 1, maxFontScale: 0.7 },
     },
+    // Ultra-tall (160x600, skyscraper) — vertical stack, center-aligned
     'ultra-tall': {
         background: { x: 0, y: 0, w: 1, h: 1, maxFontScale: 1 },
         logo: { x: 0.10, y: 0.02, w: 0.80, h: 0.06, maxFontScale: 0.6 },

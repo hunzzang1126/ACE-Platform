@@ -17,7 +17,7 @@
 // ─────────────────────────────────────────────────
 
 import { callAnthropicApi, DEFAULT_CLAUDE_MODEL } from '@/services/anthropicClient';
-import { classifyRatio } from '@/engine/smartSizing';
+import { classifyRatio, LAYOUT_ZONES } from '@/engine/smartSizing';
 
 // ── Shared Types ────────────────────────────────────
 
@@ -169,53 +169,67 @@ const REARRANGE_BANNER_TOOL = {
 
 function buildFromScratchPrompt(canvasW: number, canvasH: number): string {
     const ratio = classifyRatio(canvasW, canvasH);
-    const layoutGuides: Record<string, string> = {
-        'ultra-wide': 'Horizontal flow: headline LEFT, CTA RIGHT.',
-        'wide': 'Background + headline top + CTA bottom-right.',
-        'landscape': 'Background + headline center-top + CTA center-bottom.',
-        'square': 'Background + headline center + CTA near bottom.',
-        'portrait': 'Background + headline upper-third + CTA lower-third.',
-        'ultra-tall': 'Background + headline top-third + CTA bottom-third.',
+    const zones = LAYOUT_ZONES[ratio];
+
+    // Compute exact pixel positions for each element from zone percentages
+    const bgX = 0, bgY = 0, bgW = canvasW, bgH = canvasH;
+    const hlX = Math.round(zones.headline.x * canvasW);
+    const hlY = Math.round(zones.headline.y * canvasH);
+    const hlW = Math.round(zones.headline.w * canvasW);
+    const ctaX = Math.round(zones.cta.x * canvasW);
+    const ctaY = Math.round(zones.cta.y * canvasH);
+    const ctaW = Math.round(zones.cta.w * canvasW);
+    const ctaH = Math.round(zones.cta.h * canvasH);
+
+    // Font sizes scaled to canvas
+    const hlFontMin = Math.max(14, Math.round(canvasH * 0.08));
+    const hlFontMax = Math.max(18, Math.round(canvasH * 0.15));
+    const ctaFont = Math.max(12, Math.round(canvasH * 0.06));
+
+    // Layout descriptions per ratio
+    const descriptions: Record<string, string> = {
+        'ultra-wide': 'Horizontal: logo LEFT, headline CENTER, CTA RIGHT. Leaderboard ad.',
+        'wide': 'Two-section: headline LEFT/CENTER, CTA RIGHT. Wide banner.',
+        'landscape': 'Standard banner: headline top-center, CTA bottom-center.',
+        'square': 'Social post (1:1): everything CENTER-ALIGNED horizontally.',
+        'portrait': 'Vertical social (4:5, 9:16): logo TOP, headline MIDDLE, CTA near BOTTOM. Center-aligned.',
+        'ultra-tall': 'Skyscraper: logo TOP, headline MIDDLE, CTA BOTTOM. Vertical center-aligned.',
     };
-    const guide = layoutGuides[ratio] ?? 'Background + headline + CTA.';
-    const pad = 16;
-    const ctaH = Math.round(canvasH * 0.12);
-    const headlineY = Math.round(canvasH * 0.3);
-    const ctaY = Math.round(canvasH * 0.72);
+    const desc = descriptions[ratio] ?? 'Balanced layout.';
 
     return `You are a professional banner ad designer. Create a ${canvasW}x${canvasH}px banner.
-Layout (${ratio}): ${guide}
+Category: ${ratio}. ${desc}
 
-YOU MUST FOLLOW THESE RULES — violations will cause visual bugs:
+YOU MUST place elements at EXACTLY these positions (calculated for this ratio):
 
-1. ELEMENT COUNT: Exactly 4 elements total:
-   [0] background  — rect, x=0,y=0,w=${canvasW},h=${canvasH}
-   [1] headline    — text, x=${pad},y=${headlineY},w=${canvasW - pad * 2}
-   [2] cta_button  — rounded_rect, y≈${ctaY},h=${ctaH},radius=10
-   [3] cta_label   — text inside/on cta_button
+[0] background — rect
+    x=${bgX}, y=${bgY}, w=${bgW}, h=${bgH}
+    name: "background"
 
-2. NO OVERLAP RULE: Each element must NOT overlap any other.
-   - headline bottom edge = y + estimated_height
-   - cta_button top edge must be > headline bottom + 12px gap
-   - All elements: x ≥ ${pad}, right edge ≤ ${canvasW - pad}
+[1] headline — text
+    x=${hlX}, y=${hlY}, w=${hlW}
+    name: "headline"
 
-3. BOUNDS: All elements must fit 100% inside canvas (0 to ${canvasW} wide, 0 to ${canvasH} tall)
+[2] cta_button — rounded_rect
+    x=${ctaX}, y=${ctaY}, w=${ctaW}, h=${ctaH}, radius=10
+    name: "cta_button"
 
-4. COLORS:
-   - Shapes: use r/g/b floats 0.0–1.0
-   - Text: use color_hex only (e.g. "#ffffff")
-   - Background and CTA button must have DIFFERENT colors
-   - Text must have HIGH contrast against background
+[3] cta_label — text (centered on cta_button)
+    x=${ctaX}, y=${ctaY + Math.round(ctaH * 0.2)}, w=${ctaW}
+    name: "cta_label"
 
-5. TYPOGRAPHY:
-   - headline font_size: ${Math.round(canvasH * 0.14)}–${Math.round(canvasH * 0.18)}px, font_weight "800"
-   - cta_label font_size: ${Math.round(canvasH * 0.07)}px, font_weight "700"
-   - text_align: "center" for both
+STRICT RULES:
+1. Return EXACTLY 4 elements in this order
+2. Use the exact x/y/w values above — do NOT change them
+3. Shapes: use r/g/b floats (0.0-1.0). Text: use color_hex ("#ffffff")
+4. Background and CTA button must have DIFFERENT, contrasting colors
+5. headline font_size: ${hlFontMin}-${hlFontMax}px, font_weight "800", text_align "center"
+6. cta_label font_size: ${ctaFont}px, font_weight "700", text_align "center"
+7. Use the exact element names: "background", "headline", "cta_button", "cta_label"
 
-6. NAMES: Give exact names: "background", "headline", "cta_button", "cta_label"
-
-Return ONLY the render_banner tool call with exactly 4 elements. No extra text.`;
+Return ONLY the render_banner tool call. No text outside.`;
 }
+
 
 function buildAssetContextPrompt(
     canvasW: number,
