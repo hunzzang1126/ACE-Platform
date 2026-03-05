@@ -195,7 +195,7 @@ export function useAutoDesign(options: AutoDesignOptions) {
         abortRef.current = new AbortController();
         const signal = abortRef.current.signal;
 
-        setState({ isGenerating: true, phase: 'generating', progress: '✦ Thinking...', error: null, createdCount: 0, finalScore: 0 });
+        setState({ isGenerating: true, phase: 'generating', progress: 'Thinking...', error: null, createdCount: 0, finalScore: 0 });
 
         try {
             // ── Detect Mode ──

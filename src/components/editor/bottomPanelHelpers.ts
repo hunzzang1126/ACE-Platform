@@ -41,8 +41,8 @@ export function nodeIcon(type: string): string {
         case 'ellipse': return '○';
         case 'rounded_rect': return '▢';
         case 'text': return 'T';
-        case 'image': return '🖼';
-        case 'path': return '✒';
+        case 'image': return '▣';
+        case 'path': return '∕';
         default: return '□';
     }
 }
