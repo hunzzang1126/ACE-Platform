@@ -67,9 +67,13 @@ export function DetailEditorPage() {
     // This prevents React Strict Mode's phantom unmount from overwriting valid saved data
     const isDirtyRef = useRef(false);
 
+    // Flag to skip re-sync when save writes to store (prevents infinite loop)
+    const isSavingRef = useRef(false);
+
     // ── Save handler (manual) ──
     const handleSave = useCallback(() => {
         setSaveStatus('saving');
+        isSavingRef.current = true;
         try {
             const result = saveToStore(engineRef, overlay.overlayElements);
             console.log('[DetailEditor] Save result:', result);
@@ -84,6 +88,8 @@ export function DetailEditorPage() {
             console.error('[DetailEditor] Save error:', err);
             setSaveStatus('idle');
         }
+        // Allow element-count watcher to resume after save completes
+        requestAnimationFrame(() => { isSavingRef.current = false; });
         setTimeout(() => setSaveStatus('idle'), 2000);
     }, [saveToStore, engineRef, overlay.overlayElements]);
 
@@ -135,8 +141,16 @@ export function DetailEditorPage() {
         }
 
         // Only re-sync if count changed (from AI add_text/add_shape calls)
+        // BUT skip when our own save caused the change (prevents infinite loop)
         if (currentCount !== lastElementCountRef.current) {
             lastElementCountRef.current = currentCount;
+
+            // If the change was triggered by our own save, skip re-sync
+            if (isSavingRef.current) {
+                console.log('[DetailEditor] Skipping re-sync — save in progress');
+                return;
+            }
+
             console.log(`[DetailEditor] Store elements changed (${currentCount}), re-syncing canvas...`);
 
             const engine = engineRef.current;
