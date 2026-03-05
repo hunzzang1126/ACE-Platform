@@ -19,7 +19,6 @@ interface Props {
     fabricCanvas: FabricCanvas | null;
     canvasW: number;
     canvasH: number;
-    apiKey: string;
     elements?: Array<{ name: string; role?: string; type: string }>;
 }
 
@@ -39,9 +38,9 @@ const PROBLEM_LABELS: Record<string, string> = {
     poor_hierarchy: 'Weak Hierarchy',
 };
 
-export function SmartSizingVisionPanel({ fabricCanvas, canvasW, canvasH, apiKey, elements = [] }: Props) {
+export function SmartSizingVisionPanel({ fabricCanvas, canvasW, canvasH, elements = [] }: Props) {
     const { state, runVisionCheck, cancel } = useSmartSizingVision({
-        fabricCanvas, canvasW, canvasH, apiKey, elements,
+        fabricCanvas, canvasW, canvasH, elements,
     });
 
     const handleRun = useCallback(async () => {
@@ -142,8 +141,7 @@ export function SmartSizingVisionPanel({ fabricCanvas, canvasW, canvasH, apiKey,
                     ...(state.isChecking ? styles.btnRunning : {}),
                 }}
                 onClick={state.isChecking ? cancel : handleRun}
-                disabled={!fabricCanvas || !apiKey}
-                title={!apiKey ? 'Anthropic API key required' : ''}
+                disabled={!fabricCanvas}
             >
                 {state.isChecking ? (
                     <>
@@ -151,15 +149,11 @@ export function SmartSizingVisionPanel({ fabricCanvas, canvasW, canvasH, apiKey,
                         {`Checking... (pass ${state.iteration})`}
                     </>
                 ) : state.result ? (
-                    '↻ Re-check'
+                    'Re-check'
                 ) : (
-                    '⚡ Run Vision Check'
+                    'Run Vision Check'
                 )}
             </button>
-
-            {!apiKey && (
-                <div style={styles.noKeyHint}>Set Anthropic API key in AI Panel to enable</div>
-            )}
         </div>
     );
 }

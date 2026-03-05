@@ -132,16 +132,6 @@ export default function AiChatPanel({ aiService, engine, trackedNodes, onSendMes
                             placeholder="gpt-4o"
                         />
                     </label>
-                    <label style={labelStyle}>
-                        API Key
-                        <input
-                            value={config.apiKey}
-                            onChange={e => setConfig(c => ({ ...c, apiKey: e.target.value }))}
-                            style={settingsInputStyle}
-                            type="password"
-                            placeholder="sk-..."
-                        />
-                    </label>
                     <button onClick={handleSaveConfig} style={saveBtnStyle}>Save</button>
                 </div>
             )}

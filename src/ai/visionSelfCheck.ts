@@ -15,6 +15,7 @@ import { resolveConstraints } from '@/schema/constraints.types';
 import type { BannerVariant } from '@/schema/design.types';
 import type { TextElement, ShapeElement, ButtonElement } from '@/schema/elements.types';
 import { getAspectCategory } from '@/schema/layoutRoles';
+import { getAnthropicKey } from '@/config/apiKeys';
 
 // ── Types ──
 
@@ -34,15 +35,12 @@ export interface VisionIssue {
 export interface VisionSelfCheckConfig {
     /** Max correction loops before giving up */
     maxLoops: number;
-    /** Claude API key */
-    apiKey: string;
     /** Model for vision analysis */
     model: string;
 }
 
 const DEFAULT_CONFIG: VisionSelfCheckConfig = {
     maxLoops: 2,
-    apiKey: '',
     model: 'claude-sonnet-4-20250514',
 };
 
@@ -100,7 +98,7 @@ export async function runVisionSelfCheck(
 ): Promise<VisionCheckResult> {
     const cfg = { ...DEFAULT_CONFIG, ...config };
 
-    if (!cfg.apiKey) {
+    if (!getAnthropicKey()) {
         return { passed: true, issues: [], loopCount: 0 };
     }
 
@@ -186,7 +184,7 @@ If no issues, return: { "issues": [] }`;
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'x-api-key': config.apiKey,
+                'x-api-key': getAnthropicKey(),
                 'anthropic-version': '2023-06-01',
                 'anthropic-dangerous-direct-browser-access': 'true',
             },

@@ -269,7 +269,6 @@ export async function callFromScratch(
     prompt: string,
     canvasW: number,
     canvasH: number,
-    apiKey: string,
     signal: AbortSignal,
 ): Promise<FromScratchResult> {
     const body = {
@@ -281,7 +280,7 @@ export async function callFromScratch(
         messages: [{ role: 'user', content: prompt }],
     };
 
-    const data = await callAnthropicApi(apiKey, body, signal) as {
+    const data = await callAnthropicApi(body, signal) as {
         content: Array<{ type: string; name?: string; input?: unknown }>;
     };
 
@@ -298,7 +297,6 @@ export async function callAssetContext(
     elements: CanvasElementInfo[],
     canvasW: number,
     canvasH: number,
-    apiKey: string,
     signal: AbortSignal,
 ): Promise<AssetContextResult> {
     const systemPrompt = buildAssetContextPrompt(canvasW, canvasH, elements, prompt);
@@ -335,7 +333,7 @@ export async function callAssetContext(
         ],
     };
 
-    const data = await callAnthropicApi(apiKey, body, signal) as {
+    const data = await callAnthropicApi(body, signal) as {
         content: Array<{ type: string; name?: string; input?: unknown }>;
     };
 

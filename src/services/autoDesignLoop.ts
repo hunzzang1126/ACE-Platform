@@ -139,7 +139,6 @@ export async function runVisionLoop(
     engine: Engine,
     canvasW: number,
     canvasH: number,
-    apiKey: string,
     signal: AbortSignal,
     onProgress: (msg: string) => void,
 ): Promise<VisionLoopResult> {
@@ -197,7 +196,7 @@ export async function runVisionLoop(
 
         let reviewResult: { score: number; fixes: VisionFix[]; reasoning: string };
         try {
-            const data = await callAnthropicApi(apiKey, body, signal) as {
+            const data = await callAnthropicApi(body, signal) as {
                 content: Array<{ type: string; text?: string }>;
             };
             const rawText = data.content.find((c) => c.type === 'text')?.text ?? '';

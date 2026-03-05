@@ -19,7 +19,6 @@ interface Props {
     engine: Engine | null;
     canvasW: number;
     canvasH: number;
-    apiKey: string;
 }
 
 const EXAMPLE_PROMPTS = [
@@ -29,14 +28,14 @@ const EXAMPLE_PROMPTS = [
     'SaaS product launch — minimal purple gradient, start free trial',
 ];
 
-export function AutoDesignPanel({ engine, canvasW, canvasH, apiKey }: Props) {
+export function AutoDesignPanel({ engine, canvasW, canvasH }: Props) {
     const [prompt, setPrompt] = useState('');
     const [elementCount, setElementCount] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
     const [uploadedAssets, setUploadedAssets] = useState<string[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const { state, generate, cancel } = useAutoDesign({ engine, canvasW, canvasH, apiKey });
+    const { state, generate, cancel } = useAutoDesign({ engine, canvasW, canvasH });
 
     // Poll canvas element count
     useEffect(() => {
@@ -89,10 +88,8 @@ export function AutoDesignPanel({ engine, canvasW, canvasH, apiKey }: Props) {
 
     // ── Controls ───────────────────────────────────
     const isAssetMode = elementCount >= 1;
-    const hasKey = !!apiKey?.trim();
-
-    // Both modes: just need engine + API key. Prompt is optional.
-    const canRun = hasKey && !!engine && !state.isGenerating;
+    // Button enabled when engine is ready (API key is centralized)
+    const canRun = !!engine && !state.isGenerating;
 
     const handleGenerate = useCallback(() => generate(prompt || 'Clean, professional layout'), [generate, prompt]);
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -238,10 +235,7 @@ export function AutoDesignPanel({ engine, canvasW, canvasH, apiKey }: Props) {
                             : 'Generate Banner'}
             </button>
 
-            {!hasKey && (
-                <div style={styles.hint}>Set Anthropic API key in AI Panel settings first</div>
-            )}
-            {!engine && hasKey && (
+            {!engine && (
                 <div style={styles.hint}>Open a canvas to use Auto-Design</div>
             )}
         </div>

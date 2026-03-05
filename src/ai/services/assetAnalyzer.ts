@@ -4,7 +4,9 @@
 // When a user uploads an image, this service calls the Vision API
 // to automatically extract metadata: type, colors, suggested role,
 // description, tags, transparency, aspect ratio, quality.
-// This makes ACE's asset library "smart" — upload only, no manual tagging.
+// This makes ACE's asset library "smart" -- upload only, no manual tagging.
+
+import { getAnthropicKey } from '@/config/apiKeys';
 
 // ── Types ──
 
@@ -114,20 +116,14 @@ export async function analyzeAsset(
 
     // Try Vision API analysis
     try {
-        const apiKey = localStorage.getItem('ace_anthropic_key')
-            || localStorage.getItem('ace_openai_key');
+        const apiKey = getAnthropicKey();
 
         if (!apiKey) {
-            // No API key — return basic analysis from filename/dimensions
+            // No API key -- return basic analysis from filename/dimensions
             return fallbackAnalysis(fileName, width, height, hasTransparency, aspectRatio);
         }
 
-        // Determine which API to use
-        const isAnthropic = localStorage.getItem('ace_anthropic_key') !== null;
-
-        const analysis = isAnthropic
-            ? await analyzeWithClaude(dataUrl, apiKey)
-            : await analyzeWithOpenAI(dataUrl, apiKey);
+        const analysis = await analyzeWithClaude(dataUrl);
 
         return {
             ...analysis,
@@ -142,7 +138,7 @@ export async function analyzeAsset(
 
 // ── Claude Vision ──
 
-async function analyzeWithClaude(dataUrl: string, apiKey: string): Promise<AssetAnalysis> {
+async function analyzeWithClaude(dataUrl: string): Promise<AssetAnalysis> {
     const base64 = dataUrl.split(',')[1] || '';
     const mediaType = dataUrl.split(';')[0]?.split(':')[1] || 'image/png';
 
@@ -150,8 +146,9 @@ async function analyzeWithClaude(dataUrl: string, apiKey: string): Promise<Asset
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'x-api-key': apiKey,
+            'x-api-key': getAnthropicKey(),
             'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true',
         },
         body: JSON.stringify({
             model: 'claude-sonnet-4-20250514',

@@ -26,24 +26,7 @@ export function DetailEditorPage() {
 
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
-    // Read Anthropic API key from localStorage (same source as GlobalAiPanel)
-    const [visionApiKey, setVisionApiKey] = useState<string>(() => {
-        try { return JSON.parse(localStorage.getItem('ace-ai-config') ?? '{}').apiKey ?? ''; }
-        catch { return ''; }
-    });
-    useEffect(() => {
-        const handler = () => {
-            try { setVisionApiKey(JSON.parse(localStorage.getItem('ace-ai-config') ?? '{}').apiKey ?? ''); }
-            catch { /* ignore */ }
-        };
-        // Listen for cross-tab storage changes AND same-tab custom event
-        window.addEventListener('storage', handler);
-        window.addEventListener('ace-ai-config-changed', handler);
-        return () => {
-            window.removeEventListener('storage', handler);
-            window.removeEventListener('ace-ai-config-changed', handler);
-        };
-    }, []);
+
 
     useEffect(() => {
         setLayer('detail');
@@ -324,7 +307,7 @@ export function DetailEditorPage() {
                         engine={engineRef.current}
                         canvasW={width}
                         canvasH={height}
-                        apiKey={visionApiKey}
+
                     />
                 </aside>
             </div>

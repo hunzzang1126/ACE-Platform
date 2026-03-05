@@ -107,7 +107,7 @@ const CLAUDE_MODEL = DEFAULT_CLAUDE_MODEL;
  * @param canvasH - Canvas height in pixels
  * @param category - Aspect ratio category (e.g. 'ultra-wide', 'portrait')
  * @param elements - List of elements on canvas with name/role/type
- * @param apiKey - Anthropic API key
+ * @param elements - List of elements on canvas with name/role/type
  */
 export async function callVisionCheck(
     base64Png: string,
@@ -115,7 +115,6 @@ export async function callVisionCheck(
     canvasH: number,
     category: string,
     elements: Array<{ name: string; role?: string; type: string }>,
-    apiKey: string,
 ): Promise<VisionResult> {
     // Strip data URL prefix if present
     const pureBase64 = base64Png.startsWith('data:')
@@ -148,7 +147,7 @@ export async function callVisionCheck(
         ],
     };
 
-    const data = await callAnthropicApi(apiKey, body) as {
+    const data = await callAnthropicApi(body) as {
         content: Array<{ type: string; text?: string }>;
     };
 

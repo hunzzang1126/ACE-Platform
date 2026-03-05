@@ -43,7 +43,6 @@ export function GlobalAiPanel() {
     const [live, setLive] = useState<LiveState>(LIVE_INIT);
     const [showSettings, setShowSettings] = useState(false);
     const [config, setConfig] = useState<AiConfig>({
-        apiKey: '',
         endpoint: 'https://api.anthropic.com',
         model: 'claude-sonnet-4-20250514',
         maxToolRounds: 30,
@@ -133,7 +132,6 @@ export function GlobalAiPanel() {
         if (!msg) return;
 
         if (!serviceRef.current) {
-            if (!config.apiKey) { setShowSettings(true); return; }
             const svc = new AiService([]);
             svc.updateConfig(config);
             serviceRef.current = svc;
@@ -260,11 +258,7 @@ export function GlobalAiPanel() {
                     {/* Settings */}
                     {showSettings && (
                         <div style={settingsStyle}>
-                            <label style={labelS}>API Key</label>
-                            <input type="password" value={config.apiKey}
-                                onChange={e => setConfig(prev => ({ ...prev, apiKey: e.target.value }))}
-                                style={fieldS} placeholder="sk-..." />
-                            <label style={{ ...labelS, marginTop: 8 }}>Model</label>
+                            <label style={labelS}>Model</label>
                             <input value={config.model}
                                 onChange={e => setConfig(prev => ({ ...prev, model: e.target.value }))}
                                 style={fieldS} />

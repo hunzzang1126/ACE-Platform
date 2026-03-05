@@ -38,7 +38,6 @@ export interface AutoDesignOptions {
     engine: Engine | null;
     canvasW: number;
     canvasH: number;
-    apiKey: string;
 }
 
 // ── Helper: read existing canvas elements ──────────
@@ -164,7 +163,7 @@ function applyRearrangePatches(engine: Engine, patches: RearrangePatch[]): numbe
 // ── Hook ────────────────────────────────────────────
 
 export function useAutoDesign(options: AutoDesignOptions) {
-    const { engine, canvasW, canvasH, apiKey } = options;
+    const { engine, canvasW, canvasH } = options;
 
     const [state, setState] = useState<AutoDesignState>({
         isGenerating: false,
@@ -180,10 +179,6 @@ export function useAutoDesign(options: AutoDesignOptions) {
     const generate = useCallback(async (prompt: string) => {
         if (!engine) {
             setState(s => ({ ...s, error: 'Canvas not ready', phase: 'error' }));
-            return;
-        }
-        if (!apiKey?.trim()) {
-            setState(s => ({ ...s, error: 'Set Anthropic API key in AI Settings first', phase: 'error' }));
             return;
         }
         if (!prompt.trim()) {
@@ -213,7 +208,7 @@ export function useAutoDesign(options: AutoDesignOptions) {
                 try { screenshot = engine.get_screenshot() as string; } catch { /* ok, vision will still work */ }
 
                 setState(s => ({ ...s, progress: 'AI reorganizing layout...' }));
-                const result = await callAssetContext(prompt, screenshot, existingElements, canvasW, canvasH, apiKey, signal);
+                const result = await callAssetContext(prompt, screenshot, existingElements, canvasW, canvasH, signal);
 
                 // Apply patches to existing elements
                 const patched = applyRearrangePatches(engine, result.patches);
@@ -229,7 +224,7 @@ export function useAutoDesign(options: AutoDesignOptions) {
             } else {
                 // ── Mode A: From Scratch ───────────────────────────
                 setState(s => ({ ...s, progress: 'Generating banner layout...' }));
-                const result = await callFromScratch(prompt, canvasW, canvasH, apiKey, signal);
+                const result = await callFromScratch(prompt, canvasW, canvasH, signal);
 
                 // Clear canvas first
                 try { engine.clear_scene?.(); } catch { /* ok */ }
@@ -260,7 +255,6 @@ export function useAutoDesign(options: AutoDesignOptions) {
                 engine,
                 canvasW,
                 canvasH,
-                apiKey,
                 signal,
                 (msg) => setState(s => ({ ...s, progress: msg })),
             );
@@ -287,7 +281,7 @@ export function useAutoDesign(options: AutoDesignOptions) {
                 error: err instanceof Error ? err.message : 'Auto-Design failed. Please retry.',
             }));
         }
-    }, [engine, canvasW, canvasH, apiKey]);
+    }, [engine, canvasW, canvasH]);
 
     const cancel = useCallback(() => {
         abortRef.current?.abort();

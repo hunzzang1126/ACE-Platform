@@ -13,6 +13,7 @@ import { toClaudeTools } from './aceToolDef';
 import { executeToolCall, type ExecutionResult } from './commandExecutor';
 import { DASHBOARD_TOOL_NAMES } from './dashboardTools';
 import { buildSmartContext, pushAction, type SmartContext } from './smartContextBuilder';
+import { getAnthropicKey } from '@/config/apiKeys';
 import type { CreativeSet } from '@/schema/design.types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -21,14 +22,12 @@ type Engine = any;
 // ── Config ───────────────────────────────────────
 
 export interface AiConfig {
-    apiKey: string;
     endpoint: string;
     model: string;
     maxToolRounds: number;
 }
 
 const DEFAULT_CONFIG: AiConfig = {
-    apiKey: '',
     endpoint: 'https://api.anthropic.com',
     model: 'claude-sonnet-4-20250514',
     maxToolRounds: 30,
@@ -131,7 +130,7 @@ export class AiService {
     }
 
     isConfigured(): boolean {
-        return !!this.config.apiKey;
+        return !!getAnthropicKey();
     }
 
     getLastReply(): string {
@@ -152,8 +151,8 @@ export class AiService {
         progress: LiveProgress,
         executorOverride?: ToolExecutorOverride,
     ): Promise<void> {
-        if (!this.config.apiKey) {
-            progress.onError('API key not configured. Set it in the settings panel.');
+        if (!getAnthropicKey()) {
+            progress.onError('API key not configured. Contact your administrator.');
             return;
         }
 
@@ -365,7 +364,8 @@ export class AiService {
         tools: ReturnType<typeof toClaudeTools>,
         progress: LiveProgress,
     ): Promise<ClaudeResponse | null> {
-        const { apiKey, model } = this.config;
+        const { model } = this.config;
+        const apiKey = getAnthropicKey();
 
         // Use Vite dev proxy to bypass CORS
         const isLocalDev = typeof window !== 'undefined' && window.location.hostname === 'localhost';

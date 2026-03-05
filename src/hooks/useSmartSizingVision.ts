@@ -33,8 +33,6 @@ export interface VisionLoopOptions {
     canvasW: number;
     /** Canvas height in pixels */
     canvasH: number;
-    /** Anthropic API key */
-    apiKey: string;
     /** Element metadata for context (name, role, type) */
     elements?: Array<{ name: string; role?: string; type: string }>;
     /** Max refinement iterations (default: 2) */
@@ -53,7 +51,7 @@ const QUALITY_THRESHOLD = 75; // Skip 2nd iteration if score >= this
  *   - Repeats up to maxIterations times
  */
 export function useSmartSizingVision(options: VisionLoopOptions) {
-    const { fabricCanvas, canvasW, canvasH, apiKey, elements = [], maxIterations = 2 } = options;
+    const { fabricCanvas, canvasW, canvasH, elements = [], maxIterations = 2 } = options;
 
     const [state, setState] = useState<VisionLoopState>({
         isChecking: false,
@@ -112,8 +110,8 @@ export function useSmartSizingVision(options: VisionLoopOptions) {
      * Returns the final VisionResult after all iterations.
      */
     const runVisionCheck = useCallback(async (): Promise<VisionResult | null> => {
-        if (!fabricCanvas || !apiKey?.trim()) {
-            setState((s) => ({ ...s, error: 'Canvas or API key not available.' }));
+        if (!fabricCanvas) {
+            setState((s) => ({ ...s, error: 'Canvas not available.' }));
             return null;
         }
 
@@ -139,7 +137,7 @@ export function useSmartSizingVision(options: VisionLoopOptions) {
             try {
                 // 2. Call Vision API
                 const result = await callVisionCheck(
-                    screenshot, canvasW, canvasH, category, elements, apiKey
+                    screenshot, canvasW, canvasH, category, elements
                 );
 
                 lastResult = result;
@@ -167,7 +165,7 @@ export function useSmartSizingVision(options: VisionLoopOptions) {
 
         setState((s) => ({ ...s, isChecking: false }));
         return lastResult;
-    }, [fabricCanvas, apiKey, canvasW, canvasH, elements, maxIterations, captureScreenshot, applyPatch]);
+    }, [fabricCanvas, canvasW, canvasH, elements, maxIterations, captureScreenshot, applyPatch]);
 
     const cancel = useCallback(() => {
         abortRef.current = true;
