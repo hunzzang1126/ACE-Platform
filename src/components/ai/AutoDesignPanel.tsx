@@ -1,10 +1,12 @@
 // ─────────────────────────────────────────────────
-// AutoDesignPanel — Auto-Design 2.0 UI
+// AutoDesignPanel — Auto-Design 2.0
 // ─────────────────────────────────────────────────
-// - Asset Upload Zone: drop/click to add images to canvas
-// - From Scratch: empty canvas → full layout
-// - Asset-Context: existing elements → AI reorganizes
-// - Vision Feedback Loop: 3-pass quality review
+// - Asset Upload Zone: drop/click images → placed on canvas
+// - From Scratch mode: empty canvas → AI generates layout
+// - Asset-Context mode: existing elements → AI reorganizes
+// - Vision Feedback Loop: 3-pass quality review after generation
+//
+// NO EMOJIS IN UI. Clean, Apple/Figma-level aesthetic.
 // ─────────────────────────────────────────────────
 
 import { useState, useCallback, useEffect, useRef } from 'react';
@@ -31,12 +33,12 @@ export function AutoDesignPanel({ engine, canvasW, canvasH, apiKey }: Props) {
     const [prompt, setPrompt] = useState('');
     const [elementCount, setElementCount] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
-    const [uploadedAssets, setUploadedAssets] = useState<string[]>([]);  // preview thumbnails
+    const [uploadedAssets, setUploadedAssets] = useState<string[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const { state, generate, cancel } = useAutoDesign({ engine, canvasW, canvasH, apiKey });
 
-    // Detect how many elements exist on canvas
+    // Poll canvas element count
     useEffect(() => {
         if (!engine) return;
         const refresh = () => {
@@ -50,7 +52,7 @@ export function AutoDesignPanel({ engine, canvasW, canvasH, apiKey }: Props) {
         return () => clearInterval(id);
     }, [engine]);
 
-    // ── Image upload → canvas ──────────────────────────
+    // ── Image upload → canvas ──────────────────────
     const placeImageOnCanvas = useCallback(async (file: File) => {
         if (!engine) return;
         const dataUrl = await new Promise<string>((resolve, reject) => {
@@ -59,18 +61,17 @@ export function AutoDesignPanel({ engine, canvasW, canvasH, apiKey }: Props) {
             reader.onerror = reject;
             reader.readAsDataURL(file);
         });
-        // Place image centered on canvas
+        // Fit inside 80% of artboard, preserving aspect ratio
+        // Pass only maxW — engine calculates h proportionally (h=undefined → auto)
         const x = Math.round(canvasW * 0.1);
         const y = Math.round(canvasH * 0.1);
         const maxW = Math.round(canvasW * 0.8);
-        const maxH = Math.round(canvasH * 0.8);
-        await engine.add_image(x, y, dataUrl, maxW, maxH, file.name.replace(/\.[^.]+$/, ''));
+        await engine.add_image(x, y, dataUrl, maxW, undefined, file.name.replace(/\.[^.]+$/, ''));
         setUploadedAssets(prev => [...prev, dataUrl]);
     }, [engine, canvasW, canvasH]);
 
     const handleFiles = useCallback((files: FileList | File[]) => {
-        const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
-        imageFiles.forEach(f => placeImageOnCanvas(f));
+        Array.from(files).filter(f => f.type.startsWith('image/')).forEach(f => placeImageOnCanvas(f));
     }, [placeImageOnCanvas]);
 
     const handleDrop = useCallback((e: React.DragEvent) => {
@@ -79,57 +80,56 @@ export function AutoDesignPanel({ engine, canvasW, canvasH, apiKey }: Props) {
         if (e.dataTransfer.files.length > 0) handleFiles(e.dataTransfer.files);
     }, [handleFiles]);
 
-    const handleDragOver = useCallback((e: React.DragEvent) => {
-        e.preventDefault();
-        setIsDragging(true);
-    }, []);
-
+    const handleDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); }, []);
     const handleDragLeave = useCallback(() => setIsDragging(false), []);
-
     const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files?.length) handleFiles(e.target.files);
         e.target.value = '';
     }, [handleFiles]);
 
-    // ── Generate ───────────────────────────────────────
+    // ── Controls ───────────────────────────────────
     const isAssetMode = elementCount >= 1;
-    const handleGenerate = useCallback(() => generate(prompt), [generate, prompt]);
+    const hasKey = !!apiKey?.trim();
+
+    // Asset mode: prompt is optional (AI can reorganize without style directive)
+    // Scratch mode: prompt is required
+    const canRun = hasKey && !!engine && !state.isGenerating &&
+        (isAssetMode || prompt.trim().length > 0);
+
+    const handleGenerate = useCallback(() => generate(prompt || 'Clean, professional layout'), [generate, prompt]);
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); handleGenerate(); }
     }, [handleGenerate]);
 
-    const hasKey = !!apiKey?.trim();
-    const canRun = hasKey && !!engine && prompt.trim().length > 0 && !state.isGenerating;
-
     const placeholderText = isAssetMode
-        ? `Describe the style for your ${elementCount} asset${elementCount > 1 ? 's' : ''}...\ne.g. "Bold summer sale, orange energy, Shop Now CTA"`
-        : `e.g. Summer sale — orange bg, '50% OFF' headline, Shop Now button...`;
+        ? 'Describe the style (optional)...\ne.g. Bold summer sale, orange energy, Shop Now CTA'
+        : 'e.g. Summer sale — orange bg, 50% OFF headline, Shop Now button...';
 
     return (
         <div style={styles.panel}>
             {/* Header */}
             <div style={styles.header}>
                 <div style={styles.titleRow}>
-                    <span style={styles.title}>✨ Auto-Design</span>
+                    <span style={styles.title}>Auto-Design</span>
                     {isAssetMode && (
                         <span style={styles.modeBadge}>
-                            🎨 {elementCount} element{elementCount > 1 ? 's' : ''}
+                            {elementCount} element{elementCount > 1 ? 's' : ''}
                         </span>
                     )}
                 </div>
                 <span style={styles.subtitle}>
                     {isAssetMode
-                        ? 'AI reorganizes your assets + Vision review'
-                        : 'Drop assets below, then describe your banner'}
+                        ? 'AI reorganizes assets + vision review'
+                        : 'Drop an asset or describe your banner'}
                 </span>
             </div>
 
-            {/* ── Asset Upload Zone ────────────────────── */}
+            {/* Asset Upload Zone */}
             <div
                 style={{
                     ...styles.dropZone,
                     borderColor: isDragging ? '#58a6ff' : '#30363d',
-                    background: isDragging ? 'rgba(88,166,255,0.08)' : '#0d1117',
+                    background: isDragging ? 'rgba(88,166,255,0.06)' : 'transparent',
                 }}
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
@@ -146,16 +146,19 @@ export function AutoDesignPanel({ engine, canvasW, canvasH, apiKey }: Props) {
                 />
                 {uploadedAssets.length > 0 ? (
                     <div style={styles.thumbRow}>
-                        {uploadedAssets.slice(-3).map((src, i) => (
-                            <img key={i} src={src} style={styles.thumb} alt={`asset ${i + 1}`} />
+                        {uploadedAssets.slice(-4).map((src, i) => (
+                            <img key={i} src={src} style={styles.thumb} alt="" />
                         ))}
-                        <span style={styles.dropHintSmall}>+ Drop more</span>
+                        <span style={styles.dropHintSmall}>+ Add more</span>
                     </div>
                 ) : (
                     <div style={styles.dropContent}>
-                        <span style={styles.dropIcon}>🖼</span>
-                        <span style={styles.dropText}>Drop logo / image here</span>
-                        <span style={styles.dropSub}>or click to browse</span>
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ opacity: 0.4 }}>
+                            <rect x="1" y="1" width="14" height="14" rx="2" stroke="#8b949e" strokeWidth="1.2" />
+                            <circle cx="5.5" cy="5.5" r="1.5" fill="#8b949e" />
+                            <path d="M1 10.5L5 7l3 3 2.5-2.5L15 10.5" stroke="#8b949e" strokeWidth="1.2" strokeLinejoin="round" />
+                        </svg>
+                        <span style={styles.dropText}>Drop image or click to upload</span>
                     </div>
                 )}
             </div>
@@ -167,7 +170,7 @@ export function AutoDesignPanel({ engine, canvasW, canvasH, apiKey }: Props) {
                     style={{
                         ...styles.textarea,
                         borderColor: state.isGenerating
-                            ? (state.phase === 'reviewing' ? '#f78166' : '#1f6feb')
+                            ? (state.phase === 'reviewing' ? '#6e7681' : '#1f6feb')
                             : '#30363d',
                     }}
                     placeholder={placeholderText}
@@ -180,10 +183,10 @@ export function AutoDesignPanel({ engine, canvasW, canvasH, apiKey }: Props) {
                 <div style={styles.inputHint}>⌘↵ to generate</div>
             </div>
 
-            {/* Example prompts — only when idle + empty canvas + no assets */}
+            {/* Example prompts — idle + no elements */}
             {!state.isGenerating && !state.createdCount && !isAssetMode && (
                 <div style={styles.examples}>
-                    <div style={styles.examplesLabel}>Try:</div>
+                    <div style={styles.examplesLabel}>Examples</div>
                     <div style={styles.examplesList}>
                         {EXAMPLE_PROMPTS.map((ex, i) => (
                             <button key={i} style={styles.exampleChip} onClick={() => setPrompt(ex)}>
@@ -202,19 +205,19 @@ export function AutoDesignPanel({ engine, canvasW, canvasH, apiKey }: Props) {
                 </div>
             )}
 
-            {/* Progress — vision review (orange) */}
+            {/* Progress — vision review */}
             {state.isGenerating && state.phase === 'reviewing' && (
-                <div style={{ ...styles.progressRow, borderColor: '#f78166', background: '#1a1008' }}>
-                    <span style={{ ...styles.spinner, borderTopColor: '#f78166', borderColor: 'rgba(247,129,102,0.3)' }} />
-                    <span style={{ ...styles.progressText, color: '#f78166' }}>{state.progress}</span>
+                <div style={{ ...styles.progressRow, borderColor: '#30363d', background: '#161b22' }}>
+                    <span style={{ ...styles.spinner, borderTopColor: '#8b949e', borderColor: 'rgba(139,148,158,0.2)' }} />
+                    <span style={{ ...styles.progressText, color: '#8b949e' }}>{state.progress}</span>
                 </div>
             )}
 
             {/* Success */}
             {!state.isGenerating && state.phase === 'done' && (
                 <div style={styles.successBlock}>
-                    ✅ Done!{state.finalScore > 0 && <span style={{ opacity: 0.7, marginLeft: 4 }}>Score: {state.finalScore}/100</span>}
-                    <span style={{ opacity: 0.6, marginLeft: 4 }}>Edit or regenerate.</span>
+                    Layout complete.
+                    {state.finalScore > 0 && <span style={{ opacity: 0.6, marginLeft: 6 }}>Score {state.finalScore}/100</span>}
                 </div>
             )}
 
@@ -223,83 +226,79 @@ export function AutoDesignPanel({ engine, canvasW, canvasH, apiKey }: Props) {
                 <div style={styles.errorBlock}>{state.error}</div>
             )}
 
-            {/* CTA Button */}
+            {/* CTA */}
             <button
                 id="auto-design-generate-btn"
                 style={{
                     ...styles.btn,
                     ...(state.isGenerating ? styles.btnRunning : {}),
-                    opacity: canRun || state.isGenerating ? 1 : 0.4,
+                    opacity: canRun || state.isGenerating ? 1 : 0.35,
                     cursor: canRun ? 'pointer' : state.isGenerating ? 'pointer' : 'not-allowed',
                 }}
                 onClick={state.isGenerating ? cancel : handleGenerate}
                 disabled={!state.isGenerating && !canRun}
             >
-                {state.isGenerating ? '✕ Cancel'
-                    : state.phase === 'done' ? '↻ Regenerate'
-                        : isAssetMode ? '✨ Redesign with AI'
-                            : '✨ Generate Banner'}
+                {state.isGenerating ? 'Cancel'
+                    : state.phase === 'done' ? 'Regenerate'
+                        : isAssetMode ? 'Redesign with AI'
+                            : 'Generate Banner'}
             </button>
 
             {!hasKey && (
-                <div style={styles.noKeyHint}>Set Anthropic API key in AI Panel settings first</div>
+                <div style={styles.hint}>Set Anthropic API key in AI Panel settings first</div>
             )}
             {!engine && hasKey && (
-                <div style={styles.noKeyHint}>Open a banner in the editor to use Auto-Design</div>
+                <div style={styles.hint}>Open a canvas to use Auto-Design</div>
             )}
         </div>
     );
 }
 
-// ── Styles ─────────────────────────────────────────
+// ── Styles ──────────────────────────────────────────
 const styles: Record<string, React.CSSProperties> = {
     panel: {
-        background: '#0d1117', border: '1px solid #30363d', borderRadius: 10,
+        background: '#0d1117', border: '1px solid #21262d', borderRadius: 10,
         padding: '14px', display: 'flex', flexDirection: 'column', gap: 10,
         fontSize: 12, color: '#c9d1d9', fontFamily: 'Inter, system-ui, sans-serif',
     },
     header: { display: 'flex', flexDirection: 'column', gap: 3 },
     titleRow: { display: 'flex', alignItems: 'center', gap: 8 },
-    title: { fontWeight: 700, fontSize: 14, color: '#f0f6fc', letterSpacing: -0.3 },
+    title: { fontWeight: 600, fontSize: 13, color: '#f0f6fc', letterSpacing: -0.2 },
     modeBadge: {
-        fontSize: 10, fontWeight: 600, color: '#ffa657',
-        background: 'rgba(255,166,87,0.12)', border: '1px solid rgba(255,166,87,0.3)',
+        fontSize: 10, fontWeight: 500, color: '#8b949e',
+        background: '#21262d', border: '1px solid #30363d',
         borderRadius: 4, padding: '1px 6px',
     },
-    subtitle: { color: '#8b949e', fontSize: 11 },
-    // Drop Zone
+    subtitle: { color: '#6e7681', fontSize: 11 },
     dropZone: {
-        border: '1.5px dashed', borderRadius: 8,
-        padding: '10px', minHeight: 64,
+        border: '1px dashed', borderRadius: 7,
+        padding: '12px 10px', minHeight: 58,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        cursor: 'pointer', transition: 'all 0.15s ease', userSelect: 'none',
+        cursor: 'pointer', transition: 'all 0.12s ease', userSelect: 'none',
     },
-    dropContent: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 },
-    dropIcon: { fontSize: 20 },
-    dropText: { fontSize: 12, color: '#8b949e', fontWeight: 500 },
-    dropSub: { fontSize: 10, color: '#484f58' },
-    thumbRow: { display: 'flex', alignItems: 'center', gap: 6 },
-    thumb: { width: 40, height: 40, objectFit: 'cover', borderRadius: 4, border: '1px solid #30363d' },
-    dropHintSmall: { fontSize: 10, color: '#484f58', marginLeft: 4 },
-    // Input
+    dropContent: { display: 'flex', alignItems: 'center', gap: 8 },
+    dropText: { fontSize: 11, color: '#6e7681' },
+    thumbRow: { display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' },
+    thumb: { width: 36, height: 36, objectFit: 'cover', borderRadius: 4, border: '1px solid #30363d' },
+    dropHintSmall: { fontSize: 10, color: '#6e7681' },
     inputWrapper: { position: 'relative' },
     textarea: {
         width: '100%', boxSizing: 'border-box',
-        background: '#161b22', border: '1px solid #30363d',
-        borderRadius: 8, padding: '8px 10px',
+        background: '#161b22', border: '1px solid',
+        borderRadius: 7, padding: '8px 10px',
         color: '#e6edf3', fontSize: 12, lineHeight: 1.5,
         fontFamily: 'inherit', resize: 'none', outline: 'none',
-        transition: 'border-color 0.15s ease',
+        transition: 'border-color 0.12s ease',
     },
     inputHint: { fontSize: 10, color: '#484f58', marginTop: 3, textAlign: 'right' },
     examples: { display: 'flex', flexDirection: 'column', gap: 5 },
-    examplesLabel: { fontSize: 10, color: '#8b949e', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 },
+    examplesLabel: { fontSize: 10, color: '#6e7681', fontWeight: 500, textTransform: 'uppercase', letterSpacing: 0.6 },
     examplesList: { display: 'flex', flexDirection: 'column', gap: 3 },
     exampleChip: {
-        background: '#161b22', border: '1px solid #21262d',
+        background: 'transparent', border: '1px solid #21262d',
         borderRadius: 5, padding: '4px 8px',
-        color: '#8b949e', fontSize: 10, textAlign: 'left',
-        cursor: 'pointer', transition: 'all 0.12s ease', lineHeight: 1.4,
+        color: '#6e7681', fontSize: 10, textAlign: 'left',
+        cursor: 'pointer', transition: 'all 0.1s ease', lineHeight: 1.4,
     },
     progressRow: {
         display: 'flex', alignItems: 'center', gap: 8,
@@ -307,29 +306,29 @@ const styles: Record<string, React.CSSProperties> = {
     },
     progressText: { fontSize: 11, fontWeight: 500 },
     successBlock: {
-        background: '#0f2a0f', border: '1px solid #238636',
-        borderRadius: 6, padding: '7px 10px',
-        color: '#3fb950', fontSize: 11, fontWeight: 600,
-        display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 2,
+        background: 'transparent', border: '1px solid #238636',
+        borderRadius: 6, padding: '6px 10px',
+        color: '#3fb950', fontSize: 11,
+        display: 'flex', alignItems: 'center',
     },
     errorBlock: {
-        background: '#2d0f0f', border: '1px solid #f85149',
-        borderRadius: 6, padding: '7px 10px',
+        background: 'transparent', border: '1px solid #f85149',
+        borderRadius: 6, padding: '6px 10px',
         color: '#f85149', fontSize: 11,
     },
     btn: {
-        background: 'linear-gradient(135deg, #6e40c9 0%, #8b5cf6 100%)',
-        color: '#fff', border: 'none', borderRadius: 7,
-        padding: '9px 14px', fontSize: 13, fontWeight: 700,
+        background: '#238636',
+        color: '#fff', border: 'none', borderRadius: 6,
+        padding: '8px 14px', fontSize: 12, fontWeight: 600,
         cursor: 'pointer', display: 'flex', alignItems: 'center',
         gap: 6, justifyContent: 'center', width: '100%',
-        transition: 'opacity 0.15s ease', letterSpacing: -0.2,
+        transition: 'opacity 0.12s ease', letterSpacing: -0.1,
     },
-    btnRunning: { background: '#21262d', color: '#f85149', border: '1px solid #f85149' },
+    btnRunning: { background: 'transparent', color: '#f85149', border: '1px solid #30363d' },
     spinner: {
-        width: 12, height: 12, borderRadius: '50%', flexShrink: 0,
-        border: '2px solid rgba(120,192,255,0.3)', borderTopColor: '#79c0ff',
+        width: 11, height: 11, borderRadius: '50%', flexShrink: 0,
+        border: '1.5px solid rgba(120,192,255,0.2)', borderTopColor: '#79c0ff',
         animation: 'spin 0.7s linear infinite', display: 'inline-block',
     },
-    noKeyHint: { color: '#484f58', fontSize: 10, textAlign: 'center' },
+    hint: { color: '#484f58', fontSize: 10, textAlign: 'center' },
 };

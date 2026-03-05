@@ -40,6 +40,7 @@ Wasm Bridge: 복잡한 레이아웃 계산(Constraint-based)은 Rust로 작성�
 1. **Role Separation**: Strictly follow the Single Responsibility Principle. A file can have 300-600 lines ONLY IF it serves a single, cohesive purpose. Mixing UI, API, and Canvas logic in one file is strictly prohibited.
 2. **Modular Hooks**: Extract all logic into Custom Hooks. Components must remain "thin" and focus on rendering.
 3. **Language**: The entire UI must be in English. No Korean text in the production code.
+4. **No Emojis in UI — ABSOLUTE RULE**: **ZERO emoji characters** in any UI label, button, title, placeholder, status message, badge, or notification. This is a professional tool — emojis look cheap and instantly degrade product quality. Use clean typography, geometric SVG icons, or simple text characters (·, +, ×) instead. **No exceptions. Ever.** Reference: Apple, Figma, Linear — none use emojis in their product UI. ACE must meet the same standard.
 4. **Project Structure**:
    - `main.py` / `App.tsx`: Entry points only.
    - `/components`: Pure UI elements.
