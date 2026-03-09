@@ -29,7 +29,7 @@ export interface AiConfig {
 
 const DEFAULT_CONFIG: AiConfig = {
     endpoint: 'https://api.anthropic.com',
-    model: 'claude-sonnet-4-20250514',
+    model: 'anthropic/claude-sonnet-4',
     maxToolRounds: 30,
 };
 

@@ -41,7 +41,7 @@ export interface VisionSelfCheckConfig {
 
 const DEFAULT_CONFIG: VisionSelfCheckConfig = {
     maxLoops: 2,
-    model: 'claude-sonnet-4-20250514',
+    model: 'anthropic/claude-sonnet-4',
 };
 
 // ── Helpers ──

@@ -151,7 +151,7 @@ async function analyzeWithClaude(dataUrl: string): Promise<AssetAnalysis> {
             'anthropic-dangerous-direct-browser-access': 'true',
         },
         body: JSON.stringify({
-            model: 'claude-sonnet-4-20250514',
+            model: 'anthropic/claude-sonnet-4',
             max_tokens: 500,
             messages: [{
                 role: 'user',
