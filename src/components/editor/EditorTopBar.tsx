@@ -5,16 +5,20 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEditorStore } from '@/stores/editorStore';
 import { IcExport, IcImage, IcFilm, IcCode, IcBell, IcHelp, IcClose } from '@/components/ui/Icons';
+import { exportToHtml5, downloadExport } from '@/engine/html5Exporter';
+import type { EngineNode } from '@/hooks/canvasTypes';
 
 interface Props {
     setName: string;
     variantLabel: string;
+    canvasWidth?: number;
+    canvasHeight?: number;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     engine?: any;
     children?: React.ReactNode;
 }
 
-export function EditorTopBar({ setName, variantLabel, engine, children }: Props) {
+export function EditorTopBar({ setName, variantLabel, canvasWidth = 300, canvasHeight = 250, engine, children }: Props) {
     const navigate = useNavigate();
     const zoom = useEditorStore((s) => s.zoom);
     const setZoom = useEditorStore((s) => s.setZoom);
@@ -56,6 +60,25 @@ export function EditorTopBar({ setName, variantLabel, engine, children }: Props)
         setExporting(false);
     }, [engine, setName]);
 
+    const handleExportHtml5 = useCallback(() => {
+        setExportOpen(false);
+        try {
+            // Read nodes from engine
+            let nodes: EngineNode[] = [];
+            if (engine?.get_all_nodes) {
+                try { nodes = JSON.parse(engine.get_all_nodes()); } catch { /* ok */ }
+            }
+            const result = exportToHtml5(nodes, {
+                width: canvasWidth, height: canvasHeight,
+                backgroundColor: '#ffffff',
+                title: `${setName}_${variantLabel.replace(/\s/g, '')}`,
+                duration: engine?.anim_duration?.() ?? 5,
+                loop: engine?.anim_looping?.() ?? false,
+            });
+            downloadExport(result);
+        } catch (err) { alert(`HTML5 export failed: ${err}`); }
+    }, [engine, setName, variantLabel, canvasWidth, canvasHeight]);
+
     const handleExportLottie = useCallback(() => {
         if (!engine?.export_lottie_json) { alert('Lottie JSON export coming soon.'); return; }
         setExportOpen(false);
@@ -95,6 +118,9 @@ export function EditorTopBar({ setName, variantLabel, engine, children }: Props)
                         <div style={dropdownStyle}>
                             <button style={dropdownItem} onClick={handleExportPng}>
                                 <IcImage size={14} color="#8b949e" /> <span>Export PNG</span>
+                            </button>
+                            <button style={dropdownItem} onClick={handleExportHtml5}>
+                                <IcCode size={14} color="#8b949e" /> <span>Export HTML5</span>
                             </button>
                             <button style={dropdownItem} onClick={handleExportMp4}>
                                 <IcFilm size={14} color="#8b949e" /> <span>Export MP4</span>

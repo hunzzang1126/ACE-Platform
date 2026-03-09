@@ -268,7 +268,7 @@ export function DetailEditorPage() {
 
     return (
         <div className="ed-layout">
-            <EditorTopBar setName={creativeSet.name} variantLabel={variantLabel} engine={engineRef.current}>
+            <EditorTopBar setName={creativeSet.name} variantLabel={variantLabel} canvasWidth={width} canvasHeight={height} engine={engineRef.current}>
                 {/* Save Button — always visible */}
                 <button
                     onClick={handleSave}
