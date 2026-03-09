@@ -116,6 +116,13 @@ export default defineConfig({
                 rewrite: (path: string) => path.replace(/^\/api\/anthropic/, ''),
                 secure: true,
             },
+            // Proxy OpenRouter API calls to bypass CORS in dev mode
+            '/api/openrouter': {
+                target: 'https://openrouter.ai/api',
+                changeOrigin: true,
+                rewrite: (path: string) => path.replace(/^\/api\/openrouter/, ''),
+                secure: true,
+            },
         },
     },
     // ── Vitest ──
