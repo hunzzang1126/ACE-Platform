@@ -33,14 +33,9 @@ function makeTestRect(id: string, fill: string): ShapeElement {
         name: `Rect ${id}`,
         visible: true,
         locked: false,
-        x: 10,
-        y: 10,
-        width: 100,
-        height: 50,
-        fill,
         opacity: 1,
-        rotation: 0,
         zIndex: 0,
+        fill,
         constraints: createDefaultConstraints(),
     } as ShapeElement;
 }
@@ -61,7 +56,7 @@ describe('designStore — Creative Set CRUD', () => {
         expect(id).toBeTruthy();
         expect(useDesignStore.getState().activeCreativeSetId).toBe(id);
         expect(useDesignStore.getState().creativeSet).not.toBeNull();
-        expect(useDesignStore.getState().creativeSet?.name).toBe('Banner A');
+        expect(useDesignStore.getState().creativeSet!.name).toBe('Banner A');
     });
 
     it('createCreativeSet creates a master variant with correct dimensions', () => {
@@ -69,7 +64,7 @@ describe('designStore — Creative Set CRUD', () => {
         const cs = useDesignStore.getState().creativeSet!;
 
         expect(cs.variants).toHaveLength(1);
-        const master = cs.variants[0];
+        const master = cs.variants[0]!;
         expect(master.preset.width).toBe(300);
         expect(master.preset.height).toBe(250);
         expect(master.id).toBe(cs.masterVariantId);
@@ -90,13 +85,11 @@ describe('designStore — Creative Set CRUD', () => {
         const id1 = useDesignStore.getState().createCreativeSet('Set A', MASTER_PRESET);
         const id2 = useDesignStore.getState().createCreativeSet('Set B', MASTER_PRESET);
 
-        // id2 is active after creation
         expect(useDesignStore.getState().activeCreativeSetId).toBe(id2);
 
-        // Switch back to id1
         useDesignStore.getState().openCreativeSet(id1);
         expect(useDesignStore.getState().activeCreativeSetId).toBe(id1);
-        expect(useDesignStore.getState().creativeSet?.name).toBe('Set A');
+        expect(useDesignStore.getState().creativeSet!.name).toBe('Set A');
     });
 });
 
@@ -112,7 +105,7 @@ describe('designStore — Element Operations', () => {
         const updated = useDesignStore.getState().creativeSet!;
         const master = updated.variants.find(v => v.id === cs.masterVariantId)!;
         expect(master.elements).toHaveLength(1);
-        expect(master.elements[0].id).toBe('el-1');
+        expect(master.elements[0]!.id).toBe('el-1');
         expect((master.elements[0] as ShapeElement).fill).toBe('#FF0000');
     });
 
@@ -123,8 +116,7 @@ describe('designStore — Element Operations', () => {
         const rect = makeTestRect('color-el', '#FF5733');
         useDesignStore.getState().addElementToMaster(rect);
 
-        // Read back the element
-        const master = useDesignStore.getState().creativeSet!.variants[0];
+        const master = useDesignStore.getState().creativeSet!.variants[0]!;
         const stored = master.elements.find(e => e.id === 'color-el') as ShapeElement;
 
         // ★ This was the bug — fill was being converted to rgba or different format
@@ -134,7 +126,6 @@ describe('designStore — Element Operations', () => {
     it('removeElementFromMaster removes from all variants', () => {
         useDesignStore.getState().createCreativeSet('Remove Test', MASTER_PRESET);
 
-        // Add element then add a variant
         const rect = makeTestRect('remove-me', '#000');
         useDesignStore.getState().addElementToMaster(rect);
         useDesignStore.getState().addVariant({
@@ -145,18 +136,16 @@ describe('designStore — Element Operations', () => {
             category: 'display',
         });
 
-        // Both variants should have the element
         const before = useDesignStore.getState().creativeSet!;
         expect(before.variants).toHaveLength(2);
-        expect(before.variants[0].elements).toHaveLength(1);
-        expect(before.variants[1].elements).toHaveLength(1);
+        expect(before.variants[0]!.elements).toHaveLength(1);
+        expect(before.variants[1]!.elements).toHaveLength(1);
 
-        // Remove it
         useDesignStore.getState().removeElementFromMaster('remove-me');
 
         const after = useDesignStore.getState().creativeSet!;
-        expect(after.variants[0].elements).toHaveLength(0);
-        expect(after.variants[1].elements).toHaveLength(0);
+        expect(after.variants[0]!.elements).toHaveLength(0);
+        expect(after.variants[1]!.elements).toHaveLength(0);
     });
 });
 
@@ -178,8 +167,7 @@ describe('designStore — Variant Management', () => {
 
         const cs = useDesignStore.getState().creativeSet!;
         expect(cs.variants).toHaveLength(2);
-        // The new variant should have elements (smart-sized from master)
-        expect(cs.variants[1].elements.length).toBeGreaterThanOrEqual(1);
+        expect(cs.variants[1]!.elements.length).toBeGreaterThanOrEqual(1);
     });
 
     it('removeVariant cannot delete the master variant', () => {
@@ -188,8 +176,7 @@ describe('designStore — Variant Management', () => {
 
         useDesignStore.getState().removeVariant(masterId);
 
-        // Master should still exist
         expect(useDesignStore.getState().creativeSet!.variants).toHaveLength(1);
-        expect(useDesignStore.getState().creativeSet!.variants[0].id).toBe(masterId);
+        expect(useDesignStore.getState().creativeSet!.variants[0]!.id).toBe(masterId);
     });
 });

@@ -35,19 +35,16 @@ describe('projectStore — Trash Actions', () => {
 
     // ── deleteCreativeSet → moves to trash ──
     it('deleteCreativeSet moves item to trash (not permanent delete)', () => {
-        // Create a project
         const id = useProjectStore.getState().createCreativeSet('Test Project');
         expect(useProjectStore.getState().creativeSets).toHaveLength(1);
         expect(useProjectStore.getState().trash).toHaveLength(0);
 
-        // Delete it
         useProjectStore.getState().deleteCreativeSet(id);
 
-        // Should be in trash, not in creativeSets
         expect(useProjectStore.getState().creativeSets).toHaveLength(0);
         expect(useProjectStore.getState().trash).toHaveLength(1);
-        expect(useProjectStore.getState().trash[0].item.id).toBe(id);
-        expect(useProjectStore.getState().trash[0].item.name).toBe('Test Project');
+        expect(useProjectStore.getState().trash[0]!.item.id).toBe(id);
+        expect(useProjectStore.getState().trash[0]!.item.name).toBe('Test Project');
     });
 
     // ── restoreFromTrash ──
@@ -60,7 +57,7 @@ describe('projectStore — Trash Actions', () => {
 
         expect(useProjectStore.getState().trash).toHaveLength(0);
         expect(useProjectStore.getState().creativeSets).toHaveLength(1);
-        expect(useProjectStore.getState().creativeSets[0].name).toBe('Restore Me');
+        expect(useProjectStore.getState().creativeSets[0]!.name).toBe('Restore Me');
     });
 
     // ── permanentDelete ──
@@ -77,7 +74,6 @@ describe('projectStore — Trash Actions', () => {
 
     // ★ REGRESSION: emptyTrash was silently failing (commit ea37f21)
     it('emptyTrash clears ALL items from trash', () => {
-        // Create and delete 3 projects
         const id1 = useProjectStore.getState().createCreativeSet('Project A');
         const id2 = useProjectStore.getState().createCreativeSet('Project B');
         const id3 = useProjectStore.getState().createCreativeSet('Project C');
@@ -86,10 +82,8 @@ describe('projectStore — Trash Actions', () => {
         useProjectStore.getState().deleteCreativeSet(id3);
         expect(useProjectStore.getState().trash).toHaveLength(3);
 
-        // Empty trash
         useProjectStore.getState().emptyTrash();
 
-        // MUST be empty — this was the regression
         expect(useProjectStore.getState().trash).toHaveLength(0);
         expect(useProjectStore.getState().creativeSets).toHaveLength(0);
     });
@@ -97,7 +91,6 @@ describe('projectStore — Trash Actions', () => {
     // ★ REGRESSION: emptyTrash on already-empty trash should not crash
     it('emptyTrash on empty trash does nothing', () => {
         expect(useProjectStore.getState().trash).toHaveLength(0);
-        // Should not throw
         expect(() => useProjectStore.getState().emptyTrash()).not.toThrow();
         expect(useProjectStore.getState().trash).toHaveLength(0);
     });
@@ -110,13 +103,13 @@ describe('projectStore — CRUD', () => {
         expect(id).toBeTruthy();
         expect(typeof id).toBe('string');
         expect(useProjectStore.getState().creativeSets).toHaveLength(1);
-        expect(useProjectStore.getState().creativeSets[0].name).toBe('My Banner');
+        expect(useProjectStore.getState().creativeSets[0]!.name).toBe('My Banner');
     });
 
     it('renameCreativeSet updates the name', () => {
         const id = useProjectStore.getState().createCreativeSet('Old Name');
         useProjectStore.getState().renameCreativeSet(id, 'New Name');
-        expect(useProjectStore.getState().creativeSets[0].name).toBe('New Name');
+        expect(useProjectStore.getState().creativeSets[0]!.name).toBe('New Name');
     });
 
     it('duplicateCreativeSet creates a copy with (Copy) suffix', () => {
@@ -124,8 +117,8 @@ describe('projectStore — CRUD', () => {
         useProjectStore.getState().duplicateCreativeSet(id);
         const sets = useProjectStore.getState().creativeSets;
         expect(sets).toHaveLength(2);
-        expect(sets[1].name).toBe('Original (Copy)');
-        expect(sets[1].id).not.toBe(id); // different ID
+        expect(sets[1]!.name).toBe('Original (Copy)');
+        expect(sets[1]!.id).not.toBe(id);
     });
 });
 
@@ -134,24 +127,20 @@ describe('projectStore — Folder Management', () => {
     it('createFolder adds a folder', () => {
         useProjectStore.getState().createFolder('My Folder');
         expect(useProjectStore.getState().folders).toHaveLength(1);
-        expect(useProjectStore.getState().folders[0].name).toBe('My Folder');
+        expect(useProjectStore.getState().folders[0]!.name).toBe('My Folder');
     });
 
     it('deleteFolder removes folder and moves contained sets to root', () => {
         useProjectStore.getState().createFolder('Temp Folder');
-        const folderId = useProjectStore.getState().folders[0].id;
+        const folderId = useProjectStore.getState().folders[0]!.id;
 
-        // Navigate into folder and create a project there
         useProjectStore.getState().navigateToFolder(folderId);
         useProjectStore.getState().createCreativeSet('Inside Folder');
-        expect(useProjectStore.getState().creativeSets[0].folderId).toBe(folderId);
+        expect(useProjectStore.getState().creativeSets[0]!.folderId).toBe(folderId);
 
-        // Delete folder
         useProjectStore.getState().deleteFolder(folderId);
 
-        // Folder gone, project should have folderId reset
         expect(useProjectStore.getState().folders).toHaveLength(0);
-        // Project still exists
         expect(useProjectStore.getState().creativeSets).toHaveLength(1);
     });
 });
