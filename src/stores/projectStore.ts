@@ -212,6 +212,10 @@ export const useProjectStore = create<ProjectState>()(
             setItemsPerPage: (count) => set({ itemsPerPage: count, currentPage: 1 }),
 
             // ── Trash Actions ──
+            // ★ REGRESSION GUARD: Never call external Zustand stores (useDesignStore)
+            // inside immer set() — causes silent failures / deadlocks.
+            // Always call external stores BEFORE or AFTER the set() block.
+
             restoreFromTrash: (id) => {
                 set((state) => {
                     const idx = state.trash.findIndex((t) => t.item.id === id);
@@ -224,23 +228,30 @@ export const useProjectStore = create<ProjectState>()(
             },
 
             permanentDelete: (id) => {
-                // ★ Clean up designStore BEFORE the immer set() — calling external store inside set() can deadlock with Immer draft
+                // 1) Clean up designStore FIRST (outside immer set)
                 try { useDesignStore.getState().deleteCreativeSet(id); } catch { /* ok */ }
+                // 2) Then remove from trash
                 set((state) => {
                     state.trash = state.trash.filter((t) => t.item.id !== id);
                 });
+                // 3) Broadcast to other tabs
+                _broadcastSync();
             },
 
             emptyTrash: () => {
-                // ★ Snapshot IDs FIRST — can't safely call external stores inside Immer set()
-                const ids = useProjectStore.getState().trash.map((t) => t.item.id);
-                for (const id of ids) {
-                    try { useDesignStore.getState().deleteCreativeSet(id); } catch { /* ok */ }
+                // 1) Read current trash IDs directly from store (safe — outside set())
+                const currentTrash = useProjectStore.getState().trash;
+                if (currentTrash.length === 0) return;
+                // 2) Clean up designStore for each trashed item
+                for (const t of currentTrash) {
+                    try { useDesignStore.getState().deleteCreativeSet(t.item.id); } catch { /* ok */ }
                 }
-                // Now clear trash atomically
+                // 3) Clear trash atomically
                 set((state) => {
                     state.trash = [];
                 });
+                // 4) Broadcast to other tabs
+                _broadcastSync();
             },
         })),
         {
@@ -273,32 +284,57 @@ export const useProjectStore = create<ProjectState>()(
     ),
 );
 
-// ── Cross-tab sync: storage event → rehydrate this tab ──
-// Fires when ANOTHER tab writes to localStorage (same-tab writes don't trigger 'storage')
+// ── Cross-tab sync ──────────────────────────────────
+// Two mechanisms:
+// 1. StorageEvent: fires when ANOTHER tab writes localStorage (NOT the writing tab)
+// 2. BroadcastChannel: fires in ALL other tabs instantly (more reliable)
+//
+// ★ REGRESSION GUARD: Always use plain-object setState() here (never immer callback).
+// setState() called outside React render context doesn't go through immer middleware.
+
+function _applyExternalSync(raw: string) {
+    try {
+        const parsed = JSON.parse(raw) as { state?: Partial<Pick<ProjectState, 'creativeSets' | 'folders' | 'trash'>> };
+        const data = parsed?.state;
+        if (!data) return;
+        const patch: Partial<ProjectState> = {};
+        if (data.creativeSets !== undefined) patch.creativeSets = data.creativeSets;
+        if (data.folders !== undefined) patch.folders = data.folders;
+        if (data.trash !== undefined) patch.trash = data.trash;
+        if (Object.keys(patch).length > 0) {
+            useProjectStore.setState(patch);
+        }
+    } catch { /* malformed JSON */ }
+}
+
+// Helper: broadcast current state to other tabs
+function _broadcastSync() {
+    try {
+        const raw = localStorage.getItem('ace-project-store');
+        if (raw && _channel) _channel.postMessage(raw);
+    } catch { /* ok */ }
+}
+
+let _channel: BroadcastChannel | null = null;
+
 if (typeof window !== 'undefined') {
+    // 1. StorageEvent (fires in OTHER tabs)
     window.addEventListener('storage', (e) => {
         if (e.key !== 'ace-project-store') return;
         if (!e.newValue) {
-            // Key was removed — reset to empty
             useProjectStore.setState({ creativeSets: [], folders: [], trash: [] });
             return;
         }
-        try {
-            const parsed = JSON.parse(e.newValue) as {
-                state?: {
-                    creativeSets?: ProjectState['creativeSets'];
-                    folders?: ProjectState['folders'];
-                    trash?: ProjectState['trash'];
-                }
-            };
-            const data = parsed?.state;
-            if (!data) return;
-            // Direct setState (not immer) — safest for cross-tab rehydration
-            useProjectStore.setState({
-                ...(data.creativeSets !== undefined && { creativeSets: data.creativeSets }),
-                ...(data.folders !== undefined && { folders: data.folders }),
-                ...(data.trash !== undefined && { trash: data.trash }),
-            });
-        } catch { /* malformed JSON — ignore */ }
+        _applyExternalSync(e.newValue);
     });
+
+    // 2. BroadcastChannel (fires in ALL other same-origin tabs, instantly)
+    try {
+        _channel = new BroadcastChannel('ace-project-sync');
+        _channel.onmessage = (e) => {
+            if (typeof e.data === 'string') {
+                _applyExternalSync(e.data);
+            }
+        };
+    } catch { /* BroadcastChannel not supported — fall back to StorageEvent only */ }
 }

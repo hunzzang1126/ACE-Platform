@@ -457,23 +457,56 @@ export const useDesignStore = create<DesignState>()(
     ),
 );
 
-// ── Cross-tab sync: when another tab writes to localStorage, rehydrate this store ──
+// ── Cross-tab sync ──────────────────────────────────
+// ★ REGRESSION GUARD: Always use plain-object setState() here (never immer callback).
+// setState() called outside React render context doesn't go through immer middleware.
+
+function _applyDesignSync(raw: string) {
+    try {
+        const parsed = JSON.parse(raw) as { state?: Partial<Pick<DesignState, 'allCreativeSets' | 'activeCreativeSetId'>> };
+        const data = parsed?.state;
+        if (!data) return;
+        const patch: Partial<DesignState> = {};
+        if (data.allCreativeSets !== undefined) patch.allCreativeSets = data.allCreativeSets;
+        if (data.activeCreativeSetId !== undefined) {
+            patch.activeCreativeSetId = data.activeCreativeSetId;
+            patch.creativeSet = data.activeCreativeSetId
+                ? (data.allCreativeSets ?? useDesignStore.getState().allCreativeSets)[data.activeCreativeSetId] ?? null
+                : null;
+        }
+        if (Object.keys(patch).length > 0) {
+            useDesignStore.setState(patch);
+        }
+    } catch { /* malformed JSON */ }
+}
+
+function _broadcastDesignSync() {
+    try {
+        const raw = localStorage.getItem('ace-design-store');
+        if (raw && _designChannel) _designChannel.postMessage(raw);
+    } catch { /* ok */ }
+}
+
+let _designChannel: BroadcastChannel | null = null;
+
 if (typeof window !== 'undefined') {
+    // 1. StorageEvent (fires in OTHER tabs only)
     window.addEventListener('storage', (e) => {
         if (e.key !== 'ace-design-store' || !e.newValue) return;
-        try {
-            const parsed = JSON.parse(e.newValue);
-            const data = parsed?.state as Partial<DesignState> | undefined;
-            if (!data) return;
-            useDesignStore.setState((state) => {
-                if (data.allCreativeSets) state.allCreativeSets = data.allCreativeSets;
-                if (data.activeCreativeSetId !== undefined) {
-                    state.activeCreativeSetId = data.activeCreativeSetId;
-                    state.creativeSet = data.activeCreativeSetId
-                        ? state.allCreativeSets[data.activeCreativeSetId] ?? null
-                        : null;
-                }
-            });
-        } catch { /* malformed data — ignore */ }
+        _applyDesignSync(e.newValue);
     });
+
+    // 2. BroadcastChannel (fires in ALL other same-origin tabs instantly)
+    try {
+        _designChannel = new BroadcastChannel('ace-design-sync');
+        _designChannel.onmessage = (e) => {
+            if (typeof e.data === 'string') {
+                _applyDesignSync(e.data);
+            }
+        };
+    } catch { /* BroadcastChannel not supported */ }
 }
+
+// Export for use by actions that need to notify other tabs
+export { _broadcastDesignSync };
+
