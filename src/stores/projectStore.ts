@@ -224,7 +224,7 @@ export const useProjectStore = create<ProjectState>()(
             },
 
             permanentDelete: (id) => {
-                // Clean up designStore first
+                // ★ Clean up designStore BEFORE the immer set() — calling external store inside set() can deadlock with Immer draft
                 try { useDesignStore.getState().deleteCreativeSet(id); } catch { /* ok */ }
                 set((state) => {
                     state.trash = state.trash.filter((t) => t.item.id !== id);
@@ -232,11 +232,13 @@ export const useProjectStore = create<ProjectState>()(
             },
 
             emptyTrash: () => {
-                // Clean up ALL trashed items from designStore
+                // ★ Snapshot IDs FIRST — can't safely call external stores inside Immer set()
+                const ids = useProjectStore.getState().trash.map((t) => t.item.id);
+                for (const id of ids) {
+                    try { useDesignStore.getState().deleteCreativeSet(id); } catch { /* ok */ }
+                }
+                // Now clear trash atomically
                 set((state) => {
-                    for (const t of state.trash) {
-                        try { useDesignStore.getState().deleteCreativeSet(t.item.id); } catch { /* ok */ }
-                    }
                     state.trash = [];
                 });
             },
@@ -271,19 +273,32 @@ export const useProjectStore = create<ProjectState>()(
     ),
 );
 
-// ── Cross-tab sync: when another tab writes to localStorage, rehydrate this store ──
+// ── Cross-tab sync: storage event → rehydrate this tab ──
+// Fires when ANOTHER tab writes to localStorage (same-tab writes don't trigger 'storage')
 if (typeof window !== 'undefined') {
     window.addEventListener('storage', (e) => {
-        if (e.key !== 'ace-project-store' || !e.newValue) return;
+        if (e.key !== 'ace-project-store') return;
+        if (!e.newValue) {
+            // Key was removed — reset to empty
+            useProjectStore.setState({ creativeSets: [], folders: [], trash: [] });
+            return;
+        }
         try {
-            const parsed = JSON.parse(e.newValue);
-            const data = parsed?.state as Partial<ProjectState> | undefined;
+            const parsed = JSON.parse(e.newValue) as {
+                state?: {
+                    creativeSets?: ProjectState['creativeSets'];
+                    folders?: ProjectState['folders'];
+                    trash?: ProjectState['trash'];
+                }
+            };
+            const data = parsed?.state;
             if (!data) return;
-            useProjectStore.setState((state) => {
-                if (data.creativeSets) state.creativeSets = data.creativeSets;
-                if (data.folders) state.folders = data.folders;
-                if (data.trash) state.trash = data.trash;
+            // Direct setState (not immer) — safest for cross-tab rehydration
+            useProjectStore.setState({
+                ...(data.creativeSets !== undefined && { creativeSets: data.creativeSets }),
+                ...(data.folders !== undefined && { folders: data.folders }),
+                ...(data.trash !== undefined && { trash: data.trash }),
             });
-        } catch { /* malformed data — ignore */ }
+        } catch { /* malformed JSON — ignore */ }
     });
 }
