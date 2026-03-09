@@ -1,636 +1,726 @@
-# ACE Upgrade Plan v2 — Deep Implementation
+# ACE Upgrade Plan v3 — Deep Implementation + Brand Kit Library Cloud
 
-> User feedback: v1은 겉핥기. 이번엔 **실제 타입, 함수 시그니처, 기존 코드 연결 지점** 까지.
-
----
-
-## Current Architecture (What We're Upgrading FROM)
-
-```
-useAutoDesign.ts (hook — UI 진입점)
-  ├── readCanvasElements(engine) → CanvasElementInfo[]
-  ├── callAutoDesign(prompt, config) → FromScratchResult | AssetContextResult
-  │     └── autoDesignService.ts — Claude tool_use with 2 tools:
-  │           ├── render_banner → RenderElement[]
-  │           └── rearrange_banner → RearrangePatch[] + RenderElement[]
-  ├── renderElement(engine, el) → canvas에 도형/텍스트 추가
-  └── runVisionLoop(engine) → VisionLoopResult
-        └── autoDesignLoop.ts — MAX_PASSES=3, PASS_SCORE=82
-              └── visionService.ts — callVisionCheck(screenshot) → VisionResult
-```
-
-**Problem**: AI가 2개 tool만 쓸 수 있고, 디자인 구조를 모르고, 단일 LLM 호출.
+> "변태적일 정도로 디테일하게" — 함수 시그니처, 타입 계약, store 스키마, AI prompt 주입 지점, 데이터 흐름 전부.
 
 ---
 
-## Phase 1: Tool Registry + Scene Graph (2 weeks)
+## Current Architecture (What We Have)
 
-### 1-1. Tool Interface Contract
-
-#### [NEW] `src/services/tools/toolTypes.ts`
-
-```typescript
-// 모든 tool의 공통 인터페이스
-export interface AceTool {
-  name: string;
-  category: ToolCategory;
-  description: string;
-  inputSchema: Record<string, unknown>;  // Claude tool_use schema
-  execute: (params: unknown, ctx: ToolContext) => ToolResult;
-}
-
-export type ToolCategory =
-  | 'read' | 'create' | 'modify' | 'structure'
-  | 'analyze' | 'sizing' | 'export' | 'generate';
-//                                       ↑ NEW: 이미지 생성 카테고리
-
-export interface ToolContext {
-  designStore: typeof useDesignStore;
-  editorStore: typeof useEditorStore;
-  canvasEngine: Engine | null;        // PixiJS 엔진 참조
-  activeVariantId: string | null;
-  brandKit: BrandKit | null;
-}
-
-export interface ToolResult {
-  success: boolean;
-  message: string;
-  data?: unknown;    // tool별 반환 데이터
-  sideEffects?: string[];  // "created element 'Hero BG'", "modified fill of 'CTA'"
-}
 ```
+userPrefs.ts (170L)
+  ├── brandColors: { primary, secondary, background, text }  ← 4개 색상만
+  ├── fonts: { heading, body }                                ← 2개 폰트만
+  ├── frequentTexts: { text, role, count }[]                  ← 텍스트 패턴만
+  └── learnBrandFromDesign() → 디자인 완료 후 자동 학습
 
-> [!IMPORTANT]
-> **모든 tool은 이 인터페이스를 구현**. `execute` 함수는 순수 함수로, designStore/editorStore를 직접 호출하여 상태 변경. 기존 `RenderElement`/`RearrangePatch`는 deprecated → `ToolResult`로 통합.
+autoDesignService.ts (543L)
+  ├── detectPersonality(prompt) → 'financial' | 'sports' | ...
+  ├── buildFromScratchPrompt() → 레이아웃 규칙 주입 (brand 연동 없음!)
+  └── callFromScratch() → Claude tool_use with render_banner
 
----
-
-### 1-2. Read Tools (← OpenPencil `get_page_tree`)
-
-#### [NEW] `src/services/tools/readTools.ts`
-
-```typescript
-// getPageTree: AI가 "지금 캔버스에 뭐가 있지?" 파악
-export const getPageTree: AceTool = {
-  name: 'get_page_tree',
-  category: 'read',
-  execute: (_, ctx) => {
-    const variant = ctx.designStore.getState().getActiveVariant();
-    if (!variant) return { success: false, message: 'No active variant' };
-
-    // 기존 CanvasElementInfo(평면)가 아니라 계층 구조로 반환
-    const tree = buildSceneGraph(variant);  // ← 1-3에서 구현
-    return { success: true, message: 'Scene graph retrieved', data: tree };
-  }
-};
-
-// getNode: 특정 요소의 상세 데이터
-export const getNode: AceTool = {
-  name: 'get_node',
-  inputSchema: { properties: { id: { type: 'string' } }, required: ['id'] },
-  execute: ({ id }, ctx) => {
-    const el = ctx.designStore.getState().getElementById(id);
-    if (!el) return { success: false, message: `Element ${id} not found` };
-    const bounds = resolveConstraints(el.constraints, canvasW, canvasH);
-    return { success: true, data: { ...el, bounds } };
-  }
-};
-
-// findNodes: 이름/타입/역할 기반 검색
-// getSelection: 현재 선택된 요소
-// getCanvasBounds: 캔버스 크기 + safe zone
-```
-
-**기존 코드 연결점**:
-- `readCanvasElements()` in `useAutoDesign.ts:45-69` → `getPageTree`로 대체
-- `CanvasElementInfo` → deprecated, `SceneGraph` 타입으로 교체
-
----
-
-### 1-3. Scene Graph Builder
-
-#### [NEW] `src/services/sceneGraphBuilder.ts`
-
-```typescript
-export interface SceneGraph {
-  canvas: { width: number; height: number; category: SizeCategory };
-  elements: SceneNode[];
-  relationships: ElementRelationship[];
-  tokens: DesignTokens;
-}
-
-export interface SceneNode {
-  id: string;
-  name: string;
-  role: ElementRole;        // ← smartSizing.ts의 detectElementRole 재사용
-  type: 'shape' | 'text' | 'image' | 'button';
-  bounds: { x: number; y: number; w: number; h: number };
-  style: NodeStyle;
-  zIndex: number;
-  visible: boolean;
-  locked: boolean;
-}
-
-interface NodeStyle {
-  fill?: string;
-  stroke?: { color: string; width: number };
-  font?: { family: string; size: number; weight: number; color: string };
-  opacity: number;
-}
-
-interface ElementRelationship {
-  elementId: string;
-  overlaps: string[];        // 겹치는 요소 ID 목록
-  containedBy: string | null; // 완전히 포함하는 요소
-  nearestNeighbor: string;   // 가장 가까운 요소
-  distanceToEdge: { top: number; right: number; bottom: number; left: number };
-}
-
-interface DesignTokens {
-  colors: { hex: string; count: number; elements: string[] }[];
-  fonts: { family: string; sizes: number[]; elements: string[] }[];
-  spacingPatterns: number[];  // 반복되는 간격 값
-}
-
-export function buildSceneGraph(variant: BannerVariant): SceneGraph {
-  // 1. variant.elements를 SceneNode[]로 변환 (resolveConstraints 사용)
-  // 2. 모든 요소 쌍에 대해 overlap/containment 계산 (rectsOverlap 재사용)
-  // 3. 색상/폰트/간격 토큰 추출
-  // 4. SceneGraph 반환
-}
-```
-
-**기존 코드 재사용**:
-- `detectElementRole()` from `smartSizing.ts:44-78` → role 감지
-- `resolveConstraints()` from `constraints.types.ts:50-130` → bounds 계산
-- `rectsOverlap()` from `smartSizingQA.ts:202-214` → 겹침 감지
-
----
-
-### 1-4. Create / Modify / Structure Tools
-
-#### [NEW] `src/services/tools/createTools.ts`
-
-```typescript
-// 핵심: designStore.getState()를 직접 호출하여 요소 추가
-export const createShape: AceTool = {
-  name: 'create_shape',
-  execute: ({ shapeType, fill, x, y, w, h, name }, ctx) => {
-    const constraints = absoluteToConstraints(x, y, w, h, canvasW, canvasH);
-    const element: ShapeElement = {
-      id: `el-${Date.now()}`,
-      name: name || `Shape ${Date.now()}`,
-      type: 'shape', shapeType, fill,
-      constraints, visible: true, locked: false, opacity: 1,
-      zIndex: ctx.designStore.getState().getMaxZIndex() + 1,
-    };
-    ctx.designStore.getState().addElement(element);
-    return { success: true, message: `Created ${shapeType} "${name}"`, data: { id: element.id } };
-  }
-};
-// createText, createImage, duplicateNode 동일 패턴
-```
-
-**기존 코드 연결점**:
-- `renderElement()` in `useAutoDesign.ts:91-149` → `createShape`/`createText`로 대체
-- `absoluteToConstraints()` from `elementConverters.ts:14-70` → 재사용
-
-#### [NEW] `src/services/tools/modifyTools.ts`
-
-```typescript
-export const setFill: AceTool = {
-  name: 'set_fill',
-  execute: ({ id, color }, ctx) => {
-    ctx.designStore.getState().updateElement(id, { fill: color });
-    return { success: true, message: `Set fill of "${id}" to ${color}` };
-  }
-};
-// moveNode → updateElement(id, { constraints: newConstraints })
-// resizeNode → absoluteToConstraints로 새 constraints 계산 → updateElement
-// setFont, setText, setOpacity, setVisible, setZIndex 동일 패턴
-```
-
-**기존 코드 연결점**:
-- `applyRearrangePatches()` in `useAutoDesign.ts:153-176` → `modifyTools`로 대체
-- `RearrangePatch` 타입 → deprecated
-
----
-
-### 1-5. Tool Registry
-
-#### [NEW] `src/services/toolRegistry.ts`
-
-```typescript
-import * as readTools from './tools/readTools';
-import * as createTools from './tools/createTools';
-import * as modifyTools from './tools/modifyTools';
-// ... 나머지 import
-
-// 전체 tool 목록 (Claude tool_use에 전달)
-export const ALL_TOOLS: AceTool[] = [
-  ...Object.values(readTools),
-  ...Object.values(createTools),
-  ...Object.values(modifyTools),
-  ...Object.values(structureTools),
-  ...Object.values(analyzeTools),
-  ...Object.values(sizingTools),
-  ...Object.values(exportTools),
-  ...Object.values(generateTools),  // ← 이미지 AI 생성
-];
-
-// Claude API용 tool schema 자동 생성
-export function getToolSchemas(): ClaudeToolSchema[] {
-  return ALL_TOOLS.map(t => ({
-    name: t.name,
-    description: t.description,
-    input_schema: t.inputSchema,
-  }));
-}
-
-// tool name → execute 매핑
-export function executeTool(name: string, params: unknown, ctx: ToolContext): ToolResult {
-  const tool = ALL_TOOLS.find(t => t.name === name);
-  if (!tool) return { success: false, message: `Unknown tool: ${name}` };
-  return tool.execute(params, ctx);
-}
-```
-
-**기존 코드 교체**:
-- `autoDesignService.ts`의 `RENDER_BANNER_TOOL` + `REARRANGE_BANNER_TOOL` → `getToolSchemas()`
-- `callAutoDesign()` 함수 내부의 tool 결과 파싱 → `executeTool()`
-
----
-
-## Phase 2: 3-Agent Chain + Image Generation (3 weeks)
-
-### 2-1. Image AI Generation (← Jaaz ComfyUI + 사용자 아이디어)
-
-#### [NEW] `src/services/tools/generateTools.ts`
-
-```typescript
-// 사용자가 직접 쓰는 게 아니라, Critic Agent가 자동으로 호출
-export const generateBackground: AceTool = {
-  name: 'generate_background',
-  category: 'generate',
-  description: 'AI-generate a background image when solid color is insufficient',
-  inputSchema: {
-    properties: {
-      prompt: { type: 'string', description: 'Image generation prompt' },
-      style: { type: 'string', enum: ['photo', 'gradient', 'pattern', 'abstract'] },
-      width: { type: 'number' },
-      height: { type: 'number' },
-    }
-  },
-  execute: async ({ prompt, style, width, height }, ctx) => {
-    // 1. modelRouter로 최적 이미지 모델 선택
-    const model = selectModel('image-gen');  // Flux > Midjourney > DALL-E
-    
-    // 2. 이미지 생성 API 호출
-    const imageUrl = await callImageGeneration(model, {
-      prompt: `${prompt}, ${style} style, banner background, ${width}x${height}`,
-      width, height,
-    });
-    
-    // 3. 생성된 이미지를 캔버스 배경으로 자동 삽입
-    ctx.designStore.getState().addElement({
-      type: 'image', src: imageUrl,
-      constraints: absoluteToConstraints(0, 0, width, height, width, height),
-      zIndex: 0, role: 'background', name: 'AI Background',
-    });
-    
-    return { success: true, message: 'Background generated and applied' };
-  }
-};
-
-export const generateProductImage: AceTool = {
-  // 브랜드킷에 프로덕트 이미지 없을 때 Critic이 호출
-  name: 'generate_product_image',
-  execute: async ({ productDescription, style }, ctx) => { ... }
-};
-
-export const generateTexture: AceTool = {
-  // 배경 패턴/텍스처 필요시
-  name: 'generate_texture',
-  execute: async ({ pattern, colors }, ctx) => { ... }
-};
-```
-
-**통합 지점**:
-- `criticAgent`가 "배경이 밋밋하다" 판단 → `generate_background` tool 호출 지시
-- `executorAgent`가 plan에 "product image needed" → `generate_product_image` 호출
-- 사용자 UI에 노출 안 됨 — 파이프라인 내부 단계
-
-#### [NEW] `src/services/imageGenClient.ts`
-
-```typescript
-type ImageModel = 'flux-schnell' | 'dall-e-3' | 'midjourney' | 'stable-diffusion-3';
-
-export async function callImageGeneration(
-  model: ImageModel,
-  params: { prompt: string; width: number; height: number; }
-): Promise<string> {
-  // OpenRouter 또는 직접 API 호출 → 이미지 URL 반환
-  // 결과를 blob으로 받아 → data URL 또는 임시 URL로 변환
-}
+⚠ 문제: 이미지/로고/에셋은 어디에도 저장되지 않음.
+⚠ 문제: AI가 "이 브랜드의 로고를 넣어라"를 할 수 없음.
+⚠ 문제: Vision Critic이 "브랜드 색상과 다르다"를 판단할 근거가 없음.
 ```
 
 ---
 
-### 2-2. Agent Architecture
+## NEW: Brand Kit Library Cloud
 
-#### [NEW] `src/services/agents/agentTypes.ts`
+### Architecture Overview
 
-```typescript
-export interface AgentMessage {
-  role: 'system' | 'user' | 'assistant' | 'tool_result';
-  content: string | ContentBlock[];
-}
-
-export interface AgentStep {
-  agent: 'planner' | 'executor' | 'critic';
-  toolCalls: { name: string; params: unknown; result: ToolResult }[];
-  thinking: string;
-  durationMs: number;
-}
-
-export interface PipelineResult {
-  steps: AgentStep[];
-  finalScore: number;
-  totalPasses: number;
-  elementsCreated: number;
-  imagesGenerated: number;    // ← AI 이미지 생성 횟수
-}
+```
+┌─────────────────────────────────────────────────────────────┐
+│                   BRAND KIT LIBRARY CLOUD                    │
+├─────────────────────────────────────────────────────────────┤
+│                                                               │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐        │
+│  │   ASSETS     │  │   PALETTE    │  │   TYPOGRAPHY │        │
+│  │              │  │              │  │              │        │
+│  │ · Logos (SVG) │  │ · Primary    │  │ · Heading    │        │
+│  │ · Product IMG │  │ · Secondary  │  │ · Body       │        │
+│  │ · Textures   │  │ · Background │  │ · CTA        │        │
+│  │ · Icons      │  │ · Accent     │  │ · Caption    │        │
+│  │ · Backgrounds│  │ · Gradient   │  │ · Brand Font │        │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘        │
+│         │                  │                  │                │
+│         ▼                  ▼                  ▼                │
+│  ┌────────────────────────────────────────────────────┐      │
+│  │              BRAND CONTEXT BUILDER                  │      │
+│  │  → AI Planner에게 "이 회사의 에셋 목록" 전달         │      │
+│  │  → AI Executor에게 "이 로고 URL·좌표" 전달           │      │
+│  │  → AI Critic에게 "이 색상과 다르면 경고" 전달         │      │
+│  └────────────────────────────────────────────────────┘      │
+│                          │                                    │
+│         ┌────────────────┼────────────────┐                  │
+│         ▼                ▼                ▼                  │
+│   [Planner Agent]  [Executor Agent]  [Critic Agent]          │
+│   "Nike 로고 있음    "로고를 우측 상단   "로고가 빠졌다        │
+│    1200x400 PNG,      에 배치, 크기      → generate 요청"     │
+│    product shot 3장"   120x60"          "색상 #ff0000 ≠      │
+│                                         brandKit #e60023     │
+│                                         → fix patch"         │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-#### [NEW] `src/services/agents/plannerAgent.ts`
+### Competitor Learnings Applied
+
+| Competitor | Feature | ACE Adaptation |
+|---|---|---|
+| **Penpot** | Component libraries with design tokens (colors, typography stored as reusable styles) | `BrandKit.palette` + `BrandKit.typography` = design tokens |
+| **Penpot** | Asset buckets with deduplication + deferred deletion | `BrandAsset.hash` for dedup, soft delete |
+| **OpenPencil** | `bind_variable` — design variables bound to elements | `BrandAsset.tag` + `BrandAsset.role` → AI binds assets to element roles |
+| **OpenPencil** | `analyze_colors/typography` — design token extraction from existing designs | `brandKitStore.learnFromDesign()` — auto-tag brand assets from completed designs |
+| **Jaaz** | ComfyUI local workflow for image processing | Asset preprocessing — auto-resize, background removal, format conversion |
+
+---
+
+### [NEW] `src/stores/brandKitStore.ts`
 
 ```typescript
-export async function runPlanner(
-  userPrompt: string,
-  sceneGraph: SceneGraph,    // ← Phase 1에서 만든 것
-  brandKit: BrandKit | null,
-  canvasW: number,
-  canvasH: number,
-): Promise<DesignPlan> {
-  // system prompt에 포함되는 것:
-  // 1. sceneGraph (현재 캔버스 상태 — AI가 "맥락" 이해)
-  // 2. brandKit (색상, 폰트, 로고 URL)
-  // 3. LAYOUT_ZONES (smartSizing.ts에서 가져옴)
-  // 4. availableTools (toolRegistry에서 가져옴 — AI가 "뭘 할 수 있는지" 안다)
-  
-  const response = await callClaude({
-    model: 'claude-sonnet-4-20250514',
-    system: buildPlannerSystemPrompt(sceneGraph, brandKit, canvasW, canvasH),
-    messages: [{ role: 'user', content: userPrompt }],
-    // tool_use 아님 — 구조화된 JSON 출력
-  });
-  
-  return parsePlan(response);  // DesignPlan 검증 (Zod)
-}
-```
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import { immer } from 'zustand/middleware/immer';
 
-#### [NEW] `src/services/agents/executorAgent.ts`
+// ── Asset Types ──
 
-```typescript
-export async function runExecutor(
-  plan: DesignPlan,
-  toolCtx: ToolContext,
-  onStep: (step: AgentStep) => void,
-): Promise<void> {
-  // Claude에게 plan + 사용 가능한 tools 전달
-  // Claude가 tool_use로 하나씩 호출 → executeTool()로 실행
-  // 각 tool 결과를 다시 Claude에게 전달 → 다음 tool 결정
-  // plan이 완료될 때까지 반복 (tool_use loop)
-  
-  const messages: AgentMessage[] = [
-    { role: 'user', content: `Execute this design plan:\n${JSON.stringify(plan)}` }
-  ];
-  
-  while (true) {
-    const response = await callClaude({
-      model: 'claude-sonnet-4-20250514',
-      tools: getToolSchemas(),  // ← 40+ tools 전달
-      messages,
-    });
-    
-    if (response.stop_reason === 'end_turn') break;
-    
-    // tool_use 응답 → 실행
-    for (const toolCall of response.tool_calls) {
-      const result = executeTool(toolCall.name, toolCall.params, toolCtx);
-      onStep({ agent: 'executor', toolCalls: [...], thinking: '...' });
-      messages.push({ role: 'tool_result', content: JSON.stringify(result) });
-    }
-  }
-}
-```
+export type AssetCategory = 'logo' | 'product' | 'texture' | 'icon' | 'background' | 'photo';
+export type AssetFormat = 'png' | 'svg' | 'jpg' | 'webp';
 
-#### [NEW] `src/services/agents/criticAgent.ts`
-
-```typescript
-export async function runCritic(
-  screenshot: string,          // base64 PNG
-  sceneGraph: SceneGraph,
-  brandKit: BrandKit | null,
-  canvasW: number,
-  canvasH: number,
-): Promise<CriticVerdict> {
-  // 기존 visionService.ts의 callVisionCheck를 확장
-  // + 브랜드 준수 체크 (색상이 brandKit과 일치?)
-  // + 레이아웃 규칙 체크 (LAYOUT_ZONES와 일치?)
-  // + 이미지 생성 제안 ("배경이 단색이라 밋밋함 → generate_background 호출 필요")
-  
-  const response = await callVisionModel('gpt-4o', screenshot, {
-    sceneGraph,
-    brandKit,
-    checkList: ['overlap', 'clipping', 'contrast', 'hierarchy', 'brand_compliance',
-                'background_quality',   // ← NEW: 배경 품질 평가
-                'asset_completeness'],  // ← NEW: 필요한 에셋 있는지
-  });
-  
-  return {
-    score: response.score,
-    pass: response.score >= 82,
-    fixes: response.patches,           // 기존 VisionPatch 호환
-    generateRequests: response.generateRequests,  // ← NEW: 이미지 생성 요청
-    // 예: [{ tool: 'generate_background', prompt: 'gradient blue to purple' }]
+export interface BrandAsset {
+  id: string;                    // uuid
+  name: string;                  // "Nike Swoosh White"
+  category: AssetCategory;
+  tags: string[];                // ["nike", "swoosh", "white", "primary"]
+  role?: string;                 // "primary_logo" | "secondary_logo" | "product_hero"
+  src: string;                   // data URL or blob URL
+  thumbSrc: string;              // 150px thumbnail (generated on upload)
+  width: number;                 // original pixel width
+  height: number;                // original pixel height
+  format: AssetFormat;
+  sizeBytes: number;
+  hash: string;                  // SHA-256 for dedup (Penpot pattern)
+  uploadedAt: string;            // ISO date
+  usageCount: number;            // how many times used in designs
+  isFavorite: boolean;           // starred for quick access
+  deletedAt: string | null;      // soft delete (Penpot pattern)
+  metadata: {
+    hasTransparency: boolean;    // does it have alpha channel?
+    dominantColors: string[];    // top 3 colors extracted from image
+    suggestedPlacement: 'top-left' | 'top-right' | 'center' | 'bottom-center' | null;
   };
 }
+
+export interface BrandPalette {
+  primary: string;       // "#e60023"
+  secondary: string;     // "#1a1f2e"
+  accent: string;        // "#ff6b35"
+  background: string;    // "#0a0e1a"
+  text: string;          // "#ffffff"
+  gradients: {           // ← NEW: gradient presets
+    start: string;
+    end: string;
+    angle: number;
+    name: string;        // "Hero Gradient", "CTA Gradient"
+  }[];
+}
+
+export interface BrandTypography {
+  heading: {
+    family: string;      // "Montserrat"
+    weights: number[];   // [700, 800]
+    letterSpacing: number;  // -0.5
+  };
+  body: {
+    family: string;      // "Inter"
+    weights: number[];   // [400, 500]
+    letterSpacing: number;  // 0
+  };
+  cta: {
+    family: string;      // "Inter"
+    weights: number[];   // [600, 700]
+    transform: 'uppercase' | 'none' | 'capitalize';
+  };
+}
+
+export interface BrandGuidelines {
+  name: string;          // "Nike" — brand name for AI context
+  industry: string;      // "sports" — maps to detectPersonality
+  voiceTone: string;     // "Bold, empowering, action-driven"
+  tagline?: string;      // "Just Do It"
+  ctaPhrases: string[];  // ["Shop Now", "Get Started", "Explore"]
+  forbiddenColors: string[];  // colors that should NEVER be used
+  forbiddenWords: string[];   // words to avoid in copy
+  logoPlacementRules: string; // "Logo always top-right, min 60px from edges"
+}
+
+export interface BrandKit {
+  id: string;
+  name: string;              // "Nike Brand Kit"
+  createdAt: string;
+  updatedAt: string;
+  assets: BrandAsset[];
+  palette: BrandPalette;
+  typography: BrandTypography;
+  guidelines: BrandGuidelines;
+}
+
+// ── Store ──
+
+interface BrandKitState {
+  kits: BrandKit[];
+  activeKitId: string | null;
+
+  // ── CRUD ──
+  createKit: (name: string) => string;          // returns kit id
+  deleteKit: (id: string) => void;
+  setActiveKit: (id: string | null) => void;
+  getActiveKit: () => BrandKit | null;
+
+  // ── Asset Management ──
+  addAsset: (kitId: string, asset: Omit<BrandAsset, 'id' | 'uploadedAt' | 'usageCount' | 'isFavorite' | 'deletedAt'>) => string;
+  removeAsset: (kitId: string, assetId: string) => void;   // soft delete
+  permanentDeleteAsset: (kitId: string, assetId: string) => void;
+  updateAsset: (kitId: string, assetId: string, updates: Partial<BrandAsset>) => void;
+  toggleFavorite: (kitId: string, assetId: string) => void;
+  incrementUsage: (kitId: string, assetId: string) => void;
+
+  // ── Query ──
+  getAssetsByCategory: (kitId: string, category: AssetCategory) => BrandAsset[];
+  getAssetsByTag: (kitId: string, tag: string) => BrandAsset[];
+  getAssetsByRole: (kitId: string, role: string) => BrandAsset[];
+  getFavorites: (kitId: string) => BrandAsset[];
+  findDuplicate: (kitId: string, hash: string) => BrandAsset | null;  // dedup
+
+  // ── Palette ──
+  updatePalette: (kitId: string, palette: Partial<BrandPalette>) => void;
+  updateTypography: (kitId: string, typo: Partial<BrandTypography>) => void;
+  updateGuidelines: (kitId: string, guidelines: Partial<BrandGuidelines>) => void;
+
+  // ── AI Integration ──
+  learnFromDesign: (elements: DesignElement[]) => void;  // auto-extract brand tokens
+}
+
+export const useBrandKitStore = create<BrandKitState>()(
+  persist(
+    immer((set, get) => ({
+      kits: [],
+      activeKitId: null,
+
+      createKit: (name) => {
+        const id = `bk-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        set(state => {
+          state.kits.push({
+            id, name,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            assets: [],
+            palette: { primary: '#c9a84c', secondary: '#1a1f2e', accent: '#ff6b35',
+                       background: '#0a0e1a', text: '#ffffff', gradients: [] },
+            typography: {
+              heading: { family: 'Inter', weights: [700, 800], letterSpacing: -0.5 },
+              body: { family: 'Inter', weights: [400, 500], letterSpacing: 0 },
+              cta: { family: 'Inter', weights: [600, 700], transform: 'uppercase' },
+            },
+            guidelines: {
+              name, industry: 'lifestyle', voiceTone: 'Professional',
+              ctaPhrases: ['Learn More', 'Get Started', 'Shop Now'],
+              forbiddenColors: [], forbiddenWords: [],
+              logoPlacementRules: 'Logo top-right, minimum 20px from edges',
+            },
+          });
+        });
+        return id;
+      },
+
+      addAsset: (kitId, assetData) => {
+        const id = `asset-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        // ★ DEDUP CHECK (Penpot pattern)
+        const existing = get().findDuplicate(kitId, assetData.hash);
+        if (existing) return existing.id; // don't add duplicate
+
+        set(state => {
+          const kit = state.kits.find(k => k.id === kitId);
+          if (!kit) return;
+          kit.assets.push({
+            ...assetData, id,
+            uploadedAt: new Date().toISOString(),
+            usageCount: 0, isFavorite: false, deletedAt: null,
+          });
+          kit.updatedAt = new Date().toISOString();
+        });
+        return id;
+      },
+
+      removeAsset: (kitId, assetId) => {
+        // ★ SOFT DELETE (Penpot pattern)
+        set(state => {
+          const kit = state.kits.find(k => k.id === kitId);
+          if (!kit) return;
+          const asset = kit.assets.find(a => a.id === assetId);
+          if (asset) asset.deletedAt = new Date().toISOString();
+        });
+      },
+
+      // ... 나머지 구현
+    })),
+    { name: 'ace-brand-kits' }
+  )
+);
 ```
 
-#### [MODIFY] `src/services/autoDesignLoop.ts`
+---
+
+### [NEW] `src/services/brandContextBuilder.ts`
+
+**핵심**: Brand Kit 데이터 → AI 에이전트의 system prompt에 주입
 
 ```typescript
-// 현재: runVisionLoop (단일 루프, vision만)
-// 목표: runAgentPipeline (3-agent 체인)
+import type { BrandKit, BrandAsset } from '@/stores/brandKitStore';
 
-export async function runAgentPipeline(
-  userPrompt: string,
-  toolCtx: ToolContext,
-  onProgress: (msg: string) => void,
-  signal: AbortSignal,
-): Promise<PipelineResult> {
-  onProgress('Planning design...');
-  const sceneGraph = buildSceneGraph(getCurrentVariant());
-  const plan = await runPlanner(userPrompt, sceneGraph, brandKit, W, H);
-  
-  onProgress('Building banner...');
-  await runExecutor(plan, toolCtx, (step) => onProgress(step.thinking));
-  
-  for (let pass = 0; pass < MAX_PASSES; pass++) {
-    onProgress(`Quality check (pass ${pass + 1})...`);
-    const screenshot = await captureScreenshot(toolCtx.canvasEngine);
-    const verdict = await runCritic(screenshot, buildSceneGraph(...), brandKit, W, H);
-    
-    if (verdict.pass) break;
-    
-    // 이미지 생성 요청 처리 (← 핵심 차별점)
-    for (const genReq of verdict.generateRequests) {
-      onProgress(`Generating ${genReq.tool}...`);
-      await executeTool(genReq.tool, genReq.params, toolCtx);
-    }
-    
-    // 나머지 fix patches 적용
-    onProgress('Applying fixes...');
-    await runExecutor(fixPlan(verdict.fixes), toolCtx, noop);
+// ── Planner에게 주입할 Brand Context ──
+
+export function buildBrandContextForPlanner(kit: BrandKit): string {
+  const logos = kit.assets.filter(a => a.category === 'logo' && !a.deletedAt);
+  const products = kit.assets.filter(a => a.category === 'product' && !a.deletedAt);
+  const favorites = kit.assets.filter(a => a.isFavorite && !a.deletedAt);
+
+  return `
+═══════════════════════════════════════════
+BRAND KIT: "${kit.guidelines.name}" (${kit.guidelines.industry})
+═══════════════════════════════════════════
+
+PALETTE:
+  Primary: ${kit.palette.primary}
+  Secondary: ${kit.palette.secondary}
+  Accent: ${kit.palette.accent}
+  Background: ${kit.palette.background}
+  Text: ${kit.palette.text}
+${kit.palette.gradients.map(g => `  Gradient "${g.name}": ${g.start} → ${g.end} (${g.angle}°)`).join('\n')}
+
+TYPOGRAPHY:
+  Heading: "${kit.typography.heading.family}" weight ${kit.typography.heading.weights.join('/')}
+  Body: "${kit.typography.body.family}" weight ${kit.typography.body.weights.join('/')}
+  CTA: "${kit.typography.cta.family}" ${kit.typography.cta.transform}
+
+AVAILABLE LOGOS (${logos.length}):
+${logos.map(l => `  · "${l.name}" — ${l.width}×${l.height} ${l.format} ${l.role ? `[${l.role}]` : ''} ${l.isFavorite ? '★' : ''}`).join('\n') || '  (none uploaded)'}
+
+PRODUCT IMAGES (${products.length}):
+${products.map(p => `  · "${p.name}" — ${p.width}×${p.height} ${p.tags.join(', ')}`).join('\n') || '  (none uploaded)'}
+
+FAVORITE ASSETS (${favorites.length}):
+${favorites.map(f => `  · "${f.name}" [${f.category}] — used ${f.usageCount} times`).join('\n') || '  (none starred)'}
+
+BRAND VOICE: ${kit.guidelines.voiceTone}
+${kit.guidelines.tagline ? `TAGLINE: "${kit.guidelines.tagline}"` : ''}
+CTA PHRASES: ${kit.guidelines.ctaPhrases.join(', ')}
+LOGO RULES: ${kit.guidelines.logoPlacementRules}
+${kit.guidelines.forbiddenColors.length ? `FORBIDDEN COLORS: ${kit.guidelines.forbiddenColors.join(', ')}` : ''}
+${kit.guidelines.forbiddenWords.length ? `FORBIDDEN WORDS: ${kit.guidelines.forbiddenWords.join(', ')}` : ''}
+
+INSTRUCTIONS FOR PLANNER:
+- ALWAYS use brand palette colors. Do NOT invent new colors.
+- If logos are available, INCLUDE the primary logo in the layout plan.
+- Product images should be placed in hero zones (LAYOUT_ZONES.image).
+- CTA text must come from ctaPhrases list unless user specifies otherwise.
+- Respect logoPlacementRules for logo positioning.
+`;
+}
+
+// ── Executor에게 주입할 Asset References ──
+
+export function buildAssetReferencesForExecutor(kit: BrandKit): AssetReference[] {
+  return kit.assets
+    .filter(a => !a.deletedAt)
+    .map(a => ({
+      id: a.id,
+      name: a.name,
+      category: a.category,
+      role: a.role ?? null,
+      src: a.src,              // ← Executor가 createImage로 삽입할 때 사용
+      width: a.width,
+      height: a.height,
+      suggestedPlacement: a.metadata.suggestedPlacement,
+    }));
+}
+
+// ── Critic에게 주입할 Brand Compliance Rules ──
+
+export function buildBrandComplianceForCritic(kit: BrandKit): BrandComplianceRules {
+  return {
+    allowedColors: [
+      kit.palette.primary, kit.palette.secondary,
+      kit.palette.accent, kit.palette.background,
+      kit.palette.text,
+      ...kit.palette.gradients.flatMap(g => [g.start, g.end]),
+    ],
+    forbiddenColors: kit.guidelines.forbiddenColors,
+    requiredAssets: kit.assets
+      .filter(a => a.role === 'primary_logo' && !a.deletedAt)
+      .map(a => a.name),  // "primary logo must be present"
+    fontFamilies: [
+      kit.typography.heading.family,
+      kit.typography.body.family,
+      kit.typography.cta.family,
+    ],
+    logoPlacementRules: kit.guidelines.logoPlacementRules,
+  };
+}
+
+interface BrandComplianceRules {
+  allowedColors: string[];
+  forbiddenColors: string[];
+  requiredAssets: string[];       // assets that MUST be in the final design
+  fontFamilies: string[];
+  logoPlacementRules: string;
+}
+```
+
+---
+
+### [NEW] `src/services/assetProcessor.ts`
+
+**Asset Upload Pipeline** — 업로드 시 자동 처리
+
+```typescript
+export async function processUploadedAsset(
+  file: File
+): Promise<ProcessedAsset> {
+  // 1. Read file → base64 / blob URL
+  const dataUrl = await readFileAsDataUrl(file);
+
+  // 2. Get dimensions
+  const { width, height } = await getImageDimensions(dataUrl);
+
+  // 3. Generate thumbnail (150px wide)
+  const thumbSrc = await generateThumbnail(dataUrl, 150);
+
+  // 4. Compute SHA-256 hash (Penpot dedup pattern)
+  const hash = await computeHash(file);
+
+  // 5. Extract dominant colors (for AI context)
+  const dominantColors = await extractDominantColors(dataUrl, 3);
+
+  // 6. Detect transparency
+  const hasTransparency = await detectAlphaChannel(dataUrl);
+
+  // 7. Auto-suggest placement based on aspect ratio
+  const ratio = width / height;
+  let suggestedPlacement: BrandAsset['metadata']['suggestedPlacement'] = null;
+  if (ratio > 3) suggestedPlacement = 'top-center';     // wide banner/logo
+  else if (ratio < 0.5) suggestedPlacement = 'center';  // tall product shot
+  else if (width < 200 && height < 200) suggestedPlacement = 'top-right'; // icon/small logo
+
+  // 8. Auto-categorize
+  const category = autoDetectCategory(file.name, width, height, hasTransparency);
+
+  return {
+    src: dataUrl,
+    thumbSrc,
+    width, height,
+    format: file.type.split('/')[1] as AssetFormat,
+    sizeBytes: file.size,
+    hash,
+    metadata: { hasTransparency, dominantColors, suggestedPlacement },
+    category,
+  };
+}
+
+function autoDetectCategory(name: string, w: number, h: number, hasAlpha: boolean): AssetCategory {
+  const n = name.toLowerCase();
+  if (n.includes('logo') || (hasAlpha && w < 500 && h < 500)) return 'logo';
+  if (n.includes('product') || n.includes('item')) return 'product';
+  if (n.includes('icon') || (w < 128 && h < 128)) return 'icon';
+  if (n.includes('texture') || n.includes('pattern')) return 'texture';
+  if (n.includes('bg') || n.includes('background')) return 'background';
+  return 'photo';
+}
+
+// ── Image utility functions ──
+
+async function readFileAsDataUrl(file: File): Promise<string> { ... }
+async function getImageDimensions(src: string): Promise<{width: number; height: number}> { ... }
+async function generateThumbnail(src: string, maxWidth: number): Promise<string> { ... }
+async function computeHash(file: File): Promise<string> { ... }
+async function extractDominantColors(src: string, count: number): Promise<string[]> { ... }
+async function detectAlphaChannel(src: string): Promise<boolean> { ... }
+```
+
+---
+
+### Integration Points (기존 코드 수정)
+
+#### [MODIFY] `src/services/autoDesignService.ts` — Brand Kit 주입
+
+```typescript
+// 현재 (line 244-348): buildFromScratchPrompt에 personality만 주입
+// 수정: brandContextBuilder로 Brand Kit Context도 주입
+
+function buildFromScratchPrompt(
+  canvasW: number, canvasH: number, userPrompt: string,
+  brandKit: BrandKit | null,  // ← NEW parameter
+): string {
+  const ratio = classifyRatio(canvasW, canvasH);
+  const zones = LAYOUT_ZONES[ratio];
+  const personality = brandKit
+    ? brandKit.guidelines.industry as DesignPersonality  // brand kit이 personality 대체
+    : detectPersonality(userPrompt);
+  const personalityRule = PERSONALITY_RULES[personality];
+
+  // ★ NEW: Brand Kit context 주입
+  const brandContext = brandKit
+    ? buildBrandContextForPlanner(brandKit)
+    : '';
+
+  return `You are a senior banner ad designer...
+${personalityRule}
+${brandContext}
+...rest of prompt`;
+}
+```
+
+#### [MODIFY] `src/services/agents/criticAgent.ts` — Brand Compliance Check
+
+```typescript
+// Critic의 checklist에 brand compliance 추가
+const checkList = [
+  'overlap', 'clipping', 'contrast', 'hierarchy',
+  'brand_color_compliance',    // ← NEW: 사용된 색상이 brandKit.palette와 일치?
+  'logo_presence',             // ← NEW: primary logo가 포함되었는가?
+  'logo_placement',            // ← NEW: logoPlacementRules 준수?
+  'font_compliance',           // ← NEW: 허용된 폰트만 사용?
+  'forbidden_color_violation', // ← NEW: 금지 색상 사용했는가?
+  'background_quality',
+  'asset_completeness',
+];
+```
+
+#### [MODIFY] `src/services/tools/createTools.ts` — Brand Asset 삽입
+
+```typescript
+// createImage tool이 Brand Kit asset을 직접 참조
+export const createImageFromBrandKit: AceTool = {
+  name: 'create_image_from_brand_kit',
+  category: 'create',
+  description: 'Place a brand kit asset (logo, product image) on canvas',
+  inputSchema: {
+    properties: {
+      assetId: { type: 'string', description: 'ID from brand kit assets list' },
+      x: { type: 'number' }, y: { type: 'number' },
+      w: { type: 'number' }, h: { type: 'number' },
+    },
+    required: ['assetId'],
+  },
+  execute: ({ assetId, x, y, w, h }, ctx) => {
+    const kit = useBrandKitStore.getState().getActiveKit();
+    if (!kit) return { success: false, message: 'No active brand kit' };
+
+    const asset = kit.assets.find(a => a.id === assetId);
+    if (!asset) return { success: false, message: `Asset ${assetId} not found` };
+
+    // Place on canvas using asset's actual data
+    ctx.designStore.getState().addElement({
+      type: 'image',
+      src: asset.src,
+      name: asset.name,
+      constraints: absoluteToConstraints(
+        x ?? 0, y ?? 0,
+        w ?? asset.width, h ?? asset.height,
+        ctx.canvasW, ctx.canvasH
+      ),
+      zIndex: ctx.designStore.getState().getMaxZIndex() + 1,
+    });
+
+    // ★ Track usage (for AI learning)
+    useBrandKitStore.getState().incrementUsage(kit.id, assetId);
+
+    return {
+      success: true,
+      message: `Placed "${asset.name}" (${asset.category}) at (${x},${y})`,
+      data: { assetId, assetName: asset.name },
+    };
   }
-  
-  return { steps, finalScore, ... };
-}
-```
-
-**기존 코드 교체**:
-- `useAutoDesign.ts`의 `generate()` 함수 → `runAgentPipeline()` 호출로 교체
-- `autoDesignService.ts`의 `callAutoDesign()` → deprecated, `runPlanner()`+`runExecutor()`로 대체
-- `autoDesignLoop.ts`의 `runVisionLoop()` → `runAgentPipeline()` 내부로 통합
-
----
-
-## Phase 3: Model Router + Layout Intelligence (4 weeks)
-
-### 3-1. Model Router (← Jaaz)
-
-#### [NEW] `src/services/modelRouter.ts`
-
-```typescript
-const MODEL_MAP: Record<TaskType, ModelConfig> = {
-  'design-planning':  { provider: 'anthropic', model: 'claude-sonnet-4-20250514' },
-  'tool-execution':   { provider: 'anthropic', model: 'claude-sonnet-4-20250514' },
-  'vision-qa':        { provider: 'openai', model: 'gpt-4o' },
-  'image-gen':        { provider: 'together', model: 'flux-schnell' },
-  'text-rewrite':     { provider: 'anthropic', model: 'claude-haiku' },
 };
-
-export function selectModel(task: TaskType): ModelConfig {
-  return MODEL_MAP[task];
-}
-
-// 향후: 사용자가 설정에서 모델 교체 가능 (Jaaz처럼)
 ```
 
-#### [NEW] `src/services/openRouterClient.ts`
+#### [MODIFY] `src/services/tools/generateTools.ts` — Brand-Constrained Generation
 
 ```typescript
-// OpenRouter API: 하나의 API key로 50+ LLM 접근
-export async function callOpenRouter(config: ModelConfig, body: RequestBody) {
-  // anthropicClient.ts와 동일 패턴이지만 엔드포인트만 다름
-}
+// AI 이미지 생성 시 brand palette를 constraint로 전달
+export const generateBackground: AceTool = {
+  execute: async ({ prompt, style, width, height }, ctx) => {
+    const kit = useBrandKitStore.getState().getActiveKit();
+
+    // ★ Brand Kit이 있으면 색상 제약 조건 추가
+    const brandConstraint = kit
+      ? `Color palette constraint: use only ${kit.palette.primary}, ${kit.palette.secondary}, ${kit.palette.background}. Style: ${kit.guidelines.voiceTone}`
+      : '';
+
+    const fullPrompt = `${prompt}, ${style} style, ${brandConstraint}, banner background, ${width}x${height}`;
+
+    const imageUrl = await callImageGeneration(selectModel('image-gen'), {
+      prompt: fullPrompt, width, height,
+    });
+
+    // ... rest of execution
+  }
+};
 ```
 
-**기존 코드 교체**:
-- `anthropicClient.ts` → 유지 (직접 호출 옵션)
-- 새로운 호출은 `modelRouter`가 `anthropicClient` 또는 `openRouterClient` 중 결정
-
-### 3-2. Layout Intelligence (← PosterMaker)
-
-#### [MODIFY] `src/engine/smartSizing.ts` — LAYOUT_ZONES 확장
+#### [MODIFY] `src/hooks/useAutoDesign.ts` — Brand Kit 전달
 
 ```typescript
-// 현재: 5 categories × 8 roles (고정)
-// 추가: 업종별 modifier
+// generate() 함수에서 Brand Kit을 전체 파이프라인에 전달
+const generate = async (prompt: string) => {
+  const brandKit = useBrandKitStore.getState().getActiveKit();  // ← NEW
 
-export const INDUSTRY_MODIFIERS: Record<string, Partial<LayoutMap>> = {
-  finance: {
-    headline: { maxFontScale: 0.7 },  // 보수적, 작은 글씨
-    cta: { h: 0.08 },                  // 작은 CTA
-  },
-  fashion: {
-    image: { w: 0.7, h: 0.8 },        // 이미지 크게
-    headline: { maxFontScale: 1.2 },   // 대담한 타이틀
-  },
-  food: {
-    image: { w: 0.6 },                // 제품 사진 강조
-    decoration: { maxFontScale: 0.8 }, // 따뜻한 장식
-  },
+  // Phase 1이 완성되면:
+  await runAgentPipeline(prompt, {
+    ...toolCtx,
+    brandKit,  // ← Planner/Executor/Critic 모두에게 전달
+  }, onProgress, signal);
 };
 ```
 
 ---
 
-## File Change Summary
+## Complete Phase Architecture (Updated)
 
-### New Files (18)
-```
-src/services/tools/toolTypes.ts      ← 공통 인터페이스
-src/services/tools/readTools.ts      ← 5 tools (getPageTree, getNode, findNodes, getSelection, getCanvasBounds)
-src/services/tools/createTools.ts    ← 5 tools (createShape, createText, createImage, createGroup, duplicateNode)
-src/services/tools/modifyTools.ts    ← 8 tools (setFill, setStroke, setFont, setText, moveNode, resizeNode, setOpacity, setZIndex)
-src/services/tools/structureTools.ts ← 4 tools (deleteNode, renameNode, groupNodes, reparentNode)
-src/services/tools/analyzeTools.ts   ← 4 tools (analyzeColors, analyzeTypography, analyzeSpacing, analyzeBrandCompliance)
-src/services/tools/sizingTools.ts    ← 4 tools (addVariant, propagateToAll, smartResize, getVariantList)
-src/services/tools/exportTools.ts    ← 3 tools (exportPNG, exportSVG, exportAllVariants)
-src/services/tools/generateTools.ts  ← 3 tools (generateBackground, generateProductImage, generateTexture)
-src/services/toolRegistry.ts        ← 통합 registry (getToolSchemas, executeTool)
-src/services/sceneGraphBuilder.ts   ← buildSceneGraph (계층 구조 + 관계 + 토큰)
-src/services/agents/agentTypes.ts   ← AgentMessage, AgentStep, PipelineResult
-src/services/agents/plannerAgent.ts ← runPlanner (brandKit + sceneGraph → DesignPlan)
-src/services/agents/executorAgent.ts← runExecutor (DesignPlan + 40 tools → 배너 생성)
-src/services/agents/criticAgent.ts  ← runCritic (Vision + 이미지생성 제안)
-src/services/imageGenClient.ts      ← callImageGeneration (Flux/DALL-E/Midjourney)
-src/services/modelRouter.ts         ← selectModel (용도별 최적 모델)
-src/services/openRouterClient.ts    ← OpenRouter API 클라이언트
-```
+### Phase 0: Brand Kit Foundation (1 week) — NEW!
 
-### Modified Files (4)
-```
-src/services/autoDesignLoop.ts      ← runVisionLoop → runAgentPipeline
-src/services/autoDesignService.ts   ← 2 tools → toolRegistry 연결 (점진적 deprecation)
-src/hooks/useAutoDesign.ts          ← callAutoDesign → runAgentPipeline
-src/engine/smartSizing.ts           ← INDUSTRY_MODIFIERS 추가
-```
+| File | Type | What |
+|---|---|---|
+| `src/stores/brandKitStore.ts` | NEW | Zustand store: assets, palette, typography, guidelines |
+| `src/services/brandContextBuilder.ts` | NEW | Kit → AI prompt context (planner/executor/critic) |
+| `src/services/assetProcessor.ts` | NEW | Upload pipeline (hash, thumbnail, dominant colors, auto-categorize) |
+| `src/components/panels/BrandKitPanel.tsx` | NEW | UI: asset grid, upload, palette editor, tag editor |
+| `src/stores/brandKitStore.test.ts` | NEW | 25+ tests: CRUD, dedup, soft delete, query |
 
-### Deprecated (not deleted, backward compat)
+### Phase 1: Tool Registry + Scene Graph (2 weeks)
+
+| File | Type | What |
+|---|---|---|
+| `src/services/tools/toolTypes.ts` | NEW | `AceTool`, `ToolContext` (now includes `brandKit`) |
+| `src/services/tools/readTools.ts` | NEW | 5 tools: getPageTree, getNode, findNodes, getSelection, getBounds |
+| `src/services/tools/createTools.ts` | NEW | 6 tools: createShape, createText, createImage, **createImageFromBrandKit**, createGroup, duplicateNode |
+| `src/services/tools/modifyTools.ts` | NEW | 8 tools: setFill, setStroke, setFont, setText, moveNode, resizeNode, setOpacity, setZIndex |
+| `src/services/tools/structureTools.ts` | NEW | 4 tools: deleteNode, renameNode, groupNodes, reparentNode |
+| `src/services/tools/analyzeTools.ts` | NEW | 5 tools: analyzeColors, analyzeTypography, analyzeSpacing, **analyzeBrandCompliance**, analyzeClusters |
+| `src/services/tools/sizingTools.ts` | NEW | 4 tools: addVariant, propagateToAll, smartResize, getVariantList |
+| `src/services/tools/exportTools.ts` | NEW | 3 tools: exportPNG, exportSVG, exportAllVariants |
+| `src/services/toolRegistry.ts` | NEW | ALL_TOOLS registry, getToolSchemas(), executeTool() |
+| `src/services/sceneGraphBuilder.ts` | NEW | buildSceneGraph(): hierarchy + relationships + tokens |
+| `src/services/designTokenAnalyzer.ts` | NEW | analyzeColors/Typography/Spacing from elements |
+| `src/services/autoDesignService.ts` | MODIFY | Brand Kit context injection into prompts |
+
+### Phase 2: 3-Agent Chain + Image Generation (3 weeks)
+
+| File | Type | What |
+|---|---|---|
+| `src/services/agents/agentTypes.ts` | NEW | AgentMessage, AgentStep, PipelineResult |
+| `src/services/agents/plannerAgent.ts` | NEW | runPlanner (brand kit + scene graph → DesignPlan) |
+| `src/services/agents/executorAgent.ts` | NEW | runExecutor (40+ tools, createImageFromBrandKit) |
+| `src/services/agents/criticAgent.ts` | NEW | runCritic (vision + **brand compliance** check) |
+| `src/services/tools/generateTools.ts` | NEW | 3 tools: generateBackground (brand-constrained), generateProductImage, generateTexture |
+| `src/services/imageGenClient.ts` | NEW | callImageGeneration (Flux/DALL-E/Midjourney) |
+| `src/services/llmContextBuilder.ts` | NEW | JSON elements → natural language (PenAI pattern) |
+| `src/schema/designPlan.types.ts` | NEW | DesignPlan, PlannedElement |
+| `src/services/autoDesignLoop.ts` | MODIFY | runVisionLoop → runAgentPipeline |
+| `src/hooks/useAutoDesign.ts` | MODIFY | Pass brandKit to entire pipeline |
+
+### Phase 3: Model Router + Layout Intelligence (4 weeks)
+
+| File | Type | What |
+|---|---|---|
+| `src/services/modelRouter.ts` | NEW | selectModel by task type |
+| `src/services/openRouterClient.ts` | NEW | OpenRouter API (50+ LLMs) |
+| `src/engine/layoutIntelligence.ts` | NEW | Industry-specific layout rules |
+| `src/engine/smartSizing.ts` | MODIFY | INDUSTRY_MODIFIERS |
+| `src/hooks/useAutoDesign.ts` | MODIFY | Semantic auto-naming |
+
+---
+
+## Data Flow (End-to-End)
+
 ```
-RenderElement type          → createTools로 대체
-RearrangePatch type         → modifyTools로 대체
-CanvasElementInfo type      → SceneGraph로 대체
-callAutoDesign()            → runPlanner+runExecutor로 대체
+User uploads logo.png
+  → assetProcessor.processUploadedAsset(file)
+    → hash, thumbnail, dominantColors, autoCategory='logo'
+  → brandKitStore.addAsset(kitId, processed)
+    → dedup check (hash exists?) → skip or add
+    → persist to localStorage
+
+User types "Make a Nike Black Friday banner"
+  → useAutoDesign.generate(prompt)
+    → brandKit = useBrandKitStore.getActiveKit()
+    → sceneGraph = buildSceneGraph(currentVariant)
+    → brandContext = buildBrandContextForPlanner(brandKit)
+
+  → runPlanner(prompt, sceneGraph, brandKit)
+    → system prompt includes:
+      · LAYOUT_ZONES for 300x250
+      · Brand palette (#e60023, #1a1f2e, ...)
+      · Available logos ("Nike Swoosh White — 400x200 PNG [primary_logo]")
+      · Product images ("Air Max 90 — 800x600 [product_hero]")
+      · CTA phrases ["Shop Now", "Get Started"]
+      · Logo placement rules
+    → outputs: DesignPlan {
+        elements: [
+          { role: 'background', type: 'gradient', colors: ['#0a0e1a', '#1a2e4a'] },
+          { role: 'logo', type: 'brand_asset', assetId: 'asset-xxx', placement: 'top-right' },
+          { role: 'product', type: 'brand_asset', assetId: 'asset-yyy', placement: 'center' },
+          { role: 'headline', type: 'text', content: 'BLACK FRIDAY', ... },
+          { role: 'cta', type: 'button', text: 'SHOP NOW', ... },
+        ]
+      }
+
+  → runExecutor(plan, toolCtx)
+    → tool calls:
+      1. createShape('rect', { gradient: ['#0a0e1a', '#1a2e4a'] })  // background
+      2. createImageFromBrandKit('asset-xxx', { x: 220, y: 10 })    // Nike logo
+      3. createImageFromBrandKit('asset-yyy', { x: 50, y: 40 })     // product
+      4. createText('BLACK FRIDAY', { font: 'Montserrat', size: 30 }) // headline
+      5. createShape('rounded_rect', { fill: '#e60023', ... })        // CTA button
+      6. createText('SHOP NOW', { font: 'Inter', transform: 'uppercase' }) // CTA label
+
+  → runCritic(screenshot, sceneGraph, brandKit)
+    → checks:
+      · ✅ Colors match palette (#e60023, #0a0e1a, #1a2e4a)
+      · ✅ Logo present and in top-right
+      · ✅ Product image visible
+      · ❌ Headline overlaps product image → fix patch
+      · ❌ Background too plain → generateRequests: [generate_background]
+    → if not pass:
+      → Executor applies fix patches
+      → generateBackground called with brand palette constraint
+      → Critic re-checks until pass
+
+  → Final: branded banner with Nike assets, correct colors, proper layout
 ```
 
 ---
 
 ## Verification Plan
 
-### Phase 1 완료 후
 ```bash
-npm test                     # 기존 114 unit 통과
-# + toolRegistry.test.ts     → tool schema 검증 (15+ tests)
-# + sceneGraphBuilder.test.ts → 계층 구조 빌드 검증 (10+ tests)
-# + readTools.test.ts         → getPageTree 반환 구조 (5+ tests)
-npx tsc --noEmit             # 0 errors
-```
+# Phase 0 (Brand Kit)
+npm test                    # brandKitStore.test.ts (25+ tests)
+                            # - createKit, addAsset, removeAsset (soft), permanentDelete
+                            # - dedup (same hash rejected)
+                            # - getByCategory, getByTag, getByRole
+                            # - toggleFavorite, incrementUsage
+                            # - palette/typography/guidelines CRUD
+                            # - learnFromDesign auto-extraction
 
-### Phase 2 완료 후
-```bash
-npm test                     # 160+ tests
-# + plannerAgent.test.ts      → plan 구조 검증 (5+ tests)
-# + criticAgent.test.ts       → verdict/score 검증 (5+ tests)
-# + generateTools.test.ts     → 이미지 생성 mock 테스트 (5+ tests)
-npm run test:e2e             # AI chat flow E2E
-```
+# Phase 1 (Tools + Scene Graph)
+npm test                    # 170+ tests total
+npx tsc --noEmit            # 0 type errors
 
-### Phase 3 완료 후
-```bash
-npm test                     # 200+ tests
-npm run test:coverage        # 목표: 50%+ statement coverage
+# Phase 2 (Agents + Image Gen)
+npm test                    # 200+ tests total
+npm run test:e2e            # AI chat flow with brand kit
+
+# Phase 3 (Router + Layout)
+npm run test:coverage       # 50%+ statement coverage
 ```
