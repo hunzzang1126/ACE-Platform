@@ -205,9 +205,7 @@ export function useAutoDesign(options: AutoDesignOptions) {
                 // ── Mode B: Asset-Context ──────────────────────────
                 setState(s => ({ ...s, progress: `Reading ${existingElements.length} element${existingElements.length > 1 ? 's' : ''} on canvas...` }));
 
-                // ★ Snapshot all image elements BEFORE AI runs
-                // We'll remove them, let AI build the layout, then re-add images LAST
-                // so they're always on top of the generated background/shapes
+                // ★ Step 1: Snapshot all IMAGE elements (preserve user's uploaded assets)
                 const imageSnapshots: Array<{ src: string; name: string; x: number; y: number; w: number; h: number }> = [];
                 try {
                     const imageIds: number[] = engine.find_all_by_type?.('image') ?? [];
@@ -218,23 +216,21 @@ export function useAutoDesign(options: AutoDesignOptions) {
                         if (src) {
                             imageSnapshots.push({ src, name, x: bounds?.x ?? 0, y: bounds?.y ?? 0, w: bounds?.w ?? 100, h: bounds?.h ?? 100 });
                         }
-                        engine.remove_element?.(imgId);
                     }
                 } catch { /* ok */ }
 
-                // Get screenshot of layout (without images — cleaner for AI to analyze text/shape positions)
+                // ★ Step 2: Clear ALL elements from canvas (clean slate before regenerate)
+                // This prevents element accumulation when user clicks Regenerate multiple times
+                try { engine.clear_scene?.(); } catch { /* ok */ }
+
+                // Get clean screenshot (empty canvas or just outline)
                 let screenshot = '';
                 try { screenshot = engine.get_screenshot() as string; } catch { /* ok */ }
 
                 setState(s => ({ ...s, progress: 'AI building professional layout...' }));
 
-                // Pass image info to AI via updated element list (images removed from canvas but shown in prompt as context)
-                const elementsForAI = existingElements.filter(e => e.type !== 'image');
-
-                const result = await callAssetContext(prompt, screenshot, elementsForAI, canvasW, canvasH, signal, imageSnapshots.length > 0);
-
-                // Apply patches to existing non-image elements
-                const patched = applyRearrangePatches(engine, result.patches);
+                // Build AI prompt: pass hasImages=true even though images are gone (we'll re-add them)
+                const result = await callAssetContext(prompt, screenshot, [], canvasW, canvasH, signal, imageSnapshots.length > 0);
 
                 // Add all new elements (background, overlay, text, CTA, etc.)
                 setState(s => ({ ...s, progress: 'Rendering layout...' }));
@@ -264,8 +260,8 @@ export function useAutoDesign(options: AutoDesignOptions) {
                     } catch { /* ok */ }
                 }
 
-                console.log(`[useAutoDesign] Asset-context: patched=${patched}, added=${createdCount}, images-readded=${imageSnapshots.length}`);
-                createdCount = patched + createdCount;
+                console.log(`[useAutoDesign] Asset-context: added=${createdCount}, images-readded=${imageSnapshots.length}`);
+                // createdCount already reflects all additions
 
             } else {
                 // ── Mode A: From Scratch ───────────────────────────
