@@ -33,14 +33,18 @@ export interface RenderElement {
     b?: number;
     a?: number;
     radius?: number;
+    // Gradient (for rect/rounded_rect background)
+    gradient_start_hex?: string; // e.g. "#0a1628"
+    gradient_end_hex?: string;   // e.g. "#1a2e4a"
+    gradient_angle?: number;     // degrees: 0=top→bottom, 90=left→right, 135=diagonal
     // Text
     content?: string;
     font_size?: number;
     font_weight?: string;
     color_hex?: string;
     text_align?: string;
-    letter_spacing?: number; // px, e.g. -0.5 (tight) to 4 (wide)
-    line_height?: number;    // multiplier, e.g. 1.0–2.0
+    letter_spacing?: number;
+    line_height?: number;
     // Naming
     name?: string;
 }
@@ -110,6 +114,9 @@ const RENDER_BANNER_TOOL = {
                         text_align: { type: 'string' },
                         letter_spacing: { type: 'number', description: 'Letter spacing in px. -0.5 for headlines (tight), 0 for body, 1–4 for labels.' },
                         line_height: { type: 'number', description: 'Line height multiplier. 1.0–1.2 for headlines, 1.4–1.6 for body text.' },
+                        gradient_start_hex: { type: 'string', description: 'Start color of linear gradient (hex). Use for background instead of r/g/b.' },
+                        gradient_end_hex: { type: 'string', description: 'End color of linear gradient (hex). Pair with gradient_start_hex.' },
+                        gradient_angle: { type: 'number', description: 'Gradient angle in degrees. 0=top→bottom, 90=left→right, 135=diagonal.' },
                     },
                 },
             },
@@ -173,67 +180,164 @@ const REARRANGE_BANNER_TOOL = {
 
 // ── System Prompts ────────────────────────────────────────
 
-function buildFromScratchPrompt(canvasW: number, canvasH: number): string {
+// ── Personality Detection ─────────────────────────────────
+type DesignPersonality = 'financial' | 'sports' | 'health' | 'tech' | 'retail' | 'lifestyle';
+
+function detectPersonality(prompt: string): DesignPersonality {
+    const p = prompt.toLowerCase();
+    if (/finance|bank|invest|insurance|legal|law|wealth|asset|fund|mortgage/.test(p)) return 'financial';
+    if (/shoe|sport|run|gym|athletic|nike|adidas|fitness|workout|energy/.test(p)) return 'sports';
+    if (/health|medical|doctor|wellness|clinic|care|pharma|hospital/.test(p)) return 'health';
+    if (/tech|saas|app|software|cloud|ai|startup|digital|devops|api/.test(p)) return 'tech';
+    if (/sale|shop|off|discount|buy|deal|promo|retail|fashion|store/.test(p)) return 'retail';
+    return 'lifestyle';
+}
+
+const PERSONALITY_RULES: Record<DesignPersonality, string> = {
+    financial: `
+PERSONALITY: FINANCIAL / PROFESSIONAL
+  - Background: dark navy (#0a1628), deep charcoal (#1a1a2e), or midnight blue — NEVER bright/saturated
+  - Accent: gold (#c9a84c), muted gold (#b8943f), or steel blue (#4a7fa5)
+  - Typography: clean geometric sans, normal-regular weight hierarchy, generous letter-spacing (1-2px on labels)
+  - Layout: balanced symmetry, generous padding, MINIMAL clutter — max 4 elements per zone
+  - Tone: STATIC, authoritative, trustworthy — NO dynamic shapes, NO playful elements`,
+    sports: `
+PERSONALITY: SPORTS / DYNAMIC
+  - Background: deep black (#0a0a0a) or dark charcoal with bold accent
+  - Accent: electric orange (#ff4500), bright red (#e60023), or neon yellow (#ffd700)
+  - Typography: HEAVY weight (800-900), TIGHT letter-spacing (-1 to -2px for headline), condensed feel
+  - Headline: ALL CAPS, maximum impact, font_size should be LARGE (canvas_h × 0.14-0.16)
+  - Layout: asymmetric energy — text aligned left or right, CTA on opposite side
+  - Tone: DYNAMIC, high-energy, bold contrasts`,
+    health: `
+PERSONALITY: HEALTH / WELLNESS
+  - Background: clean white (#ffffff), soft mint (#f0f9f0), or light blue (#e8f4fd)
+  - Accent: fresh green (#2ecc71) or calm teal (#17a589)
+  - Typography: light-regular weight, open tracking (+0.5 to +1px), airy spacing
+  - Layout: centered, breathing room between elements, not cramped
+  - Tone: CALM, trustworthy, clean — NO hard shadows, NO sharp contrasts`,
+    tech: `
+PERSONALITY: TECH / SAAS
+  - Background: dark (#0d1117) or very dark blue (#0a0e1a)
+  - Accent: electric blue (#007aff), cyan (#00d4ff), or purple (#6c5ce7)
+  - Typography: geometric mono-influenced sans, medium weight, normal tracking
+  - CTA button: bright accent on dark — high contrast, crisp corners or small radius
+  - Layout: grid-aligned, tight, precise
+  - Tone: MODERN, precise, data-forward`,
+    retail: `
+PERSONALITY: RETAIL / PROMOTIONAL
+  - Background: SATURATED primary or bold contrast (bright red, electric blue, etc.)
+  - Accent: bright complementary — yellow on red, white on navy
+  - Typography: BOLD, condensed or heavy weight, LARGE discount numbers
+  - Sale numbers / percentages: make them ENORMOUS (font_size = canvas_h × 0.20-0.25)
+  - Layout: DENSE, urgency-driven — CTA prominent and large
+  - Tone: URGENT, high-energy, promotional`,
+    lifestyle: `
+PERSONALITY: LIFESTYLE / BRAND
+  - Background: warm neutrals, soft gradients, elegant darks
+  - Accent: warm tones (#e8b86d, #c4956a) or vibrant brand color
+  - Typography: elegant weight progression, balanced spacing
+  - Layout: centered or split, visually balanced
+  - Tone: ASPIRATIONAL, premium, stylish`,
+};
+
+function buildFromScratchPrompt(canvasW: number, canvasH: number, userPrompt: string): string {
     const ratio = classifyRatio(canvasW, canvasH);
     const zones = LAYOUT_ZONES[ratio];
+    const personality = detectPersonality(userPrompt);
+    const personalityRule = PERSONALITY_RULES[personality];
 
     // Compute exact pixel positions for each element from zone percentages
     const bgX = 0, bgY = 0, bgW = canvasW, bgH = canvasH;
     const hlX = Math.round(zones.headline.x * canvasW);
     const hlY = Math.round(zones.headline.y * canvasH);
     const hlW = Math.round(zones.headline.w * canvasW);
+    const subY = Math.round(hlY + canvasH * 0.14); // subheadline always 14% below headline start
     const ctaX = Math.round(zones.cta.x * canvasW);
     const ctaY = Math.round(zones.cta.y * canvasH);
     const ctaW = Math.round(zones.cta.w * canvasW);
     const ctaH = Math.round(zones.cta.h * canvasH);
+    const ctaLabelY = ctaY + Math.round(ctaH * 0.22);
 
-    // Font sizes scaled to canvas
-    const hlFontMin = Math.max(14, Math.round(canvasH * 0.08));
-    const hlFontMax = Math.max(18, Math.round(canvasH * 0.15));
-    const ctaFont = Math.max(12, Math.round(canvasH * 0.06));
+    // Font sizes scaled to canvas — strict hierarchy
+    const hlFont = Math.max(18, Math.round(canvasH * 0.12));
+    const subFont = Math.round(hlFont * 0.58);   // 58% of headline
+    const bodyFont = Math.round(hlFont * 0.44);  // 44% of headline
+    const ctaFont = Math.round(hlFont * 0.55);   // 55% of headline
 
     // Layout descriptions per ratio
     const descriptions: Record<string, string> = {
-        'ultra-wide': 'Horizontal: logo LEFT, headline CENTER, CTA RIGHT. Leaderboard ad.',
-        'wide': 'Two-section: headline LEFT/CENTER, CTA RIGHT. Wide banner.',
-        'landscape': 'Standard banner: headline top-center, CTA bottom-center.',
-        'square': 'Social post (1:1): everything CENTER-ALIGNED horizontally.',
-        'portrait': 'Vertical social (4:5, 9:16): logo TOP, headline MIDDLE, CTA near BOTTOM. Center-aligned.',
-        'ultra-tall': 'Skyscraper: logo TOP, headline MIDDLE, CTA BOTTOM. Vertical center-aligned.',
+        'ultra-wide': 'Horizontal strip: text LEFT HALF, CTA button RIGHT EDGE.',
+        'wide': 'Two-section: headline LEFT/CENTER, CTA RIGHT side.',
+        'landscape': 'Standard banner: headline top-center, CTA button bottom-center.',
+        'square': 'Social post: everything CENTER-ALIGNED horizontally.',
+        'portrait': 'Vertical: headline UPPER MIDDLE, subheadline below, CTA near BOTTOM.',
+        'ultra-tall': 'Skyscraper: stacked top-to-bottom, all center-aligned.',
     };
     const desc = descriptions[ratio] ?? 'Balanced layout.';
 
-    return `You are a professional banner ad designer. Create a ${canvasW}x${canvasH}px banner.
-Category: ${ratio}. ${desc}
+    return `You are a senior banner ad designer producing ${canvasW}×${canvasH}px ads.
+Layout format: ${ratio}. ${desc}
+${personalityRule}
 
-YOU MUST place elements at EXACTLY these positions (calculated for this ratio):
+═══════════════════════════════════════════
+ABSOLUTE RULES — NEVER VIOLATE THESE:
+═══════════════════════════════════════════
 
-[0] background — rect
-    x=${bgX}, y=${bgY}, w=${bgW}, h=${bgH}
-    name: "background"
+1. NO TEXT OVERLAP (most critical rule):
+   - Each text element's bounding box must NOT intersect with any other text element
+   - Minimum VERTICAL GAP between any two text layers: max(12, font_size × 0.3) px
+   - If placing subheadline would overlap headline: move subheadline DOWN until gap is clear
+   - NEVER place two text elements at the same Y coordinate
 
-[1] headline — text
-    x=${hlX}, y=${hlY}, w=${hlW}
-    name: "headline"
+2. VISUAL HIERARCHY (never use same size for two levels):
+   - Headline: font_size=${hlFont}px, font_weight="800" or "900", letter_spacing=-0.5
+   - Subheadline: font_size=${subFont}px, font_weight="400"–"500", letter_spacing=0
+   - Body copy (if any): font_size=${bodyFont}px, font_weight="400"
+   - CTA label: font_size=${ctaFont}px, font_weight="700", text_align="center", ALL CAPS
 
-[2] cta_button — rounded_rect
-    x=${ctaX}, y=${ctaY}, w=${ctaW}, h=${ctaH}, radius=10
-    name: "cta_button"
+3. GRADIENT BACKGROUND (preferred over flat color):
+   - Use gradient_start_hex + gradient_end_hex for the background
+   - Choose two colors 20-40 lightness units apart — NOT identical, NOT clashing
+   - gradient_angle: 135 for diagonal, 180 for top→bottom, 90 for left→right
 
-[3] cta_label — text (centered on cta_button)
-    x=${ctaX}, y=${ctaY + Math.round(ctaH * 0.2)}, w=${ctaW}
-    name: "cta_label"
+4. ELEMENT LIMITS — generate EXACTLY 5 elements in this order:
+   [0] background (rect with gradient or solid)
+   [1] headline (text)
+   [2] subheadline (text) — MUST be positioned below headline with gap
+   [3] cta_button (rounded_rect)
+   [4] cta_label (text centered on cta_button)
 
-STRICT RULES:
-1. Return EXACTLY 4 elements in this order
-2. Use the exact x/y/w values above — do NOT change them
-3. Shapes: use r/g/b floats (0.0-1.0). Text: use color_hex ("#ffffff")
-4. Background and CTA button must have DIFFERENT, contrasting colors
-5. headline font_size: ${hlFontMin}-${hlFontMax}px, font_weight "800", text_align "center"
-6. cta_label font_size: ${ctaFont}px, font_weight "700", text_align "center"
-7. Use the exact element names: "background", "headline", "cta_button", "cta_label"
+═══════════════════════════════════════════
+REQUIRED POSITIONS (calculated for ${canvasW}×${canvasH}):
+═══════════════════════════════════════════
 
-Return ONLY the render_banner tool call. No text outside.`;
+[0] background
+    type="rect", x=${bgX}, y=${bgY}, w=${bgW}, h=${bgH}
+    name="background"
+    → Choose brand-appropriate colors based on personality above
+
+[1] headline
+    type="text", x=${hlX}, y=${hlY}, w=${hlW}
+    name="headline", font_size=${hlFont}, font_weight="800"
+    → Write the MAIN message from the prompt (impactful, short)
+
+[2] subheadline  
+    type="text", x=${hlX}, y=${subY}, w=${hlW}
+    name="subheadline", font_size=${subFont}, font_weight="400"
+    ⚠ VERIFY: y=${subY} must be at least ${Math.round(hlFont * 1.3 + 12)}px below headline y=${hlY}. If not, adjust DOWN.
+
+[3] cta_button
+    type="rounded_rect", x=${ctaX}, y=${ctaY}, w=${ctaW}, h=${ctaH}, radius=8
+    name="cta_button"
+    → High contrast to background — this is the action element
+
+[4] cta_label
+    type="text", x=${ctaX}, y=${ctaLabelY}, w=${ctaW}
+    name="cta_label", font_size=${ctaFont}, font_weight="700", text_align="center"
+    → SHORT action phrase: "SHOP NOW", "GET STARTED", "LEARN MORE" etc.
+
+Return ONLY the render_banner tool call. No explanation.`;
 }
 
 
@@ -349,7 +453,7 @@ export async function callFromScratch(
     const body = {
         model: DEFAULT_CLAUDE_MODEL,
         max_tokens: 2048,
-        system: buildFromScratchPrompt(canvasW, canvasH),
+        system: buildFromScratchPrompt(canvasW, canvasH, prompt),
         tools: [RENDER_BANNER_TOOL],
         tool_choice: { type: 'tool', name: 'render_banner' },
         messages: [{ role: 'user', content: prompt }],

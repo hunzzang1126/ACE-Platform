@@ -36,6 +36,11 @@ export interface EngineNode {
     objectFit?: 'cover' | 'contain' | 'fill';
     naturalWidth?: number;
     naturalHeight?: number;
+    // Gradient fields (when type === 'rect' or 'rounded_rect' with gradient)
+    gradient_type?: 'linear' | 'radial';
+    gradient_start?: string; // hex color
+    gradient_end?: string;   // hex color
+    gradient_angle?: number; // degrees, 0=top→bottom, 90=left→right
     // Name (for layer panel display)
     name?: string;
 }
@@ -58,6 +63,7 @@ export interface CanvasEngineActions {
     addRect: (x?: number, y?: number) => number | null;
     addEllipse: (x?: number, y?: number) => number | null;
     addRoundedRect: (x?: number, y?: number) => number | null;
+    addGradientRect: (x: number, y: number, w: number, h: number, color1: string, color2: string, angle?: number, radius?: number, name?: string) => number | null;
     // Text creation + manipulation
     addText: (x: number, y: number, content?: string, opts?: {
         fontSize?: number; fontFamily?: string; fontWeight?: string;

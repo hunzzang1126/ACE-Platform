@@ -922,6 +922,9 @@ export function useFabricCanvas(
     const actions: CanvasEngineActions = {
         onMouseDown, onMouseMove, onMouseUp,
         addRect, addEllipse, addRoundedRect,
+        addGradientRect: (x: number, y: number, w: number, h: number, c1: string, c2: string, angle?: number, radius?: number, name?: string) => {
+            return engineRef.current?.add_gradient_rect?.(x, y, w, h, c1, c2, angle, radius, name) ?? null;
+        },
         addText, updateText, getTextContent, addImage,
         deleteSelected, selectNode, deselectAll,
         setNodePosition, setNodeSize, setNodeOpacity, setFillColor,
@@ -1003,6 +1006,49 @@ function createEngineShim(fc: Canvas, syncState: () => void, artboardW: number, 
             syncState();
             return id;
         },
+
+        // ── Linear / Radial Gradient Rect ──
+        add_gradient_rect: (
+            x: number, y: number, w: number, h: number,
+            hex1: string, hex2: string,
+            angleDeg: number = 0,
+            radius: number = 0,
+            name?: string,
+        ) => {
+            const id = nextId();
+            // Convert angle to gradient coords: 0° = top→bottom, 90° = left→right
+            const rad = (angleDeg * Math.PI) / 180;
+            const x1 = 0.5 - Math.sin(rad) * 0.5;
+            const y1 = 0.5 - Math.cos(rad) * 0.5;
+            const x2 = 0.5 + Math.sin(rad) * 0.5;
+            const y2 = 0.5 + Math.cos(rad) * 0.5;
+            const gradient = new Gradient({
+                type: 'linear',
+                coords: { x1: x1 * w, y1: y1 * h, x2: x2 * w, y2: y2 * h },
+                colorStops: [
+                    { offset: 0, color: hex1 },
+                    { offset: 1, color: hex2 },
+                ],
+                gradientUnits: 'pixels',
+            });
+            const rect = new Rect({
+                left: x, top: y, width: w, height: h,
+                fill: gradient,
+                rx: radius, ry: radius,
+            });
+            (rect as any).__aceId = id;
+            (rect as any).__aceName = name || `Gradient Rect #${id}`;
+            (rect as any).__aceZIndex = userObjects().length;
+            (rect as any).__aceGradientStart = hex1;
+            (rect as any).__aceGradientEnd = hex2;
+            (rect as any).__aceGradientAngle = angleDeg;
+            patchAceProps(rect);
+            fc.add(rect);
+            fc.renderAll();
+            syncState();
+            return id;
+        },
+
         add_ellipse: (cx: number, cy: number, rx: number, ry: number, r: number, g: number, b: number, a: number) => {
             const id = nextId();
             const el = new Ellipse({
@@ -1019,36 +1065,6 @@ function createEngineShim(fc: Canvas, syncState: () => void, artboardW: number, 
             return id;
         },
 
-        add_gradient_rect: (x: number, y: number, w: number, h: number, r1: number, g1: number, b1: number, _a1: number, r2: number, g2: number, b2: number, _a2: number, angle_deg: number) => {
-            const id = nextId();
-            // Convert angle to gradient coordinates
-            const rad = (angle_deg * Math.PI) / 180;
-            const cos = Math.cos(rad);
-            const sin = Math.sin(rad);
-            const rect = new Rect({
-                left: x, top: y, width: w, height: h,
-                fill: new Gradient({
-                    type: 'linear',
-                    coords: {
-                        x1: 0.5 - cos * 0.5,
-                        y1: 0.5 - sin * 0.5,
-                        x2: 0.5 + cos * 0.5,
-                        y2: 0.5 + sin * 0.5,
-                    },
-                    colorStops: [
-                        { offset: 0, color: rgbToHex(r1, g1, b1) },
-                        { offset: 1, color: rgbToHex(r2, g2, b2) },
-                    ],
-                    gradientUnits: 'percentage',
-                }),
-            });
-            (rect as any).__aceId = id;
-            (rect as any).__aceZIndex = userObjects().length;
-            patchAceProps(rect);
-            fc.add(rect);
-            fc.renderAll();
-            return id;
-        },
 
         // ── Text (Fabric Textbox) — positional args for AI tool compatibility ──
         add_text: (

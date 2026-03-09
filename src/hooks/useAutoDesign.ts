@@ -121,6 +121,19 @@ function renderElement(engine: Engine, el: RenderElement, canvasW: number, canva
         const sg = typeof el.g === 'number' ? el.g : (el.color_hex ? hexToRgb(el.color_hex)[1] : 0.5);
         const sb = typeof el.b === 'number' ? el.b : (el.color_hex ? hexToRgb(el.color_hex)[2] : 0.5);
 
+        // ★ Gradient path: AI specified gradient_start_hex + gradient_end_hex
+        if (el.gradient_start_hex && el.gradient_end_hex) {
+            engine.add_gradient_rect(
+                x, y, w, h,
+                el.gradient_start_hex,
+                el.gradient_end_hex,
+                el.gradient_angle ?? 135,
+                el.type === 'rounded_rect' ? (el.radius ?? 0) : 0,
+                name,
+            );
+            return true;
+        }
+
         if (el.type === 'rounded_rect') {
             engine.add_rounded_rect(x, y, w, h, sr, sg, sb, a, el.radius ?? 8, name);
         } else if (el.type === 'ellipse') {
