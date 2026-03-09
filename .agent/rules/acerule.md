@@ -76,6 +76,22 @@ Wasm Bridge: 복잡한 레이아웃 계산(Constraint-based)은 Rust로 작성�
    - If a task involves multiple files, commit after EACH logical unit (not at the very end)
    - **Rationale**: Code loss = wasted API cost + wasted user time. This is UNACCEPTABLE.
 
+   **Regression Test Gate (MANDATORY)**:
+   - After EVERY code change, run `npm test` before committing
+   - If tests fail → the change BROKE something → fix it before committing
+   - If you INTENTIONALLY changed behavior → update the corresponding `.test.ts` file FIRST, then change the code
+   - Never delete or skip a failing test — either fix the code or update the test to match new intended behavior
+   - When fixing a NEW bug → add a test case for it in the relevant `.test.ts` file
+   - Commit sequence: `code change → npm test → pass → git commit`
+   - Test files live next to their source: `projectStore.ts` → `projectStore.test.ts`
+
+   **Zustand Store Safety (MANDATORY — prevents recurring bugs)**:
+   - **NEVER call external Zustand stores inside immer `set()` callbacks** — causes silent deadlock
+   - Always call `useOtherStore.getState().action()` BEFORE or AFTER the `set()` block, never inside
+   - Cross-tab sync: ALWAYS use plain-object `setState({...})`, NEVER use immer mutator callbacks
+   - Look for `★ REGRESSION GUARD` comments in store files — these mark previously-fixed patterns
+
+
 8. **Code Maintainability (Clean Architecture — Zero Tech Debt Policy)**:
 
    **File Size Limits:**
