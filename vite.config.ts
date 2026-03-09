@@ -124,5 +124,21 @@ export default defineConfig({
         globals: true,
         setupFiles: [],
         include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+        coverage: {
+            provider: 'v8',
+            reporter: ['text', 'lcov', 'json'],
+            reportsDirectory: './coverage',
+            include: [
+                'src/stores/**/*.ts',
+                'src/engine/**/*.ts',
+                'src/schema/**/*.ts',
+                'src/services/**/*.ts',
+            ],
+            exclude: [
+                'src/**/*.test.ts',
+                'src/**/*.d.ts',
+                'src/engine/wasm/**',
+            ],
+        },
     },
 });
