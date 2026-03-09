@@ -207,4 +207,4 @@ export async function callWithRole(
 
 /** @deprecated Use callOpenRouterApi() or callWithRole() instead */
 export const callAnthropicApi = callOpenRouterApi;
-export const DEFAULT_CLAUDE_MODEL = 'anthropic/claude-sonnet-4-20250514';
+export const DEFAULT_CLAUDE_MODEL = 'anthropic/claude-sonnet-4-20250522';

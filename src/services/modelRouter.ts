@@ -29,7 +29,7 @@ export interface ModelConfig {
 
 const MODEL_CONFIGS: Record<AceModelRole, ModelConfig> = {
     planner: {
-        id: 'anthropic/claude-sonnet-4-20250514',
+        id: 'anthropic/claude-sonnet-4-20250522',
         name: 'Claude Sonnet 4',
         maxTokens: 4096,
         supportsVision: true,
@@ -38,7 +38,7 @@ const MODEL_CONFIGS: Record<AceModelRole, ModelConfig> = {
         costPer1MOutput: 15.00,
     },
     executor: {
-        id: 'anthropic/claude-haiku-3-5-20241022',
+        id: 'anthropic/claude-3.5-haiku',
         name: 'Claude Haiku 3.5',
         maxTokens: 2048,
         supportsVision: false,
@@ -47,7 +47,7 @@ const MODEL_CONFIGS: Record<AceModelRole, ModelConfig> = {
         costPer1MOutput: 4.00,
     },
     critic: {
-        id: 'anthropic/claude-sonnet-4-20250514',
+        id: 'anthropic/claude-sonnet-4-20250522',
         name: 'Claude Sonnet 4',
         maxTokens: 2048,
         supportsVision: true,
@@ -56,7 +56,7 @@ const MODEL_CONFIGS: Record<AceModelRole, ModelConfig> = {
         costPer1MOutput: 15.00,
     },
     vision: {
-        id: 'anthropic/claude-sonnet-4-20250514',
+        id: 'anthropic/claude-sonnet-4-20250522',
         name: 'Claude Sonnet 4',
         maxTokens: 1024,
         supportsVision: true,
@@ -65,7 +65,7 @@ const MODEL_CONFIGS: Record<AceModelRole, ModelConfig> = {
         costPer1MOutput: 15.00,
     },
     design: {
-        id: 'anthropic/claude-sonnet-4-20250514',
+        id: 'anthropic/claude-sonnet-4-20250522',
         name: 'Claude Sonnet 4',
         maxTokens: 4096,
         supportsVision: true,
