@@ -5,9 +5,9 @@ import { describe, it, expect } from 'vitest';
 import { getModelForRole, getModelId, getMaxTokens, listModels, type AceModelRole } from '@/services/modelRouter';
 
 describe('modelRouter', () => {
-    it('returns correct model for planner role', () => {
+    it('returns correct model for planner role (Opus 4)', () => {
         const config = getModelForRole('planner');
-        expect(config.id).toContain('claude');
+        expect(config.id).toContain('opus');
         expect(config.supportsTools).toBe(true);
         expect(config.maxTokens).toBeGreaterThan(0);
     });
@@ -44,5 +44,12 @@ describe('modelRouter', () => {
             expect(models[role].id).toBeTruthy();
             expect(models[role].name).toBeTruthy();
         }
+    });
+
+    it('design role uses Sonnet 4', () => {
+        const config = getModelForRole('design');
+        expect(config.id).toContain('sonnet');
+        expect(config.supportsVision).toBe(true);
+        expect(config.supportsTools).toBe(true);
     });
 });

@@ -12,16 +12,15 @@ import { executeDashboardTool } from '@/ai/dashboardExecutor';
 import { getModelForRole, listModels, type AceModelRole } from '@/services/modelRouter';
 import type { AgentMessage, SceneNodeInfo } from '@/ai/agentContext';
 import type { ExecutionResult } from '@/ai/commandExecutor';
-import { IcAi, IcSettings, IcSend, IcClose, IcChevronLeft, IcChevronRight, IcLoader, IcCheck, IcError, IcSearch } from '@/components/ui/Icons';
+import { IcAi, IcSend, IcClose, IcChevronLeft, IcChevronRight, IcLoader, IcCheck, IcError, IcSearch } from '@/components/ui/Icons';
 import type { ToolExecutorOverride } from '@/ai/aiService';
 
 // ── Model Selector Config ──
 const MODEL_OPTIONS: Array<{ role: AceModelRole; label: string; group: 'LLM' | 'Image' }> = [
-    { role: 'planner', label: 'Planner', group: 'LLM' },
+    { role: 'planner', label: 'Planner (Advanced)', group: 'LLM' },
     { role: 'design', label: 'Design (Full)', group: 'LLM' },
     { role: 'executor', label: 'Executor (Fast)', group: 'LLM' },
     { role: 'critic', label: 'Critic', group: 'LLM' },
-    { role: 'vision', label: 'Vision', group: 'LLM' },
     { role: 'image_fast', label: 'Image (Fast)', group: 'Image' },
     { role: 'image_quality', label: 'Image (Quality)', group: 'Image' },
 ];
@@ -53,7 +52,6 @@ export function GlobalAiPanel() {
     const [messages, setMessages] = useState<AgentMessage[]>([]);
     const [input, setInput] = useState('');
     const [live, setLive] = useState<LiveState>(LIVE_INIT);
-    const [showSettings, setShowSettings] = useState(false);
     const [selectedRole, setSelectedRole] = useState<AceModelRole>('design');
     const [showModelDropdown, setShowModelDropdown] = useState(false);
     const activeModel = getModelForRole(selectedRole);
@@ -225,17 +223,6 @@ export function GlobalAiPanel() {
         }
     }, [input, config, buildContextSummary, navigate]);
 
-    const saveConfig = useCallback((newConfig: AiConfig) => {
-        setConfig(newConfig);
-        localStorage.setItem('ace-ai-config', JSON.stringify(newConfig));
-        // Dispatch custom event for same-tab consumers (storage event only fires cross-tab)
-        window.dispatchEvent(new CustomEvent('ace-ai-config-changed'));
-        const svc = new AiService([]);
-        svc.updateConfig(newConfig);
-        serviceRef.current = svc;
-        setShowSettings(false);
-    }, []);
-
     const isBusy = live.phase !== 'idle' && live.phase !== 'done' && live.phase !== 'error';
 
     // ── Render ───────────────────────────────
@@ -262,24 +249,11 @@ export function GlobalAiPanel() {
                             <div style={{ fontWeight: 600, fontSize: 13, color: '#e6edf3' }}>ACE AI</div>
                             <div style={{ fontSize: 10, color: '#6e7681', marginTop: 1 }}>{contextLabel}</div>
                         </div>
-                        <button onClick={() => setShowSettings(!showSettings)} style={headerBtnStyle} title="Settings">
-                            <IcSettings size={14} color="#6e7681" />
-                        </button>
                         <button onClick={() => setOpen(false)} style={headerBtnStyle} title="Close (Esc)">
                             <IcClose size={14} color="#6e7681" />
                         </button>
                     </div>
 
-                    {/* Settings */}
-                    {showSettings && (
-                        <div style={settingsStyle}>
-                            <label style={labelS}>Model</label>
-                            <input value={config.model}
-                                onChange={e => setConfig(prev => ({ ...prev, model: e.target.value }))}
-                                style={fieldS} />
-                            <button onClick={() => saveConfig(config)} style={saveBtnS}>Save</button>
-                        </div>
-                    )}
 
                     {/* Messages */}
                     <div style={msgAreaStyle}>
@@ -468,19 +442,7 @@ const headerBtnStyle: CSSProperties = {
     display: 'flex', alignItems: 'center',
 };
 
-const settingsStyle: CSSProperties = {
-    padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)',
-};
 
-const labelS: CSSProperties = { display: 'block', fontSize: 10, color: '#6e7681', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.5px' };
-const fieldS: CSSProperties = {
-    width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 6, padding: '6px 8px', color: '#e6edf3', fontSize: 12, outline: 'none',
-};
-const saveBtnS: CSSProperties = {
-    marginTop: 10, background: '#238636', border: 'none', color: '#fff', padding: '5px 14px',
-    borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer',
-};
 
 const msgAreaStyle: CSSProperties = {
     flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2, padding: '4px 0',

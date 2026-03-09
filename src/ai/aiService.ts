@@ -1,8 +1,8 @@
 // ─────────────────────────────────────────────────
 // AI Service — Claude API + Agentic Loop
 // ─────────────────────────────────────────────────
-// Client-side LLM integration using Anthropic Claude API:
-// - Claude Messages API (/v1/messages)
+// Client-side LLM integration via OpenRouter:
+// - OpenAI-compatible chat/completions API
 // - Extended thinking for complex reasoning
 // - 4-phase agentic loop (think → plan → execute → reflect)
 // ─────────────────────────────────────────────────
@@ -28,7 +28,7 @@ export interface AiConfig {
 }
 
 const DEFAULT_CONFIG: AiConfig = {
-    endpoint: 'https://api.anthropic.com',
+    endpoint: 'https://openrouter.ai/api',
     model: 'anthropic/claude-sonnet-4',
     maxToolRounds: 30,
 };

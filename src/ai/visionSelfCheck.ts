@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────
 // After the AI generates or modifies a design, this module:
 // 1. Captures a screenshot of the result
-// 2. Sends it to Claude Vision for analysis
+// 2. Sends it to Claude Vision (via OpenRouter) for analysis
 // 3. Returns issues found
 // 4. Can trigger auto-correction (max N loops)
 //
@@ -15,7 +15,9 @@ import { resolveConstraints } from '@/schema/constraints.types';
 import type { BannerVariant } from '@/schema/design.types';
 import type { TextElement, ShapeElement, ButtonElement } from '@/schema/elements.types';
 import { getAspectCategory } from '@/schema/layoutRoles';
-import { getAnthropicKey } from '@/config/apiKeys';
+import { getOpenRouterKey } from '@/config/apiKeys';
+import { callOpenRouterApi } from '@/services/openRouterClient';
+import { getModelId } from '@/services/modelRouter';
 
 // ── Types ──
 
@@ -35,13 +37,10 @@ export interface VisionIssue {
 export interface VisionSelfCheckConfig {
     /** Max correction loops before giving up */
     maxLoops: number;
-    /** Model for vision analysis */
-    model: string;
 }
 
 const DEFAULT_CONFIG: VisionSelfCheckConfig = {
     maxLoops: 2,
-    model: 'anthropic/claude-sonnet-4',
 };
 
 // ── Helpers ──
@@ -90,7 +89,7 @@ function variantToRenderInput(variant: BannerVariant) {
 
 /**
  * Run a vision self-check on a variant.
- * Captures screenshot → sends to Claude Vision → returns issues.
+ * Captures screenshot → sends to Claude Vision via OpenRouter → returns issues.
  */
 export async function runVisionSelfCheck(
     variant: BannerVariant,
@@ -98,7 +97,7 @@ export async function runVisionSelfCheck(
 ): Promise<VisionCheckResult> {
     const cfg = { ...DEFAULT_CONFIG, ...config };
 
-    if (!getAnthropicKey()) {
+    if (!getOpenRouterKey()) {
         return { passed: true, issues: [], loopCount: 0 };
     }
 
@@ -108,7 +107,7 @@ export async function runVisionSelfCheck(
         const base64 = renderVariantToCanvas(renderInput);
         const dataUrl = `data:image/png;base64,${base64}`;
 
-        // 2. Send to Claude Vision for analysis
+        // 2. Send to Claude Vision via OpenRouter for analysis
         const issues = await analyzeWithVision(base64, variant, cfg);
 
         return {
@@ -141,9 +140,9 @@ export async function runBatchVisionCheck(
 // ── Vision API Call ──
 
 async function analyzeWithVision(
-    screenshotDataUrl: string,
+    screenshotBase64: string,
     variant: BannerVariant,
-    config: VisionSelfCheckConfig,
+    _cfg: VisionSelfCheckConfig,
 ): Promise<VisionIssue[]> {
     const w = variant.preset.width;
     const h = variant.preset.height;
@@ -153,7 +152,7 @@ async function analyzeWithVision(
         .map(el => `${el.name} (${el.role})`)
         .join(', ');
 
-    const prompt = `You are a QA inspector for banner ad designs. Analyze this ${w}×${h} (${category}) banner screenshot.
+    const prompt = `You are a QA inspector for banner ad designs. Analyze this ${w}x${h} (${category}) banner screenshot.
 
 Elements expected: ${elementRoles || 'unknown'}
 
@@ -177,43 +176,29 @@ Reply in JSON format ONLY:
 If no issues, return: { "issues": [] }`;
 
     try {
-        // Remove "data:image/png;base64," prefix
-        const base64 = screenshotDataUrl.replace(/^data:image\/\w+;base64,/, '');
+        // Use the vision model from modelRouter (built into the selected model)
+        const visionModel = getModelId('vision');
 
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-api-key': getAnthropicKey(),
-                'anthropic-version': '2023-06-01',
-                'anthropic-dangerous-direct-browser-access': 'true',
-            },
-            body: JSON.stringify({
-                model: config.model,
-                max_tokens: 1024,
-                messages: [{
-                    role: 'user',
-                    content: [
-                        {
-                            type: 'image',
-                            source: {
-                                type: 'base64',
-                                media_type: 'image/png',
-                                data: base64,
-                            },
+        // Call via OpenRouter (handles format conversion automatically)
+        const data = await callOpenRouterApi({
+            model: visionModel,
+            max_tokens: 1024,
+            messages: [{
+                role: 'user',
+                content: [
+                    {
+                        type: 'image',
+                        source: {
+                            type: 'base64',
+                            media_type: 'image/png',
+                            data: screenshotBase64,
                         },
-                        { type: 'text', text: prompt },
-                    ],
-                }],
-            }),
-        });
+                    },
+                    { type: 'text', text: prompt },
+                ],
+            }],
+        }) as { content?: Array<{ text?: string }> };
 
-        if (!response.ok) {
-            console.warn(`[VisionSelfCheck] API error: ${response.status}`);
-            return [];
-        }
-
-        const data = await response.json();
         const text = data.content?.[0]?.text || '';
 
         // Parse JSON from response

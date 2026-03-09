@@ -3,14 +3,20 @@
 // ─────────────────────────────────────────────────
 // Maps ACE use cases to optimal OpenRouter models.
 // Single config point for all model decisions.
+//
+// Model lineup:
+//   Advanced: Claude Opus 4 (complex reasoning, planning)
+//   Standard: Claude Sonnet 4 (design, general)
+//   Fast:     Claude 3.5 Haiku (quick execution, low cost)
+//   Vision is built into all Claude models — no separate role needed.
 // ─────────────────────────────────────────────────
 
 export type AceModelRole =
-    | 'planner'       // Design planning (complex reasoning)
-    | 'executor'      // Tool execution (fast, cheap)
-    | 'critic'        // Design review (vision + analysis)
-    | 'vision'        // Screenshot analysis
-    | 'design'        // General design generation (legacy)
+    | 'planner'       // Design planning (complex reasoning) — Opus 4
+    | 'executor'      // Tool execution (fast, cheap) — Haiku 3.5
+    | 'critic'        // Design review (vision + analysis) — Sonnet 4
+    | 'vision'        // Screenshot analysis (internal, not in selector) — Sonnet 4
+    | 'design'        // General design generation — Sonnet 4
     | 'image_fast'    // Image gen — speed/cost priority
     | 'image_quality' // Image gen — quality priority
     ;
@@ -29,13 +35,13 @@ export interface ModelConfig {
 
 const MODEL_CONFIGS: Record<AceModelRole, ModelConfig> = {
     planner: {
-        id: 'anthropic/claude-sonnet-4',
-        name: 'Claude Sonnet 4',
+        id: 'anthropic/claude-opus-4',
+        name: 'Claude Opus 4',
         maxTokens: 4096,
         supportsVision: true,
         supportsTools: true,
-        costPer1MInput: 3.00,
-        costPer1MOutput: 15.00,
+        costPer1MInput: 15.00,
+        costPer1MOutput: 75.00,
     },
     executor: {
         id: 'anthropic/claude-3.5-haiku',
@@ -56,6 +62,8 @@ const MODEL_CONFIGS: Record<AceModelRole, ModelConfig> = {
         costPer1MOutput: 15.00,
     },
     vision: {
+        // Internal only — not exposed in model selector
+        // Vision capability is built into all Claude models
         id: 'anthropic/claude-sonnet-4',
         name: 'Claude Sonnet 4',
         maxTokens: 1024,
@@ -84,7 +92,7 @@ const MODEL_CONFIGS: Record<AceModelRole, ModelConfig> = {
     },
     image_quality: {
         id: 'google/imagen-3',
-        name: 'Nano Banana 2 (Imagen 3)',
+        name: 'Imagen 3',
         maxTokens: 0,
         supportsVision: false,
         supportsTools: false,

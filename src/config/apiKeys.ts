@@ -2,6 +2,7 @@
 // apiKeys.ts — Centralized API Key Provider
 // ─────────────────────────────────────────────────
 // ACE supplies keys to all users (company-managed).
+// All API calls route through OpenRouter.
 // Future: token system via login/auth.
 // ─────────────────────────────────────────────────
 
@@ -15,9 +16,8 @@ export function getOpenRouterKey(): string {
 
 /**
  * @deprecated Use getOpenRouterKey() instead.
- * Kept for backward compatibility during migration.
+ * Now returns the OpenRouter key for backward compatibility.
  */
 export function getAnthropicKey(): string {
-    // Fallback: check for legacy direct Anthropic key
-    return import.meta.env.VITE_ANTHROPIC_API_KEY ?? '';
+    return getOpenRouterKey();
 }

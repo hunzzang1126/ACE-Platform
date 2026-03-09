@@ -109,13 +109,6 @@ export default defineConfig({
                 rewrite: (path: string) => path.replace(/^\/api\/openai/, ''),
                 secure: true,
             },
-            // Proxy Anthropic (Claude) API calls to bypass CORS in dev mode
-            '/api/anthropic': {
-                target: 'https://api.anthropic.com',
-                changeOrigin: true,
-                rewrite: (path: string) => path.replace(/^\/api\/anthropic/, ''),
-                secure: true,
-            },
             // Proxy OpenRouter API calls to bypass CORS in dev mode
             '/api/openrouter': {
                 target: 'https://openrouter.ai/api',
