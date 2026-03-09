@@ -375,3 +375,84 @@ export function smartSizeElements(
         };
     });
 }
+
+// ── Multi-Master Architecture (P3) ──────────────────────
+//
+// Instead of scaling ONE master to all sizes (causes squishing),
+// we group all sizes into 3 master families and generate AI layouts
+// tailored to each family's aspect ratio profile.
+//
+// Landscape family: ultra-wide + wide + landscape
+// Square family:    square + mild portrait
+// Portrait family:  portrait + ultra-tall
+//
+// ────────────────────────────────────────────────────────
+
+export type MasterGroup = 'landscape' | 'square' | 'portrait';
+
+/**
+ * Classify a size into one of 3 master groups.
+ * Used to determine which master design to clone from.
+ */
+export function classifyMasterGroup(w: number, h: number): MasterGroup {
+    const ratio = w / h;
+    if (ratio >= 0.85) return 'landscape'; // wide and ultra-wide
+    if (ratio >= 0.7) return 'square';     // square-ish (1:1, 4:5)
+    return 'portrait';                      // tall (9:16, skyscraper)
+}
+
+/**
+ * Group a list of target sizes into master groups.
+ * Returns map of group → target sizes that belong to it.
+ */
+export function groupSizesByMaster(
+    sizes: Array<{ w: number; h: number; id: string }>
+): Record<MasterGroup, Array<{ w: number; h: number; id: string }>> {
+    const groups: Record<MasterGroup, typeof sizes> = {
+        landscape: [],
+        square: [],
+        portrait: [],
+    };
+    for (const size of sizes) {
+        const group = classifyMasterGroup(size.w, size.h);
+        groups[group].push(size);
+    }
+    return groups;
+}
+
+/**
+ * Per-group layout description for Auto-Design system prompt.
+ * The AI gets this BEFORE generating so it understands the typical layout.
+ */
+export function getMasterGroupDescriptions(): Record<MasterGroup, string> {
+    return {
+        landscape: `MASTER GROUP: LANDSCAPE (wide banners, leaderboards)
+  Layout: HORIZONTAL. Logo/text LEFT side, CTA RIGHT side.
+  Elements fill width, shorter height. Text must be readable in single lines.
+  Priority: Headline impact, clear CTA button, no vertical stacking.`,
+
+        square: `MASTER GROUP: SQUARE (1:1 social, Facebook/Instagram)
+  Layout: CENTERED. Large image/background behind.
+  Headline CENTER-ALIGNED, CTA at bottom third.
+  Priority: Visual punch, center balance, single-screen impact.`,
+
+        portrait: `MASTER GROUP: PORTRAIT (skyscraper, Stories, 9:16)
+  Layout: VERTICAL STACK. Logo/brand TOP, headline MIDDLE, CTA BOTTOM.
+  All elements CENTER-ALIGNED horizontally. Text stacks vertically.
+  Priority: Clear reading flow top-to-bottom, generous vertical spacing.`,
+    };
+}
+
+/**
+ * Get font size boost factor for a master group.
+ * Landscape groups get smaller fonts (less height), portrait gets bigger.
+ */
+export function getMasterGroupFontBoost(group: MasterGroup): number {
+    const boosts: Record<MasterGroup, number> = {
+        landscape: 0.85,  // compressed height → smaller fonts
+        square: 1.0,       // balanced
+        portrait: 1.15,    // tall canvas → more room for large type
+    };
+    return boosts[group];
+}
+

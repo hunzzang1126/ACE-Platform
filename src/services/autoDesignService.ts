@@ -17,7 +17,7 @@
 // ─────────────────────────────────────────────────
 
 import { callAnthropicApi, DEFAULT_CLAUDE_MODEL } from '@/services/anthropicClient';
-import { classifyRatio, LAYOUT_ZONES } from '@/engine/smartSizing';
+import { classifyRatio, LAYOUT_ZONES, classifyMasterGroup, getMasterGroupDescriptions } from '@/engine/smartSizing';
 
 // ── Shared Types ────────────────────────────────────
 
@@ -247,6 +247,11 @@ function buildFromScratchPrompt(canvasW: number, canvasH: number, userPrompt: st
     const personality = detectPersonality(userPrompt);
     const personalityRule = PERSONALITY_RULES[personality];
 
+    // Multi-Master: classify which layout group this canvas belongs to
+    const masterGroup = classifyMasterGroup(canvasW, canvasH);
+    const groupDescriptions = getMasterGroupDescriptions();
+    const masterGroupDesc = groupDescriptions[masterGroup];
+
     // Compute exact pixel positions for each element from zone percentages
     const bgX = 0, bgY = 0, bgW = canvasW, bgH = canvasH;
     const hlX = Math.round(zones.headline.x * canvasW);
@@ -279,6 +284,8 @@ function buildFromScratchPrompt(canvasW: number, canvasH: number, userPrompt: st
     return `You are a senior banner ad designer producing ${canvasW}×${canvasH}px ads.
 Layout format: ${ratio}. ${desc}
 ${personalityRule}
+
+${masterGroupDesc}
 
 ═══════════════════════════════════════════
 ABSOLUTE RULES — NEVER VIOLATE THESE:
