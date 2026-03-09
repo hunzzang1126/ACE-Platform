@@ -76,14 +76,32 @@ Wasm Bridge: 복잡한 레이아웃 계산(Constraint-based)은 Rust로 작성�
    - If a task involves multiple files, commit after EACH logical unit (not at the very end)
    - **Rationale**: Code loss = wasted API cost + wasted user time. This is UNACCEPTABLE.
 
-   **Regression Test Gate (MANDATORY)**:
-   - After EVERY code change, run `npm test` before committing
+   **Regression Test Gate (MANDATORY — ZERO EXCEPTIONS)**:
+   - **After EVERY significant code change, the AGENT MUST run `npm test` AUTOMATICALLY** — do NOT wait for the user to ask
+   - **After changes to UI flows, multi-tab sync, canvas, or navigation**, also run `npm run test:e2e` (requires dev server running)
    - If tests fail → the change BROKE something → fix it before committing
    - If you INTENTIONALLY changed behavior → update the corresponding `.test.ts` file FIRST, then change the code
    - Never delete or skip a failing test — either fix the code or update the test to match new intended behavior
    - When fixing a NEW bug → add a test case for it in the relevant `.test.ts` file
    - Commit sequence: `code change → npm test → pass → git commit`
    - Test files live next to their source: `projectStore.ts` → `projectStore.test.ts`
+   - E2E tests live in `e2e/` folder: `dashboard.spec.ts`, `multi-tab-sync.spec.ts`, `canvas-editor.spec.ts`, `size-dashboard.spec.ts`
+
+   **Test Commands (agent must know and use these automatically)**:
+   - `npm test` — run 114+ unit tests (Vitest, ~1s) — run after EVERY code change
+   - `npm run test:e2e` — run 37+ E2E tests (Playwright, ~30s) — run after UI/sync/flow changes
+   - `npm run test:coverage` — generate coverage report (V8) — run periodically
+   - `npx tsc --noEmit` — TypeScript type check — run after type changes
+   - **The agent MUST run these proactively. The user should NEVER have to ask "did you run the tests?"**
+
+   **When to Run Which Test**:
+   - Store logic changes (projectStore, designStore, etc.) → `npm test`
+   - Engine logic changes (smartSizing, brandPalette, etc.) → `npm test`
+   - Schema/type changes → `npm test` + `npx tsc --noEmit`
+   - UI component changes → `npm test` + `npm run test:e2e`
+   - Sync/BroadcastChannel changes → `npm run test:e2e` (multi-tab tests)
+   - Canvas/layer/property panel changes → `npm run test:e2e`
+   - ANY change before git commit → `npm test` at minimum
 
    **Zustand Store Safety (MANDATORY — prevents recurring bugs)**:
    - **NEVER call external Zustand stores inside immer `set()` callbacks** — causes silent deadlock
