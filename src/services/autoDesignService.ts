@@ -39,6 +39,8 @@ export interface RenderElement {
     font_weight?: string;
     color_hex?: string;
     text_align?: string;
+    letter_spacing?: number; // px, e.g. -0.5 (tight) to 4 (wide)
+    line_height?: number;    // multiplier, e.g. 1.0–2.0
     // Naming
     name?: string;
 }
@@ -106,6 +108,8 @@ const RENDER_BANNER_TOOL = {
                         font_weight: { type: 'string' },
                         color_hex: { type: 'string' },
                         text_align: { type: 'string' },
+                        letter_spacing: { type: 'number', description: 'Letter spacing in px. -0.5 for headlines (tight), 0 for body, 1–4 for labels.' },
+                        line_height: { type: 'number', description: 'Line height multiplier. 1.0–1.2 for headlines, 1.4–1.6 for body text.' },
                     },
                 },
             },
@@ -158,6 +162,8 @@ const REARRANGE_BANNER_TOOL = {
                         font_weight: { type: 'string' },
                         color_hex: { type: 'string' },
                         text_align: { type: 'string' },
+                        letter_spacing: { type: 'number', description: 'Letter spacing in px. -0.5 for headlines (tight), 0 for body, 1–4 for labels.' },
+                        line_height: { type: 'number', description: 'Line height multiplier. 1.0–1.2 for headlines, 1.4–1.6 for body text.' },
                     },
                 },
             },

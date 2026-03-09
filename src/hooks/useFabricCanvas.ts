@@ -101,6 +101,9 @@ function fabricToEngineNode(obj: FabricObject): EngineNode {
         node.color = typeof obj.fill === 'string' ? obj.fill : '#000000';
         node.textAlign = obj.textAlign ?? 'left';
         node.lineHeight = obj.lineHeight ?? 1.4;
+        // Fabric stores charSpacing in units of 1/1000 em — convert to px equivalent
+        // We use charSpacing/10 as px offset (consistent with updateText set logic)
+        node.letterSpacing = (obj.charSpacing ?? 0) / 10;
     }
 
     // Image-specific properties
@@ -1041,6 +1044,8 @@ function createEngineShim(fc: Canvas, syncState: () => void, artboardW: number, 
             r: number, g: number, b: number, _a: number,
             width: number, textAlign: string,
             name?: string,
+            lineHeight?: number,
+            letterSpacing?: number,
         ) => {
             const id = nextId();
             const tb = new Textbox(content || 'Text', {
@@ -1052,7 +1057,8 @@ function createEngineShim(fc: Canvas, syncState: () => void, artboardW: number, 
                 fontWeight: fontWeight || '400',
                 fill: rgbToHex(r, g, b),
                 textAlign: (textAlign as any) || 'left',
-                lineHeight: 1.4,
+                lineHeight: lineHeight ?? 1.4,
+                charSpacing: (letterSpacing ?? 0) * 10,
                 editable: true,
             });
             (tb as any).__aceId = id;

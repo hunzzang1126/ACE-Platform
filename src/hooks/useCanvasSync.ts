@@ -199,7 +199,7 @@ export function useCanvasSync(
                 const [tr, tg, tb] = hexToRgbFloat(text.color || '#ffffff');
 
                 // IMPORTANT: engine.add_text takes POSITIONAL args, not an options object:
-                // (x, y, content, fontSize, fontFamily, fontWeight, r, g, b, a, width, textAlign, name?)
+                // (x, y, content, fontSize, fontFamily, fontWeight, r, g, b, a, width, textAlign, name?, lineHeight?, letterSpacing?)
                 const nodeId = engine.add_text(
                     x,
                     y,
@@ -211,6 +211,8 @@ export function useCanvasSync(
                     w > 0 ? w : canvasW * 0.85,
                     text.textAlign || 'center',
                     text.name,
+                    text.lineHeight,
+                    text.letterSpacing,
                 );
 
                 if (text.opacity !== undefined && text.opacity !== 1) {

@@ -111,6 +111,8 @@ function renderElement(engine: Engine, el: RenderElement, canvasW: number, canva
                 w > 0 ? w : canvasW * 0.85,
                 el.text_align ?? 'center',
                 name,
+                el.line_height,
+                el.letter_spacing,
             );
             return true;
         }

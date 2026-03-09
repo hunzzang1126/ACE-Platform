@@ -375,6 +375,28 @@ export function PropertyPanel({ nodes = [], selection = [], actions, selectedOve
                                 </button>
                             ))}
                         </div>
+
+                        {/* Letter Spacing */}
+                        <ScrubField
+                            label="Letter Spacing"
+                            value={selectedNode.letterSpacing ?? 0}
+                            min={-10}
+                            max={40}
+                            step={0.5}
+                            unit="px"
+                            onChange={(v) => actions.updateText?.(selectedNode.id, { letterSpacing: v })}
+                        />
+
+                        {/* Line Height */}
+                        <ScrubField
+                            label="Line Height"
+                            value={selectedNode.lineHeight ?? 1.4}
+                            min={0.5}
+                            max={4}
+                            step={0.05}
+                            unit="×"
+                            onChange={(v) => actions.updateText?.(selectedNode.id, { lineHeight: v })}
+                        />
                     </Section>
                 )}
 
