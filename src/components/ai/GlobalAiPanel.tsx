@@ -16,13 +16,11 @@ import { IcAi, IcSend, IcClose, IcChevronLeft, IcChevronRight, IcLoader, IcCheck
 import type { ToolExecutorOverride } from '@/ai/aiService';
 
 // ── Model Selector Config ──
-const MODEL_OPTIONS: Array<{ role: AceModelRole; label: string; group: 'LLM' | 'Image' }> = [
-    { role: 'planner', label: 'Planner (Advanced)', group: 'LLM' },
-    { role: 'design', label: 'Design (Full)', group: 'LLM' },
-    { role: 'executor', label: 'Executor (Fast)', group: 'LLM' },
-    { role: 'critic', label: 'Critic', group: 'LLM' },
-    { role: 'image_fast', label: 'Image (Fast)', group: 'Image' },
-    { role: 'image_quality', label: 'Image (Quality)', group: 'Image' },
+const MODEL_OPTIONS: Array<{ role: AceModelRole; label: string }> = [
+    { role: 'planner', label: 'Planner (Advanced)' },
+    { role: 'design', label: 'Design (Full)' },
+    { role: 'executor', label: 'Executor (Fast)' },
+    { role: 'critic', label: 'Critic' },
 ];
 
 // ── Types ────────────────────────────────────────
@@ -145,10 +143,10 @@ export function GlobalAiPanel() {
         if (!msg) return;
 
         if (!serviceRef.current) {
-            const svc = new AiService([]);
-            svc.updateConfig(config);
-            serviceRef.current = svc;
+            serviceRef.current = new AiService([]);
         }
+        // ★ Always sync config → service so model dropdown changes take effect
+        serviceRef.current.updateConfig(config);
 
         setInput('');
         const userMsg: AgentMessage = { role: 'user', content: msg, timestamp: Date.now() };
@@ -351,41 +349,36 @@ export function GlobalAiPanel() {
                         {/* Dropdown */}
                         {showModelDropdown && (
                             <div style={modelDropdownStyle}>
-                                {(['LLM', 'Image'] as const).map(group => (
-                                    <div key={group}>
-                                        <div style={modelGroupLabelStyle}>{group}</div>
-                                        {MODEL_OPTIONS.filter(o => o.group === group).map(opt => {
-                                            const m = getModelForRole(opt.role);
-                                            const active = opt.role === selectedRole;
-                                            return (
-                                                <button
-                                                    key={opt.role}
-                                                    onClick={() => {
-                                                        setSelectedRole(opt.role);
-                                                        const newModel = getModelForRole(opt.role);
-                                                        setConfig(prev => ({ ...prev, model: newModel.id }));
-                                                        setShowModelDropdown(false);
-                                                    }}
-                                                    style={{
-                                                        ...modelOptionStyle,
-                                                        background: active ? 'rgba(56,139,253,0.1)' : 'transparent',
-                                                        borderLeft: active ? '2px solid #388bfd' : '2px solid transparent',
-                                                    }}
-                                                >
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                                                        <span style={{ fontSize: 12, color: active ? '#e6edf3' : '#c9d1d9' }}>{opt.label}</span>
-                                                        {m.costPer1MInput > 0 && (
-                                                            <span style={{ fontSize: 10, color: '#484f58' }}>
-                                                                ${m.costPer1MInput}/{m.costPer1MOutput}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                    <div style={{ fontSize: 10, color: '#484f58', marginTop: 2 }}>{m.id}</div>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                ))}
+                                {MODEL_OPTIONS.map(opt => {
+                                    const m = getModelForRole(opt.role);
+                                    const active = opt.role === selectedRole;
+                                    return (
+                                        <button
+                                            key={opt.role}
+                                            onClick={() => {
+                                                setSelectedRole(opt.role);
+                                                const newModel = getModelForRole(opt.role);
+                                                setConfig(prev => ({ ...prev, model: newModel.id }));
+                                                setShowModelDropdown(false);
+                                            }}
+                                            style={{
+                                                ...modelOptionStyle,
+                                                background: active ? 'rgba(56,139,253,0.1)' : 'transparent',
+                                                borderLeft: active ? '2px solid #388bfd' : '2px solid transparent',
+                                            }}
+                                        >
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                                                <span style={{ fontSize: 12, color: active ? '#e6edf3' : '#c9d1d9' }}>{opt.label}</span>
+                                                {m.costPer1MInput > 0 && (
+                                                    <span style={{ fontSize: 10, color: '#484f58' }}>
+                                                        ${m.costPer1MInput}/{m.costPer1MOutput}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div style={{ fontSize: 10, color: '#484f58', marginTop: 2 }}>{m.id}</div>
+                                        </button>
+                                    );
+                                })}
                             </div>
                         )}
 

@@ -5,17 +5,26 @@ import { describe, it, expect } from 'vitest';
 import { getModelForRole, getModelId, getMaxTokens, listModels, type AceModelRole } from '@/services/modelRouter';
 
 describe('modelRouter', () => {
-    it('returns correct model for planner role (Opus 4)', () => {
+    it('planner uses Sonnet 4.5 (advanced)', () => {
         const config = getModelForRole('planner');
-        expect(config.id).toContain('opus');
+        expect(config.id).toBe('anthropic/claude-sonnet-4.5');
         expect(config.supportsTools).toBe(true);
         expect(config.maxTokens).toBeGreaterThan(0);
     });
 
-    it('uses cheaper model for executor role', () => {
+    it('design uses same model as planner (Sonnet 4.5)', () => {
+        const design = getModelForRole('design');
+        const planner = getModelForRole('planner');
+        expect(design.id).toBe(planner.id);
+        expect(design.supportsVision).toBe(true);
+        expect(design.supportsTools).toBe(true);
+    });
+
+    it('executor uses cheaper model than planner', () => {
         const planner = getModelForRole('planner');
         const executor = getModelForRole('executor');
         expect(executor.costPer1MInput).toBeLessThan(planner.costPer1MInput);
+        expect(executor.id).toContain('haiku');
     });
 
     it('critic supports vision', () => {
@@ -44,12 +53,5 @@ describe('modelRouter', () => {
             expect(models[role].id).toBeTruthy();
             expect(models[role].name).toBeTruthy();
         }
-    });
-
-    it('design role uses Sonnet 4', () => {
-        const config = getModelForRole('design');
-        expect(config.id).toContain('sonnet');
-        expect(config.supportsVision).toBe(true);
-        expect(config.supportsTools).toBe(true);
     });
 });

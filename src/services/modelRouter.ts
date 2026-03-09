@@ -4,21 +4,24 @@
 // Maps ACE use cases to optimal OpenRouter models.
 // Single config point for all model decisions.
 //
-// Model lineup:
-//   Advanced: Claude Opus 4 (complex reasoning, planning)
-//   Standard: Claude Sonnet 4 (design, general)
-//   Fast:     Claude 3.5 Haiku (quick execution, low cost)
-//   Vision is built into all Claude models — no separate role needed.
+// Model lineup (exposed in selector):
+//   Advanced: Claude Sonnet 4.5 (latest, best reasoning)
+//   Standard: Claude Sonnet 4   (proven, balanced)
+//   Fast:     Claude 3.5 Haiku  (quick execution, low cost)
+//
+// Internal (not in selector):
+//   Vision:   uses the selected model (all Claude models have vision built-in)
+//   Image:    Flux Schnell / Imagen 3
 // ─────────────────────────────────────────────────
 
 export type AceModelRole =
-    | 'planner'       // Design planning (complex reasoning) — Opus 4
+    | 'planner'       // Design planning (complex reasoning) — Sonnet 4.5
     | 'executor'      // Tool execution (fast, cheap) — Haiku 3.5
     | 'critic'        // Design review (vision + analysis) — Sonnet 4
-    | 'vision'        // Screenshot analysis (internal, not in selector) — Sonnet 4
-    | 'design'        // General design generation — Sonnet 4
-    | 'image_fast'    // Image gen — speed/cost priority
-    | 'image_quality' // Image gen — quality priority
+    | 'vision'        // Screenshot analysis (internal) — Sonnet 4
+    | 'design'        // General design generation — Sonnet 4.5
+    | 'image_fast'    // Image gen — speed/cost priority (internal)
+    | 'image_quality' // Image gen — quality priority (internal)
     ;
 
 export interface ModelConfig {
@@ -35,13 +38,13 @@ export interface ModelConfig {
 
 const MODEL_CONFIGS: Record<AceModelRole, ModelConfig> = {
     planner: {
-        id: 'anthropic/claude-opus-4',
-        name: 'Claude Opus 4',
+        id: 'anthropic/claude-sonnet-4.5',
+        name: 'Claude Sonnet 4.5',
         maxTokens: 4096,
         supportsVision: true,
         supportsTools: true,
-        costPer1MInput: 15.00,
-        costPer1MOutput: 75.00,
+        costPer1MInput: 5.00,
+        costPer1MOutput: 25.00,
     },
     executor: {
         id: 'anthropic/claude-3.5-haiku',
@@ -62,8 +65,8 @@ const MODEL_CONFIGS: Record<AceModelRole, ModelConfig> = {
         costPer1MOutput: 15.00,
     },
     vision: {
-        // Internal only — not exposed in model selector
-        // Vision capability is built into all Claude models
+        // Internal — not exposed in model selector
+        // Vision is built into all Claude models
         id: 'anthropic/claude-sonnet-4',
         name: 'Claude Sonnet 4',
         maxTokens: 1024,
@@ -73,15 +76,16 @@ const MODEL_CONFIGS: Record<AceModelRole, ModelConfig> = {
         costPer1MOutput: 15.00,
     },
     design: {
-        id: 'anthropic/claude-sonnet-4',
-        name: 'Claude Sonnet 4',
+        id: 'anthropic/claude-sonnet-4.5',
+        name: 'Claude Sonnet 4.5',
         maxTokens: 4096,
         supportsVision: true,
         supportsTools: true,
-        costPer1MInput: 3.00,
-        costPer1MOutput: 15.00,
+        costPer1MInput: 5.00,
+        costPer1MOutput: 25.00,
     },
     image_fast: {
+        // Internal — not exposed in model selector
         id: 'black-forest-labs/flux-1-schnell',
         name: 'Flux Schnell',
         maxTokens: 0,
@@ -91,6 +95,7 @@ const MODEL_CONFIGS: Record<AceModelRole, ModelConfig> = {
         costPer1MOutput: 0,
     },
     image_quality: {
+        // Internal — not exposed in model selector
         id: 'google/imagen-3',
         name: 'Imagen 3',
         maxTokens: 0,
