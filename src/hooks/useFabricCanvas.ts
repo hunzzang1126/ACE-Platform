@@ -1,153 +1,24 @@
 // ─────────────────────────────────────────────────
-// useFabricCanvas — Fabric.js-based canvas engine
-// Full-viewport canvas with artboard as background rect
-// Handles shapes, selection, drag, resize, zoom/pan natively
+// useFabricCanvas — Fabric.js canvas engine hook
+// ─────────────────────────────────────────────────
+// Full-viewport canvas with artboard as background rect.
+// Handles shapes, selection, drag, resize, zoom/pan natively.
+//
+// Split architecture:
+//   fabricHelpers.ts    — shared utilities (ID gen, color conversion, types)
+//   fabricEngineShim.ts — engine-compatible API (used by AI executors)
+//   useFabricCanvas.ts  — React hook (this file)
 // ─────────────────────────────────────────────────
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Canvas, Rect, Ellipse, Shadow, PencilBrush, Textbox, FabricImage, Gradient, Group, type FabricObject } from 'fabric';
+import { Canvas, Rect, Ellipse, Shadow, PencilBrush, Textbox, FabricImage, type FabricObject } from 'fabric';
 import { useEditorStore } from '@/stores/editorStore';
-import { useAnimPresetStore } from './useAnimationPresets';
 import type { EngineNode, CanvasEngineState, CanvasEngineActions, UseCanvasEngineResult } from './canvasTypes';
-
-// ── Unique ID generator ──
-let _nextId = 1;
-function nextId(): number { return _nextId++; }
-
-// Random pastel colors for new shapes
-const SHAPE_COLORS: string[] = [
-    '#547BFF', '#29D2A0', '#F05C99',
-    '#FFA600', '#9966E6', '#33BFD9',
-    '#F2D933',
-];
-let colorIdx = 0;
-function nextColor(): string {
-    const c = SHAPE_COLORS[colorIdx % SHAPE_COLORS.length]!;
-    colorIdx++;
-    return c;
-}
-
-// ── Hex ↔ RGB helpers ──
-function hexToRgb01(colorStr: string): [number, number, number] {
-    if (colorStr.startsWith('rgba') || colorStr.startsWith('rgb')) {
-        // Parse 'rgba(255, 0, 0, 1)' or 'rgb(255, 0, 0)'
-        const m = colorStr.match(/rgba?\((\d+\.?\d*),\s*(\d+\.?\d*),\s*(\d+\.?\d*)/);
-        if (m) return [parseFloat(m[1]!) / 255, parseFloat(m[2]!) / 255, parseFloat(m[3]!) / 255];
-    }
-    // Handle #rgb or #rrggbb
-    const hex = colorStr.replace('#', '');
-    if (hex.length === 3) {
-        return [
-            parseInt(hex.charAt(0) + hex.charAt(0), 16) / 255,
-            parseInt(hex.charAt(1) + hex.charAt(1), 16) / 255,
-            parseInt(hex.charAt(2) + hex.charAt(2), 16) / 255,
-        ];
-    }
-    const r = parseInt(hex.substring(0, 2), 16) / 255;
-    const g = parseInt(hex.substring(2, 4), 16) / 255;
-    const b = parseInt(hex.substring(4, 6), 16) / 255;
-    if (isNaN(r) || isNaN(g) || isNaN(b)) return [0.5, 0.5, 0.5]; // safe fallback = gray
-    return [r, g, b];
-}
-
-function rgbToHex(r: number, g: number, b: number): string {
-    const toHex = (v: number) => Math.round(v * 255).toString(16).padStart(2, '0');
-    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-}
-
-// ── Check if object is the artboard background ──
-function isArtboard(obj: FabricObject): boolean {
-    return (obj as any).__aceArtboard === true;
-}
-
-// ── Extract EngineNode from Fabric object ──
-function fabricToEngineNode(obj: FabricObject): EngineNode {
-    const id = (obj as any).__aceId ?? 0;
-    const objType = obj.type;
-    const fill = typeof obj.fill === 'string' ? obj.fill : '#808080';
-    const [r, g, b] = hexToRgb01(fill);
-    const br = (obj as any).rx ?? 0;
-
-    // Determine ACE type from Fabric type
-    let aceType: EngineNode['type'] = 'rect';
-    let name = `Rectangle #${id}`;
-    if (objType === 'ellipse') {
-        aceType = 'ellipse';
-        name = `Ellipse #${id}`;
-    } else if (objType === 'textbox' || objType === 'i-text') {
-        aceType = 'text';
-        name = (obj as any).__aceName || `Text #${id}`;
-    } else if (objType === 'image') {
-        aceType = 'image';
-        name = (obj as any).__aceName || `Image #${id}`;
-    } else if (objType === 'path') {
-        aceType = 'path';
-        name = `Path #${id}`;
-    } else if (br > 0) {
-        aceType = 'rounded_rect';
-        name = `Rounded Rect #${id}`;
-    }
-
-    const node: EngineNode = {
-        id,
-        type: aceType,
-        x: obj.left ?? 0,
-        y: obj.top ?? 0,
-        w: (obj.width ?? 0) * (obj.scaleX ?? 1),
-        h: (obj.height ?? 0) * (obj.scaleY ?? 1),
-        opacity: obj.opacity ?? 1,
-        z_index: (obj as any).__aceZIndex ?? 0,
-        fill_r: r,
-        fill_g: g,
-        fill_b: b,
-        fill_a: 1,
-        border_radius: br,
-        name,
-    };
-
-    // Text-specific properties
-    if (aceType === 'text' && obj instanceof Textbox) {
-        node.content = obj.text ?? '';
-        node.fontSize = obj.fontSize ?? 16;
-        node.fontFamily = obj.fontFamily ?? 'Inter';
-        node.fontWeight = String(obj.fontWeight ?? '400');
-        node.color = typeof obj.fill === 'string' ? obj.fill : '#000000';
-        node.textAlign = obj.textAlign ?? 'left';
-        node.lineHeight = obj.lineHeight ?? 1.4;
-        // Fabric stores charSpacing in units of 1/1000 em — convert to px equivalent
-        // We use charSpacing/10 as px offset (consistent with updateText set logic)
-        node.letterSpacing = (obj.charSpacing ?? 0) / 10;
-    }
-
-    // Image-specific properties
-    if (aceType === 'image') {
-        const imgEl = (obj as any)._element;
-        if (imgEl?.src) {
-            node.src = imgEl.src;
-        }
-        // Capture natural dimensions for aspect ratio preservation
-        if (imgEl?.naturalWidth) node.naturalWidth = imgEl.naturalWidth;
-        if (imgEl?.naturalHeight) node.naturalHeight = imgEl.naturalHeight;
-    }
-
-    return node;
-}
-
-// ── Custom properties to include in serialization ──
-const ACE_CUSTOM_PROPS = ['__aceId', '__aceZIndex', '__aceArtboard', '__aceName'];
-
-// Patch a Fabric object to include ACE custom props in toObject()
-function patchAceProps(obj: FabricObject): void {
-    const original = obj.toObject.bind(obj);
-    obj.toObject = function (additionalProps?: string[]) {
-        const data = original(additionalProps);
-        data.__aceId = (this as any).__aceId;
-        data.__aceZIndex = (this as any).__aceZIndex;
-        if ((this as any).__aceArtboard) data.__aceArtboard = true;
-        if ((this as any).__aceName) data.__aceName = (this as any).__aceName;
-        return data;
-    };
-}
+import {
+    nextId, nextColor, rgbToHex, hexToRgb01,
+    isArtboard, fabricToEngineNode, patchAceProps, ACE_CUSTOM_PROPS,
+} from './fabricHelpers';
+import { createEngineShim } from './fabricEngineShim';
 
 /**
  * useFabricCanvas — Fabric.js canvas engine hook.
@@ -160,7 +31,7 @@ export function useFabricCanvas(
     _addDemoShapes = false,
 ): UseCanvasEngineResult {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
-    const overlayRef = useRef<HTMLCanvasElement | null>(null); // unused, interface compat
+    const overlayRef = useRef<HTMLCanvasElement | null>(null);
     const fabricRef = useRef<Canvas | null>(null);
     const engineRef = useRef<any>(null);
     const containerRef = useRef<HTMLElement | null>(null);
@@ -181,15 +52,14 @@ export function useFabricCanvas(
     const activeTool = useEditorStore((s) => s.activeTool);
     const setTool = useEditorStore((s) => s.setTool);
 
-    // ── Get user-created objects (exclude artboard background) ──
+    // ── Get user-created objects (exclude artboard) ──
     const getUserObjects = useCallback((): FabricObject[] => {
         const fc = fabricRef.current;
         if (!fc) return [];
         return fc.getObjects().filter(o => !isArtboard(o));
     }, []);
 
-    // ── Sync state — RAF-debounced to prevent render cascades ──
-    // Stale-check: only update React state if data actually changed
+    // ── Sync state — RAF-debounced ──
     const prevNodesJson = useRef('');
     const prevSelJson = useRef('');
 
@@ -200,7 +70,6 @@ export function useFabricCanvas(
             .map(fabricToEngineNode)
             .filter(n => n.id > 0);
 
-        // Only update nodes if they actually changed (prevents render cascades)
         const nodesJson = JSON.stringify(engineNodes);
         if (nodesJson !== prevNodesJson.current) {
             prevNodesJson.current = nodesJson;
@@ -250,7 +119,6 @@ export function useFabricCanvas(
             return;
         }
 
-        // Find the container (ed-canvas-area) to get viewport dimensions
         const container = el.parentElement;
         containerRef.current = container;
         const cw = container?.clientWidth ?? 1200;
@@ -258,60 +126,45 @@ export function useFabricCanvas(
 
         try {
             const fc = new Canvas(el, {
-                width: cw,
-                height: ch,
-                backgroundColor: '#16191f', // Dark workspace background
+                width: cw, height: ch,
+                backgroundColor: '#16191f',
                 selection: true,
                 preserveObjectStacking: true,
                 stopContextMenu: true,
                 fireRightClick: true,
             });
 
-            // Style selection controls
             (fc as any).selectionColor = 'rgba(74, 158, 255, 0.08)';
             (fc as any).selectionBorderColor = '#4a9eff';
             (fc as any).selectionLineWidth = 1;
 
-            // ── Add artboard background rect (skip undo history) ──
+            // ── Artboard background ──
             skipHistory.current = true;
             const artboard = new Rect({
-                left: 0,
-                top: 0,
-                width,
-                height,
+                left: 0, top: 0, width, height,
                 fill: '#ffffff',
-                selectable: false,
-                evented: false,
-                hasControls: false,
-                hasBorders: false,
-                lockMovementX: true,
-                lockMovementY: true,
+                selectable: false, evented: false,
+                hasControls: false, hasBorders: false,
+                lockMovementX: true, lockMovementY: true,
                 hoverCursor: 'default',
-                shadow: new Shadow({
-                    color: 'rgba(0,0,0,0.3)',
-                    blur: 20,
-                    offsetX: 0,
-                    offsetY: 4,
-                }),
+                shadow: new Shadow({ color: 'rgba(0,0,0,0.3)', blur: 20, offsetX: 0, offsetY: 4 }),
             });
             (artboard as any).__aceArtboard = true;
             patchAceProps(artboard);
             fc.add(artboard);
 
-            // Center the artboard in the viewport
             const vpt = fc.viewportTransform!;
             vpt[4] = (cw - width) / 2;
             vpt[5] = (ch - height) / 2;
             fc.setViewportTransform(vpt);
             skipHistory.current = false;
 
-            // Events
+            // ── Events ──
             fc.on('selection:created', () => syncState());
             fc.on('selection:updated', () => syncState());
             fc.on('selection:cleared', () => syncState());
             fc.on('object:modified', () => { pushUndo(); syncState(); });
             fc.on('object:added', (opt) => {
-                // Auto-assign __aceId to objects w/o one (PencilBrush paths, loadFromJSON)
                 const obj = opt.target;
                 if (obj && !(obj as any).__aceId && !isArtboard(obj)) {
                     (obj as any).__aceId = nextId();
@@ -323,53 +176,39 @@ export function useFabricCanvas(
             });
             fc.on('object:removed', () => { pushUndo(); syncState(); });
 
-            // ── Zoom with Ctrl+Wheel ──
+            // ── Zoom (Ctrl+Wheel) ──
             fc.on('mouse:wheel', (opt) => {
                 const e = opt.e as WheelEvent;
                 if (e.ctrlKey || e.metaKey) {
-                    e.preventDefault();
-                    e.stopPropagation();
+                    e.preventDefault(); e.stopPropagation();
                     const delta = e.deltaY > 0 ? -0.08 : 0.08;
                     let newZoom = (fc.getZoom() || 1) + delta;
                     newZoom = Math.max(0.1, Math.min(5, newZoom));
-                    const point = fc.getScenePoint(e);
-                    fc.zoomToPoint(point, newZoom);
+                    fc.zoomToPoint(fc.getScenePoint(e), newZoom);
                     fc.renderAll();
                 }
             });
 
-            // ── Pan with Alt+drag or middle mouse ──
+            // ── Pan (Alt+drag / middle mouse) ──
             let isPanning = false;
-            let lastPanX = 0;
-            let lastPanY = 0;
+            let lastPanX = 0, lastPanY = 0;
 
             fc.on('mouse:down', (opt) => {
                 const e = opt.e as MouseEvent;
                 if (e.altKey || e.button === 1) {
-                    isPanning = true;
-                    lastPanX = e.clientX;
-                    lastPanY = e.clientY;
-                    fc.setCursor('grabbing');
-                    e.preventDefault();
+                    isPanning = true; lastPanX = e.clientX; lastPanY = e.clientY;
+                    fc.setCursor('grabbing'); e.preventDefault();
                 }
             });
             fc.on('mouse:move', (opt) => {
                 if (!isPanning) return;
                 const e = opt.e as MouseEvent;
                 const vpt = fc.viewportTransform!;
-                vpt[4] += e.clientX - lastPanX;
-                vpt[5] += e.clientY - lastPanY;
-                lastPanX = e.clientX;
-                lastPanY = e.clientY;
-                fc.setViewportTransform(vpt);
-                fc.renderAll();
+                vpt[4] += e.clientX - lastPanX; vpt[5] += e.clientY - lastPanY;
+                lastPanX = e.clientX; lastPanY = e.clientY;
+                fc.setViewportTransform(vpt); fc.renderAll();
             });
-            fc.on('mouse:up', () => {
-                if (isPanning) {
-                    isPanning = false;
-                    fc.setCursor('default');
-                }
-            });
+            fc.on('mouse:up', () => { if (isPanning) { isPanning = false; fc.setCursor('default'); } });
 
             fabricRef.current = fc;
             engineRef.current = createEngineShim(fc, syncState, width, height);
@@ -392,26 +231,22 @@ export function useFabricCanvas(
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [width, height]);
 
-    // ── ResizeObserver: keep Fabric canvas = viewport size ──
+    // ── ResizeObserver ──
     useEffect(() => {
         const fc = fabricRef.current;
         const container = containerRef.current;
         if (!fc || !container) return;
-
         const ro = new ResizeObserver((entries) => {
             for (const entry of entries) {
                 const { width: cw, height: ch } = entry.contentRect;
-                if (cw > 0 && ch > 0) {
-                    fc.setDimensions({ width: cw, height: ch });
-                    fc.renderAll();
-                }
+                if (cw > 0 && ch > 0) { fc.setDimensions({ width: cw, height: ch }); fc.renderAll(); }
             }
         });
         ro.observe(container);
         return () => ro.disconnect();
     }, [status]);
 
-    // ── Helper: find object by ACE id ──
+    // ── Helper: find by ACE id ──
     const findById = useCallback((id: number): FabricObject | undefined => {
         return fabricRef.current?.getObjects().find((o) => (o as any).__aceId === id);
     }, []);
@@ -421,22 +256,14 @@ export function useFabricCanvas(
         const fc = fabricRef.current;
         if (!fc) return null;
         const id = nextId();
-        const color = nextColor();
         const rect = new Rect({
-            left: x ?? (width / 2 - 60),
-            top: y ?? (height / 2 - 40),
-            width: 120,
-            height: 80,
-            fill: color,
-            opacity: 0.9,
+            left: x ?? (width / 2 - 60), top: y ?? (height / 2 - 40),
+            width: 120, height: 80, fill: nextColor(), opacity: 0.9,
         });
         (rect as any).__aceId = id;
         (rect as any).__aceZIndex = getUserObjects().length;
         patchAceProps(rect);
-        fc.add(rect);
-        fc.setActiveObject(rect);
-        fc.renderAll();
-        syncState();
+        fc.add(rect); fc.setActiveObject(rect); fc.renderAll(); syncState();
         return id;
     }, [width, height, syncState, getUserObjects]);
 
@@ -444,24 +271,14 @@ export function useFabricCanvas(
         const fc = fabricRef.current;
         if (!fc) return null;
         const id = nextId();
-        const color = nextColor();
         const rect = new Rect({
-            left: x ?? (width / 2 - 60),
-            top: y ?? (height / 2 - 40),
-            width: 120,
-            height: 80,
-            fill: color,
-            opacity: 0.9,
-            rx: 12,
-            ry: 12,
+            left: x ?? (width / 2 - 60), top: y ?? (height / 2 - 40),
+            width: 120, height: 80, fill: nextColor(), opacity: 0.9, rx: 12, ry: 12,
         });
         (rect as any).__aceId = id;
         (rect as any).__aceZIndex = getUserObjects().length;
         patchAceProps(rect);
-        fc.add(rect);
-        fc.setActiveObject(rect);
-        fc.renderAll();
-        syncState();
+        fc.add(rect); fc.setActiveObject(rect); fc.renderAll(); syncState();
         return id;
     }, [width, height, syncState, getUserObjects]);
 
@@ -469,59 +286,43 @@ export function useFabricCanvas(
         const fc = fabricRef.current;
         if (!fc) return null;
         const id = nextId();
-        const color = nextColor();
         const el = new Ellipse({
-            left: x ?? (width / 2 - 60),
-            top: y ?? (height / 2 - 40),
-            rx: 60,
-            ry: 50,
-            fill: color,
-            opacity: 0.9,
+            left: x ?? (width / 2 - 60), top: y ?? (height / 2 - 40),
+            rx: 60, ry: 50, fill: nextColor(), opacity: 0.9,
         });
         (el as any).__aceId = id;
         (el as any).__aceZIndex = getUserObjects().length;
         patchAceProps(el);
-        fc.add(el);
-        fc.setActiveObject(el);
-        fc.renderAll();
-        syncState();
+        fc.add(el); fc.setActiveObject(el); fc.renderAll(); syncState();
         return id;
     }, [width, height, syncState, getUserObjects]);
 
-    // ── Text creation ──
+    // ── Text ──
     const addText = useCallback((x: number, y: number, content?: string, opts?: {
         fontSize?: number; fontFamily?: string; fontWeight?: string;
-        color?: string; textAlign?: string; lineHeight?: number;
-        width?: number;
+        color?: string; textAlign?: string; lineHeight?: number; width?: number;
     }): number | null => {
         const fc = fabricRef.current;
         if (!fc) return null;
         const id = nextId();
         const tb = new Textbox(content || 'Type here...', {
-            left: x,
-            top: y,
-            width: opts?.width ?? 200,
+            left: x, top: y, width: opts?.width ?? 200,
             fontSize: opts?.fontSize ?? 18,
             fontFamily: opts?.fontFamily ?? 'Inter, system-ui, sans-serif',
             fontWeight: opts?.fontWeight ?? '400',
             fill: opts?.color ?? '#000000',
             textAlign: (opts?.textAlign as any) ?? 'left',
             lineHeight: opts?.lineHeight ?? 1.4,
-            editable: true,
-            splitByGrapheme: false,
+            editable: true, splitByGrapheme: false,
         });
         (tb as any).__aceId = id;
         (tb as any).__aceName = `Text #${id}`;
         (tb as any).__aceZIndex = getUserObjects().length;
         patchAceProps(tb);
-        fc.add(tb);
-        fc.setActiveObject(tb);
-        fc.renderAll();
-        syncState();
+        fc.add(tb); fc.setActiveObject(tb); fc.renderAll(); syncState();
         return id;
     }, [syncState, getUserObjects]);
 
-    // ── Text update ──
     const updateText = useCallback((id: number, updates: Partial<{
         content: string; fontSize: number; fontFamily: string;
         fontWeight: string; color: string; textAlign: string;
@@ -541,14 +342,13 @@ export function useFabricCanvas(
         syncState();
     }, [findById, syncState]);
 
-    // ── Text content getter ──
     const getTextContent = useCallback((id: number): string | null => {
         const obj = findById(id);
         if (!obj || !(obj instanceof Textbox)) return null;
         return obj.text ?? null;
     }, [findById]);
 
-    // ── Image creation ──
+    // ── Image ──
     const addImage = useCallback(async (x: number, y: number, src: string, w?: number, h?: number): Promise<number | null> => {
         const fc = fabricRef.current;
         if (!fc) return null;
@@ -560,20 +360,12 @@ export function useFabricCanvas(
             const targetW = w ?? Math.min(natW, width * 0.6);
             const scale = targetW / natW;
             const targetH = h ?? (natH * scale);
-            img.set({
-                left: x,
-                top: y,
-                scaleX: targetW / natW,
-                scaleY: targetH / natH,
-            });
+            img.set({ left: x, top: y, scaleX: targetW / natW, scaleY: targetH / natH });
             (img as any).__aceId = id;
             (img as any).__aceName = `Image #${id}`;
             (img as any).__aceZIndex = getUserObjects().length;
             patchAceProps(img);
-            fc.add(img);
-            fc.setActiveObject(img);
-            fc.renderAll();
-            syncState();
+            fc.add(img); fc.setActiveObject(img); fc.renderAll(); syncState();
             return id;
         } catch (err) {
             console.error('[Fabric] Failed to load image:', err);
@@ -581,133 +373,95 @@ export function useFabricCanvas(
         }
     }, [width, syncState, getUserObjects]);
 
-    // ── Delete ──
+    // ── Delete / Select / Position / Color ──
     const deleteSelected = useCallback(() => {
         const fc = fabricRef.current;
         if (!fc) return;
-        const active = fc.getActiveObjects().filter(o => !isArtboard(o));
-        active.forEach((obj) => fc.remove(obj));
-        fc.discardActiveObject();
-        fc.renderAll();
-        syncState();
+        fc.getActiveObjects().filter(o => !isArtboard(o)).forEach((obj) => fc.remove(obj));
+        fc.discardActiveObject(); fc.renderAll(); syncState();
     }, [syncState]);
 
-    // ── Selection ──
     const selectNode = useCallback((id: number) => {
         const fc = fabricRef.current;
         if (!fc) return;
         const obj = findById(id);
-        if (obj) {
-            fc.setActiveObject(obj);
-            fc.renderAll();
-        }
+        if (obj) { fc.setActiveObject(obj); fc.renderAll(); }
         syncState();
     }, [findById, syncState]);
 
     const deselectAll = useCallback(() => {
         const fc = fabricRef.current;
         if (!fc) return;
-        fc.discardActiveObject();
-        fc.renderAll();
-        syncState();
+        fc.discardActiveObject(); fc.renderAll(); syncState();
     }, [syncState]);
 
-    // ── Position / Size / Opacity ──
     const setNodePosition = useCallback((id: number, x: number, y: number) => {
         const obj = findById(id);
         if (!obj) return;
-        obj.set({ left: x, top: y });
-        obj.setCoords();
-        fabricRef.current?.renderAll();
+        obj.set({ left: x, top: y }); obj.setCoords(); fabricRef.current?.renderAll();
     }, [findById]);
 
     const setNodeSize = useCallback((id: number, w: number, h: number) => {
         const obj = findById(id);
         if (!obj) return;
-        obj.set({ width: w, height: h, scaleX: 1, scaleY: 1 });
-        obj.setCoords();
-        fabricRef.current?.renderAll();
+        obj.set({ width: w, height: h, scaleX: 1, scaleY: 1 }); obj.setCoords(); fabricRef.current?.renderAll();
     }, [findById]);
 
     const setNodeOpacity = useCallback((id: number, opacity: number) => {
         const obj = findById(id);
         if (!obj) return;
-        obj.set({ opacity });
-        fabricRef.current?.renderAll();
+        obj.set({ opacity }); fabricRef.current?.renderAll();
     }, [findById]);
 
     const setFillColor = useCallback((id: number, r: number, g: number, b: number, _a: number) => {
         const obj = findById(id);
         if (!obj) return;
-        obj.set({ fill: rgbToHex(r, g, b) });
-        fabricRef.current?.renderAll();
-        syncState();
+        obj.set({ fill: rgbToHex(r, g, b) }); fabricRef.current?.renderAll(); syncState();
     }, [findById, syncState]);
 
-    // ── Z-index / layer order ──
+    // ── Z-index ──
     const bringToFront = useCallback((id: number) => {
-        const fc = fabricRef.current;
-        const obj = findById(id);
+        const fc = fabricRef.current; const obj = findById(id);
         if (!fc || !obj) return;
-        fc.bringObjectToFront(obj);
-        fc.renderAll();
-        syncState();
+        fc.bringObjectToFront(obj); fc.renderAll(); syncState();
     }, [findById, syncState]);
 
     const sendToBack = useCallback((id: number) => {
-        const fc = fabricRef.current;
-        const obj = findById(id);
+        const fc = fabricRef.current; const obj = findById(id);
         if (!fc || !obj) return;
-        // Send to back but keep above artboard
         fc.sendObjectToBack(obj);
-        // Move artboard to absolute bottom
         const artboard = fc.getObjects().find(isArtboard);
         if (artboard) fc.sendObjectToBack(artboard);
-        fc.renderAll();
-        syncState();
+        fc.renderAll(); syncState();
     }, [findById, syncState]);
 
     const bringForward = useCallback((id: number) => {
-        const fc = fabricRef.current;
-        const obj = findById(id);
+        const fc = fabricRef.current; const obj = findById(id);
         if (!fc || !obj) return;
-        fc.bringObjectForward(obj);
-        fc.renderAll();
-        syncState();
+        fc.bringObjectForward(obj); fc.renderAll(); syncState();
     }, [findById, syncState]);
 
     const sendBackward = useCallback((id: number) => {
-        const fc = fabricRef.current;
-        const obj = findById(id);
+        const fc = fabricRef.current; const obj = findById(id);
         if (!fc || !obj) return;
         fc.sendObjectBackwards(obj);
-        // Ensure artboard stays at bottom
         const artboard = fc.getObjects().find(isArtboard);
         if (artboard) fc.sendObjectToBack(artboard);
-        fc.renderAll();
-        syncState();
+        fc.renderAll(); syncState();
     }, [findById, syncState]);
 
     // ── Effects ──
     const setShadow = useCallback((id: number, ox: number, oy: number, blur: number, r: number, g: number, b: number, a: number) => {
         const obj = findById(id);
         if (!obj) return;
-        obj.set({
-            shadow: new Shadow({
-                color: `rgba(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)},${a})`,
-                blur,
-                offsetX: ox,
-                offsetY: oy,
-            }),
-        });
+        obj.set({ shadow: new Shadow({ color: `rgba(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)},${a})`, blur, offsetX: ox, offsetY: oy }) });
         fabricRef.current?.renderAll();
     }, [findById]);
 
     const removeShadow = useCallback((id: number) => {
         const obj = findById(id);
         if (!obj) return;
-        obj.set({ shadow: undefined });
-        fabricRef.current?.renderAll();
+        obj.set({ shadow: undefined }); fabricRef.current?.renderAll();
     }, [findById]);
 
     const setBlendMode = useCallback((_id: number, _mode: string) => { }, []);
@@ -719,24 +473,16 @@ export function useFabricCanvas(
 
     // ── Undo / Redo ──
     const restoreArtboardFlags = useCallback((fc: Canvas) => {
-        // After loadFromJSON, re-apply behavioral flags on artboard and ensure all objects have aceId
         fc.getObjects().forEach((obj) => {
             if ((obj as any).__aceArtboard) {
                 obj.set({
-                    selectable: false,
-                    evented: false,
-                    hasControls: false,
-                    hasBorders: false,
-                    lockMovementX: true,
-                    lockMovementY: true,
-                    hoverCursor: 'default',
+                    selectable: false, evented: false, hasControls: false, hasBorders: false,
+                    lockMovementX: true, lockMovementY: true, hoverCursor: 'default',
                 });
             } else if (!(obj as any).__aceId) {
-                // Ensure every non-artboard object has a unique ID
                 (obj as any).__aceId = nextId();
                 (obj as any).__aceZIndex = 0;
             }
-            // Re-patch toObject for all objects after deserialization
             patchAceProps(obj);
         });
     }, []);
@@ -748,10 +494,7 @@ export function useFabricCanvas(
         const prev = undoStack.current.pop()!;
         skipHistory.current = true;
         fc.loadFromJSON(prev).then(() => {
-            restoreArtboardFlags(fc);
-            fc.renderAll();
-            skipHistory.current = false;
-            syncState();
+            restoreArtboardFlags(fc); fc.renderAll(); skipHistory.current = false; syncState();
         });
     }, [syncState, restoreArtboardFlags]);
 
@@ -762,10 +505,7 @@ export function useFabricCanvas(
         const next = redoStack.current.pop()!;
         skipHistory.current = true;
         fc.loadFromJSON(next).then(() => {
-            restoreArtboardFlags(fc);
-            fc.renderAll();
-            skipHistory.current = false;
-            syncState();
+            restoreArtboardFlags(fc); fc.renderAll(); skipHistory.current = false; syncState();
         });
     }, [syncState, restoreArtboardFlags]);
 
@@ -775,20 +515,16 @@ export function useFabricCanvas(
         if (!fc) return null;
         const active = fc.getActiveObject();
         if (!active || isArtboard(active)) return null;
-
         const id = nextId();
         active.clone().then((cloned: FabricObject) => {
             cloned.set({ left: (cloned.left ?? 0) + 20, top: (cloned.top ?? 0) + 20 });
             (cloned as any).__aceId = id;
-            fc.add(cloned);
-            fc.setActiveObject(cloned);
-            fc.renderAll();
-            syncState();
+            fc.add(cloned); fc.setActiveObject(cloned); fc.renderAll(); syncState();
         });
         return id;
     }, [syncState]);
 
-    // ── Alignment to canvas ──
+    // ── Alignment ──
     const alignToCanvas = useCallback((id: number, alignment: 'left' | 'center-h' | 'right' | 'top' | 'center-v' | 'bottom') => {
         const obj = findById(id);
         if (!obj) return;
@@ -802,9 +538,7 @@ export function useFabricCanvas(
             case 'center-v': obj.set({ top: (height - objH) / 2 }); break;
             case 'bottom': obj.set({ top: height - objH }); break;
         }
-        obj.setCoords();
-        fabricRef.current?.renderAll();
-        syncState();
+        obj.setCoords(); fabricRef.current?.renderAll(); syncState();
     }, [width, height, findById, syncState]);
 
     // ── Mouse handlers (stubs — Fabric handles natively) ──
@@ -812,59 +546,42 @@ export function useFabricCanvas(
     const onMouseMove = useCallback((_e: React.MouseEvent) => { }, []);
     const onMouseUp = useCallback(() => { }, []);
 
-    // Tool-aware canvas click for shape creation
+    // ── Tool-aware canvas click ──
     useEffect(() => {
         const fc = fabricRef.current;
         if (!fc || status !== 'ready') return;
-
         const handler = (opt: any) => {
             const pointer = fc.getScenePoint(opt.e);
-            if (activeTool === 'shape') {
-                addRect(pointer.x - 60, pointer.y - 40);
-                setTool('select');
-            } else if (activeTool === 'text') {
-                addText(pointer.x, pointer.y);
-                setTool('select');
-            } else if (activeTool === 'image') {
-                // Open file dialog for image upload
+            if (activeTool === 'shape') { addRect(pointer.x - 60, pointer.y - 40); setTool('select'); }
+            else if (activeTool === 'text') { addText(pointer.x, pointer.y); setTool('select'); }
+            else if (activeTool === 'image') {
                 const input = document.createElement('input');
-                input.type = 'file';
-                input.accept = 'image/*';
-                input.style.display = 'none';
+                input.type = 'file'; input.accept = 'image/*'; input.style.display = 'none';
                 input.onchange = () => {
                     const file = input.files?.[0];
                     if (!file) return;
                     const reader = new FileReader();
-                    reader.onload = () => {
-                        const dataUrl = reader.result as string;
-                        addImage(pointer.x, pointer.y, dataUrl);
-                    };
+                    reader.onload = () => { addImage(pointer.x, pointer.y, reader.result as string); };
                     reader.readAsDataURL(file);
                     document.body.removeChild(input);
                 };
-                document.body.appendChild(input);
-                input.click();
-                setTool('select');
+                document.body.appendChild(input); input.click(); setTool('select');
             }
         };
-
         fc.on('mouse:down', handler);
         return () => { fc.off('mouse:down', handler); };
     }, [activeTool, status, addRect, addText, addImage, setTool]);
 
-    // ── Pen tool activation ──
+    // ── Pen tool ──
     useEffect(() => {
         const fc = fabricRef.current;
         if (!fc || status !== 'ready') return;
-
         if (activeTool === 'pen') {
             fc.isDrawingMode = true;
             fc.freeDrawingBrush = new PencilBrush(fc);
             fc.freeDrawingBrush.color = '#333333';
             fc.freeDrawingBrush.width = 2;
-        } else {
-            fc.isDrawingMode = false;
-        }
+        } else { fc.isDrawingMode = false; }
         fc.renderAll();
     }, [activeTool, status]);
 
@@ -874,20 +591,8 @@ export function useFabricCanvas(
             const tag = (e.target as HTMLElement)?.tagName;
             if (tag === 'INPUT' || tag === 'TEXTAREA') return;
             if ((e.target as HTMLElement)?.isContentEditable) return;
-
-            // Cmd+Z / Ctrl+Z → undo
-            if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
-                e.preventDefault();
-                undo();
-                return;
-            }
-            // Cmd+Shift+Z / Ctrl+Y → redo
-            if ((e.metaKey || e.ctrlKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) {
-                e.preventDefault();
-                redo();
-                return;
-            }
-            // Tool shortcuts (single key, no modifiers)
+            if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return; }
+            if ((e.metaKey || e.ctrlKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) { e.preventDefault(); redo(); return; }
             if (!e.metaKey && !e.ctrlKey && !e.altKey) {
                 switch (e.key.toLowerCase()) {
                     case 'v': setTool('select'); break;
@@ -903,28 +608,19 @@ export function useFabricCanvas(
         return () => window.removeEventListener('keydown', handler);
     }, [undo, redo, setTool]);
 
-    // NOTE: the following shape-tool useEffect was closed above, remove duplicate closure
-
-
     const retryInit = useCallback(() => {
-        if (fabricRef.current) {
-            fabricRef.current.dispose();
-            fabricRef.current = null;
-        }
-        setStatus('loading');
-        setErrorMsg('');
+        if (fabricRef.current) { fabricRef.current.dispose(); fabricRef.current = null; }
+        setStatus('loading'); setErrorMsg('');
     }, []);
 
-    const state: CanvasEngineState = {
-        status, errorMsg, selection, canUndo, canRedo, nodeCount, nodes,
-    };
+    // ── Return ──
+    const state: CanvasEngineState = { status, errorMsg, selection, canUndo, canRedo, nodeCount, nodes };
 
     const actions: CanvasEngineActions = {
         onMouseDown, onMouseMove, onMouseUp,
         addRect, addEllipse, addRoundedRect,
-        addGradientRect: (x: number, y: number, w: number, h: number, c1: string, c2: string, angle?: number, radius?: number, name?: string) => {
-            return engineRef.current?.add_gradient_rect?.(x, y, w, h, c1, c2, angle, radius, name) ?? null;
-        },
+        addGradientRect: (x, y, w, h, c1, c2, angle?, radius?, name?) =>
+            engineRef.current?.add_gradient_rect?.(x, y, w, h, c1, c2, angle, radius, name) ?? null,
         addText, updateText, getTextContent, addImage,
         deleteSelected, selectNode, deselectAll,
         setNodePosition, setNodeSize, setNodeOpacity, setFillColor,
@@ -932,644 +628,12 @@ export function useFabricCanvas(
         setShadow, removeShadow, setBlendMode,
         setBrightness, setContrast, setSaturation, setHueRotate,
         addKeyframe, duplicateSelected,
-        undo, redo,
-        alignToCanvas,
+        undo, redo, alignToCanvas,
         canvasWidth: width, canvasHeight: height,
     };
 
-    return {
-        canvasRef,
-        overlayRef,
-        engineRef,
-        state,
-        actions,
-        syncState,
-        retryInit,
-    };
+    return { canvasRef, overlayRef, engineRef, state, actions, syncState, retryInit };
 }
 
-// ── Engine Compatibility Shim ──
-function createEngineShim(fc: Canvas, syncState: () => void, artboardW: number, artboardH: number) {
-    const findById = (id: number) => fc.getObjects().find((o) => (o as any).__aceId === id);
-    const userObjects = () => fc.getObjects().filter(o => !isArtboard(o));
-
-    return {
-        get_all_nodes: () => {
-            const nodes = userObjects().map(fabricToEngineNode);
-            return JSON.stringify(nodes);
-        },
-        node_count: () => userObjects().length,
-        get_selection: () => {
-            const active = fc.getActiveObjects();
-            return JSON.stringify(active.map((o) => (o as any).__aceId ?? 0));
-        },
-        selection_bounds: () => {
-            const active = fc.getActiveObject();
-            if (!active) return 'null';
-            const bounds = active.getBoundingRect();
-            return JSON.stringify({ x: bounds.left, y: bounds.top, w: bounds.width, h: bounds.height });
-        },
-        selection_handles: () => '[]',
-        rubber_band_rect: () => 'null',
-        hit_test: () => JSON.stringify({ type: 'none' }),
-
-        add_rect: (x: number, y: number, w: number, h: number, r: number, g: number, b: number, a: number, name?: string) => {
-            const id = nextId();
-            const rect = new Rect({
-                left: x, top: y, width: w, height: h,
-                fill: rgbToHex(r, g, b),
-                opacity: a,
-            });
-            (rect as any).__aceId = id;
-            (rect as any).__aceName = name || `Rectangle #${id}`;
-            (rect as any).__aceZIndex = userObjects().length;
-            patchAceProps(rect);
-            fc.add(rect);
-            fc.renderAll();
-            syncState();
-            return id;
-        },
-        add_rounded_rect: (x: number, y: number, w: number, h: number, r: number, g: number, b: number, a: number, radius: number, name?: string) => {
-            const id = nextId();
-            const rect = new Rect({
-                left: x, top: y, width: w, height: h,
-                fill: rgbToHex(r, g, b),
-                opacity: a,
-                rx: radius, ry: radius,
-            });
-            (rect as any).__aceId = id;
-            (rect as any).__aceName = name || `Rounded Rect #${id}`;
-            (rect as any).__aceZIndex = userObjects().length;
-            patchAceProps(rect);
-            fc.add(rect);
-            fc.renderAll();
-            syncState();
-            return id;
-        },
-
-        // ── Linear / Radial Gradient Rect ──
-        add_gradient_rect: (
-            x: number, y: number, w: number, h: number,
-            hex1: string, hex2: string,
-            angleDeg: number = 0,
-            radius: number = 0,
-            name?: string,
-        ) => {
-            const id = nextId();
-            // Convert angle to gradient coords: 0° = top→bottom, 90° = left→right
-            const rad = (angleDeg * Math.PI) / 180;
-            const x1 = 0.5 - Math.sin(rad) * 0.5;
-            const y1 = 0.5 - Math.cos(rad) * 0.5;
-            const x2 = 0.5 + Math.sin(rad) * 0.5;
-            const y2 = 0.5 + Math.cos(rad) * 0.5;
-            const gradient = new Gradient({
-                type: 'linear',
-                coords: { x1: x1 * w, y1: y1 * h, x2: x2 * w, y2: y2 * h },
-                colorStops: [
-                    { offset: 0, color: hex1 },
-                    { offset: 1, color: hex2 },
-                ],
-                gradientUnits: 'pixels',
-            });
-            const rect = new Rect({
-                left: x, top: y, width: w, height: h,
-                fill: gradient,
-                rx: radius, ry: radius,
-            });
-            (rect as any).__aceId = id;
-            (rect as any).__aceName = name || `Gradient Rect #${id}`;
-            (rect as any).__aceZIndex = userObjects().length;
-            (rect as any).__aceGradientStart = hex1;
-            (rect as any).__aceGradientEnd = hex2;
-            (rect as any).__aceGradientAngle = angleDeg;
-            patchAceProps(rect);
-            fc.add(rect);
-            fc.renderAll();
-            syncState();
-            return id;
-        },
-
-        add_ellipse: (cx: number, cy: number, rx: number, ry: number, r: number, g: number, b: number, a: number) => {
-            const id = nextId();
-            const el = new Ellipse({
-                left: cx - rx, top: cy - ry,
-                rx, ry,
-                fill: rgbToHex(r, g, b),
-                opacity: a,
-            });
-            (el as any).__aceId = id;
-            (el as any).__aceZIndex = userObjects().length;
-            patchAceProps(el);
-            fc.add(el);
-            fc.renderAll();
-            return id;
-        },
-
-
-        // ── Text (Fabric Textbox) — positional args for AI tool compatibility ──
-        add_text: (
-            x: number, y: number, content: string,
-            fontSize: number, fontFamily: string, fontWeight: string,
-            r: number, g: number, b: number, _a: number,
-            width: number, textAlign: string,
-            name?: string,
-            lineHeight?: number,
-            letterSpacing?: number,
-        ) => {
-            const id = nextId();
-            const tb = new Textbox(content || 'Text', {
-                left: x,
-                top: y,
-                width: width > 0 ? width : 200,
-                fontSize: fontSize || 18,
-                fontFamily: fontFamily || 'Inter, system-ui, sans-serif',
-                fontWeight: fontWeight || '400',
-                fill: rgbToHex(r, g, b),
-                textAlign: (textAlign as any) || 'left',
-                lineHeight: lineHeight ?? 1.4,
-                charSpacing: (letterSpacing ?? 0) * 10,
-                editable: true,
-            });
-            (tb as any).__aceId = id;
-            (tb as any).__aceName = name || `Text #${id}`;
-            (tb as any).__aceZIndex = userObjects().length;
-            patchAceProps(tb);
-            fc.add(tb);
-            fc.renderAll();
-            syncState();
-            return id;
-        },
-
-        // ── Image (Fabric Image) ── async
-        add_image: async (x: number, y: number, src: string, w?: number, h?: number, name?: string): Promise<number> => {
-            const id = nextId();
-            try {
-                // data: URLs must NOT have crossOrigin set — CORS doesn't apply
-                // and 'anonymous' flag causes browsers to reject them
-                const isDataUrl = src.startsWith('data:');
-                const imgOptions = isDataUrl ? {} : { crossOrigin: 'anonymous' as const };
-                const img = await FabricImage.fromURL(src, imgOptions);
-                const natW = img.width ?? 200;
-                const natH = img.height ?? 200;
-
-                let targetW: number;
-                let targetH: number;
-
-                if (w != null && h != null) {
-                    // Both dimensions provided (restore path) — use UNIFORM scale
-                    // to preserve aspect ratio. Fit within the bounding box.
-                    const uniformScale = Math.min(w / Math.max(natW, 1), h / Math.max(natH, 1));
-                    targetW = natW * uniformScale;
-                    targetH = natH * uniformScale;
-                } else if (w != null) {
-                    // Only width provided — auto-calculate height
-                    targetW = w;
-                    targetH = natH * (targetW / Math.max(natW, 1));
-                } else {
-                    // No dimensions — use natural size clamped to artboard
-                    targetW = Math.min(natW, artboardW * 0.7);
-                    targetH = natH * (targetW / Math.max(natW, 1));
-                }
-
-                const uniformScaleVal = targetW / Math.max(natW, 1);
-                img.set({
-                    left: x,
-                    top: y,
-                    scaleX: uniformScaleVal,
-                    scaleY: uniformScaleVal,
-                });
-                (img as any).__aceId = id;
-                (img as any).__aceName = name || `Image #${id}`;
-                (img as any).__aceZIndex = userObjects().length;
-                patchAceProps(img);
-                fc.add(img);
-                fc.setActiveObject(img);
-                fc.renderAll();
-                syncState();
-                console.log(`[EngineShim] Image added: id=${id} name="${name}" at (${x},${y}) size=${Math.round(targetW)}x${Math.round(targetH)}`);
-            } catch (err) {
-                console.error('[EngineShim] Failed to load image:', err);
-            }
-            return id;
-        },
-
-        // ── Grouping ─────────────────────────────────────
-        group_elements: (ids: number[], name?: string): number => {
-            const objects = ids.map(findById).filter(Boolean) as FabricObject[];
-            if (objects.length < 2) return -1;
-
-            const gid = nextId();
-            const group = new Group(objects, {
-                // Fabric Group auto-calculates position from children
-            });
-            // Remove individual objects from canvas (they're now in the group)
-            objects.forEach(o => fc.remove(o));
-            (group as any).__aceId = gid;
-            (group as any).__aceName = name || `Group #${gid}`;
-            (group as any).__aceZIndex = userObjects().length;
-            patchAceProps(group);
-            fc.add(group);
-            fc.setActiveObject(group);
-            fc.renderAll();
-            syncState();
-            console.log(`[EngineShim] Grouped ${ids.length} objects → id=${gid} name="${name}"`);
-            return gid;
-        },
-
-        ungroup: (id: number) => {
-            const obj = findById(id);
-            if (!obj || !(obj instanceof Group)) return;
-            const items = (obj as Group).getObjects();
-            fc.remove(obj);
-            items.forEach((item, i) => {
-                (item as any).__aceId = nextId();
-                (item as any).__aceZIndex = userObjects().length + i;
-                patchAceProps(item);
-                fc.add(item);
-            });
-            fc.renderAll();
-            syncState();
-            console.log(`[EngineShim] Ungrouped id=${id}, ${items.length} objects released`);
-        },
-
-        select: (id: number) => {
-            const obj = findById(id);
-            if (obj) { fc.setActiveObject(obj); fc.renderAll(); }
-        },
-        toggle_select: (id: number) => {
-            const obj = findById(id);
-            if (!obj) return;
-            const active = fc.getActiveObjects();
-            if (active.includes(obj)) {
-                fc.discardActiveObject();
-            } else {
-                fc.setActiveObject(obj);
-            }
-            fc.renderAll();
-        },
-        deselect_all: () => { fc.discardActiveObject(); fc.renderAll(); },
-        delete_selected: () => {
-            const active = fc.getActiveObjects().filter(o => !isArtboard(o));
-            active.forEach((o) => fc.remove(o));
-            fc.discardActiveObject();
-            fc.renderAll();
-        },
-        clear_scene: () => {
-            const toRemove = userObjects();
-            toRemove.forEach((o) => fc.remove(o));
-            fc.renderAll();
-        },
-        // Alias: AI executor calls engine.clear()
-        clear() { this.clear_scene(); },
-
-        // ── Screenshot (artboard-only crop) ──────────────
-        // Returns base64 PNG data URL clipped to artboard bounds.
-        // Used by Vision Feedback Loop after each render pass.
-        get_screenshot: (): string => {
-            const artboard = fc.getObjects().find(isArtboard);
-            if (!artboard) return fc.toDataURL({ format: 'png', multiplier: 1 });
-            const zoom = fc.getZoom();
-            const vpt = fc.viewportTransform ?? [1, 0, 0, 1, 0, 0];
-            return fc.toDataURL({
-                format: 'png',
-                multiplier: 1,
-                left: Math.round(vpt[4]),
-                top: Math.round(vpt[5]),
-                width: Math.round(artboardW * zoom),
-                height: Math.round(artboardH * zoom),
-            });
-        },
-
-        // ── Find element by layer name ─────────────────────
-        find_by_name: (name: string): number | null => {
-            const obj = userObjects().find((o) => (o as any).__aceName === name);
-            return obj ? ((obj as any).__aceId as number) : null;
-        },
-
-        // ── Send element to front (highest zIndex) ─────────
-        send_to_front: (id: number): void => {
-            const obj = findById(id);
-            if (obj) {
-                fc.bringObjectToFront(obj);
-                (obj as any).__aceZIndex = userObjects().length - 1;
-                fc.renderAll();
-                syncState();
-            }
-        },
-
-        // ── Find all element IDs of a given type ───────────
-        find_all_by_type: (type: string): number[] => {
-            return userObjects()
-                .filter((o) => {
-                    const n = fabricToEngineNode(o);
-                    return n.type === type;
-                })
-                .map((o) => (o as any).__aceId as number);
-        },
-
-        // ── Remove a single element from canvas ────────────
-        remove_element: (id: number): void => {
-            const obj = findById(id);
-            if (obj) {
-                fc.remove(obj);
-                fc.renderAll();
-            }
-        },
-
-        // ── Get data src for an image element ──────────────
-        get_image_src: (id: number): string => {
-            const obj = findById(id);
-            if (!obj || obj.type !== 'image') return '';
-            return (obj as any)._element?.src ?? '';
-        },
-
-        // ── Get display size for any element ──────────────
-        get_element_bounds: (id: number): { x: number; y: number; w: number; h: number } | null => {
-            const obj = findById(id);
-            if (!obj) return null;
-            const n = fabricToEngineNode(obj);
-            return { x: n.x, y: n.y, w: n.w, h: n.h };
-        },
-
-        // ── Set font size (for text elements) ─────────────
-        set_font_size: (id: number, size: number) => {
-            const obj = findById(id);
-            if (obj && (obj as any).set && 'fontSize' in obj) {
-                obj.set({ fontSize: size } as any);
-                fc.renderAll();
-                syncState();
-            }
-        },
-
-        // ── Set fill by hex color string ───────────────────
-        set_fill_hex: (id: number, hex: string) => {
-            const obj = findById(id);
-            if (obj) { obj.set({ fill: hex }); fc.renderAll(); }
-        },
-
-        set_position: (id: number, x: number, y: number) => {
-            const obj = findById(id);
-            if (obj) { obj.set({ left: x, top: y }); obj.setCoords(); fc.renderAll(); }
-        },
-        set_size: (id: number, w: number, h: number) => {
-            const obj = findById(id);
-            if (!obj) return;
-            if (obj.type === 'image') {
-                // Fabric Images: size is controlled by scaleX/scaleY, not width/height
-                const natW = (obj as any).width ?? w;
-                const natH = (obj as any).height ?? h;
-                const scale = Math.min(w / Math.max(natW, 1), h / Math.max(natH, 1));
-                obj.set({ scaleX: scale, scaleY: scale });
-            } else {
-                obj.set({ width: w, height: h, scaleX: 1, scaleY: 1 });
-            }
-            obj.setCoords();
-            fc.renderAll();
-        },
-        set_opacity: (id: number, v: number) => {
-            const obj = findById(id);
-            if (obj) { obj.set({ opacity: v }); fc.renderAll(); }
-        },
-        set_fill_color: (id: number, r: number, g: number, b: number, _a: number) => {
-            const obj = findById(id);
-            if (obj) { obj.set({ fill: rgbToHex(r, g, b) }); fc.renderAll(); }
-        },
-        set_z_index: (id: number, z: number) => {
-            const obj = findById(id);
-            if (!obj) return;
-            (obj as any).__aceZIndex = z;
-            // Actually move object in Fabric's render array so visual order matches
-            const objs = userObjects().sort((a, b) => ((a as any).__aceZIndex ?? 0) - ((b as any).__aceZIndex ?? 0));
-            objs.forEach((o, i) => { fc.moveObjectTo(o, i + 1); }); // +1 because artboard is at index 0
-            fc.renderAll();
-            syncState();
-        },
-        set_shadow: (id: number, ox: number, oy: number, blur: number, r: number, g: number, b: number, a: number) => {
-            const obj = findById(id);
-            if (!obj) return;
-            obj.set({
-                shadow: new Shadow({
-                    color: `rgba(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)},${a})`,
-                    blur, offsetX: ox, offsetY: oy,
-                }),
-            });
-            fc.renderAll();
-        },
-        remove_shadow: (id: number) => {
-            const obj = findById(id);
-            if (obj) { obj.set({ shadow: undefined }); fc.renderAll(); }
-        },
-        set_blend_mode: () => { },
-        set_brightness: () => { },
-        set_contrast: () => { },
-        set_saturation: () => { },
-        set_hue_rotate: () => { },
-        add_keyframe: () => { },
-        clear_node_keyframes: () => { },
-
-        // ── Animation state machine ──
-        // Drives timeline time AND applies transforms to Fabric objects.
-        _animState: {
-            playing: false,
-            time: 0,
-            duration: 5.0,
-            looping: false,
-            speed: 1.0,
-            startTs: 0,
-            startOffset: 0,
-            rafId: 0,
-        },
-
-        anim_play() {
-            const s = this._animState;
-            if (s.playing) return;
-            s.playing = true;
-            s.startTs = performance.now();
-            s.startOffset = s.time;
-
-            // Snapshot original positions before animation starts
-            const objs = fc.getObjects().filter(o => !isArtboard(o));
-            for (const obj of objs) {
-                if (!(obj as any).__aceOrigPos) {
-                    (obj as any).__aceOrigPos = {
-                        left: obj.left ?? 0,
-                        top: obj.top ?? 0,
-                        opacity: obj.opacity ?? 1,
-                        scaleX: obj.scaleX ?? 1,
-                        scaleY: obj.scaleY ?? 1,
-                    };
-                }
-            }
-
-            const tick = () => {
-                if (!s.playing) return;
-                const elapsed = (performance.now() - s.startTs) / 1000 * s.speed;
-                s.time = s.startOffset + elapsed;
-                if (s.time >= s.duration) {
-                    if (s.looping) {
-                        s.time = s.time % s.duration;
-                        s.startTs = performance.now();
-                        s.startOffset = s.time;
-                    } else {
-                        s.time = s.duration;
-                        s.playing = false;
-                        // Restore positions when animation ends
-                        this._restoreOriginalPositions();
-                        return;
-                    }
-                }
-
-                // ★ Apply animation transforms to Fabric objects
-                this._applyAnimationFrame(s.time);
-
-                s.rafId = requestAnimationFrame(tick);
-            };
-            s.rafId = requestAnimationFrame(tick);
-        },
-
-        /** Apply animation presets to all Fabric objects at given time */
-        _applyAnimationFrame(currentTime: number) {
-            const presets = useAnimPresetStore.getState().presets;
-
-            const objs = fc.getObjects().filter(o => !isArtboard(o));
-            let needsRender = false;
-
-            for (const obj of objs) {
-                const aceId = (obj as any).__aceId;
-                if (!aceId) continue;
-
-                const key = String(aceId);
-                const config = presets[key];
-                if (!config || config.anim === 'none') continue;
-
-                const orig = (obj as any).__aceOrigPos;
-                if (!orig) continue;
-
-                // Compute animation progress
-                const animStart = config.startTime ?? 0;
-                const animEnd = animStart + (config.animDuration ?? 0.3);
-                let progress: number;
-                if (currentTime <= animStart) {
-                    progress = 0;
-                } else if (currentTime >= animEnd) {
-                    progress = 1;
-                } else {
-                    progress = (currentTime - animStart) / (animEnd - animStart);
-                }
-                // Ease-out
-                const inv = 1 - progress;
-                const t = 1 - inv * inv * inv;
-
-                // Apply transforms based on preset type
-                switch (config.anim) {
-                    case 'fade':
-                        obj.set({ opacity: t * orig.opacity });
-                        break;
-                    case 'slide-left':
-                        obj.set({ left: orig.left + (-300 * (1 - t)) });
-                        break;
-                    case 'slide-right':
-                        obj.set({ left: orig.left + (300 * (1 - t)) });
-                        break;
-                    case 'slide-up':
-                        obj.set({ top: orig.top + (-300 * (1 - t)) });
-                        break;
-                    case 'slide-down':
-                        obj.set({ top: orig.top + (300 * (1 - t)) });
-                        break;
-                    case 'scale':
-                        obj.set({ scaleX: orig.scaleX * t, scaleY: orig.scaleY * t });
-                        break;
-                    case 'ascend':
-                        obj.set({
-                            top: orig.top + (200 * (1 - t)),
-                            opacity: t * orig.opacity,
-                        });
-                        break;
-                    case 'descend':
-                        obj.set({
-                            top: orig.top + (-200 * (1 - t)),
-                            opacity: t * orig.opacity,
-                        });
-                        break;
-                }
-                needsRender = true;
-            }
-
-            if (needsRender) {
-                fc.renderAll();
-            }
-        },
-
-        /** Restore all objects to their original positions */
-        _restoreOriginalPositions() {
-            const objs = fc.getObjects().filter(o => !isArtboard(o));
-            for (const obj of objs) {
-                const orig = (obj as any).__aceOrigPos;
-                if (orig) {
-                    obj.set({
-                        left: orig.left,
-                        top: orig.top,
-                        opacity: orig.opacity,
-                        scaleX: orig.scaleX,
-                        scaleY: orig.scaleY,
-                    });
-                    delete (obj as any).__aceOrigPos;
-                }
-            }
-            fc.renderAll();
-        },
-
-        anim_pause() {
-            this._animState.playing = false;
-            cancelAnimationFrame(this._animState.rafId);
-            // Keep objects at current animated positions (don't restore)
-        },
-        anim_stop() {
-            this._animState.playing = false;
-            this._animState.time = 0;
-            cancelAnimationFrame(this._animState.rafId);
-            // Restore to original positions
-            this._restoreOriginalPositions();
-        },
-        anim_seek(t: number) {
-            this._animState.time = Math.max(0, Math.min(t, this._animState.duration));
-            if (this._animState.playing) {
-                this._animState.startTs = performance.now();
-                this._animState.startOffset = this._animState.time;
-            }
-            // Apply frame at seek position
-            this._applyAnimationFrame(this._animState.time);
-        },
-        anim_time(): number { return this._animState.time; },
-        anim_playing(): boolean { return this._animState.playing; },
-        anim_duration(): number { return this._animState.duration; },
-        anim_looping(): boolean { return this._animState.looping; },
-        set_duration(d: number) { this._animState.duration = d; },
-        set_looping(v: boolean) { this._animState.looping = v; },
-        anim_set_speed(s: number) { this._animState.speed = s; },
-        anim_toggle() {
-            if (this._animState.playing) {
-                this.anim_pause();
-            } else {
-                this.anim_play();
-            }
-        },
-
-        render_frame: () => { fc.renderAll(); },
-        /** Returns [scaleX, 0, 0, scaleY, translateX, translateY] — Fabric's viewportTransform.
-         *  Used by EditorCanvas to sync HTML overlay elements with the artboard position. */
-        get_viewport_transform: (): number[] => {
-            return fc.viewportTransform ? [...fc.viewportTransform] : [1, 0, 0, 1, 0, 0];
-        },
-        can_undo: () => false,
-        can_redo: () => false,
-        start_move: () => { },
-        start_resize: () => { },
-        update_drag: () => { },
-        end_drag: () => { },
-        free: () => {
-            cancelAnimationFrame(0); // cleanup
-        },
-    };
-}
+// Re-export for backward compatibility
+export { createEngineShim } from './fabricEngineShim';
