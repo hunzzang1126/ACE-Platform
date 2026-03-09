@@ -9,10 +9,22 @@ import { useDesignStore } from '@/stores/designStore';
 import { AiService, type AiConfig } from '@/ai/aiService';
 import { DASHBOARD_TOOL_NAMES } from '@/ai/dashboardTools';
 import { executeDashboardTool } from '@/ai/dashboardExecutor';
+import { getModelForRole, listModels, type AceModelRole } from '@/services/modelRouter';
 import type { AgentMessage, SceneNodeInfo } from '@/ai/agentContext';
 import type { ExecutionResult } from '@/ai/commandExecutor';
 import { IcAi, IcSettings, IcSend, IcClose, IcChevronLeft, IcChevronRight, IcLoader, IcCheck, IcError, IcSearch } from '@/components/ui/Icons';
 import type { ToolExecutorOverride } from '@/ai/aiService';
+
+// ── Model Selector Config ──
+const MODEL_OPTIONS: Array<{ role: AceModelRole; label: string; group: 'LLM' | 'Image' }> = [
+    { role: 'planner', label: 'Planner', group: 'LLM' },
+    { role: 'design', label: 'Design (Full)', group: 'LLM' },
+    { role: 'executor', label: 'Executor (Fast)', group: 'LLM' },
+    { role: 'critic', label: 'Critic', group: 'LLM' },
+    { role: 'vision', label: 'Vision', group: 'LLM' },
+    { role: 'image_fast', label: 'Image (Fast)', group: 'Image' },
+    { role: 'image_quality', label: 'Image (Quality)', group: 'Image' },
+];
 
 // ── Types ────────────────────────────────────────
 
@@ -42,9 +54,12 @@ export function GlobalAiPanel() {
     const [input, setInput] = useState('');
     const [live, setLive] = useState<LiveState>(LIVE_INIT);
     const [showSettings, setShowSettings] = useState(false);
+    const [selectedRole, setSelectedRole] = useState<AceModelRole>('design');
+    const [showModelDropdown, setShowModelDropdown] = useState(false);
+    const activeModel = getModelForRole(selectedRole);
     const [config, setConfig] = useState<AiConfig>({
-        endpoint: 'https://api.anthropic.com',
-        model: 'claude-sonnet-4-20250514',
+        endpoint: 'https://openrouter.ai/api',
+        model: activeModel.id,
         maxToolRounds: 30,
     });
 
@@ -339,17 +354,79 @@ export function GlobalAiPanel() {
                         <div ref={bottomRef} />
                     </div>
 
-                    {/* Input */}
-                    <div style={inputAreaStyle}>
-                        <input ref={inputRef} value={input}
-                            onChange={e => setInput(e.target.value)}
-                            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                            placeholder={`Message AI... (${contextLabel.toLowerCase()})`}
-                            style={inputFieldStyle}
-                        />
-                        <button onClick={() => handleSend()} disabled={!input.trim() || isBusy} style={sendBtnStyle}>
-                            <IcSend size={14} color="#fff" />
-                        </button>
+                    {/* Model Selector + Input */}
+                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                        {/* Model Bar */}
+                        <div style={modelBarStyle}>
+                            <button
+                                onClick={() => setShowModelDropdown(!showModelDropdown)}
+                                style={modelSelectorBtnStyle}
+                            >
+                                <span style={{ fontSize: 11, color: '#6e7681' }}>{MODEL_OPTIONS.find(o => o.role === selectedRole)?.label ?? 'Design'}</span>
+                                <span style={{ fontSize: 11, color: '#8b949e', margin: '0 4px' }}>·</span>
+                                <span style={{ fontSize: 11, color: '#c9d1d9', fontWeight: 500 }}>{activeModel.name}</span>
+                                <IcChevronRight size={10} color="#6e7681" />
+                            </button>
+                            {activeModel.costPer1MInput > 0 && (
+                                <span style={{ fontSize: 9, color: '#484f58', marginLeft: 'auto' }}>
+                                    ~${(activeModel.costPer1MInput * 0.002 + activeModel.costPer1MOutput * 0.001).toFixed(3)}/call
+                                </span>
+                            )}
+                        </div>
+
+                        {/* Dropdown */}
+                        {showModelDropdown && (
+                            <div style={modelDropdownStyle}>
+                                {(['LLM', 'Image'] as const).map(group => (
+                                    <div key={group}>
+                                        <div style={modelGroupLabelStyle}>{group}</div>
+                                        {MODEL_OPTIONS.filter(o => o.group === group).map(opt => {
+                                            const m = getModelForRole(opt.role);
+                                            const active = opt.role === selectedRole;
+                                            return (
+                                                <button
+                                                    key={opt.role}
+                                                    onClick={() => {
+                                                        setSelectedRole(opt.role);
+                                                        const newModel = getModelForRole(opt.role);
+                                                        setConfig(prev => ({ ...prev, model: newModel.id }));
+                                                        setShowModelDropdown(false);
+                                                    }}
+                                                    style={{
+                                                        ...modelOptionStyle,
+                                                        background: active ? 'rgba(56,139,253,0.1)' : 'transparent',
+                                                        borderLeft: active ? '2px solid #388bfd' : '2px solid transparent',
+                                                    }}
+                                                >
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                                                        <span style={{ fontSize: 12, color: active ? '#e6edf3' : '#c9d1d9' }}>{opt.label}</span>
+                                                        {m.costPer1MInput > 0 && (
+                                                            <span style={{ fontSize: 10, color: '#484f58' }}>
+                                                                ${m.costPer1MInput}/{m.costPer1MOutput}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div style={{ fontSize: 10, color: '#484f58', marginTop: 2 }}>{m.id}</div>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Input Row */}
+                        <div style={inputAreaStyle}>
+                            <input ref={inputRef} value={input}
+                                onChange={e => setInput(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                                placeholder={`Message AI... (${contextLabel.toLowerCase()})`}
+                                style={inputFieldStyle}
+                            />
+                            <button onClick={() => handleSend()} disabled={!input.trim() || isBusy} style={sendBtnStyle}>
+                                <IcSend size={14} color="#fff" />
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
@@ -447,4 +524,44 @@ const sendBtnStyle: CSSProperties = {
     width: 34, height: 34, borderRadius: 8,
     background: '#238636', border: 'none', cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
+};
+
+// ── Model Selector Styles ──
+
+const modelBarStyle: CSSProperties = {
+    display: 'flex', alignItems: 'center', gap: 6,
+    padding: '6px 12px',
+    borderBottom: '1px solid rgba(255,255,255,0.04)',
+};
+
+const modelSelectorBtnStyle: CSSProperties = {
+    display: 'flex', alignItems: 'center', gap: 4,
+    background: 'none', border: 'none', cursor: 'pointer',
+    padding: '3px 6px', borderRadius: 4,
+    transition: 'background 0.15s',
+};
+
+const modelDropdownStyle: CSSProperties = {
+    background: '#161b22',
+    border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: 8,
+    margin: '0 8px 4px',
+    padding: '6px 0',
+    boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+    maxHeight: 280,
+    overflowY: 'auto',
+};
+
+const modelGroupLabelStyle: CSSProperties = {
+    fontSize: 9, fontWeight: 600, letterSpacing: '0.8px',
+    textTransform: 'uppercase', color: '#484f58',
+    padding: '8px 12px 4px',
+};
+
+const modelOptionStyle: CSSProperties = {
+    display: 'flex', flexDirection: 'column',
+    width: '100%', textAlign: 'left',
+    background: 'none', border: 'none',
+    padding: '6px 12px', cursor: 'pointer',
+    transition: 'background 0.1s',
 };
