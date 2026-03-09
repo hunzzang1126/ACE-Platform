@@ -279,7 +279,14 @@ export function useAutoDesign(options: AutoDesignOptions) {
             } else {
                 // ── Mode A: From Scratch ───────────────────────────
                 setState(s => ({ ...s, progress: 'Generating banner layout...' }));
-                const result = await callFromScratch(prompt, canvasW, canvasH, signal);
+
+                // Load few-shot examples from memory store (top-rated designs)
+                const { buildFewShotExamples } = await import('@/stores/designMemoryStore');
+                const { useDesignMemoryStore } = await import('@/stores/designMemoryStore');
+                const topExamples = useDesignMemoryStore.getState().getTopExamples(3);
+                const fewShotStr = buildFewShotExamples(topExamples);
+
+                const result = await callFromScratch(prompt, canvasW, canvasH, signal, fewShotStr);
 
                 // Clear canvas first
                 try { engine.clear_scene?.(); } catch { /* ok */ }

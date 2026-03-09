@@ -449,11 +449,17 @@ export async function callFromScratch(
     canvasW: number,
     canvasH: number,
     signal: AbortSignal,
+    fewShotExamples: string = '',
 ): Promise<FromScratchResult> {
+    const systemPrompt = buildFromScratchPrompt(canvasW, canvasH, prompt);
+    const fullSystem = fewShotExamples
+        ? `${fewShotExamples}\n${systemPrompt}`
+        : systemPrompt;
+
     const body = {
         model: DEFAULT_CLAUDE_MODEL,
         max_tokens: 2048,
-        system: buildFromScratchPrompt(canvasW, canvasH, prompt),
+        system: fullSystem,
         tools: [RENDER_BANNER_TOOL],
         tool_choice: { type: 'tool', name: 'render_banner' },
         messages: [{ role: 'user', content: prompt }],

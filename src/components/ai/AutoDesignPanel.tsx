@@ -11,6 +11,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useAutoDesign } from '@/hooks/useAutoDesign';
+import { useDesignMemoryStore } from '@/stores/designMemoryStore';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Engine = any;
@@ -33,9 +34,14 @@ export function AutoDesignPanel({ engine, canvasW, canvasH }: Props) {
     const [elementCount, setElementCount] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
     const [uploadedAssets, setUploadedAssets] = useState<string[]>([]);
+    const [rated, setRated] = useState<number | null>(null); // current session rating
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const lastPromptRef = useRef('');
 
     const { state, generate, cancel } = useAutoDesign({ engine, canvasW, canvasH });
+    const addEntry = useDesignMemoryStore(s => s.addEntry);
+
+
 
     // Poll canvas element count
     useEffect(() => {
@@ -93,7 +99,11 @@ export function AutoDesignPanel({ engine, canvasW, canvasH }: Props) {
     // Button enabled when engine is ready (API key is centralized)
     const canRun = !!engine && !state.isGenerating;
 
-    const handleGenerate = useCallback(() => generate(prompt || 'Clean, professional layout'), [generate, prompt]);
+    const handleGenerate = useCallback(() => {
+        lastPromptRef.current = prompt;
+        setRated(null);
+        generate(prompt || 'Clean, professional layout');
+    }, [generate, prompt]);
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); handleGenerate(); }
     }, [handleGenerate]);
@@ -206,11 +216,61 @@ export function AutoDesignPanel({ engine, canvasW, canvasH }: Props) {
                 </div>
             )}
 
-            {/* Success */}
+            {/* Success + Rating */}
             {!state.isGenerating && state.phase === 'done' && (
-                <div style={styles.successBlock}>
-                    Layout complete.
-                    {state.finalScore > 0 && <span style={{ opacity: 0.6, marginLeft: 6 }}>Score {state.finalScore}/100</span>}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={styles.successBlock}>
+                        Layout complete.
+                        {state.finalScore > 0 && <span style={{ opacity: 0.6, marginLeft: 6 }}>Score {state.finalScore}/100</span>}
+                    </div>
+                    {/* Rating — saves result to design memory for few-shot learning */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 10, color: '#484f58' }}>Rate this design:</span>
+                        <button
+                            title="Good design — save as example"
+                            style={{
+                                background: rated === 5 ? '#238636' : '#21262d',
+                                border: `1px solid ${rated === 5 ? '#2ea043' : '#30363d'}`,
+                                borderRadius: 5, padding: '3px 9px', cursor: 'pointer',
+                                color: rated === 5 ? '#fff' : '#8b949e', fontSize: 11,
+                                transition: 'all 0.1s',
+                            }}
+                            onClick={() => {
+                                if (rated === 5) return;
+                                setRated(5);
+                                if (engine) {
+                                    try {
+                                        const nodes = JSON.parse(engine.get_all_nodes());
+                                        addEntry({ prompt: lastPromptRef.current, elements: nodes, canvasW, canvasH, rating: 5, personality: 'auto' });
+                                    } catch { /* ok */ }
+                                }
+                            }}
+                        >
+                            + Good
+                        </button>
+                        <button
+                            title="Poor design — mark as low quality"
+                            style={{
+                                background: rated === 1 ? '#6e1a1a' : '#21262d',
+                                border: `1px solid ${rated === 1 ? '#f85149' : '#30363d'}`,
+                                borderRadius: 5, padding: '3px 9px', cursor: 'pointer',
+                                color: rated === 1 ? '#fff' : '#8b949e', fontSize: 11,
+                                transition: 'all 0.1s',
+                            }}
+                            onClick={() => {
+                                if (rated === 1) return;
+                                setRated(1);
+                                if (engine) {
+                                    try {
+                                        const nodes = JSON.parse(engine.get_all_nodes());
+                                        addEntry({ prompt: lastPromptRef.current, elements: nodes, canvasW, canvasH, rating: 1, personality: 'auto' });
+                                    } catch { /* ok */ }
+                                }
+                            }}
+                        >
+                            - Poor
+                        </button>
+                    </div>
                 </div>
             )}
 
