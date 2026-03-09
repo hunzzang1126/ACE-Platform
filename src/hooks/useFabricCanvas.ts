@@ -28,13 +28,26 @@ function nextColor(): string {
 }
 
 // ── Hex ↔ RGB helpers ──
-function hexToRgb01(hex: string): [number, number, number] {
-    const c = hex.replace('#', '');
-    return [
-        parseInt(c.substring(0, 2), 16) / 255,
-        parseInt(c.substring(2, 4), 16) / 255,
-        parseInt(c.substring(4, 6), 16) / 255,
-    ];
+function hexToRgb01(colorStr: string): [number, number, number] {
+    if (colorStr.startsWith('rgba') || colorStr.startsWith('rgb')) {
+        // Parse 'rgba(255, 0, 0, 1)' or 'rgb(255, 0, 0)'
+        const m = colorStr.match(/rgba?\((\d+\.?\d*),\s*(\d+\.?\d*),\s*(\d+\.?\d*)/);
+        if (m) return [parseFloat(m[1]!) / 255, parseFloat(m[2]!) / 255, parseFloat(m[3]!) / 255];
+    }
+    // Handle #rgb or #rrggbb
+    const hex = colorStr.replace('#', '');
+    if (hex.length === 3) {
+        return [
+            parseInt(hex.charAt(0) + hex.charAt(0), 16) / 255,
+            parseInt(hex.charAt(1) + hex.charAt(1), 16) / 255,
+            parseInt(hex.charAt(2) + hex.charAt(2), 16) / 255,
+        ];
+    }
+    const r = parseInt(hex.substring(0, 2), 16) / 255;
+    const g = parseInt(hex.substring(2, 4), 16) / 255;
+    const b = parseInt(hex.substring(4, 6), 16) / 255;
+    if (isNaN(r) || isNaN(g) || isNaN(b)) return [0.5, 0.5, 0.5]; // safe fallback = gray
+    return [r, g, b];
 }
 
 function rgbToHex(r: number, g: number, b: number): string {
@@ -1307,7 +1320,13 @@ function createEngineShim(fc: Canvas, syncState: () => void, artboardW: number, 
         },
         set_z_index: (id: number, z: number) => {
             const obj = findById(id);
-            if (obj) { (obj as any).__aceZIndex = z; }
+            if (!obj) return;
+            (obj as any).__aceZIndex = z;
+            // Actually move object in Fabric's render array so visual order matches
+            const objs = userObjects().sort((a, b) => ((a as any).__aceZIndex ?? 0) - ((b as any).__aceZIndex ?? 0));
+            objs.forEach((o, i) => { fc.moveObjectTo(o, i + 1); }); // +1 because artboard is at index 0
+            fc.renderAll();
+            syncState();
         },
         set_shadow: (id: number, ox: number, oy: number, blur: number, r: number, g: number, b: number, a: number) => {
             const obj = findById(id);
