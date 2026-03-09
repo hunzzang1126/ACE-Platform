@@ -13,7 +13,7 @@ import { toClaudeTools } from './aceToolDef';
 import { executeToolCall, type ExecutionResult } from './commandExecutor';
 import { DASHBOARD_TOOL_NAMES } from './dashboardTools';
 import { buildSmartContext, pushAction, type SmartContext } from './smartContextBuilder';
-import { getAnthropicKey } from '@/config/apiKeys';
+import { getOpenRouterKey } from '@/config/apiKeys';
 import type { CreativeSet } from '@/schema/design.types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -130,7 +130,7 @@ export class AiService {
     }
 
     isConfigured(): boolean {
-        return !!getAnthropicKey();
+        return !!getOpenRouterKey();
     }
 
     getLastReply(): string {
@@ -151,8 +151,8 @@ export class AiService {
         progress: LiveProgress,
         executorOverride?: ToolExecutorOverride,
     ): Promise<void> {
-        if (!getAnthropicKey()) {
-            progress.onError('API key not configured. Contact your administrator.');
+        if (!getOpenRouterKey()) {
+            progress.onError('OpenRouter API key not configured. Set VITE_OPENROUTER_API_KEY in .env');
             return;
         }
 
@@ -365,23 +365,78 @@ export class AiService {
         progress: LiveProgress,
     ): Promise<ClaudeResponse | null> {
         const { model } = this.config;
-        const apiKey = getAnthropicKey();
+        const apiKey = getOpenRouterKey();
 
         // Use Vite dev proxy to bypass CORS
         const isLocalDev = typeof window !== 'undefined' && window.location.hostname === 'localhost';
         const apiUrl = isLocalDev
-            ? '/api/anthropic/v1/messages'
-            : 'https://api.anthropic.com/v1/messages';
+            ? '/api/openrouter/v1/chat/completions'
+            : 'https://openrouter.ai/api/v1/chat/completions';
+
+        // Convert Anthropic messages → OpenAI format
+        const openAiMessages: Array<Record<string, unknown>> = [];
+        if (systemPrompt) {
+            openAiMessages.push({ role: 'system', content: systemPrompt });
+        }
+        for (const msg of messages) {
+            if (typeof msg.content === 'string') {
+                openAiMessages.push({ role: msg.role, content: msg.content });
+            } else if (Array.isArray(msg.content)) {
+                // Handle tool_result blocks (user role) and tool_use blocks (assistant role)
+                if (msg.role === 'user') {
+                    // Convert tool_result blocks to OpenAI tool message format
+                    const toolResults = msg.content.filter((b: ClaudeContentBlock) => b.type === 'tool_result');
+                    if (toolResults.length > 0) {
+                        for (const tr of toolResults) {
+                            openAiMessages.push({
+                                role: 'tool',
+                                tool_call_id: tr.tool_use_id,
+                                content: tr.content ?? '',
+                            });
+                        }
+                    } else {
+                        openAiMessages.push({ role: msg.role, content: msg.content });
+                    }
+                } else {
+                    // Assistant message with tool_use blocks → OpenAI tool_calls format
+                    const textParts = msg.content.filter((b: ClaudeContentBlock) => b.type === 'text');
+                    const toolParts = msg.content.filter((b: ClaudeContentBlock) => b.type === 'tool_use');
+                    const openAiMsg: Record<string, unknown> = { role: 'assistant' };
+                    if (textParts.length > 0) {
+                        openAiMsg.content = textParts.map((b: ClaudeContentBlock) => b.text).join('\n');
+                    } else {
+                        openAiMsg.content = null;
+                    }
+                    if (toolParts.length > 0) {
+                        openAiMsg.tool_calls = toolParts.map((tc: ClaudeContentBlock) => ({
+                            id: tc.id,
+                            type: 'function',
+                            function: { name: tc.name, arguments: JSON.stringify(tc.input ?? {}) },
+                        }));
+                    }
+                    openAiMessages.push(openAiMsg);
+                }
+            }
+        }
+
+        // Convert Anthropic tool schema → OpenAI function format
+        const openAiTools = tools.length > 0 ? tools.map(t => ({
+            type: 'function' as const,
+            function: {
+                name: t.name,
+                description: t.description,
+                parameters: t.input_schema,
+            },
+        })) : undefined;
 
         const body = {
             model,
             max_tokens: 2048,
-            system: systemPrompt,
-            messages,
-            tools: tools.length > 0 ? tools : undefined,
+            messages: openAiMessages,
+            tools: openAiTools,
         };
 
-        console.log(`[AiService] callClaude → ${apiUrl} (model: ${model}, msgs: ${messages.length})`);
+        console.log(`[AiService] callClaude → ${apiUrl} (model: ${model}, msgs: ${openAiMessages.length})`);
 
         // Retry loop for rate limits (429)
         const maxRetries = 3;
@@ -392,22 +447,62 @@ export class AiService {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'x-api-key': apiKey,
-                    'anthropic-version': '2023-06-01',
-                    'anthropic-dangerous-direct-browser-access': 'true',
+                    'Authorization': `Bearer ${apiKey}`,
+                    'HTTP-Referer': 'https://ace.design',
+                    'X-Title': 'ACE Design Engine',
                 },
                 body: JSON.stringify(body),
             });
 
             if (resp.ok) {
-                const data = await resp.json() as ClaudeResponse;
-                console.log(`[AiService] Claude response: stop=${data.stop_reason}, blocks=${data.content.length}, usage=${data.usage.input_tokens}in/${data.usage.output_tokens}out`);
-                return data;
+                // Convert OpenAI response → Anthropic ClaudeResponse format
+                const data = await resp.json() as Record<string, unknown>;
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const choice = (data.choices as any[])?.[0];
+                if (!choice) {
+                    progress.onError('Empty response from OpenRouter');
+                    return null;
+                }
+
+                const msg = choice.message ?? {};
+                const content: ClaudeContentBlock[] = [];
+
+                if (msg.content) {
+                    content.push({ type: 'text', text: msg.content });
+                }
+                if (msg.tool_calls) {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    for (const tc of msg.tool_calls as any[]) {
+                        content.push({
+                            type: 'tool_use',
+                            id: tc.id,
+                            name: tc.function?.name,
+                            input: JSON.parse(tc.function?.arguments ?? '{}'),
+                        });
+                    }
+                }
+
+                const stopReason = msg.tool_calls?.length > 0 ? 'tool_use' : 'end_turn';
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const usage = data.usage as any ?? { input_tokens: 0, output_tokens: 0 };
+
+                const result: ClaudeResponse = {
+                    id: data.id as string ?? '',
+                    type: 'message',
+                    role: 'assistant',
+                    content,
+                    model: data.model as string ?? model,
+                    stop_reason: stopReason as ClaudeResponse['stop_reason'],
+                    usage: { input_tokens: usage.prompt_tokens ?? 0, output_tokens: usage.completion_tokens ?? 0 },
+                };
+
+                console.log(`[AiService] OpenRouter response: stop=${result.stop_reason}, blocks=${result.content.length}, usage=${result.usage.input_tokens}in/${result.usage.output_tokens}out`);
+                return result;
             }
 
             // Rate limit — retry with backoff
             if (resp.status === 429) {
-                const waitSec = 10 * Math.pow(2, attempt); // 10s, 20s, 40s
+                const waitSec = 10 * Math.pow(2, attempt);
                 console.warn(`[AiService] Rate limited (429). Retrying in ${waitSec}s... (attempt ${attempt + 1}/${maxRetries})`);
                 progress.onThinking(`Rate limited. Waiting ${waitSec}s before retrying... (${attempt + 1}/${maxRetries})`);
                 await sleep(waitSec * 1000);
@@ -418,9 +513,9 @@ export class AiService {
             const errorText = await resp.text();
             try {
                 const errJson = JSON.parse(errorText);
-                lastError = errJson?.error?.message || `API Error ${resp.status}: ${errorText.substring(0, 200)}`;
+                lastError = errJson?.error?.message || `OpenRouter API Error ${resp.status}: ${errorText.substring(0, 200)}`;
             } catch {
-                lastError = `API Error ${resp.status}: ${errorText.substring(0, 200)}`;
+                lastError = `OpenRouter API Error ${resp.status}: ${errorText.substring(0, 200)}`;
             }
             console.error(`[AiService] ${lastError}`);
             progress.onError(lastError);
