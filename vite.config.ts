@@ -1,4 +1,4 @@
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig, type Plugin } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import wasm from 'vite-plugin-wasm';
@@ -117,5 +117,12 @@ export default defineConfig({
                 secure: true,
             },
         },
+    },
+    // ── Vitest ──
+    test: {
+        environment: 'jsdom',
+        globals: true,
+        setupFiles: [],
+        include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     },
 });
