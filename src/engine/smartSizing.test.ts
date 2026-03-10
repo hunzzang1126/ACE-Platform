@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────
 // Core differentiator. If this breaks, ACE loses its moat.
 import { describe, it, expect } from 'vitest';
-import { classifyRatio, smartSizeElements, LAYOUT_ZONES } from './smartSizing';
+import { classifyRatio, smartSizeElements, LAYOUT_ZONES, clampToCanvas } from './smartSizing';
 import type { ShapeElement, TextElement } from '@/schema/elements.types';
 import { createDefaultConstraints } from '@/schema/elements.types';
 
