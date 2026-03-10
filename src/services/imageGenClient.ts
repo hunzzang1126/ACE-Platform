@@ -199,9 +199,10 @@ async function callImageGenApi(
  * Extract image URL from various OpenRouter response formats.
  *
  * Image models can return data in different structures:
- * 1. choices[0].message.content = "data:image/png;base64,..."
- * 2. choices[0].message.content[].image_url.url = "data:..."
- * 3. data[0].b64_json = base64 string (DALL-E format)
+ * 1. choices[0].message.images[].image_url.url = "data:..." (Gemini)
+ * 2. choices[0].message.content = "data:image/png;base64,..."
+ * 3. choices[0].message.content[].image_url.url = "data:..."
+ * 4. data[0].b64_json = base64 string (DALL-E format)
  */
 function extractImageUrl(response: Record<string, unknown>): string | null {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -219,6 +220,27 @@ function extractImageUrl(response: Record<string, unknown>): string | null {
             return imageData[0].url as string;
         }
         return null;
+    }
+
+    // ★ Gemini format: message.images[] (content is null, images is separate)
+    if (Array.isArray(message.images)) {
+        for (const img of message.images) {
+            if (img.image_url?.url) {
+                return img.image_url.url as string;
+            }
+            if (img.type === 'image' && img.source?.data) {
+                return `data:${img.source.media_type ?? 'image/png'};base64,${img.source.data}`;
+            }
+        }
+    }
+
+    // ★ Gemini parts[] format (some variants)
+    if (Array.isArray(message.parts)) {
+        for (const part of message.parts) {
+            if (part.inline_data?.data) {
+                return `data:${part.inline_data.mime_type ?? 'image/png'};base64,${part.inline_data.data}`;
+            }
+        }
     }
 
     const content = message.content;

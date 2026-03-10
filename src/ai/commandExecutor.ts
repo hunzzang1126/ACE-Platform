@@ -216,13 +216,38 @@ export async function executeToolCall(
             }
 
             case 'set_canvas_background': {
-                const imageUrl = str('image_url');
-                if (!imageUrl) return { success: false, message: 'No image_url provided' };
                 if (!engine?.add_image) return { success: false, message: 'Canvas engine not available' };
                 const canvasW = engine.canvas_width?.() ?? 300;
                 const canvasH = engine.canvas_height?.() ?? 250;
+
+                // Accept image_url directly, OR a prompt to generate one
+                let imageUrl = str('image_url');
+                if (!imageUrl) {
+                    const prompt = str('prompt');
+                    if (!prompt) return { success: false, message: 'Provide either image_url or prompt' };
+                    // ★ Self-contained: generate + place in one step
+                    try {
+                        const genResult = await generateImage({
+                            prompt: `${prompt}. No text, no logos, no watermarks. Professional quality.`,
+                            width: canvasW,
+                            height: canvasH,
+                            model: 'flux',
+                            style: 'photography',
+                            negativePrompt: 'text, logos, watermark, low quality, blurry',
+                        });
+                        if (!genResult.success || !genResult.imageUrl) {
+                            return { success: false, message: `Image generation failed: ${genResult.message}` };
+                        }
+                        imageUrl = genResult.imageUrl;
+                    } catch (err) {
+                        return { success: false, message: `Image generation failed: ${err}` };
+                    }
+                }
+
                 try {
                     const nodeId = await engine.add_image(0, 0, imageUrl, canvasW, canvasH, 'ai_background');
+                    // Send to back (z-index 0 for background)
+                    if (engine.send_to_back) engine.send_to_back(nodeId);
                     trackedNodes.push({
                         id: nodeId, type: 'rect' as const, x: 0, y: 0, width: canvasW, height: canvasH,
                         color: 'image', opacity: 1, zIndex: 0, label: `Background Image #${nodeId}`,

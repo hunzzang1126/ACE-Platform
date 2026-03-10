@@ -546,13 +546,14 @@ const generate_image: ToolDefinition = {
 
 const set_canvas_background: ToolDefinition = {
     name: 'set_canvas_background',
-    description: 'Set an image as the full canvas background. The image fills the entire canvas (0,0 to canvasW,canvasH). Use after generate_image to place the result as background. Pass the image_url returned by generate_image.',
+    description: 'Set a full-canvas background image. PREFERRED: pass a "prompt" to auto-generate and place in one step. Or pass "image_url" if you already have a data URL.',
     parameters: {
         type: 'object',
         properties: {
-            image_url: { type: 'string', description: 'Data URL of the image (from generate_image result)' },
+            prompt: { type: 'string', description: 'Description of the background image to generate (e.g. "dark moody cityscape at night"). If provided, the image is generated automatically.' },
+            image_url: { type: 'string', description: 'Data URL of an already-generated image. Use prompt instead when possible.' },
         },
-        required: ['image_url'],
+        required: [],
     },
     category: 'create',
 };
