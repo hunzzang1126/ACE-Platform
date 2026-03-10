@@ -448,40 +448,63 @@ export function useSmartCheck() {
 
             const allVariants = freshVariants as BannerVariant[];
 
-            for (let i = 0; i < allVariants.length; i++) {
-                if (controller.signal.aborted) break;
-                const variant = allVariants[i]!;
+            // ── Parallel Vision QA (Pencil-inspired spawn_agents) ──
+            // Analyze up to MAX_CONCURRENT variants simultaneously
+            const MAX_CONCURRENT_VISION = 3;
+            let completedCount = 0;
+
+            // Concurrency-limited parallel executor
+            async function analyzeVariantVision(
+                variant: BannerVariant,
+                idx: number,
+                total: number,
+            ): Promise<VariantVisionResult | null> {
+                if (controller.signal.aborted) return null;
                 const vW = variant.preset.width;
                 const vH = variant.preset.height;
                 const label = `${vW}x${vH}`;
 
-                setProgressMessage(`Vision QA: analyzing ${label} (${i + 1}/${allVariants.length})...`);
-
                 try {
-                    // Render variant elements to an offscreen canvas
                     const base64 = renderVariantToCanvas(variant);
+                    if (!base64) return null;
 
-                    if (base64) {
-                        const analysis: DesignAnalysis | null = await analyzeDesign(
-                            base64, vW, vH, controller.signal,
-                        );
+                    const analysis: DesignAnalysis | null = await analyzeDesign(
+                        base64, vW, vH, controller.signal,
+                    );
 
-                        if (analysis) {
-                            const variantIssues = analysis.issues.map(
-                                iss => `[${iss.severity}] ${iss.type}: ${iss.description}`,
-                            );
-                            totalVisionIssues += variantIssues.length;
-                            visionResults.push({
-                                variantId: variant.id,
-                                label,
-                                score: analysis.qualityScore,
-                                issues: variantIssues,
-                                impression: analysis.impression,
-                            });
-                        }
-                    }
+                    completedCount++;
+                    setProgressMessage(`Vision QA: ${completedCount}/${total} analyzed...`);
+
+                    if (!analysis) return null;
+                    const variantIssues = analysis.issues.map(
+                        iss => `[${iss.severity}] ${iss.type}: ${iss.description}`,
+                    );
+                    return {
+                        variantId: variant.id,
+                        label,
+                        score: analysis.qualityScore,
+                        issues: variantIssues,
+                        impression: analysis.impression,
+                    };
                 } catch {
                     console.warn(`[SmartCheck] Vision QA skipped for ${label}`);
+                    return null;
+                }
+            }
+
+            // Process in batches of MAX_CONCURRENT_VISION
+            setProgressMessage(`Vision QA: analyzing ${allVariants.length} variants (${MAX_CONCURRENT_VISION} parallel)...`);
+            for (let batch = 0; batch < allVariants.length; batch += MAX_CONCURRENT_VISION) {
+                if (controller.signal.aborted) break;
+                const chunk = allVariants.slice(batch, batch + MAX_CONCURRENT_VISION);
+                const settled = await Promise.allSettled(
+                    chunk.map((v, ci) => analyzeVariantVision(v, batch + ci, allVariants.length)),
+                );
+                for (const r of settled) {
+                    if (r.status === 'fulfilled' && r.value) {
+                        totalVisionIssues += r.value.issues.length;
+                        visionResults.push(r.value);
+                    }
                 }
             }
 
