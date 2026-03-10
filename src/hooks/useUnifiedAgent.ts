@@ -161,8 +161,8 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         const engine = engineRef.current?.current ?? engineRef.current;
         if (!engine) throw new Error('Canvas not connected.');
 
-        // Phase 1: Context — narrate what we're doing
-        narrate(`I'll create this design for you. Let me start by reading the canvas context and selecting the right style.`);
+        // Phase 1: Context scan
+        narrate(`Starting design generation. Reading current canvas state...`);
         addCard('context', 'Reading canvas context', 'running');
         let elementCount = 0;
         try {
@@ -172,10 +172,17 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         } catch { /* ok */ }
         updateCard('context', 'done', `${elementCount} elements found`);
 
-        // Phase 2: Style selection — let the user know
+        // Phase 2: Style guide selection — show WHICH guide and WHY
         const { selectStyleGuide } = await import('@/services/designStyleGuides');
         const guide = selectStyleGuide(prompt);
-        narrate(`Selected "${guide.name}" style guide — ${guide.description.split('.')[0]}. Now generating the layered composition.`);
+
+        // Build a color summary like Pencil shows variables
+        const colorSummary = [
+            `Background: ${guide.colors.gradientStart} → ${guide.colors.gradientEnd}`,
+            `Accent: ${guide.colors.accent}`,
+            `Text: ${guide.colors.foreground}`,
+        ].join('\n');
+        narrate(`Style guide selected: "${guide.name}"\n${colorSummary}\nFont: ${guide.typography.primaryFont} / ${guide.typography.secondaryFont}`);
 
         addCard('design', 'Generating layered composition', 'running');
         const { callFromScratch } = await import('@/services/autoDesignService');
@@ -198,14 +205,35 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         const result = await callFromScratch(prompt, canvasW, canvasH, abort.signal, fewShotStr);
         updateCard('design', 'done', `${result.elements.length} elements planned`);
 
-        // Phase 3: Render — narrate the placement
-        narrate(`Got ${result.elements.length} elements across 4 layers. Now placing them on the canvas.`);
+        // Phase 3: Render — narrate EACH element like Pencil shows operation results
+        // Group elements by layer for narration
+        const structureEls = result.elements.filter(el => ['background', 'accent_zone', 'accent_glow'].includes(el.name ?? ''));
+        const contentEls = result.elements.filter(el => ['headline', 'subheadline', 'body_text', 'tag_text'].includes(el.name ?? ''));
+        const actionEls = result.elements.filter(el => ['cta_button', 'cta_label'].includes(el.name ?? ''));
+        const polishEls = result.elements.filter(el => !structureEls.includes(el) && !contentEls.includes(el) && !actionEls.includes(el));
+
+        narrate(`Composition ready. Placing ${result.elements.length} elements in 4 layers:\n` +
+            `Layer 1 — Structure: ${structureEls.length} elements\n` +
+            `Layer 2 — Content: ${contentEls.length} elements\n` +
+            `Layer 3 — Action: ${actionEls.length} elements\n` +
+            `Layer 4 — Polish: ${polishEls.length} elements`);
+
         addCard('render', 'Placing elements on canvas', 'running');
         try { engine.clear_scene?.(); } catch { /* ok */ }
 
-        // Inline render with live cursor animation
+        // Inline render with live per-element narration
         let rendered = 0;
+        let currentLayer = '';
         for (const el of result.elements) {
+            // Detect layer transition and narrate it
+            const elLayer = structureEls.includes(el) ? 'Structure'
+                : contentEls.includes(el) ? 'Content'
+                : actionEls.includes(el) ? 'Action' : 'Polish';
+            if (elLayer !== currentLayer) {
+                currentLayer = elLayer;
+                updateCard('render', 'running', `Placing ${elLayer.toLowerCase()} layer...`);
+            }
+
             moveCursor(el.x ?? 0, el.y ?? 0, el.name);
             await new Promise(r => setTimeout(r, 150));
 
@@ -252,18 +280,27 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         hideCursor();
         updateCard('render', 'done', `${rendered} elements placed`);
 
-        // Phase 4: Vision QA — narrate the quality check
-        narrate(`All ${rendered} elements placed. Let me run a quick vision quality check to make sure everything looks right.`);
+        // Build a summary of what was placed — like Pencil's operation results
+        const placedSummary = result.elements.slice(0, 6).map(el => {
+            if (el.type === 'text') return `  "${el.name}" — ${el.type} "${(el.content ?? '').slice(0, 30)}" ${el.font_size}px at (${el.x}, ${el.y})`;
+            if (el.gradient_start_hex) return `  "${el.name}" — gradient ${el.gradient_start_hex} → ${el.gradient_end_hex} at (${el.x}, ${el.y}) ${el.w}x${el.h}`;
+            return `  "${el.name}" — ${el.type} at (${el.x}, ${el.y}) ${el.w}x${el.h}`;
+        }).join('\n');
+        const moreCount = Math.max(0, result.elements.length - 6);
+        narrate(`${rendered} elements placed successfully:\n${placedSummary}${moreCount > 0 ? `\n  ... and ${moreCount} more` : ''}`);
+
+        // Phase 4: Vision QA
+        narrate(`Running vision quality check on the ${canvasW}x${canvasH} canvas...`);
         addCard('vision', 'Vision quality review', 'running');
         try {
             const loopResult = await runVisionLoop(engine, canvasW, canvasH, abort.signal, (msg) => {
                 updateCard('vision', 'running', msg);
             });
             updateCard('vision', 'done', `Score: ${loopResult.finalScore}/100`);
-            narrate(`Design complete — vision score ${loopResult.finalScore}/100. The ${guide.name} palette was applied with ${rendered} layered elements. Let me know if you'd like to refine anything.`);
+            narrate(`Vision review complete — score ${loopResult.finalScore}/100.\nStyle: ${guide.name}\nElements: ${rendered}\nCanvas: ${canvasW}x${canvasH}px\n\nLet me know if you'd like to refine anything.`);
         } catch {
             updateCard('vision', 'done', 'Vision check skipped');
-            narrate(`Design complete with ${rendered} elements using the ${guide.name} palette. Let me know if you'd like to refine anything.`);
+            narrate(`Design placed with ${rendered} elements using ${guide.name}.\nCanvas: ${canvasW}x${canvasH}px\n\nLet me know if you'd like to refine anything.`);
         }
 
         return `Design generated with ${rendered} elements.`;
