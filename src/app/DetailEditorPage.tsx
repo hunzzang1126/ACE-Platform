@@ -351,13 +351,6 @@ export function DetailEditorPage() {
                         canvasW={width}
                         canvasH={height}
                     />
-                    {/* Brand Compliance */}
-                    {brandComplianceOpen && (
-                        <BrandCompliancePanel
-                            nodes={state.nodes}
-                            onClose={toggleBrandCompliance}
-                        />
-                    )}
                     {/* Keyframe Inspector */}
                     {keyframeInspectorOpen && (
                         <KeyframeInspector

@@ -12,6 +12,7 @@ import { useUIStore } from '@/stores/uiStore';
 import { useAiMcpBridge } from '@/hooks/useAiMcpBridge';
 import { ResizeHandles, type HandleDir, overlayMessage, spinnerStyle, statusBarStyle, zoomBtnStyle } from './ResizeHandles';
 import { CanvasRuler } from './CanvasRuler';
+import { CanvasContextMenu } from './CanvasContextMenu';
 import type { SceneNodeInfo } from '@/ai/agentContext';
 
 interface Props {
@@ -247,10 +248,19 @@ export function EditorCanvas({
 
     const totalCount = state.nodeCount + overlayElements.length;
 
+    // ── Context menu state ──
+    const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
+    const handleContextMenu = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        setCtxMenu({ x: e.clientX, y: e.clientY });
+    }, []);
+    const closeCtxMenu = useCallback(() => setCtxMenu(null), []);
+
     return (
         <div
             className="ed-canvas-area"
             onMouseDown={handleCanvasAreaMouseDown}
+            onContextMenu={handleContextMenu}
             style={{ position: 'relative', overflow: 'hidden', cursor: activeTool === 'hand' ? 'grab' : 'default' }}
         >
             {/* Loading / Error States */}
@@ -469,6 +479,19 @@ export function EditorCanvas({
                     {activeTool.toUpperCase()}
                 </span>
             </div>
+
+            {/* Right-click context menu */}
+            {ctxMenu && (
+                <CanvasContextMenu
+                    x={ctxMenu.x}
+                    y={ctxMenu.y}
+                    actions={actions}
+                    hasSelection={state.selection.length > 0}
+                    selectionCount={state.selection.length}
+                    selectedIds={state.selection}
+                    onClose={closeCtxMenu}
+                />
+            )}
         </div>
     );
 }

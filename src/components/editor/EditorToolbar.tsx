@@ -4,7 +4,9 @@
 // ─────────────────────────────────────────────────
 import { type ReactNode, useCallback } from 'react';
 import { useEditorStore, type EditorTool } from '@/stores/editorStore';
+import { useUIStore } from '@/stores/uiStore';
 import { IcCursor, IcImage, IcSearch } from '@/components/ui/Icons';
+import { BrandCompliancePanel } from './BrandCompliancePanel';
 import type { CanvasEngineActions } from '@/hooks/canvasTypes';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -74,6 +76,8 @@ const TOOLS: ToolDef[] = [
 export function EditorToolbar({ actions, onTriggerImageUpload, onTriggerVideoUpload }: Props) {
     const activeTool = useEditorStore((s) => s.activeTool);
     const setTool = useEditorStore((s) => s.setTool);
+    const brandComplianceOpen = useUIStore((s) => s.brandComplianceOpen);
+    const toggleBrandCompliance = useUIStore((s) => s.toggleBrandCompliance);
 
     const handleAddRect = useCallback(() => {
         actions?.addRect();
@@ -143,6 +147,43 @@ export function EditorToolbar({ actions, onTriggerImageUpload, onTriggerVideoUpl
                     </svg>
                 </span>
             </button>
+
+            {/* Divider */}
+            <div style={{ width: '60%', height: 1, background: 'rgba(255,255,255,0.06)', margin: '4px auto' }} />
+
+            {/* Brand Compliance */}
+            <div style={{ position: 'relative' }}>
+                <button
+                    className={`ed-tool-btn ${brandComplianceOpen ? 'active' : ''}`}
+                    onClick={toggleBrandCompliance}
+                    title="Brand Compliance"
+                >
+                    <span className="ed-tool-icon">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                            <path d="M12 2L3 7v7c0 5.25 3.75 10.74 9 12 5.25-1.26 9-6.75 9-12V7l-9-5z" />
+                            <polyline points="9 12 11 14 15 10" />
+                        </svg>
+                    </span>
+                </button>
+                {/* Floating panel */}
+                {brandComplianceOpen && (
+                    <div style={{
+                        position: 'absolute',
+                        left: 50,
+                        top: 0,
+                        width: 320,
+                        maxHeight: 480,
+                        background: 'var(--bg-elevated, #1a1f2e)',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: 10,
+                        boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
+                        zIndex: 100,
+                        overflow: 'auto',
+                    }}>
+                        <BrandCompliancePanel />
+                    </div>
+                )}
+            </div>
         </aside>
     );
 }

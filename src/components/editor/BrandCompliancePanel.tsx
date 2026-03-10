@@ -8,7 +8,7 @@ import { useBrandKitStore } from '@/stores/brandKitStore';
 import type { EngineNode } from '@/hooks/canvasTypes';
 
 interface Props {
-    nodes: EngineNode[];
+    nodes?: EngineNode[];
     onAutoFix?: (patches: Array<{ elementId: number; property: string; value: any }>) => void;
     onClose?: () => void;
 }
@@ -21,7 +21,7 @@ const GRADE_COLORS: Record<string, string> = {
     F: '#f87171',
 };
 
-export function BrandCompliancePanel({ nodes, onAutoFix, onClose }: Props) {
+export function BrandCompliancePanel({ nodes = [], onAutoFix, onClose }: Props) {
     const brandKit = useBrandKitStore(s => s.getActiveKit());
     const [expanded, setExpanded] = useState(true);
 

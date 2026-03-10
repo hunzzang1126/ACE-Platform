@@ -105,36 +105,36 @@ export function computeAnimStyle(
             return { opacity: t };
 
         case 'slide-left':
-            // Enters from the left (starts off-screen left, slides rightward to position)
-            return { transform: `translateX(${-1000 * (1 - t)}px)` };
-
-        case 'slide-right':
-            // Enters from the right (starts off-screen right, slides leftward to position)
+            // Element slides leftward (enters from right, lands at position)
             return { transform: `translateX(${1000 * (1 - t)}px)` };
 
+        case 'slide-right':
+            // Element slides rightward (enters from left, lands at position)
+            return { transform: `translateX(${-1000 * (1 - t)}px)` };
+
         case 'slide-up':
-            // Slides upward into position (starts off-screen below, moves up)
-            return { transform: `translateY(${1000 * (1 - t)}px)` };
+            // Element slides upward (enters from below, lands at position)
+            return { transform: `translateY(${-1000 * (1 - t)}px)` };
 
         case 'slide-down':
-            // Slides downward into position (starts off-screen above, moves down)
-            return { transform: `translateY(${-1000 * (1 - t)}px)` };
+            // Element slides downward (enters from above, lands at position)
+            return { transform: `translateY(${1000 * (1 - t)}px)` };
 
         case 'scale':
             return { transform: `scale(${t})` };
 
         case 'ascend':
-            // Rises up with fade (starts off-screen below)
-            return {
-                opacity: t,
-                transform: `translateY(${1000 * (1 - t)}px)`,
-            };
-
-        case 'descend':
-            // Falls down with fade (starts off-screen above)
+            // Rises upward with fade (enters from below)
             return {
                 opacity: t,
                 transform: `translateY(${-1000 * (1 - t)}px)`,
+            };
+
+        case 'descend':
+            // Falls downward with fade (enters from above)
+            return {
+                opacity: t,
+                transform: `translateY(${1000 * (1 - t)}px)`,
             };
 
         default:

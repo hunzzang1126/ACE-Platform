@@ -161,13 +161,6 @@ export function EditorTopBar({ setName, variantLabel, canvasWidth = 300, canvasH
                     </svg>
                 </button>
 
-                {/* Brand Compliance */}
-                <button className="ed-topbar-icon-btn" title="Brand Compliance" onClick={toggleBrandCompliance}>
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M12 2L3 7v7c0 5.25 3.75 10.74 9 12 5.25-1.26 9-6.75 9-12V7l-9-5z" />
-                        <polyline points="9 12 11 14 15 10" />
-                    </svg>
-                </button>
 
                 <button className="ed-topbar-icon-btn" title="Notifications"><IcBell size={15} /></button>
                 <div className="ed-topbar-avatar" onClick={toggleAuthModal} style={{ cursor: 'pointer' }} title="Account">YA</div>

@@ -87,6 +87,18 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
     // ── Context menu state ──
     const [ctxMenu, setCtxMenu] = useState<ContextMenuState | null>(null);
 
+    // ── Multi-select state (Apple-style) ──
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const toggleSelection = useCallback((id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
+    }, []);
+    const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
+
     // ── Video blob URL restoration map ──
     const [videoUrls, setVideoUrls] = useState<Record<string, string>>({});
 
@@ -151,6 +163,11 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
     const handleContextMenu = useCallback((e: React.MouseEvent, variantId: string) => {
         e.preventDefault();
         e.stopPropagation();
+        // Auto-add to selection if not already
+        setSelectedIds(prev => {
+            if (!prev.has(variantId)) { const next = new Set(prev); next.add(variantId); return next; }
+            return prev;
+        });
         setCtxMenu({ x: e.clientX, y: e.clientY, variantId });
     }, []);
 
@@ -192,6 +209,21 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
             } catch { /* skip */ }
         }
     }, [visibleVariants]);
+
+    // ── Export selected sizes ──
+    const handleExportSelected = useCallback(async () => {
+        setCtxMenu(null);
+        const toExport = variants.filter(v => selectedIds.has(v.id));
+        for (const variant of toExport) {
+            const cardEl = cardRefs.current[variant.id]?.querySelector('.banner-card-canvas') as HTMLElement;
+            if (!cardEl) continue;
+            try {
+                const dataURL = await captureBannerCard(cardEl, variant.preset.width, variant.preset.height);
+                downloadDataURL(dataURL, `banner_${variant.preset.width}x${variant.preset.height}.png`);
+                await new Promise((r) => setTimeout(r, 300));
+            } catch { /* skip */ }
+        }
+    }, [variants, selectedIds]);
 
 
     return (
@@ -237,16 +269,31 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                         <div
                             key={variant.id}
                             ref={(el) => { cardRefs.current[variant.id] = el; }}
-                            className={`banner-card ${isPlaying ? 'banner-card--playing' : ''}`}
+                            className={`banner-card ${isPlaying ? 'banner-card--playing' : ''} ${selectedIds.has(variant.id) ? 'banner-card--selected' : ''}`}
+                            onClick={(e) => toggleSelection(variant.id, e)}
                             onDoubleClick={() => handleDoubleClick(variant.id)}
                             onContextMenu={(e) => handleContextMenu(e, variant.id)}
+                            style={{
+                                outline: selectedIds.has(variant.id) ? '2px solid #4a9eff' : '2px solid transparent',
+                                outlineOffset: -2,
+                                transition: 'outline-color 0.15s ease, background 0.15s ease',
+                                background: selectedIds.has(variant.id) ? 'rgba(74,158,255,0.06)' : undefined,
+                            }}
                         >
-                            {/* Dimension label */}
                             <div className="banner-card-header">
                                 <span className="banner-card-dims">
-                                    {width} × {height}
+                                    {width} x {height}
                                     {isMaster && <span className="banner-card-master">  M</span>}
                                 </span>
+                                {selectedIds.has(variant.id) && (
+                                    <span style={{
+                                        width: 16, height: 16, borderRadius: '50%',
+                                        background: '#4a9eff', display: 'inline-flex', alignItems: 'center',
+                                        justifyContent: 'center',
+                                    }}>
+                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
+                                    </span>
+                                )}
                             </div>
 
                             {/* Scaled preview */}
@@ -394,12 +441,9 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                                 </div>
                             )}
 
-                            {/* Footer with actions */}
+                            {/* Footer */}
                             <div className="banner-card-footer">
-                                <div className="banner-card-actions">
-                                    <input type="checkbox" className="banner-card-checkbox" />
-                                    <span className="banner-card-count"> {variant.elements.length}</span>
-                                </div>
+                                <span className="banner-card-count">{variant.elements.length} elements</span>
                                 <span className="banner-card-zoom">{zoom}%</span>
                             </div>
                         </div>
@@ -413,47 +457,56 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                 )}
             </div>
 
+            {/* ── Floating selection action bar ── */}
+            {selectedIds.size > 0 && (
+                <div style={{
+                    position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+                    background: '#1e2231', border: '1px solid rgba(255,255,255,0.12)',
+                    borderRadius: 12, padding: '8px 20px', display: 'flex', alignItems: 'center',
+                    gap: 16, boxShadow: '0 8px 32px rgba(0,0,0,0.5)', zIndex: 1000,
+                    fontSize: 12, color: '#e6edf3', backdropFilter: 'blur(12px)',
+                }}>
+                    <span style={{ fontWeight: 600 }}>{selectedIds.size} selected</span>
+                    <button onClick={handleExportSelected} style={{
+                        background: 'linear-gradient(135deg, #4a9eff, #6c63ff)', border: 'none',
+                        color: '#fff', padding: '6px 16px', borderRadius: 6, fontSize: 11,
+                        fontWeight: 600, cursor: 'pointer',
+                    }}>Export Selected</button>
+                    <button onClick={clearSelection} style={{
+                        background: 'none', border: 'none', color: '#8b949e',
+                        fontSize: 14, cursor: 'pointer', padding: '2px 6px',
+                    }} title="Clear selection">x</button>
+                </div>
+            )}
+
             {/* ── Right-click context menu ── */}
             {ctxMenu && (
                 <div
                     className="banner-ctx-menu"
                     style={{
-                        position: 'fixed',
-                        top: ctxMenu.y,
-                        left: ctxMenu.x,
-                        zIndex: 10000,
-                        background: '#1e2231',
-                        border: '1px solid rgba(255,255,255,0.1)',
-                        borderRadius: 8,
-                        padding: '4px 0',
-                        minWidth: 180,
+                        position: 'fixed', top: ctxMenu.y, left: ctxMenu.x, zIndex: 10000,
+                        background: '#1e2231', border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: 8, padding: '4px 0', minWidth: 200,
                         boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
                     }}
                     onClick={(e) => e.stopPropagation()}
                 >
-                    <button
-                        className="banner-ctx-item"
-                        onClick={() => handleExportPNG(ctxMenu.variantId)}
-                    >
-                        📥 Export This Size (PNG)
+                    {selectedIds.size > 1 && (
+                        <button className="banner-ctx-item" onClick={handleExportSelected}>
+                            Export Selected ({selectedIds.size})
+                        </button>
+                    )}
+                    <button className="banner-ctx-item" onClick={() => handleExportPNG(ctxMenu.variantId)}>
+                        Export This Size (PNG)
                     </button>
-                    <button
-                        className="banner-ctx-item"
-                        onClick={handleExportAll}
-                    >
+                    <button className="banner-ctx-item" onClick={handleExportAll}>
                         Export All Sizes (PNG)
                     </button>
                     <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', margin: '4px 0' }} />
-                    <button
-                        className="banner-ctx-item"
-                        onClick={() => { setCtxMenu(null); handleDoubleClick(ctxMenu.variantId); }}
-                    >
+                    <button className="banner-ctx-item" onClick={() => { setCtxMenu(null); handleDoubleClick(ctxMenu.variantId); }}>
                         Open in Editor
                     </button>
-                    <button
-                        className="banner-ctx-item banner-ctx-item--danger"
-                        onClick={closeCtxMenu}
-                    >
+                    <button className="banner-ctx-item banner-ctx-item--danger" onClick={closeCtxMenu}>
                         x Cancel
                     </button>
                 </div>

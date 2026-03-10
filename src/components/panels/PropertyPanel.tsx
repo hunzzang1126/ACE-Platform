@@ -11,6 +11,9 @@ import { IcAlignLeft, IcAlignCenterH, IcAlignRight, IcAlignTop, IcAlignCenterV, 
 import { ColorPicker } from '@/components/ui/ColorPicker';
 import { EffectsSection } from '@/components/panels/EffectsSection';
 import { Section, ScrubField, PropField, OpacitySlider } from '@/components/panels/PropertyFields';
+import { useSizingOverrideStore } from '@/stores/sizingOverrideStore';
+import { useEditorStore } from '@/stores/editorStore';
+import { useDesignStore } from '@/stores/designStore';
 import type { EngineNode, CanvasEngineActions } from '@/hooks/useCanvasEngine';
 import type { OverlayElement } from '@/hooks/useOverlayElements';
 
@@ -442,9 +445,96 @@ export function PropertyPanel({ nodes = [], selection = [], actions, selectedOve
 
                 {/* Effects */}
                 <EffectsSection nodeId={selectedNode.id} actions={actions} />
+
+                {/* Smart Sizing — override controls */}
+                <SmartSizingSection elementId={String(selectedNode.id)} />
             </aside>
         );
     }
 
     return null;
+}
+
+// ── Smart Sizing section — per-element override controls ──
+function SmartSizingSection({ elementId }: { elementId: string }) {
+    const activeVariant = useEditorStore(s => s.activeVariantId);
+    const creativeSet = useDesignStore(s => s.creativeSet);
+    const isMaster = creativeSet ? activeVariant === creativeSet.masterVariantId : false;
+    const variantId = activeVariant ?? '';
+
+    const hasOverride = useSizingOverrideStore(s => s.hasOverride(variantId, elementId));
+    const isLocked = useSizingOverrideStore(s => s.isLocked(variantId, elementId));
+    const lockElement = useSizingOverrideStore(s => s.lockElement);
+    const unlockElement = useSizingOverrideStore(s => s.unlockElement);
+    const resetToMaster = useSizingOverrideStore(s => s.resetToMaster);
+    const overrideCount = useSizingOverrideStore(s => s.getOverrideCount(variantId));
+
+    // Master has no override concept
+    if (isMaster) {
+        return (
+            <Section label="Smart Sizing">
+                <div style={{ fontSize: 11, color: '#8b949e', padding: '2px 0' }}>
+                    This is the master variant. Edits here propagate to all sizes.
+                </div>
+                {overrideCount > 0 && (
+                    <div style={{ fontSize: 11, color: '#fbbf24', marginTop: 4 }}>
+                        {overrideCount} element{overrideCount !== 1 ? 's' : ''} overridden in other variants
+                    </div>
+                )}
+            </Section>
+        );
+    }
+
+    return (
+        <Section label="Smart Sizing">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                {/* Override badge */}
+                <span style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                    padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 600,
+                    background: hasOverride ? 'rgba(251,191,36,0.15)' : 'rgba(74,222,128,0.12)',
+                    color: hasOverride ? '#fbbf24' : '#4ade80',
+                    border: `1px solid ${hasOverride ? 'rgba(251,191,36,0.3)' : 'rgba(74,222,128,0.2)'}`,
+                }}>
+                    {hasOverride ? 'OVERRIDDEN' : 'SYNCED'}
+                </span>
+
+                {/* Lock toggle */}
+                <button
+                    onClick={() => isLocked ? unlockElement(variantId, elementId) : lockElement(variantId, elementId)}
+                    title={isLocked ? 'Unlock: Resume master sync' : 'Lock: Prevent master sync'}
+                    style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 3,
+                        background: isLocked ? 'rgba(248,113,113,0.12)' : 'rgba(255,255,255,0.04)',
+                        border: `1px solid ${isLocked ? 'rgba(248,113,113,0.3)' : 'rgba(255,255,255,0.08)'}`,
+                        borderRadius: 4, padding: '2px 8px', color: isLocked ? '#f87171' : '#8b949e',
+                        fontSize: 10, fontWeight: 500, cursor: 'pointer',
+                    }}
+                >
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        {isLocked ? (
+                            <><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" /></>
+                        ) : (
+                            <><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 019.9-1" /></>
+                        )}
+                    </svg>
+                    {isLocked ? 'Locked' : 'Unlocked'}
+                </button>
+            </div>
+
+            {/* Reset to master */}
+            {hasOverride && (
+                <button
+                    onClick={() => resetToMaster(variantId, elementId)}
+                    style={{
+                        marginTop: 6, width: '100%', padding: '4px 0',
+                        background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                        borderRadius: 4, color: '#8b949e', fontSize: 10, cursor: 'pointer',
+                    }}
+                >
+                    Reset to Master
+                </button>
+            )}
+        </Section>
+    );
 }
