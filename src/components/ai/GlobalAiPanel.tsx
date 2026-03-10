@@ -336,6 +336,9 @@ export function GlobalAiPanel() {
 // ── Sub-components ───────────────────────────────
 
 function ProgressCardRow({ card }: { card: ProgressCard }) {
+    const [expanded, setExpanded] = useState(false);
+    const hasExpandable = !!card.expandedDetail;
+
     const icon = card.status === 'running' ? <IcLoader size={12} color="#58a6ff" />
         : card.status === 'done' ? <IcCheck size={12} color="#3fb950" />
             : card.status === 'error' ? <IcError size={12} color="#f85149" />
@@ -344,17 +347,61 @@ function ProgressCardRow({ card }: { card: ProgressCard }) {
     return (
         <div style={{
             ...cardRowStyle,
-            opacity: card.status === 'done' ? 0.7 : 1,
+            opacity: card.status === 'done' ? 0.85 : 1,
+            flexDirection: 'column',
         }}>
-            {icon}
-            <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 11, color: card.status === 'error' ? '#f85149' : '#c9d1d9', fontWeight: 500 }}>
-                    {card.label}
+            {/* Main row — clickable to expand */}
+            <div
+                onClick={() => hasExpandable && setExpanded(!expanded)}
+                style={{
+                    display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                    cursor: hasExpandable ? 'pointer' : 'default',
+                }}
+            >
+                {icon}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 11, color: card.status === 'error' ? '#f85149' : '#c9d1d9', fontWeight: 500 }}>
+                        {card.label}
+                    </div>
+                    {card.reasoning && (
+                        <div style={{ fontSize: 10, color: '#8b949e', marginTop: 2, fontStyle: 'italic', lineHeight: 1.4 }}>
+                            {card.reasoning}
+                        </div>
+                    )}
+                    {card.detail && !expanded && (
+                        <div style={{ fontSize: 10, color: '#6e7681', marginTop: 1 }}>{card.detail}</div>
+                    )}
                 </div>
-                {card.detail && (
-                    <div style={{ fontSize: 10, color: '#6e7681', marginTop: 1 }}>{card.detail}</div>
+                {hasExpandable && (
+                    <span style={{
+                        fontSize: 10, color: '#484f58', cursor: 'pointer',
+                        transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                        transition: 'transform 0.2s ease',
+                        flexShrink: 0, padding: '0 2px',
+                    }}>
+                        &#9660;
+                    </span>
                 )}
             </div>
+
+            {/* Expanded detail pane */}
+            {expanded && card.expandedDetail && (
+                <div style={{
+                    marginTop: 6, marginLeft: 20,
+                    padding: '6px 8px',
+                    background: 'rgba(255,255,255,0.02)',
+                    border: '1px solid rgba(255,255,255,0.04)',
+                    borderRadius: 6,
+                    fontSize: 10, lineHeight: 1.6,
+                    color: '#8b949e',
+                    fontFamily: 'JetBrains Mono, Menlo, monospace',
+                    whiteSpace: 'pre-wrap',
+                    maxHeight: 200,
+                    overflowY: 'auto',
+                }}>
+                    {card.expandedDetail}
+                </div>
+            )}
         </div>
     );
 }

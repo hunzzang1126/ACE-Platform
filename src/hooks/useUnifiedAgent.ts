@@ -24,6 +24,10 @@ export interface ProgressCard {
     label: string;
     status: 'pending' | 'running' | 'done' | 'error';
     detail?: string;
+    /** AI reasoning/thinking text shown in collapsed view */
+    reasoning?: string;
+    /** Expandable detail content (element list, variables, etc.) */
+    expandedDetail?: string;
 }
 
 export interface LiveCursor {
@@ -111,17 +115,17 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
     }, []);
 
     // ── Progress card helpers ────────────────────
-    const addCard = useCallback((id: string, label: string, status: ProgressCard['status'] = 'running') => {
+    const addCard = useCallback((id: string, label: string, status: ProgressCard['status'] = 'running', opts?: { reasoning?: string; expandedDetail?: string }) => {
         setState(prev => ({
             ...prev,
-            cards: [...prev.cards.filter(c => c.id !== id), { id, label, status }],
+            cards: [...prev.cards.filter(c => c.id !== id), { id, label, status, reasoning: opts?.reasoning, expandedDetail: opts?.expandedDetail }],
         }));
     }, []);
 
-    const updateCard = useCallback((id: string, status: ProgressCard['status'], detail?: string) => {
+    const updateCard = useCallback((id: string, status: ProgressCard['status'], detail?: string, opts?: { reasoning?: string; expandedDetail?: string }) => {
         setState(prev => ({
             ...prev,
-            cards: prev.cards.map(c => c.id === id ? { ...c, status, detail } : c),
+            cards: prev.cards.map(c => c.id === id ? { ...c, status, detail, ...(opts?.reasoning != null ? { reasoning: opts.reasoning } : {}), ...(opts?.expandedDetail != null ? { expandedDetail: opts.expandedDetail } : {}) } : c),
         }));
     }, []);
 
@@ -186,20 +190,23 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         const { selectTemplate } = await import('@/services/designTemplates');
         const template = selectTemplate(canvasW, canvasH);
 
-        // Show variables like Pencil's set_variables step
-        const colorSummary = [
-            `Background: ${guide.colors.gradientStart} → ${guide.colors.gradientEnd}`,
+        // Build expandable style variable detail
+        const styleDetail = [
+            `Background: ${guide.colors.gradientStart} -> ${guide.colors.gradientEnd}`,
             `Accent: ${guide.colors.accent}`,
             `Text: ${guide.colors.foreground}`,
+            `Font: ${guide.typography.primaryFont} / ${guide.typography.secondaryFont}`,
         ].join('\n');
-        narrate(
-            `Style guide: "${guide.name}"\n${colorSummary}\n` +
-            `Font: ${guide.typography.primaryFont} / ${guide.typography.secondaryFont}\n` +
-            (template ? `Template: "${template.name}" (${canvasW}x${canvasH})` : `No template match — using freestyle generation`)
-        );
 
-        addCard('template', template ? `Template: ${template.name}` : 'Freestyle generation', 'done');
-        await new Promise(r => setTimeout(r, 600)); // Pacing: let user read style guide info
+        // AI reasoning for template choice
+        const templateReasoning = template
+            ? `This is a ${canvasW}x${canvasH} canvas. A structured template will produce consistent, professional results.`
+            : `No pre-built template for ${canvasW}x${canvasH} — using freestyle AI generation instead.`;
+
+        narrate(`I'll set up the visual style and select the right layout approach.`);
+        addCard('guide', `Guide: ${guide.name}`, 'done', { expandedDetail: styleDetail });
+        addCard('template', template ? `Template: ${template.name}` : 'Freestyle generation', 'done', { reasoning: templateReasoning });
+        await new Promise(r => setTimeout(r, 800)); // Pacing: let user read style guide info
 
         const abort = new AbortController();
         const { runVisionLoop } = await import('@/services/autoDesignLoop');
@@ -210,27 +217,38 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
             // ── Template-based path (PRIMARY) ──
 
             // Phase 3: AI generates ONLY content text
-            addCard('content', 'Generating creative copy with AI', 'running');
-            narrate(`Generating creative copy for "${prompt.slice(0, 60)}"...`);
+            addCard('content', 'Generating creative copy', 'running');
+            narrate(`Now I'll generate the ad copy for your prompt.`);
+            await new Promise(r => setTimeout(r, 400));
 
             const { callTemplateContent } = await import('@/services/autoDesignService');
             const content = await callTemplateContent(prompt, canvasW, canvasH, template.name, abort.signal);
-            updateCard('content', 'done', `Copy generated`);
 
-            narrate(
-                `Content ready:\n` +
-                `  Headline: "${content.headline}"\n` +
-                `  Subheadline: "${content.subheadline}"\n` +
-                `  CTA: "${content.cta}"\n` +
-                `  Tag: "${content.tag}"`
-            );
+            const copyDetail = [
+                `Headline: "${content.headline}"`,
+                `Subheadline: "${content.subheadline}"`,
+                `CTA: "${content.cta}"`,
+                `Tag: "${content.tag}"`,
+            ].join('\n');
+            updateCard('content', 'done', 'Copy generated', { expandedDetail: copyDetail });
+            await new Promise(r => setTimeout(r, 600));
 
-            // Phase 4: Template fills positions
-            addCard('build', 'Building layout from template', 'running');
-            narrate(`Building layout from "${template.name}" template with ${guide.name} style...`);
+            // Phase 4: Template fills positions  
+            narrate(`Building the layout now. I'll place each element precisely using the template.`);
+            addCard('build', 'Building layout', 'running');
+            await new Promise(r => setTimeout(r, 400));
             allElements = template.build(canvasW, canvasH, guide, content);
-            updateCard('build', 'done', `${allElements.length} elements composed`);
-            await new Promise(r => setTimeout(r, 400)); // Pacing
+
+            // Build per-element breakdown for expandable detail
+            const elementBreakdown = allElements.map(el => {
+                const type = el.gradient_start_hex ? 'gradient' : el.type ?? 'rect';
+                const pos = `(${Math.round(el.x ?? 0)}, ${Math.round(el.y ?? 0)})`;
+                const size = `${Math.round(el.w ?? 0)}x${Math.round(el.h ?? 0)}`;
+                const extra = el.content ? ` "${el.content.slice(0, 30)}"` : el.gradient_start_hex ? ` ${el.gradient_start_hex} -> ${el.gradient_end_hex}` : '';
+                return `"${el.name}" — ${type} at ${pos} ${size}${extra}`;
+            }).join('\n');
+            updateCard('build', 'done', `${allElements.length} elements composed`, { expandedDetail: elementBreakdown });
+            await new Promise(r => setTimeout(r, 600));
 
         } else {
             // ── Freestyle path (FALLBACK for unusual sizes) ──
@@ -261,11 +279,8 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
             { name: 'Polish', elements: allElements.filter(el => !structureNames.has(el.name ?? '') && !contentNames.has(el.name ?? '') && !actionNames.has(el.name ?? '')) },
         ];
 
-        narrate(
-            `Composition ready. Rendering ${allElements.length} elements in 4 layers:\n` +
-            layers.map((l, i) => `  Layer ${i + 1} — ${l.name}: ${l.elements.length} elements`).join('\n')
-        );
-        await new Promise(r => setTimeout(r, 500)); // Pacing: let user read layer breakdown
+        narrate(`Now I'll render each element onto the canvas.`);
+        await new Promise(r => setTimeout(r, 500));
 
         addCard('render', 'Placing elements on canvas', 'running');
         // Clear scene and gradient cache
