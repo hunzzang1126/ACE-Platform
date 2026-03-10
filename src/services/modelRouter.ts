@@ -38,13 +38,13 @@ export interface ModelConfig {
 
 const MODEL_CONFIGS: Record<AceModelRole, ModelConfig> = {
     planner: {
-        id: 'anthropic/claude-sonnet-4.5',
-        name: 'Claude Sonnet 4.5',
+        id: 'anthropic/claude-sonnet-4',
+        name: 'Claude Sonnet 4',
         maxTokens: 4096,
         supportsVision: true,
         supportsTools: true,
-        costPer1MInput: 5.00,
-        costPer1MOutput: 25.00,
+        costPer1MInput: 3.00,
+        costPer1MOutput: 15.00,
     },
     executor: {
         id: 'anthropic/claude-3.5-haiku',
@@ -76,32 +76,32 @@ const MODEL_CONFIGS: Record<AceModelRole, ModelConfig> = {
         costPer1MOutput: 15.00,
     },
     design: {
-        id: 'anthropic/claude-sonnet-4.5',
-        name: 'Claude Sonnet 4.5',
+        id: 'anthropic/claude-sonnet-4',
+        name: 'Claude Sonnet 4',
         maxTokens: 4096,
         supportsVision: true,
         supportsTools: true,
-        costPer1MInput: 5.00,
-        costPer1MOutput: 25.00,
+        costPer1MInput: 3.00,
+        costPer1MOutput: 15.00,
     },
     image_fast: {
-        // NANO Banana 2.0 — Gemini 2.5 Flash Image (free tier)
-        id: 'google/gemini-2.5-flash-image-preview:free',
+        // NANO Banana 2.0 — Gemini 2.5 Flash Image
+        id: 'google/gemini-2.5-flash-image',
         name: 'NANO Banana 2.0',
         maxTokens: 0,
         supportsVision: false,
         supportsTools: false,
-        costPer1MInput: 0,
+        costPer1MInput: 0.0000003,
         costPer1MOutput: 0,
     },
     image_quality: {
-        // Internal — not exposed in model selector
-        id: 'google/imagen-3',
-        name: 'Imagen 3',
+        // Gemini 3 Pro Image Preview — higher quality
+        id: 'google/gemini-3-pro-image-preview',
+        name: 'Gemini 3 Pro Image',
         maxTokens: 0,
         supportsVision: false,
         supportsTools: false,
-        costPer1MInput: 0,
+        costPer1MInput: 0.000002,
         costPer1MOutput: 0,
     },
 };

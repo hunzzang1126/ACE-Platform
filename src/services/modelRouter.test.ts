@@ -5,14 +5,14 @@ import { describe, it, expect } from 'vitest';
 import { getModelForRole, getModelId, getMaxTokens, listModels, type AceModelRole } from '@/services/modelRouter';
 
 describe('modelRouter', () => {
-    it('planner uses Sonnet 4.5 (advanced)', () => {
+    it('planner uses Sonnet 4 (default)', () => {
         const config = getModelForRole('planner');
-        expect(config.id).toBe('anthropic/claude-sonnet-4.5');
+        expect(config.id).toBe('anthropic/claude-sonnet-4');
         expect(config.supportsTools).toBe(true);
         expect(config.maxTokens).toBeGreaterThan(0);
     });
 
-    it('design uses same model as planner (Sonnet 4.5)', () => {
+    it('design uses same model as planner (Sonnet 4)', () => {
         const design = getModelForRole('design');
         const planner = getModelForRole('planner');
         expect(design.id).toBe(planner.id);
@@ -37,7 +37,7 @@ describe('modelRouter', () => {
         const quality = getModelId('image_quality');
         expect(fast).not.toBe(quality);
         expect(fast).toContain('gemini'); // NANO Banana 2.0
-        expect(quality).toContain('imagen');
+        expect(quality).toContain('gemini'); // Gemini 3 Pro Image
     });
 
     it('getMaxTokens returns correct value', () => {

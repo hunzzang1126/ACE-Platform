@@ -135,13 +135,23 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
     }, []);
 
     // ── Config ───────────────────────────────────
+    // ★ CRITICAL: UI-selected model ALWAYS takes priority.
+    // localStorage is used only for endpoint/maxToolRounds, never for model override.
     const getConfig = useCallback((): AiConfig => {
+        const model = getModelForRole(selectedRole);
+        const base: AiConfig = { endpoint: 'https://openrouter.ai/api', model: model.id, maxToolRounds: 30 };
+
+        // Merge non-model settings from localStorage (if any)
         const saved = localStorage.getItem('ace-ai-config');
         if (saved) {
-            try { return JSON.parse(saved) as AiConfig; } catch { /* */ }
+            try {
+                const parsed = JSON.parse(saved) as Partial<AiConfig>;
+                if (parsed.endpoint) base.endpoint = parsed.endpoint;
+                if (parsed.maxToolRounds) base.maxToolRounds = parsed.maxToolRounds;
+                // ★ NEVER use parsed.model — UI selection is the source of truth
+            } catch { /* */ }
         }
-        const model = getModelForRole(selectedRole);
-        return { endpoint: 'https://openrouter.ai/api', model: model.id, maxToolRounds: 30 };
+        return base;
     }, [selectedRole]);
 
     // ── Generate Design (template-first pipeline) ──
