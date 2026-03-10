@@ -5,7 +5,7 @@
 // Single config point for all model decisions.
 //
 // Model lineup (exposed in selector):
-//   Advanced: Claude Sonnet 4.5 (latest, best reasoning)
+//   Default: Claude Sonnet 4 (reliable, cost-effective)
 //   Standard: Claude Sonnet 4   (proven, balanced)
 //   Fast:     Claude 3.5 Haiku  (quick execution, low cost)
 //
@@ -15,11 +15,11 @@
 // ─────────────────────────────────────────────────
 
 export type AceModelRole =
-    | 'planner'       // Design planning (complex reasoning) — Sonnet 4.5
+    | 'planner'       // Design planning (complex reasoning) — Sonnet 4
     | 'executor'      // Tool execution (fast, cheap) — Haiku 3.5
     | 'critic'        // Design review (vision + analysis) — Sonnet 4
     | 'vision'        // Screenshot analysis (internal) — Sonnet 4
-    | 'design'        // General design generation — Sonnet 4.5
+    | 'design'        // General design generation — Sonnet 4
     | 'image_fast'    // Image gen — speed/cost priority (internal)
     | 'image_quality' // Image gen — quality priority (internal)
     ;

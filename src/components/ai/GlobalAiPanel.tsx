@@ -402,10 +402,8 @@ function ActionCardInline({ card }: { card: ActionCardData }) {
 // ── Model Dropdown (extracted for readability) ───
 
 const MODEL_OPTIONS: Array<{ role: AceModelRole; label: string }> = [
-    { role: 'planner', label: 'Planner (Advanced)' },
-    { role: 'design', label: 'Design (Full)' },
-    { role: 'executor', label: 'Executor (Fast)' },
-    { role: 'critic', label: 'Critic' },
+    { role: 'design', label: 'Claude Sonnet 4' },
+    { role: 'executor', label: 'Claude 3.5 Haiku (Fast)' },
 ];
 
 function ModelDropdown({ selectedRole, onSelect }: { selectedRole: AceModelRole; onSelect: (role: AceModelRole) => void }) {
