@@ -40,8 +40,12 @@ export function absoluteToConstraints(
     const centerY = y + h / 2;
     const relCenterY = centerY / canvasH;
 
-    const coversWidth = w >= canvasW * 0.9;
-    const coversHeight = h >= canvasH * 0.9;
+    // ★ REGRESSION GUARD: Threshold was 0.9 — too low for text elements.
+    // A text at 270/300 = 90% was promoted to relative:1.0 (full 300px width),
+    // causing the preview to render wider than the engine → different text wrapping.
+    // Raised to 0.98 so only genuinely full-canvas elements (backgrounds) are promoted.
+    const coversWidth = w >= canvasW * 0.98;
+    const coversHeight = h >= canvasH * 0.98;
 
     let horizontal: ElementConstraints['horizontal'];
     let vertical: ElementConstraints['vertical'];
