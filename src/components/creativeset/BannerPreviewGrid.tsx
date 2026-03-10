@@ -491,29 +491,56 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                     }}
                     onClick={(e) => e.stopPropagation()}
                 >
-                    {/* Export This Size — with format sub-items */}
-                    <div className="banner-ctx-label" style={{ padding: '4px 14px', fontSize: 10, color: '#484f58', fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase' as const }}>
-                        Export This Size
+                    {/* Export — cascading submenu */}
+                    <div
+                        style={{ position: 'relative' }}
+                        onMouseEnter={(e) => {
+                            const sub = (e.currentTarget as HTMLElement).querySelector('.banner-ctx-sub') as HTMLElement;
+                            if (sub) sub.style.display = 'block';
+                        }}
+                        onMouseLeave={(e) => {
+                            const sub = (e.currentTarget as HTMLElement).querySelector('.banner-ctx-sub') as HTMLElement;
+                            if (sub) sub.style.display = 'none';
+                        }}
+                    >
+                        <button className="banner-ctx-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span>Export</span>
+                            <span style={{ color: '#484f58', fontSize: 11, marginLeft: 12 }}>&#9654;</span>
+                        </button>
+                        {/* Sub-panel */}
+                        <div
+                            className="banner-ctx-sub"
+                            style={{
+                                display: 'none',
+                                position: 'absolute', left: '100%', top: -4,
+                                background: '#1e2231', border: '1px solid rgba(255,255,255,0.1)',
+                                borderRadius: 8, padding: '4px 0', minWidth: 180,
+                                boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+                            }}
+                        >
+                            <button className="banner-ctx-item" onClick={() => handleExportPNG(ctxMenu.variantId)}>
+                                PNG (Static Image)
+                            </button>
+                            <button className="banner-ctx-item" onClick={() => { setCtxMenu(null); alert('GIF export coming soon'); }}>
+                                GIF (Animated)
+                            </button>
+                            <button className="banner-ctx-item" onClick={() => { setCtxMenu(null); alert('MP4 export coming soon'); }}>
+                                MP4 (Video)
+                            </button>
+                            <button className="banner-ctx-item" onClick={() => { setCtxMenu(null); alert('JS bundle export coming soon'); }}>
+                                JS (Interactive Bundle)
+                            </button>
+                        </div>
                     </div>
-                    <button className="banner-ctx-item" onClick={() => handleExportPNG(ctxMenu.variantId)}>
-                        PNG (Static Image)
-                    </button>
-                    <button className="banner-ctx-item" onClick={() => { setCtxMenu(null); alert('GIF export coming soon'); }}>
-                        GIF (Animated)
-                    </button>
-                    <button className="banner-ctx-item" onClick={() => { setCtxMenu(null); alert('MP4 export coming soon'); }}>
-                        MP4 (Video)
-                    </button>
-                    <button className="banner-ctx-item" onClick={() => { setCtxMenu(null); alert('JS bundle export coming soon'); }}>
-                        JS (Interactive Bundle)
-                    </button>
 
                     {/* Export Selected / All */}
-                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', margin: '4px 0' }} />
                     {selectedIds.size > 1 && (
-                        <button className="banner-ctx-item" onClick={handleExportSelected}>
-                            Export Selected ({selectedIds.size}) as PNG
-                        </button>
+                        <>
+                            <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', margin: '4px 0' }} />
+                            <button className="banner-ctx-item" onClick={handleExportSelected}>
+                                Export Selected ({selectedIds.size}) as PNG
+                            </button>
+                        </>
                     )}
                     <button className="banner-ctx-item" onClick={handleExportAll}>
                         Export All Sizes as PNG
@@ -522,9 +549,6 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                     <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', margin: '4px 0' }} />
                     <button className="banner-ctx-item" onClick={() => { setCtxMenu(null); handleDoubleClick(ctxMenu.variantId); }}>
                         Open in Editor
-                    </button>
-                    <button className="banner-ctx-item banner-ctx-item--danger" onClick={closeCtxMenu}>
-                        x Cancel
                     </button>
                 </div>
             )}

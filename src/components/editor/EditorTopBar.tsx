@@ -5,8 +5,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEditorStore } from '@/stores/editorStore';
 import { useUIStore } from '@/stores/uiStore';
-import { IcExport, IcImage, IcFilm, IcCode, IcBell, IcHelp, IcClose } from '@/components/ui/Icons';
-import { exportToHtml5, downloadExport } from '@/engine/html5Exporter';
+import { IcBell, IcHelp, IcClose } from '@/components/ui/Icons';
 import type { EngineNode } from '@/hooks/canvasTypes';
 
 interface Props {
@@ -23,81 +22,12 @@ export function EditorTopBar({ setName, variantLabel, canvasWidth = 300, canvasH
     const navigate = useNavigate();
     const zoom = useEditorStore((s) => s.zoom);
     const setZoom = useEditorStore((s) => s.setZoom);
-    const [exportOpen, setExportOpen] = useState(false);
-    const [exporting, setExporting] = useState(false);
-    const dropdownRef = useRef<HTMLDivElement>(null);
 
     // UI panel toggles
-    const toggleExportPanel = useUIStore(s => s.toggleExportPanel);
     const toggleCanvasRuler = useUIStore(s => s.toggleCanvasRuler);
-    const toggleBrandCompliance = useUIStore(s => s.toggleBrandCompliance);
     const toggleAuthModal = useUIStore(s => s.toggleAuthModal);
     const canvasRulerVisible = useUIStore(s => s.canvasRulerVisible);
 
-    useEffect(() => {
-        if (!exportOpen) return;
-        const handler = (e: MouseEvent) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) setExportOpen(false);
-        };
-        document.addEventListener('mousedown', handler);
-        return () => document.removeEventListener('mousedown', handler);
-    }, [exportOpen]);
-
-    const handleExportPng = useCallback(() => {
-        setExportOpen(false);
-        const canvas = document.querySelector('.ed-artboard canvas') as HTMLCanvasElement;
-        if (canvas) {
-            canvas.toBlob((blob) => {
-                if (!blob) return;
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a'); a.href = url; a.download = `${setName}_${variantLabel.replace(/\s/g, '')}.png`; a.click();
-                URL.revokeObjectURL(url);
-            }, 'image/png');
-        }
-    }, [setName, variantLabel]);
-
-    const handleExportMp4 = useCallback(async () => {
-        if (!engine?.export_mp4) { alert('MP4 export requires the full engine.'); return; }
-        setExporting(true); setExportOpen(false);
-        try {
-            const blob = await engine.export_mp4();
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url; a.download = `${setName}_export.mp4`; a.click();
-            URL.revokeObjectURL(url);
-        } catch (err) { alert(`Export failed: ${err}`); }
-        setExporting(false);
-    }, [engine, setName]);
-
-    const handleExportHtml5 = useCallback(() => {
-        setExportOpen(false);
-        try {
-            // Read nodes from engine
-            let nodes: EngineNode[] = [];
-            if (engine?.get_all_nodes) {
-                try { nodes = JSON.parse(engine.get_all_nodes()); } catch { /* ok */ }
-            }
-            const result = exportToHtml5(nodes, {
-                width: canvasWidth, height: canvasHeight,
-                backgroundColor: '#ffffff',
-                title: `${setName}_${variantLabel.replace(/\s/g, '')}`,
-                duration: engine?.anim_duration?.() ?? 5,
-                loop: engine?.anim_looping?.() ?? false,
-            });
-            downloadExport(result);
-        } catch (err) { alert(`HTML5 export failed: ${err}`); }
-    }, [engine, setName, variantLabel, canvasWidth, canvasHeight]);
-
-    const handleExportLottie = useCallback(() => {
-        if (!engine?.export_lottie_json) { alert('Lottie JSON export coming soon.'); return; }
-        setExportOpen(false);
-        try {
-            const json = engine.export_lottie_json();
-            const blob = new Blob([json], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url; a.download = `${setName}_animation.json`; a.click();
-            URL.revokeObjectURL(url);
-        } catch (err) { alert(`Export failed: ${err}`); }
-    }, [engine, setName]);
 
     return (
         <header className="ed-topbar">
@@ -115,30 +45,6 @@ export function EditorTopBar({ setName, variantLabel, canvasWidth = 300, canvasH
             <div className="ed-topbar-right">
                 {/* Custom actions (Save button) */}
                 {children}
-
-                {/* Export */}
-                <div ref={dropdownRef} style={{ position: 'relative' }}>
-                    <button className="ed-topbar-icon-btn" onClick={() => setExportOpen(!exportOpen)}
-                        title="Export" disabled={exporting} style={exporting ? { opacity: 0.5 } : {}}>
-                        <IcExport size={15} />
-                    </button>
-                    {exportOpen && (
-                        <div style={dropdownStyle}>
-                            <button style={dropdownItem} onClick={handleExportPng}>
-                                <IcImage size={14} color="#8b949e" /> <span>Export PNG</span>
-                            </button>
-                            <button style={dropdownItem} onClick={handleExportHtml5}>
-                                <IcCode size={14} color="#8b949e" /> <span>Export HTML5</span>
-                            </button>
-                            <button style={dropdownItem} onClick={handleExportMp4}>
-                                <IcFilm size={14} color="#8b949e" /> <span>Export MP4</span>
-                            </button>
-                            <button style={dropdownItem} onClick={handleExportLottie}>
-                                <IcCode size={14} color="#8b949e" /> <span>Export Lottie JSON</span>
-                            </button>
-                        </div>
-                    )}
-                </div>
 
                 {/* Zoom */}
                 <div className="ed-zoom-control">
