@@ -36,7 +36,11 @@ export function useCanvasSync(
     canvasH: number,
 ) {
     const replaceVariantElements = useDesignStore((s) => s.replaceVariantElements);
-    const creativeSet = useDesignStore((s) => s.creativeSet);
+    // ★ REGRESSION GUARD: Do NOT capture creativeSet in a closure for save functions.
+    // Always use useDesignStore.getState().creativeSet for real-time reads.
+    // Capturing via useDesignStore((s) => s.creativeSet) creates a stale reference
+    // that causes the size dashboard to show pre-edit state after saving.
+    const creativeSetForRestore = useDesignStore((s) => s.creativeSet);
 
     /**
      * Save current canvas state → designStore
@@ -45,7 +49,9 @@ export function useCanvasSync(
         engineRef: React.RefObject<Engine | null>,
         overlayElements: OverlayElement[],
     ): { success: boolean; message: string } => {
-        if (!variantId || !creativeSet) {
+        // ★ REGRESSION GUARD: Read fresh state, never stale closure
+        const cs = useDesignStore.getState().creativeSet;
+        if (!variantId || !cs) {
             return { success: false, message: 'No variant or creative set active.' };
         }
 
@@ -82,14 +88,14 @@ export function useCanvasSync(
         // 4. Write to store (triggers smart sizing propagation if master)
         replaceVariantElements(variantId, elements);
 
-        const isMaster = creativeSet.masterVariantId === variantId;
+        const isMaster = cs.masterVariantId === variantId;
         const msg = isMaster
-            ? `Saved ${elements.length} elements to master. Propagated to ${creativeSet.variants.length - 1} sizes.`
+            ? `Saved ${elements.length} elements to master. Propagated to ${cs.variants.length - 1} sizes.`
             : `Saved ${elements.length} elements to variant.`;
 
         console.log(`[useCanvasSync] ${msg}`);
         return { success: true, message: msg };
-    }, [variantId, canvasW, canvasH, creativeSet, replaceVariantElements]);
+    }, [variantId, canvasW, canvasH, replaceVariantElements]);
 
     /**
      * Save from pre-cached node data (for unmount when engine may already be freed).
@@ -99,7 +105,9 @@ export function useCanvasSync(
         cachedNodes: EngineNode[],
         overlayElements: OverlayElement[],
     ): { success: boolean; message: string } => {
-        if (!variantId || !creativeSet) {
+        // ★ REGRESSION GUARD: Read fresh state, never stale closure
+        const cs = useDesignStore.getState().creativeSet;
+        if (!variantId || !cs) {
             return { success: false, message: 'No variant or creative set active.' };
         }
 
@@ -127,14 +135,14 @@ export function useCanvasSync(
         // 4. Write to store
         replaceVariantElements(variantId, elements);
 
-        const isMaster = creativeSet.masterVariantId === variantId;
+        const isMaster = cs.masterVariantId === variantId;
         const msg = isMaster
-            ? `Saved ${elements.length} elements (from cache). Propagated to ${creativeSet.variants.length - 1} sizes.`
+            ? `Saved ${elements.length} elements (from cache). Propagated to ${cs.variants.length - 1} sizes.`
             : `Saved ${elements.length} elements (from cache) to variant.`;
 
         console.log(`[useCanvasSync] ${msg}`);
         return { success: true, message: msg };
-    }, [variantId, canvasW, canvasH, creativeSet, replaceVariantElements]);
+    }, [variantId, canvasW, canvasH, replaceVariantElements]);
 
     /**
      * Restore saved elements from designStore → engine + overlay
@@ -143,11 +151,13 @@ export function useCanvasSync(
     const restoreFromStore = useCallback(async (
         engine: Engine,
     ): Promise<{ restoredShapes: number; overlayElements: OverlayElement[] }> => {
-        if (!variantId || !creativeSet) {
+        // ★ Use fresh state for restore too — especially important after AI adds elements
+        const cs = useDesignStore.getState().creativeSet;
+        if (!variantId || !cs) {
             return { restoredShapes: 0, overlayElements: [] };
         }
 
-        const variant = creativeSet.variants.find((v) => v.id === variantId);
+        const variant = cs.variants.find((v) => v.id === variantId);
         if (!variant || !variant.elements || variant.elements.length === 0) {
             console.log('[useCanvasSync] No saved elements to restore');
             return { restoredShapes: 0, overlayElements: [] };
@@ -349,7 +359,7 @@ export function useCanvasSync(
 
         console.log(`[useCanvasSync] Restored ${restoredShapes} shapes, ${overlayElements.length} overlays`);
         return { restoredShapes, overlayElements };
-    }, [variantId, canvasW, canvasH, creativeSet]);
+    }, [variantId, canvasW, canvasH]);
 
     return { saveToStore, saveFromCachedNodes, restoreFromStore };
 }

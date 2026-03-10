@@ -87,6 +87,10 @@ export function DetailEditorPage() {
     // Flag to skip re-sync when save writes to store (prevents infinite loop)
     const isSavingRef = useRef(false);
 
+    // ★ REGRESSION GUARD: Tracks the last manual save timestamp.
+    // Prevents auto-save on unmount from overwriting a recent manual save.
+    const lastManualSaveRef = useRef(0);
+
     // ── Save handler (manual) ──
     const handleSave = useCallback(() => {
         setSaveStatus('saving');
@@ -95,6 +99,7 @@ export function DetailEditorPage() {
             const result = saveToStore(engineRef, overlay.overlayElements);
             console.log('[DetailEditor] Save result:', result);
             isDirtyRef.current = false; // Saved — no longer dirty
+            lastManualSaveRef.current = Date.now();
             if (result.success) {
                 setSaveStatus('saved');
             } else {
@@ -105,8 +110,10 @@ export function DetailEditorPage() {
             console.error('[DetailEditor] Save error:', err);
             setSaveStatus('idle');
         }
-        // Allow element-count watcher to resume after save completes
-        requestAnimationFrame(() => { isSavingRef.current = false; });
+        // ★ REGRESSION GUARD: Use 200ms timeout instead of rAF for the guard window.
+        // rAF fires too quickly, allowing the storeElementCount effect to re-dirty
+        // after save. 200ms gives Zustand effects time to settle.
+        setTimeout(() => { isSavingRef.current = false; }, 200);
         setTimeout(() => setSaveStatus('idle'), 2000);
     }, [saveToStore, engineRef, overlay.overlayElements]);
 
@@ -222,6 +229,14 @@ export function DetailEditorPage() {
         return () => {
             if (!isDirtyRef.current) {
                 console.log('[DetailEditor] Auto-save skipped — no changes made');
+                return;
+            }
+
+            // ★ REGRESSION GUARD: If user manually saved recently, skip auto-save.
+            // This prevents the stale-data overwrite that causes preview bugs.
+            const timeSinceManualSave = Date.now() - lastManualSaveRef.current;
+            if (timeSinceManualSave < 2000) {
+                console.log('[DetailEditor] Auto-save skipped — manual save was recent (' + timeSinceManualSave + 'ms ago)');
                 return;
             }
 
