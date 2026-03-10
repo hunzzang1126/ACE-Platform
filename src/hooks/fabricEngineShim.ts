@@ -188,25 +188,30 @@ export function createEngineShim(
 
                 let targetW: number;
                 let targetH: number;
+                let scaleX: number;
+                let scaleY: number;
 
                 if (w != null && h != null) {
-                    const uniformScale = Math.min(w / Math.max(natW, 1), h / Math.max(natH, 1));
-                    targetW = natW * uniformScale;
-                    targetH = natH * uniformScale;
+                    // ★ Stretch to fill — use independent scaleX/scaleY (for backgrounds)
+                    targetW = w;
+                    targetH = h;
+                    scaleX = w / Math.max(natW, 1);
+                    scaleY = h / Math.max(natH, 1);
                 } else if (w != null) {
                     targetW = w;
                     targetH = natH * (targetW / Math.max(natW, 1));
+                    scaleX = scaleY = targetW / Math.max(natW, 1);
                 } else {
                     targetW = Math.min(natW, artboardW * 0.7);
                     targetH = natH * (targetW / Math.max(natW, 1));
+                    scaleX = scaleY = targetW / Math.max(natW, 1);
                 }
 
-                const uniformScaleVal = targetW / Math.max(natW, 1);
                 img.set({
                     left: x,
                     top: y,
-                    scaleX: uniformScaleVal,
-                    scaleY: uniformScaleVal,
+                    scaleX,
+                    scaleY,
                 });
                 (img as any).__aceId = id;
                 (img as any).__aceName = name || `Image #${id}`;
