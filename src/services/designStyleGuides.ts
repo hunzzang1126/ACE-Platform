@@ -129,9 +129,15 @@ RULES:
 4. ALWAYS ensure 4.5:1+ contrast between text and background.
 5. Dark backgrounds (< #333) should have white/light text. Light backgrounds (> #ccc) should have dark text.
 6. Decide if a BACKGROUND IMAGE is needed:
+   - User explicitly asks for background/image/photo → ALWAYS YES
    - Brands with physical products (Nike shoes, Coca-Cola bottles) → YES
    - Location/travel prompts → YES (scenic imagery)
-   - Abstract/data/SaaS/dashboard → NO (gradient is better)
+   - Food/restaurant/lifestyle → YES (appetizing or lifestyle imagery)
+   - Fashion/beauty → YES (model or product imagery)
+   - Sport/fitness → YES (athletic imagery)
+   - Abstract/data/SaaS/dashboard/fintech → NO (gradient is better)
+   - Simple text-only or minimalist requests → NO
+   - When in doubt and the prompt is visual/emotional → YES
    - If YES, write a short Imagen prompt describing the ideal background.
 7. Return ONLY the JSON object, nothing else.`;
 
