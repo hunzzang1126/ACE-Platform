@@ -11,6 +11,7 @@ import { buildBrandContextForPlanner } from '@/services/brandContextBuilder';
 import { classifyRatio, LAYOUT_ZONES, classifyMasterGroup, getMasterGroupDescriptions } from '@/engine/smartSizing';
 import { getToolSchemasByCategory } from '@/services/toolRegistry';
 import { buildBannerStyleGuide } from '@/services/bannerDesignGuide';
+import { buildTokenPromptForAI } from '@/services/designTokens';
 import type { BrandKit } from '@/stores/brandKitStore';
 import type { SceneGraph } from '@/services/sceneGraphBuilder';
 import type { DesignPlan, PlannedElement, ProgressCallback } from './agentTypes';
@@ -39,7 +40,9 @@ function buildPlannerSystemPrompt(
     const structureToolList = structureSchemas.map(t => `  - ${t.name}: ${t.description}`).join('\n');
     const analyzeToolList = analyzeSchemas.map(t => `  - ${t.name}: ${t.description}`).join('\n');
 
-    const brandContext = brandKit ? buildBrandContextForPlanner(brandKit) : '';
+    const brandContext = brandKit
+        ? buildBrandContextForPlanner(brandKit) + '\n' + buildTokenPromptForAI(brandKit)
+        : '';
 
     // Detect refinement mode: existing elements = iterative design session
     const isRefinement = sceneGraph && sceneGraph.elements.length > 0;
