@@ -239,6 +239,36 @@ export const STYLE_GUIDES: Record<string, DesignStyleGuide> = {
     },
 };
 
+// ── Color keyword detection ──────────────────────
+// When user says "red", "blue", etc., override the style guide's accent + gradient
+
+const COLOR_KEYWORDS: Record<string, { accent: string; gradientEnd: string; surface: string }> = {
+    red:     { accent: '#ff2d2d', gradientEnd: '#2a0000', surface: '#1a0505' },
+    crimson: { accent: '#dc143c', gradientEnd: '#2a0008', surface: '#1a0005' },
+    orange:  { accent: '#ff6b00', gradientEnd: '#2a1400', surface: '#1a0e02' },
+    yellow:  { accent: '#ffc107', gradientEnd: '#2a2200', surface: '#1a1500' },
+    gold:    { accent: '#c9a84c', gradientEnd: '#1a1400', surface: '#151005' },
+    green:   { accent: '#22c55e', gradientEnd: '#002a10', surface: '#051a0a' },
+    teal:    { accent: '#14b8a6', gradientEnd: '#002a24', surface: '#051a16' },
+    cyan:    { accent: '#00d4ff', gradientEnd: '#001a2a', surface: '#050f1a' },
+    blue:    { accent: '#3b82f6', gradientEnd: '#000a2a', surface: '#050a1a' },
+    navy:    { accent: '#1e40af', gradientEnd: '#000520', surface: '#030510' },
+    purple:  { accent: '#a855f7', gradientEnd: '#15002a', surface: '#0d051a' },
+    violet:  { accent: '#8b5cf6', gradientEnd: '#12002a', surface: '#0c051a' },
+    pink:    { accent: '#ec4899', gradientEnd: '#2a0018', surface: '#1a050f' },
+    magenta: { accent: '#d946ef', gradientEnd: '#2a0020', surface: '#1a0512' },
+    white:   { accent: '#e0e0e0', gradientEnd: '#1a1a1a', surface: '#111111' },
+    black:   { accent: '#ffffff', gradientEnd: '#050505', surface: '#0a0a0a' },
+};
+
+function detectColorOverride(prompt: string): { accent: string; gradientEnd: string; surface: string } | null {
+    const lower = prompt.toLowerCase();
+    for (const [keyword, colors] of Object.entries(COLOR_KEYWORDS)) {
+        if (lower.includes(keyword)) return colors;
+    }
+    return null;
+}
+
 // ── Auto-detect best style guide from prompt ─────
 
 export function selectStyleGuide(prompt: string): DesignStyleGuide {
@@ -258,8 +288,25 @@ export function selectStyleGuide(prompt: string): DesignStyleGuide {
     }
 
     // Default to electric-dark if no strong match (modern, versatile)
-    if (bestScore === 0) return STYLE_GUIDES['electric-dark']!;
-    return bestMatch;
+    const base = bestScore === 0 ? STYLE_GUIDES['electric-dark']! : bestMatch;
+
+    // Apply color override if user mentions a specific color
+    const colorOverride = detectColorOverride(prompt);
+    if (colorOverride) {
+        return {
+            ...base,
+            name: `${base.name} (${prompt.match(/\b(red|crimson|orange|yellow|gold|green|teal|cyan|blue|navy|purple|violet|pink|magenta|white|black)\b/i)?.[1] ?? 'custom'})`,
+            colors: {
+                ...base.colors,
+                accent: colorOverride.accent,
+                accentForeground: '#ffffff',
+                gradientEnd: colorOverride.gradientEnd,
+                surface: colorOverride.surface,
+            },
+        };
+    }
+
+    return base;
 }
 
 // ── Build AI-readable style description ──────────
