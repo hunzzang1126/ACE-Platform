@@ -11,10 +11,12 @@ import type { Engine, ExecutionResult } from './executorHelpers';
 import { hexToRgb, rgbToHex, makeNodeInfo, getLayoutColor } from './executorHelpers';
 
 // Forward reference — set by commandExecutor.ts on init
-let _executeToolCall: ((engine: Engine, toolName: string, params: Record<string, unknown>, trackedNodes: SceneNodeInfo[]) => ExecutionResult) | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _executeToolCall: ((engine: Engine, toolName: string, params: Record<string, unknown>, trackedNodes: SceneNodeInfo[]) => ExecutionResult | Promise<ExecutionResult>) | null = null;
 
 /** Called by commandExecutor.ts to avoid circular dependency */
-export function setExecuteToolCallRef(fn: typeof _executeToolCall) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function setExecuteToolCallRef(fn: any) {
     _executeToolCall = fn;
 }
 
@@ -131,11 +133,11 @@ export function executeSetAnimPreset(
 
 // ── render_banner ───────────────────────────────
 
-export function executeRenderBanner(
+export async function executeRenderBanner(
     engine: Engine,
     params: Record<string, unknown>,
     trackedNodes: SceneNodeInfo[],
-): ExecutionResult {
+): Promise<ExecutionResult> {
     const elements = (params.elements as Record<string, unknown>[]) ?? [];
     if (!Array.isArray(elements) || elements.length === 0) {
         return { success: false, message: 'render_banner: elements array is required and cannot be empty' };
@@ -166,7 +168,9 @@ export function executeRenderBanner(
             if (!_executeToolCall) {
                 result = { success: false, message: 'Internal error: executeToolCall not registered' };
             } else {
-                result = _executeToolCall(engine, toolName, shapeParams, trackedNodes);
+                // render_banner only calls sync shape tools (add_rect, etc.) — safe to cast
+                const maybePromise = _executeToolCall(engine, toolName, shapeParams, trackedNodes);
+                result = (maybePromise && 'then' in maybePromise) ? await maybePromise : maybePromise;
             }
         }
 

@@ -7,6 +7,8 @@
 
 import type { SceneNodeInfo } from './agentContext';
 import type { Engine, ExecutionResult } from './executorHelpers';
+import { generateImage } from '@/services/imageGenClient';
+import type { ImageGenResult } from '@/services/imageGenClient';
 import { rgbToHex, makeNodeInfo } from './executorHelpers';
 import {
     executeAddText,
@@ -25,12 +27,12 @@ export type { ExecutionResult } from './executorHelpers';
  * Execute a single tool call on the engine.
  * Returns node tracking info for Scene RAG updates.
  */
-export function executeToolCall(
+export async function executeToolCall(
     engine: Engine,
     toolName: string,
     params: Record<string, unknown>,
     trackedNodes: SceneNodeInfo[],
-): ExecutionResult {
+): Promise<ExecutionResult> {
     if (!engine) {
         return { success: false, message: `Cannot execute "${toolName}": no canvas engine available. Navigate to a canvas editor first.` };
     }
@@ -183,6 +185,78 @@ export function executeToolCall(
             case 'animate_all': return executeAnimateAll(engine, params, trackedNodes);
             case 'analyze_scene': return { success: true, message: analyzeScene(trackedNodes) };
             case 'render_banner': return executeRenderBanner(engine, params, trackedNodes);
+
+            // ── Image Generation (Atomic) ────────────
+            case 'generate_image': {
+                const prompt = str('prompt', 'abstract background');
+                const style = str('style', 'photography') as 'realistic' | 'illustration' | 'abstract' | 'minimal' | 'photography';
+                const canvasW = engine?.canvas_width?.() ?? 300;
+                const canvasH = engine?.canvas_height?.() ?? 250;
+                let result: ImageGenResult;
+                try {
+                    result = await generateImage({
+                        prompt: `${prompt}. No text, no logos, no watermarks. Professional quality.`,
+                        width: canvasW,
+                        height: canvasH,
+                        model: 'flux', // routes to NANO Banana 2.0
+                        style,
+                        negativePrompt: 'text, logos, watermark, low quality, blurry',
+                    });
+                } catch (err) {
+                    return { success: false, message: `Image generation failed: ${err}` };
+                }
+                if (!result.success) {
+                    return { success: false, message: result.message };
+                }
+                return {
+                    success: true,
+                    message: `Image generated (${canvasW}x${canvasH}) via ${result.model}${result.isFallback ? ' (gradient fallback)' : ''}`,
+                    data: { image_url: result.imageUrl },
+                };
+            }
+
+            case 'set_canvas_background': {
+                const imageUrl = str('image_url');
+                if (!imageUrl) return { success: false, message: 'No image_url provided' };
+                if (!engine?.add_image) return { success: false, message: 'Canvas engine not available' };
+                const canvasW = engine.canvas_width?.() ?? 300;
+                const canvasH = engine.canvas_height?.() ?? 250;
+                try {
+                    const nodeId = await engine.add_image(0, 0, imageUrl, canvasW, canvasH, 'ai_background');
+                    trackedNodes.push({
+                        id: nodeId, type: 'rect' as const, x: 0, y: 0, width: canvasW, height: canvasH,
+                        color: 'image', opacity: 1, zIndex: 0, label: `Background Image #${nodeId}`,
+                        effects: { hasShadow: false, brightness: 1, contrast: 1, saturation: 1, hueRotate: 0, blendMode: 'normal' },
+                        animations: [],
+                    });
+                    return { success: true, message: `Background image set (${canvasW}x${canvasH})`, nodeId };
+                } catch (err) {
+                    return { success: false, message: `Failed to set background: ${err}` };
+                }
+            }
+
+            case 'add_image_layer': {
+                const imageUrl = str('image_url');
+                if (!imageUrl) return { success: false, message: 'No image_url provided' };
+                if (!engine?.add_image) return { success: false, message: 'Canvas engine not available' };
+                const x = num('x'), y = num('y');
+                const w = params.w != null ? num('w') : undefined;
+                const h = params.h != null ? num('h') : undefined;
+                const name = str('name', 'image_layer');
+                try {
+                    const nodeId = await engine.add_image(x, y, imageUrl, w, h, name);
+                    return { success: true, message: `Image layer added at (${x}, ${y})${w ? ` size ${w}x${h}` : ''}`, nodeId };
+                } catch (err) {
+                    return { success: false, message: `Failed to add image layer: ${err}` };
+                }
+            }
+
+            // ── Full Design Pipeline (Meta-Tool) ─────
+            case 'generate_full_design': {
+                // This is handled at a higher level in useUnifiedAgent.ts
+                // When the LLM calls this, the executor override in useUnifiedAgent intercepts it
+                return { success: false, message: 'generate_full_design must be handled by the agent orchestrator. This tool is intercepted at a higher level.' };
+            }
 
             default:
                 return { success: false, message: `Unknown tool: ${toolName}` };

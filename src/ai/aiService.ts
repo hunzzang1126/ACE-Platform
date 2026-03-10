@@ -276,7 +276,7 @@ export class AiService {
                     } else if (DASHBOARD_TOOL_NAMES.has(tc.name!)) {
                         result = { success: false, message: `Dashboard tool "${tc.name}" not available.` };
                     } else if (engine) {
-                        result = executeToolCall(engine, tc.name!, params, this.trackedNodes);
+                        result = await executeToolCall(engine, tc.name!, params, this.trackedNodes);
                     } else {
                         result = { success: false, message: 'Canvas engine not available. Navigate to the editor first.' };
                     }

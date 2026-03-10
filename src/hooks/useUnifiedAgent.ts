@@ -14,10 +14,11 @@ import { useDesignStore } from '@/stores/designStore';
 import { getModelForRole, type AceModelRole } from '@/services/modelRouter';
 import type { AgentMessage } from '@/ai/agentContext';
 import type { NavigateFunction } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 
 // ── Types ────────────────────────────────────────
 
-export type AgentIntent = 'generate' | 'scan' | 'modify' | 'check' | 'general';
+// AgentIntent type is defined below after intent detection section
 
 // ProgressCard type kept for backward compat, data now lives inside AgentMessage.actionCard
 export interface ProgressCard {
@@ -50,40 +51,11 @@ const INITIAL_STATE: UnifiedAgentState = {
     liveCursor: { active: false, x: 0, y: 0 },
 };
 
-// ── Intent Detection ─────────────────────────────
+// ── Intent Detection (LEGACY — scan-only) ────────
+// All text input routes to the LLM agentic loop (Single Loop).
+// Only image data triggers the scan flow.
 
-const GENERATE_PATTERNS = [
-    /\b(create|generate|make|design|build|new)\b.*\b(banner|ad|creative|layout|poster|social|post|page|landing)\b/i,
-    /\b(from scratch|start fresh|new design|blank canvas)\b/i,
-    /\b(summer|winter|sale|promo|launch|event|campaign)\b.*\b(banner|ad|creative|design)\b/i,
-    /^(create|generate|make|design|build)\s/i,
-];
-
-const SCAN_PATTERNS = [
-    /\b(scan|analyze|reverse.?engineer|extract|recreate|replicate)\b.*\b(design|screenshot|image|layout)\b/i,
-    /\b(drop|upload|import)\b.*\b(screenshot|design|image)\b/i,
-    /\b(convert|turn)\b.*\b(into|to)\b.*\b(editable|layers)\b/i,
-];
-
-const MODIFY_PATTERNS = [
-    /\b(change|modify|update|edit|adjust|tweak|fix|make it|move|resize|recolor)\b/i,
-    /\b(bolder|bigger|smaller|darker|lighter|brighter|wider|taller|shorter)\b/i,
-    /\b(more|less)\s+(contrast|space|padding|gap|margin)\b/i,
-];
-
-const CHECK_PATTERNS = [
-    /\b(check|verify|review|inspect|audit|qa|quality)\b/i,
-    /\b(smart\s*check|vision\s*check)\b/i,
-];
-
-export function detectIntent(message: string): AgentIntent {
-    const clean = message.trim();
-    if (SCAN_PATTERNS.some(p => p.test(clean))) return 'scan';
-    if (GENERATE_PATTERNS.some(p => p.test(clean))) return 'generate';
-    if (CHECK_PATTERNS.some(p => p.test(clean))) return 'check';
-    if (MODIFY_PATTERNS.some(p => p.test(clean))) return 'modify';
-    return 'general';
-}
+export type AgentIntent = 'scan' | 'agent';
 
 // ── Hook ─────────────────────────────────────────
 
@@ -96,6 +68,7 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
     const [messages, setMessages] = useState<AgentMessage[]>([]);
     const [state, setState] = useState<UnifiedAgentState>(INITIAL_STATE);
     const [input, setInput] = useState('');
+    const location = useLocation();
 
     const serviceRef = useRef<AiService | null>(null);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -550,7 +523,7 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         return reply || 'Request completed.';
     }, [navigate, addCard, updateCard, moveCursor, hideCursor]);
 
-    // ── Main Send ────────────────────────────────
+    // ── Main Send (Single Loop) ──────────────────
     const send = useCallback(async (text?: string, imageData?: string) => {
         const msg = text ?? input.trim();
         if (!msg && !imageData) return;
@@ -559,8 +532,9 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         const userMsg: AgentMessage = { role: 'user', content: msg || 'Scan this design', timestamp: Date.now() };
         setMessages(prev => [...prev, userMsg]);
 
-        // Detect intent
-        const intent: AgentIntent = imageData ? 'scan' : detectIntent(msg);
+        // SINGLE LOOP: Only image upload triggers scan.
+        // ALL text input goes to LLM agentic loop — LLM decides tools.
+        const intent: AgentIntent = imageData ? 'scan' : 'agent';
         setState({ ...INITIAL_STATE, phase: 'thinking', intent });
 
         try {
@@ -568,12 +542,29 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
 
             if (intent === 'scan' && imageData) {
                 reply = await runScanFlow(imageData);
-            } else if (intent === 'generate') {
-                reply = await runGenerateFlow(msg);
             } else {
-                // general / modify / check — route through AI chat
+                // ── SINGLE LOOP: ALL text → LLM agentic loop ──
+                // LLM decides: generate_full_design, generate_image,
+                // add_text, set_color, or any other tool.
                 const config = getConfig();
-                reply = await runChatFlow(msg, config);
+
+                // Build context snapshot for LLM
+                const currentPath = location.pathname;
+                let locationLabel = 'Main Dashboard';
+                if (currentPath.includes('/editor/detail/')) locationLabel = 'Canvas Editor';
+                else if (currentPath.includes('/editor')) locationLabel = 'Size Dashboard';
+
+                const designState = useDesignStore.getState();
+                const cs = designState.creativeSet;
+                const masterVariant = cs?.variants?.find(v => v.id === cs.masterVariantId);
+                const contextPrefix = [
+                    `[CONTEXT] Location: ${locationLabel}`,
+                    masterVariant ? `Canvas: ${masterVariant.preset.width}x${masterVariant.preset.height}` : '',
+                    cs?.name ? `Project: ${cs.name}` : '',
+                ].filter(Boolean).join(' | ');
+
+                const enrichedMsg = `${contextPrefix}\n\nUser request: ${msg}`;
+                reply = await runChatFlow(enrichedMsg, config);
             }
 
             setMessages(prev => [...prev, { role: 'assistant', content: reply, timestamp: Date.now() }]);
@@ -583,7 +574,7 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
             setMessages(prev => [...prev, { role: 'assistant', content: `[Error] ${errMsg}`, timestamp: Date.now() }]);
             setState(prev => ({ ...prev, phase: 'error', error: errMsg }));
         }
-    }, [input, getConfig, runGenerateFlow, runScanFlow, runChatFlow]);
+    }, [input, location.pathname, getConfig, runGenerateFlow, runScanFlow, runChatFlow]);
 
     const clearChat = useCallback(() => {
         setMessages([]);

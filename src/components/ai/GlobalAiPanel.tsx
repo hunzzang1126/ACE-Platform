@@ -9,7 +9,7 @@
 
 import { useState, useEffect, useRef, useCallback, type CSSProperties } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useUnifiedAgent, detectIntent, type AgentIntent } from '@/hooks/useUnifiedAgent';
+import { useUnifiedAgent, type AgentIntent } from '@/hooks/useUnifiedAgent';
 import { getModelForRole, type AceModelRole } from '@/services/modelRouter';
 import type { AgentMessage } from '@/ai/agentContext';
 import {
@@ -22,11 +22,8 @@ import {
 const PANEL_WIDTH = 400;
 
 const INTENT_LABELS: Record<AgentIntent, string> = {
-    generate: 'Generating design',
+    agent: 'Working on your request',
     scan: 'Scanning design',
-    modify: 'Modifying elements',
-    check: 'Running quality check',
-    general: 'Processing',
 };
 
 const QUICK_ACTIONS = [

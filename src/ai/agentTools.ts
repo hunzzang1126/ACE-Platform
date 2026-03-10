@@ -523,6 +523,73 @@ const render_banner: ToolDefinition = {
     category: 'compound',
 };
 
+// ── Image Generation (Atomic) ─────────────────────
+
+const generate_image: ToolDefinition = {
+    name: 'generate_image',
+    description: 'Generate an image using AI (NANO Banana 2.0 / Imagen). Returns a data URL that can be used with set_canvas_background or add_image_layer. Use this when the user wants a background image, product photo, or any visual element.',
+    parameters: {
+        type: 'object',
+        properties: {
+            prompt: { type: 'string', description: 'Detailed description of the image to generate. Be specific about mood, lighting, composition, and subject.' },
+            style: {
+                type: 'string',
+                description: 'Visual style hint',
+                enum: ['realistic', 'illustration', 'abstract', 'minimal', 'photography'],
+                default: 'photography',
+            },
+        },
+        required: ['prompt'],
+    },
+    category: 'create',
+};
+
+const set_canvas_background: ToolDefinition = {
+    name: 'set_canvas_background',
+    description: 'Set an image as the full canvas background. The image fills the entire canvas (0,0 to canvasW,canvasH). Use after generate_image to place the result as background. Pass the image_url returned by generate_image.',
+    parameters: {
+        type: 'object',
+        properties: {
+            image_url: { type: 'string', description: 'Data URL of the image (from generate_image result)' },
+        },
+        required: ['image_url'],
+    },
+    category: 'create',
+};
+
+const add_image_layer: ToolDefinition = {
+    name: 'add_image_layer',
+    description: 'Add an image as a new layer at a specific position and size. Use for product images, logos, or decorative elements — NOT for backgrounds (use set_canvas_background for that).',
+    parameters: {
+        type: 'object',
+        properties: {
+            image_url: { type: 'string', description: 'Data URL of the image (from generate_image result)' },
+            x: { type: 'number', description: 'X position (left edge)', default: 0 },
+            y: { type: 'number', description: 'Y position (top edge)', default: 0 },
+            w: { type: 'number', description: 'Width in pixels. Omit to auto-size.' },
+            h: { type: 'number', description: 'Height in pixels. Omit to auto-size.' },
+            name: { type: 'string', description: 'Layer name for identification', default: 'image' },
+        },
+        required: ['image_url'],
+    },
+    category: 'create',
+};
+
+// ── Full Design Pipeline (Meta-Tool) ──────────────
+
+const generate_full_design: ToolDefinition = {
+    name: 'generate_full_design',
+    description: 'Generate a complete creative design from scratch. This is a high-level tool that runs the full AI pipeline: color palette selection, layout template, copy generation, and element rendering. Use this when the user wants to create an entirely NEW design (e.g. "create a nike ad", "design a summer sale banner"). For modifications to existing designs, use individual tools instead.',
+    parameters: {
+        type: 'object',
+        properties: {
+            prompt: { type: 'string', description: 'Full design brief describing what to create' },
+        },
+        required: ['prompt'],
+    },
+    category: 'compound',
+};
+
 export const ALL_TOOLS: ToolDefinition[] = [
     // Create
     add_rect, add_rounded_rect, add_ellipse, add_gradient_rect,
@@ -543,6 +610,10 @@ export const ALL_TOOLS: ToolDefinition[] = [
     undo_action, redo_action,
     // Compound
     create_layout, animate_all, analyze_scene, render_banner,
+    // Image Generation (Atomic)
+    generate_image, set_canvas_background, add_image_layer,
+    // Full Design Pipeline
+    generate_full_design,
     // Dashboard (app-level)
     ...DASHBOARD_TOOLS,
 ];
