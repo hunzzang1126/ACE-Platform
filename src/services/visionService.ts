@@ -172,15 +172,26 @@ export interface CaptureOptions {
  */
 export function captureCanvas(options: CaptureOptions = {}): string | null {
     const {
-        selector = '.ed-artboard canvas',
+        // Fabric.js renders to canvas.lower-canvas inside .ed-canvas-area
+        selector = '.ed-canvas-area canvas.lower-canvas',
         maxDimension = 1024,
         format = 'image/png',
         quality = 0.92,
     } = options;
 
-    const canvasEl = document.querySelector(selector) as HTMLCanvasElement | null;
+    // Try primary selector, then broader fallbacks
+    let canvasEl = document.querySelector(selector) as HTMLCanvasElement | null;
+
     if (!canvasEl || !(canvasEl instanceof HTMLCanvasElement)) {
-        console.warn(`[Vision] Canvas not found: "${selector}"`);
+        // Fallback 1: any canvas inside the canvas area
+        canvasEl = document.querySelector('.ed-canvas-area canvas') as HTMLCanvasElement | null;
+    }
+    if (!canvasEl || !(canvasEl instanceof HTMLCanvasElement)) {
+        // Fallback 2: canvas inside canvas-container (Fabric.js wraps in this)
+        canvasEl = document.querySelector('.canvas-container canvas') as HTMLCanvasElement | null;
+    }
+    if (!canvasEl || !(canvasEl instanceof HTMLCanvasElement)) {
+        console.warn(`[Vision] Canvas not found with selector "${selector}" or fallbacks`);
         return null;
     }
 
