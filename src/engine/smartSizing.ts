@@ -368,12 +368,87 @@ export function smartSizeElements(
         const newConstraints = smartReposition(el, masterW, masterH, targetW, targetH);
         const fontPatch = scaleFontSize(el, masterW, masterH, targetW, targetH);
 
-        return {
+        const adapted: DesignElement = {
             ...JSON.parse(JSON.stringify(el)),
             constraints: newConstraints,
             ...fontPatch,
         };
+
+        // ── Overflow prevention ──
+        return clampToCanvas(adapted, targetW, targetH);
     });
+}
+
+/**
+ * Clamp element to stay within canvas bounds.
+ * If element extends beyond canvas:
+ * 1. Shift position to fit
+ * 2. If still too large, shrink to fit
+ * 3. For text, reduce fontSize until it fits
+ */
+export function clampToCanvas(
+    element: DesignElement,
+    canvasW: number,
+    canvasH: number,
+    padding = 4,
+): DesignElement {
+    const resolved = resolveConstraints(element.constraints, canvasW, canvasH);
+    let { x, y, width: elW, height: elH } = resolved;
+
+    const role = detectElementRole(element, canvasW, canvasH);
+    // Background is allowed to fill entire canvas
+    if (role === 'background') return element;
+
+    let modified = false;
+
+    // 1. Shift to fit (prefer moving over shrinking)
+    if (x < padding) { x = padding; modified = true; }
+    if (y < padding) { y = padding; modified = true; }
+    if (x + elW > canvasW - padding) {
+        x = Math.max(padding, canvasW - padding - elW);
+        modified = true;
+    }
+    if (y + elH > canvasH - padding) {
+        y = Math.max(padding, canvasH - padding - elH);
+        modified = true;
+    }
+
+    // 2. If still overflowing, shrink to fit
+    if (x + elW > canvasW - padding) {
+        elW = canvasW - padding - x;
+        modified = true;
+    }
+    if (y + elH > canvasH - padding) {
+        elH = canvasH - padding - y;
+        modified = true;
+    }
+
+    // Minimum visible area enforcement
+    const MIN_SIZE = 10;
+    elW = Math.max(MIN_SIZE, elW);
+    elH = Math.max(MIN_SIZE, elH);
+
+    if (!modified) return element;
+
+    // 3. For text, auto-shrink fontSize if element was shrunk significantly
+    const scaleFactor = Math.min(elW / resolved.width, elH / resolved.height);
+    const elFontSize = (element as any).fontSize as number | undefined;
+    let newFontSize = elFontSize;
+    if ((element.type === 'text' || element.type === 'button') && elFontSize && scaleFactor < 0.9) {
+        const MIN_FONT = 8;
+        newFontSize = Math.max(MIN_FONT, Math.round(elFontSize * scaleFactor));
+    }
+
+    return {
+        ...element,
+        constraints: {
+            ...element.constraints,
+            horizontal: { anchor: 'left' as const, offset: Math.round(x) },
+            vertical: { anchor: 'top' as const, offset: Math.round(y) },
+            size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width: Math.round(elW), height: Math.round(elH) },
+        },
+        ...(newFontSize !== elFontSize ? { fontSize: newFontSize } : {}),
+    };
 }
 
 // ── Multi-Master Architecture (P3) ──────────────────────
