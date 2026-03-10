@@ -27,14 +27,47 @@ function buildPlannerSystemPrompt(
     const groupType = classifyMasterGroup(canvasW, canvasH);
     const groupDesc = getMasterGroupDescriptions()[groupType];
 
-    // Available create tools (so planner knows what executor can do)
+    // Available tools — planner needs ALL categories for iterative refinement
+    // (not just create — modify/structure tools are essential for "vibe designing")
     const createSchemas = getToolSchemasByCategory('create');
-    const toolList = createSchemas.map(t => `  - ${t.name}: ${t.description}`).join('\n');
+    const modifySchemas = getToolSchemasByCategory('modify');
+    const structureSchemas = getToolSchemasByCategory('structure');
+    const analyzeSchemas = getToolSchemasByCategory('analyze');
+
+    const createToolList = createSchemas.map(t => `  - ${t.name}: ${t.description}`).join('\n');
+    const modifyToolList = modifySchemas.map(t => `  - ${t.name}: ${t.description}`).join('\n');
+    const structureToolList = structureSchemas.map(t => `  - ${t.name}: ${t.description}`).join('\n');
+    const analyzeToolList = analyzeSchemas.map(t => `  - ${t.name}: ${t.description}`).join('\n');
 
     const brandContext = brandKit ? buildBrandContextForPlanner(brandKit) : '';
 
-    const existingElements = sceneGraph && sceneGraph.elements.length > 0
-        ? `\nEXISTING ELEMENTS ON CANVAS:\n${sceneGraph.elements.map(e => `  - "${e.name}" (${e.type}) at (${e.bounds.x},${e.bounds.y}) ${e.bounds.w}x${e.bounds.h}`).join('\n')}`
+    // Detect refinement mode: existing elements = iterative design session
+    const isRefinement = sceneGraph && sceneGraph.elements.length > 0;
+
+    const existingElements = isRefinement
+        ? `\nEXISTING ELEMENTS ON CANVAS (${sceneGraph.elements.length} elements):\n${sceneGraph.elements.map(e => {
+            const details = [
+                `"${e.name}" (${e.type})`,
+                `at (${e.bounds.x},${e.bounds.y}) ${e.bounds.w}x${e.bounds.h}`,
+                e.style.fill ? `fill:${e.style.fill}` : '',
+                e.style.fontSize ? `font:${e.style.fontSize}px` : '',
+            ].filter(Boolean).join(' ');
+            return `  - ${details}`;
+        }).join('\n')}`
+        : '';
+
+    const refinementInstructions = isRefinement
+        ? `
+REFINEMENT MODE — You are iterating on an existing design.
+- PREFER modify tools (setFill, setFont, setText, moveNode, resizeNode) over creating new elements
+- Only add NEW elements if the user explicitly asks for them
+- Keep the overall composition intact unless the user asks for a new layout
+- When the user says "make it bolder" → increase font weight/size on existing text
+- When "change to dark mode" → update background fill + adjust text colors for contrast
+- When "more minimal" → remove/hide elements, increase whitespace, simplify
+- When "add a CTA" → create a new button element, position it in the CTA zone
+- ALWAYS explain what you changed and why in the "reasoning" field
+`
         : '';
 
     // Banner Design Intelligence (Pencil-inspired style guide)
@@ -51,10 +84,22 @@ LAYOUT ZONES (${ratio}):
   Image: x(${zones.image.x}%-${zones.image.x + zones.image.w}%), y(${zones.image.y}%-${zones.image.y + zones.image.h}%)
   CTA: x(${zones.cta.x}%-${zones.cta.x + zones.cta.w}%), y(${zones.cta.y}%-${zones.cta.y + zones.cta.h}%)
 
-AVAILABLE TOOLS FOR EXECUTOR:
-${toolList}
+AVAILABLE TOOLS:
+
+CREATE (add new elements):
+${createToolList}
+
+MODIFY (change existing elements):
+${modifyToolList}
+
+STRUCTURE (organize/delete):
+${structureToolList}
+
+ANALYZE (inspect design):
+${analyzeToolList}
 ${brandContext}
 ${existingElements}
+${refinementInstructions}
 
 INSTRUCTIONS:
 - Follow the BANNER DESIGN INTELLIGENCE rules above precisely
