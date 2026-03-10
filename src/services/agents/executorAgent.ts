@@ -6,7 +6,8 @@
 // Returns: Array of ToolResults
 // ─────────────────────────────────────────────────
 
-import { executeTool } from '@/services/toolRegistry';
+import { executeTool, executeBatch } from '@/services/toolRegistry';
+import type { BatchOperation, BatchResult } from '@/services/toolRegistry';
 import type { ToolContext, ToolResult } from '@/services/tools/toolTypes';
 import type { DesignPlan, ProgressCallback } from './agentTypes';
 
@@ -26,6 +27,7 @@ export async function runExecutor(
         if (signal.aborted) break;
 
         const planned = plan.elements[i];
+        if (!planned) continue;
         onProgress?.(`[${i + 1}/${plan.elements.length}] ${planned.tool}...`, 'executor');
 
         const result = await executeTool(planned.tool, planned.params, ctx);
@@ -45,6 +47,41 @@ export async function runExecutor(
     );
 
     return results;
+}
+
+// ── Batch Executor (Pencil-inspired) ──
+// Processes all elements in a plan as a single batch operation.
+// This is the preferred execution mode: fewer round-trips, atomic.
+
+export async function runBatchExecutor(
+    plan: DesignPlan,
+    ctx: ToolContext,
+    signal: AbortSignal,
+    onProgress?: ProgressCallback,
+): Promise<BatchResult> {
+    onProgress?.(`Batch executing ${plan.elements.length} design elements...`, 'executor');
+
+    const operations: BatchOperation[] = plan.elements.map(el => ({
+        tool: el.tool,
+        params: el.params,
+        label: el.role ?? el.type ?? el.tool,
+    }));
+
+    if (signal.aborted) {
+        return {
+            success: false, totalOps: 0, succeeded: 0, failed: 0,
+            results: [], message: 'Aborted before execution',
+        };
+    }
+
+    const batchResult = await executeBatch(operations, ctx);
+
+    onProgress?.(
+        `Batch complete: ${batchResult.succeeded}/${batchResult.totalOps} succeeded`,
+        'executor',
+    );
+
+    return batchResult;
 }
 
 // ── Apply Critic Fix Patches ──

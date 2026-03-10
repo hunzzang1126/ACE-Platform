@@ -70,6 +70,67 @@ export async function executeTool(
     }
 }
 
+// ── Batch Execution (Pencil-inspired) ──
+
+export interface BatchOperation {
+    tool: string;
+    params: Record<string, unknown>;
+    label?: string; // optional human-readable label (e.g., "background", "headline")
+}
+
+export interface BatchResult {
+    success: boolean;
+    totalOps: number;
+    succeeded: number;
+    failed: number;
+    results: Array<ToolResult & { tool: string; label?: string }>;
+    message: string;
+}
+
+/** Max operations per batch (Pencil uses 25) */
+const MAX_BATCH_OPS = 25;
+
+/**
+ * Execute multiple tool operations atomically.
+ * Pencil.dev's `batch_design` does up to 25 insert/update/delete/copy
+ * operations in a single call. We mirror this: the AI plans all operations
+ * in one JSON block, and we execute them sequentially in one batch.
+ *
+ * @param operations - Array of {tool, params} objects (max 25)
+ * @param ctx - Tool context (store references, canvas state)
+ * @returns Aggregated batch result with per-operation details
+ */
+export async function executeBatch(
+    operations: BatchOperation[],
+    ctx: ToolContext,
+): Promise<BatchResult> {
+    const ops = operations.slice(0, MAX_BATCH_OPS);
+    const results: BatchResult['results'] = [];
+
+    for (const op of ops) {
+        const result = await executeTool(op.tool, op.params, ctx);
+        results.push({ ...result, tool: op.tool, label: op.label });
+    }
+
+    const succeeded = results.filter(r => r.success).length;
+    const failed = results.filter(r => !r.success).length;
+    const failedDetails = results
+        .filter(r => !r.success)
+        .map(r => `${r.label ?? r.tool}: ${r.message}`)
+        .join('; ');
+
+    return {
+        success: failed === 0,
+        totalOps: ops.length,
+        succeeded,
+        failed,
+        results,
+        message: failed === 0
+            ? `All ${succeeded} operations completed successfully.`
+            : `${succeeded}/${ops.length} succeeded. Failures: ${failedDetails}`,
+    };
+}
+
 // ── Info ──
 
 /** Get tool count summary */
