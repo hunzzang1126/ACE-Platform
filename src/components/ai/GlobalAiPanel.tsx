@@ -32,7 +32,6 @@ const INTENT_LABELS: Record<AgentIntent, string> = {
 const QUICK_ACTIONS = [
     { id: 'generate', label: 'Generate', hint: 'Create a new design from a prompt' },
     { id: 'scan', label: 'Scan Design', hint: 'Drop a screenshot to recreate' },
-    { id: 'check', label: 'Smart Check', hint: 'Vision QA on current canvas' },
 ] as const;
 
 // ── Component ────────────────────────────────────

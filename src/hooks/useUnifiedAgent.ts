@@ -100,6 +100,16 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const engineRef = useRef<any>(null);
 
+    // ── Narration — Pencil-style live explanation ─
+    // Pushes conversational messages that explain what the AI is about to do
+    const narrate = useCallback((text: string) => {
+        setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: text,
+            timestamp: Date.now(),
+        }]);
+    }, []);
+
     // ── Progress card helpers ────────────────────
     const addCard = useCallback((id: string, label: string, status: ProgressCard['status'] = 'running') => {
         setState(prev => ({
@@ -151,6 +161,8 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         const engine = engineRef.current?.current ?? engineRef.current;
         if (!engine) throw new Error('Canvas not connected.');
 
+        // Phase 1: Context — narrate what we're doing
+        narrate(`I'll create this design for you. Let me start by reading the canvas context and selecting the right style.`);
         addCard('context', 'Reading canvas context', 'running');
         let elementCount = 0;
         try {
@@ -160,8 +172,12 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         } catch { /* ok */ }
         updateCard('context', 'done', `${elementCount} elements found`);
 
-        addCard('design', 'Generating design layout', 'running');
-        // Service-level imports (not hooks)
+        // Phase 2: Style selection — let the user know
+        const { selectStyleGuide } = await import('@/services/designStyleGuides');
+        const guide = selectStyleGuide(prompt);
+        narrate(`Selected "${guide.name}" style guide — ${guide.description.split('.')[0]}. Now generating the layered composition.`);
+
+        addCard('design', 'Generating layered composition', 'running');
         const { callFromScratch } = await import('@/services/autoDesignService');
         const { runVisionLoop } = await import('@/services/autoDesignLoop');
 
@@ -182,19 +198,18 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         const result = await callFromScratch(prompt, canvasW, canvasH, abort.signal, fewShotStr);
         updateCard('design', 'done', `${result.elements.length} elements planned`);
 
-        // Render elements with live cursor animation
+        // Phase 3: Render — narrate the placement
+        narrate(`Got ${result.elements.length} elements across 4 layers. Now placing them on the canvas.`);
         addCard('render', 'Placing elements on canvas', 'running');
         try { engine.clear_scene?.(); } catch { /* ok */ }
 
-        // Inline render — each element type handled directly
+        // Inline render with live cursor animation
         let rendered = 0;
         for (const el of result.elements) {
-            // Animate cursor to element position
             moveCursor(el.x ?? 0, el.y ?? 0, el.name);
-            await new Promise(r => setTimeout(r, 150)); // brief pause for animation
+            await new Promise(r => setTimeout(r, 150));
 
             try {
-                // Render via engine — simplified version
                 if (el.type === 'text') {
                     const hexToRgb = (hex: string): [number, number, number] => {
                         const c = hex.replace('#', '');
@@ -219,19 +234,22 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         hideCursor();
         updateCard('render', 'done', `${rendered} elements placed`);
 
-        // Vision QA loop
+        // Phase 4: Vision QA — narrate the quality check
+        narrate(`All ${rendered} elements placed. Let me run a quick vision quality check to make sure everything looks right.`);
         addCard('vision', 'Vision quality review', 'running');
         try {
             const loopResult = await runVisionLoop(engine, canvasW, canvasH, abort.signal, (msg) => {
                 updateCard('vision', 'running', msg);
             });
             updateCard('vision', 'done', `Score: ${loopResult.finalScore}/100`);
+            narrate(`Design complete — vision score ${loopResult.finalScore}/100. The ${guide.name} palette was applied with ${rendered} layered elements. Let me know if you'd like to refine anything.`);
         } catch {
             updateCard('vision', 'done', 'Vision check skipped');
+            narrate(`Design complete with ${rendered} elements using the ${guide.name} palette. Let me know if you'd like to refine anything.`);
         }
 
         return `Design generated with ${rendered} elements.`;
-    }, [addCard, updateCard, moveCursor, hideCursor]);
+    }, [addCard, updateCard, moveCursor, hideCursor, narrate]);
 
     // ── Scan Design (via screenshotScanService) ──
     const runScanFlow = useCallback(async (imageData: string) => {
@@ -244,11 +262,13 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
             if (dims) { canvasW = dims.width ?? 300; canvasH = dims.height ?? 250; }
         } catch { /* ok */ }
 
+        narrate('I see your screenshot. Let me analyze it with Vision AI and extract the design layers.');
         addCard('scan', 'Analyzing screenshot with Vision AI', 'running');
         const { scanDesignScreenshot } = await import('@/services/screenshotScanService');
         const abort = new AbortController();
         const result = await scanDesignScreenshot(imageData, canvasW, canvasH, abort.signal);
         updateCard('scan', 'done', `Found ${result.elements.length} elements`);
+        narrate(`Found ${result.elements.length} elements in the design. Now rendering them as editable layers on your canvas.`);
 
         addCard('render', 'Rendering layers on canvas', 'running');
         try { engine.clear_scene?.(); } catch { /* ok */ }
@@ -281,9 +301,10 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         }
         hideCursor();
         updateCard('render', 'done', `${rendered} layers created`);
+        narrate(`Done — ${rendered} layers extracted and placed on canvas. Each layer is fully editable. You can select, move, resize, or restyle any element.`);
 
         return `Scanned design: ${rendered} layers extracted and placed on canvas.`;
-    }, [addCard, updateCard, moveCursor, hideCursor]);
+    }, [addCard, updateCard, moveCursor, hideCursor, narrate]);
 
     // ── Chat (regular AI agent) ──────────────────
     const runChatFlow = useCallback(async (msg: string, config: AiConfig) => {
@@ -309,6 +330,7 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
             designState.creativeSet?.masterVariantId,
         );
 
+        narrate('Let me look at the current canvas and work on your request.');
         addCard('thinking', 'Processing request', 'running');
 
         let hadError = '';

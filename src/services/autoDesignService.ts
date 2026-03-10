@@ -18,6 +18,7 @@
 
 import { callAnthropicApi, DEFAULT_CLAUDE_MODEL } from '@/services/anthropicClient';
 import { classifyRatio, LAYOUT_ZONES, classifyMasterGroup, getMasterGroupDescriptions } from '@/engine/smartSizing';
+import { selectStyleGuide, buildStylePromptForAI } from '@/services/designStyleGuides';
 
 // ── Shared Types ────────────────────────────────────
 
@@ -34,9 +35,9 @@ export interface RenderElement {
     a?: number;
     radius?: number;
     // Gradient (for rect/rounded_rect background)
-    gradient_start_hex?: string; // e.g. "#0a1628"
-    gradient_end_hex?: string;   // e.g. "#1a2e4a"
-    gradient_angle?: number;     // degrees: 0=top→bottom, 90=left→right, 135=diagonal
+    gradient_start_hex?: string;
+    gradient_end_hex?: string;
+    gradient_angle?: number;
     // Text
     content?: string;
     font_size?: number;
@@ -50,14 +51,13 @@ export interface RenderElement {
 }
 
 export interface RearrangePatch {
-    /** Must exactly match an existing layer __aceName */
     elementName: string;
     x?: number;
     y?: number;
     w?: number;
     h?: number;
     fontSize?: number;
-    fill?: string;  // hex #rrggbb
+    fill?: string;
 }
 
 export interface FromScratchResult {
@@ -68,18 +68,15 @@ export interface FromScratchResult {
 export interface AssetContextResult {
     mode: 'asset_context';
     patches: RearrangePatch[];
-    /** New text/shape elements to ADD (supplement existing assets) */
     additions?: RenderElement[];
 }
 
 export type AutoDesignResult = FromScratchResult | AssetContextResult;
 
-// ── Canvas element context (passed from hook) ─────────────
-
 export interface CanvasElementInfo {
     id: number;
     name: string;
-    type: string;  // 'text' | 'rect' | 'image' | 'video'
+    type: string;
     x: number;
     y: number;
     w: number;
@@ -90,7 +87,7 @@ export interface CanvasElementInfo {
 
 const RENDER_BANNER_TOOL = {
     name: 'render_banner',
-    description: 'Create a full banner ad layout from scratch. Define all visual elements.',
+    description: 'Create a professional creative layout with layered composition. Generate 8-15 elements across structure, content, action, and polish layers.',
     input_schema: {
         type: 'object',
         required: ['elements'],
@@ -101,7 +98,7 @@ const RENDER_BANNER_TOOL = {
                     type: 'object',
                     properties: {
                         type: { type: 'string', enum: ['rect', 'rounded_rect', 'ellipse', 'text'] },
-                        name: { type: 'string' },
+                        name: { type: 'string', description: 'Descriptive name: background, accent_bar, headline, subheadline, cta_button, cta_label, divider, tag_badge, brand_mark, etc.' },
                         x: { type: 'number' }, y: { type: 'number' },
                         w: { type: 'number' }, h: { type: 'number' },
                         r: { type: 'number' }, g: { type: 'number' },
@@ -112,11 +109,11 @@ const RENDER_BANNER_TOOL = {
                         font_weight: { type: 'string' },
                         color_hex: { type: 'string' },
                         text_align: { type: 'string' },
-                        letter_spacing: { type: 'number', description: 'Letter spacing in px. -0.5 for headlines (tight), 0 for body, 1–4 for labels.' },
-                        line_height: { type: 'number', description: 'Line height multiplier. 1.0–1.2 for headlines, 1.4–1.6 for body text.' },
-                        gradient_start_hex: { type: 'string', description: 'Start color of linear gradient (hex). Use for background instead of r/g/b.' },
-                        gradient_end_hex: { type: 'string', description: 'End color of linear gradient (hex). Pair with gradient_start_hex.' },
-                        gradient_angle: { type: 'number', description: 'Gradient angle in degrees. 0=top→bottom, 90=left→right, 135=diagonal.' },
+                        letter_spacing: { type: 'number', description: 'px. Tight for headlines (-0.5 to -1.5), wide for labels (+1 to +3).' },
+                        line_height: { type: 'number', description: 'Multiplier. 1.0–1.15 headlines, 1.3–1.6 body.' },
+                        gradient_start_hex: { type: 'string' },
+                        gradient_end_hex: { type: 'string' },
+                        gradient_angle: { type: 'number' },
                     },
                 },
             },
@@ -126,34 +123,27 @@ const RENDER_BANNER_TOOL = {
 
 const REARRANGE_BANNER_TOOL = {
     name: 'rearrange_banner',
-    description: [
-        'Reorganize existing banner elements into a polished, professional layout.',
-        'You can move, resize, recolor existing elements.',
-        'You can also ADD new text/shape elements to fill gaps.',
-        'Do NOT reference elements that do not exist in the provided list.',
-    ].join(' '),
+    description: 'Reorganize existing elements into a polished layout. Move, resize, recolor existing elements and add new ones.',
     input_schema: {
         type: 'object',
         required: ['patches'],
         properties: {
             patches: {
                 type: 'array',
-                description: 'Changes to existing elements.',
                 items: {
                     type: 'object',
                     required: ['elementName'],
                     properties: {
-                        elementName: { type: 'string', description: 'Exact layer name from the list.' },
+                        elementName: { type: 'string' },
                         x: { type: 'number' }, y: { type: 'number' },
                         w: { type: 'number' }, h: { type: 'number' },
                         fontSize: { type: 'number' },
-                        fill: { type: 'string', description: 'Hex color e.g. #ff6600' },
+                        fill: { type: 'string' },
                     },
                 },
             },
             additions: {
                 type: 'array',
-                description: 'New elements to add (text labels, CTA buttons, decorative shapes).',
                 items: {
                     type: 'object',
                     properties: {
@@ -169,8 +159,8 @@ const REARRANGE_BANNER_TOOL = {
                         font_weight: { type: 'string' },
                         color_hex: { type: 'string' },
                         text_align: { type: 'string' },
-                        letter_spacing: { type: 'number', description: 'Letter spacing in px. -0.5 for headlines (tight), 0 for body, 1–4 for labels.' },
-                        line_height: { type: 'number', description: 'Line height multiplier. 1.0–1.2 for headlines, 1.4–1.6 for body text.' },
+                        letter_spacing: { type: 'number' },
+                        line_height: { type: 'number' },
                     },
                 },
             },
@@ -178,171 +168,146 @@ const REARRANGE_BANNER_TOOL = {
     },
 };
 
-// ── System Prompts ────────────────────────────────────────
-
-// ── Personality Detection ─────────────────────────────────
-type DesignPersonality = 'financial' | 'sports' | 'health' | 'tech' | 'retail' | 'lifestyle';
-
-function detectPersonality(prompt: string): DesignPersonality {
-    const p = prompt.toLowerCase();
-    if (/finance|bank|invest|insurance|legal|law|wealth|asset|fund|mortgage/.test(p)) return 'financial';
-    if (/shoe|sport|run|gym|athletic|nike|adidas|fitness|workout|energy/.test(p)) return 'sports';
-    if (/health|medical|doctor|wellness|clinic|care|pharma|hospital/.test(p)) return 'health';
-    if (/tech|saas|app|software|cloud|ai|startup|digital|devops|api/.test(p)) return 'tech';
-    if (/sale|shop|off|discount|buy|deal|promo|retail|fashion|store/.test(p)) return 'retail';
-    return 'lifestyle';
-}
-
-const PERSONALITY_RULES: Record<DesignPersonality, string> = {
-    financial: `
-PERSONALITY: FINANCIAL / PROFESSIONAL
-  - Background: dark navy (#0a1628), deep charcoal (#1a1a2e), or midnight blue — NEVER bright/saturated
-  - Accent: gold (#c9a84c), muted gold (#b8943f), or steel blue (#4a7fa5)
-  - Typography: clean geometric sans, normal-regular weight hierarchy, generous letter-spacing (1-2px on labels)
-  - Layout: balanced symmetry, generous padding, MINIMAL clutter — max 4 elements per zone
-  - Tone: STATIC, authoritative, trustworthy — NO dynamic shapes, NO playful elements`,
-    sports: `
-PERSONALITY: SPORTS / DYNAMIC
-  - Background: deep black (#0a0a0a) or dark charcoal with bold accent
-  - Accent: electric orange (#ff4500), bright red (#e60023), or neon yellow (#ffd700)
-  - Typography: HEAVY weight (800-900), TIGHT letter-spacing (-1 to -2px for headline), condensed feel
-  - Headline: ALL CAPS, maximum impact, font_size should be LARGE (canvas_h × 0.14-0.16)
-  - Layout: asymmetric energy — text aligned left or right, CTA on opposite side
-  - Tone: DYNAMIC, high-energy, bold contrasts`,
-    health: `
-PERSONALITY: HEALTH / WELLNESS
-  - Background: clean white (#ffffff), soft mint (#f0f9f0), or light blue (#e8f4fd)
-  - Accent: fresh green (#2ecc71) or calm teal (#17a589)
-  - Typography: light-regular weight, open tracking (+0.5 to +1px), airy spacing
-  - Layout: centered, breathing room between elements, not cramped
-  - Tone: CALM, trustworthy, clean — NO hard shadows, NO sharp contrasts`,
-    tech: `
-PERSONALITY: TECH / SAAS
-  - Background: dark (#0d1117) or very dark blue (#0a0e1a)
-  - Accent: electric blue (#007aff), cyan (#00d4ff), or purple (#6c5ce7)
-  - Typography: geometric mono-influenced sans, medium weight, normal tracking
-  - CTA button: bright accent on dark — high contrast, crisp corners or small radius
-  - Layout: grid-aligned, tight, precise
-  - Tone: MODERN, precise, data-forward`,
-    retail: `
-PERSONALITY: RETAIL / PROMOTIONAL
-  - Background: SATURATED primary or bold contrast (bright red, electric blue, etc.)
-  - Accent: bright complementary — yellow on red, white on navy
-  - Typography: BOLD, condensed or heavy weight, LARGE discount numbers
-  - Sale numbers / percentages: make them ENORMOUS (font_size = canvas_h × 0.20-0.25)
-  - Layout: DENSE, urgency-driven — CTA prominent and large
-  - Tone: URGENT, high-energy, promotional`,
-    lifestyle: `
-PERSONALITY: LIFESTYLE / BRAND
-  - Background: warm neutrals, soft gradients, elegant darks
-  - Accent: warm tones (#e8b86d, #c4956a) or vibrant brand color
-  - Typography: elegant weight progression, balanced spacing
-  - Layout: centered or split, visually balanced
-  - Tone: ASPIRATIONAL, premium, stylish`,
-};
+// ── From-Scratch Prompt — Hierarchical Composition ────────
 
 function buildFromScratchPrompt(canvasW: number, canvasH: number, userPrompt: string): string {
     const ratio = classifyRatio(canvasW, canvasH);
     const zones = LAYOUT_ZONES[ratio];
-    const personality = detectPersonality(userPrompt);
-    const personalityRule = PERSONALITY_RULES[personality];
-
-    // Multi-Master: classify which layout group this canvas belongs to
     const masterGroup = classifyMasterGroup(canvasW, canvasH);
     const groupDescriptions = getMasterGroupDescriptions();
     const masterGroupDesc = groupDescriptions[masterGroup];
 
-    // Compute exact pixel positions for each element from zone percentages
-    const bgX = 0, bgY = 0, bgW = canvasW, bgH = canvasH;
-    const hlX = Math.round(zones.headline.x * canvasW);
-    const hlY = Math.round(zones.headline.y * canvasH);
-    const hlW = Math.round(zones.headline.w * canvasW);
-    const subY = Math.round(hlY + canvasH * 0.14); // subheadline always 14% below headline start
-    const ctaX = Math.round(zones.cta.x * canvasW);
-    const ctaY = Math.round(zones.cta.y * canvasH);
-    const ctaW = Math.round(zones.cta.w * canvasW);
-    const ctaH = Math.round(zones.cta.h * canvasH);
-    const ctaLabelY = ctaY + Math.round(ctaH * 0.22);
-
-    // Font sizes scaled to canvas — strict hierarchy
-    const hlFont = Math.max(18, Math.round(canvasH * 0.12));
-    const subFont = Math.round(hlFont * 0.58);   // 58% of headline
-    const bodyFont = Math.round(hlFont * 0.44);  // 44% of headline
-    const ctaFont = Math.round(hlFont * 0.55);   // 55% of headline
+    // Style guide auto-selection
+    const guide = selectStyleGuide(userPrompt);
+    const stylePrompt = buildStylePromptForAI(guide, canvasW, canvasH);
 
     // Layout descriptions per ratio
-    const descriptions: Record<string, string> = {
-        'ultra-wide': 'Horizontal strip: text LEFT HALF, CTA button RIGHT EDGE.',
-        'wide': 'Two-section: headline LEFT/CENTER, CTA RIGHT side.',
-        'landscape': 'Standard banner: headline top-center, CTA button bottom-center.',
-        'square': 'Social post: everything CENTER-ALIGNED horizontally.',
-        'portrait': 'Vertical: headline UPPER MIDDLE, subheadline below, CTA near BOTTOM.',
-        'ultra-tall': 'Skyscraper: stacked top-to-bottom, all center-aligned.',
+    const layoutHints: Record<string, string> = {
+        'ultra-wide': 'Horizontal strip. Content flows LEFT to RIGHT. Text left 55%, CTA right edge. Single headline line.',
+        'wide': 'Wide landscape. Two zones: content left/center, CTA right. Keep text compact.',
+        'landscape': 'Standard rectangle. Headline upper-center, supporting text mid, CTA bottom-center.',
+        'square': 'Social format. CENTER everything. Bold headline dominates. CTA bottom third.',
+        'portrait': 'Vertical flow. TOP-DOWN reading: headline upper, supporting mid, CTA bottom quarter.',
+        'ultra-tall': 'Skyscraper. Strict vertical stack. All center-aligned. Generous spacing between zones.',
     };
-    const desc = descriptions[ratio] ?? 'Balanced layout.';
 
-    return `You are a senior banner ad designer producing ${canvasW}×${canvasH}px ads.
-Layout format: ${ratio}. ${desc}
-${personalityRule}
+    // Zone positions as percentages for AI guidance (not rigid pixels)
+    const safe = guide.spacing.safe;
+    const contentStart = { x: Math.round(zones.headline.x * canvasW), y: Math.round(zones.headline.y * canvasH) };
+    const contentW = Math.round(zones.headline.w * canvasW);
+    const ctaZone = {
+        x: Math.round(zones.cta.x * canvasW),
+        y: Math.round(zones.cta.y * canvasH),
+        w: Math.round(zones.cta.w * canvasW),
+        h: Math.round(zones.cta.h * canvasH),
+    };
 
+    // Font sizes from style guide
+    const minDim = Math.min(canvasW, canvasH);
+    const fonts = {
+        hero: Math.max(18, Math.round(minDim * guide.typography.scale.hero)),
+        headline: Math.max(16, Math.round(minDim * guide.typography.scale.headline)),
+        title: Math.max(14, Math.round(minDim * guide.typography.scale.title)),
+        body: Math.max(11, Math.round(minDim * guide.typography.scale.body)),
+        caption: Math.max(9, Math.round(minDim * guide.typography.scale.caption)),
+    };
+
+    return `You are a world-class creative director at a premium design agency.
+You produce ${canvasW}x${canvasH}px creatives that rival Apple, Airbnb, and Nike quality.
+
+Canvas: ${canvasW}x${canvasH}px (${ratio} format)
+${layoutHints[ratio] ?? 'Balanced layout.'}
 ${masterGroupDesc}
 
-═══════════════════════════════════════════
-ABSOLUTE RULES — NEVER VIOLATE THESE:
-═══════════════════════════════════════════
+${stylePrompt}
 
-1. NO TEXT OVERLAP (most critical rule):
-   - Each text element's bounding box must NOT intersect with any other text element
-   - Minimum VERTICAL GAP between any two text layers: max(12, font_size × 0.3) px
-   - If placing subheadline would overlap headline: move subheadline DOWN until gap is clear
-   - NEVER place two text elements at the same Y coordinate
+═══════════════════════════════════════════════════
+DESIGN PRINCIPLES (Pencil-grade quality)
+═══════════════════════════════════════════════════
 
-2. VISUAL HIERARCHY (never use same size for two levels):
-   - Headline: font_size=${hlFont}px, font_weight="800" or "900", letter_spacing=-0.5
-   - Subheadline: font_size=${subFont}px, font_weight="400"–"500", letter_spacing=0
-   - Body copy (if any): font_size=${bodyFont}px, font_weight="400"
-   - CTA label: font_size=${ctaFont}px, font_weight="700", text_align="center", ALL CAPS
+DOMINANT REGION RULE:
+  One area of the design must visually dominate. The headline is your focal point.
+  All other elements are subordinate. Avoid equal-weight layouts.
 
-3. GRADIENT BACKGROUND (preferred over flat color):
-   - Use gradient_start_hex + gradient_end_hex for the background
-   - Choose two colors 20-40 lightness units apart — NOT identical, NOT clashing
-   - gradient_angle: 135 for diagonal, 180 for top→bottom, 90 for left→right
+SPATIAL LOGIC:
+  Use ONE dominant axis (horizontal for wide, vertical for tall).
+  Prefer two structural zones before three. Let whitespace create separation.
+  Structure over ornament — every element must serve a purpose.
 
-4. ELEMENT LIMITS — generate EXACTLY 5 elements in this order:
-   [0] background (rect with gradient or solid)
-   [1] headline (text)
-   [2] subheadline (text) — MUST be positioned below headline with gap
-   [3] cta_button (rounded_rect)
-   [4] cta_label (text centered on cta_button)
+VISUAL HIERARCHY:
+  Size + weight + color establish importance: Headline > Subheadline > Body > CTA label.
+  Never use the same font size for two different hierarchy levels.
 
-═══════════════════════════════════════════
-REQUIRED POSITIONS (calculated for ${canvasW}×${canvasH}):
-═══════════════════════════════════════════
+CONSTRAINT OVER DECORATION:
+  If an element does not support understanding, decision-making, or action, remove it.
+  But DO add elements that create depth and visual richness (accent bars, subtle shapes).
 
-[0] background
-    type="rect", x=${bgX}, y=${bgY}, w=${bgW}, h=${bgH}
-    name="background"
-    → Choose brand-appropriate colors based on personality above
+═══════════════════════════════════════════════════
+LAYERED COMPOSITION — Generate 8-15 elements in this order:
+═══════════════════════════════════════════════════
 
-[1] headline
-    type="text", x=${hlX}, y=${hlY}, w=${hlW}
-    name="headline", font_size=${hlFont}, font_weight="800"
-    → Write the MAIN message from the prompt (impactful, short)
+LAYER 1: STRUCTURE (2-3 elements)
+  [background]  Full canvas rect with gradient. Use style guide gradient colors.
+                x=0, y=0, w=${canvasW}, h=${canvasH}, name="background"
+  [accent_zone] A secondary rect creating depth. Examples:
+                - Darker/lighter rectangle covering 30-50% of canvas
+                - Subtle gradient overlay on one side
+                - Semi-transparent panel behind text area (a=0.3-0.5)
+                name="accent_zone"
 
-[2] subheadline  
-    type="text", x=${hlX}, y=${subY}, w=${hlW}
-    name="subheadline", font_size=${subFont}, font_weight="400"
-    ⚠ VERIFY: y=${subY} must be at least ${Math.round(hlFont * 1.3 + 12)}px below headline y=${hlY}. If not, adjust DOWN.
+LAYER 2: CONTENT (3-4 elements)
+  [headline]    The dominant text. MUST be the largest, boldest element.
+                Font: ${fonts.hero}px, weight="${guide.typography.weights.bold}", "${guide.typography.primaryFont}"
+                Color: ${guide.colors.foreground}
+                Position: around x=${contentStart.x}, y=${contentStart.y}, w=${contentW}
+                Letter spacing: ${guide.typography.letterSpacing.tight}px
+                name="headline"
+  [subheadline] Supporting text BELOW headline with clear gap (min ${Math.round(fonts.hero * 0.4)}px).
+                Font: ${fonts.body}px, weight="${guide.typography.weights.normal}", "${guide.typography.secondaryFont}"
+                Color: ${guide.colors.secondary}
+                name="subheadline"
+  [body_text]   Optional extra detail (1 short line). Only if canvas has room.
+                Font: ${fonts.caption}px, color: ${guide.colors.tertiary}
+                name="body_text" (skip if canvas < 200px in any dimension)
 
-[3] cta_button
-    type="rounded_rect", x=${ctaX}, y=${ctaY}, w=${ctaW}, h=${ctaH}, radius=8
-    name="cta_button"
-    → High contrast to background — this is the action element
+LAYER 3: ACTION (2-3 elements)
+  [cta_button]  Rounded rect button. MUST contrast strongly with background.
+                Background: ${guide.colors.accent}, radius=${guide.radius}
+                Position: around x=${ctaZone.x}, y=${ctaZone.y}, w=${ctaZone.w}, h=${ctaZone.h}
+                name="cta_button"
+  [cta_label]   Text centered on cta_button. ALL CAPS.
+                Font: ${fonts.title}px, weight="${guide.typography.weights.semibold}"
+                Color: ${guide.colors.accentForeground}
+                Vertically centered inside button
+                name="cta_label"
 
-[4] cta_label
-    type="text", x=${ctaX}, y=${ctaLabelY}, w=${ctaW}
-    name="cta_label", font_size=${ctaFont}, font_weight="700", text_align="center"
-    → SHORT action phrase: "SHOP NOW", "GET STARTED", "LEARN MORE" etc.
+LAYER 4: POLISH (2-4 elements — these create "premium" feel)
+  [accent_line] Thin accent bar (2-4px height or width) in accent color.
+                Place near headline or between content zones as a visual separator.
+                name="accent_line"
+  [tag_badge]   Small label like "NEW", "LIMITED", "2024" — uppercase, tiny font.
+                Rect with text overlay. Font: ${fonts.caption}px, weight="700"
+                Background: ${guide.colors.accent}, text: ${guide.colors.accentForeground}
+                Position: above headline or top corner.
+                name="tag_badge", tag text name="tag_text"
+  [decorative]  ONE subtle geometric shape: small circle, thin line, or corner accent.
+                Low opacity (a=0.05-0.15). Creates depth without clutter.
+                name="decorative_shape" (skip if canvas is very small)
+
+═══════════════════════════════════════════════════
+ABSOLUTE RULES — NEVER VIOLATE:
+═══════════════════════════════════════════════════
+
+1. NO TEXT OVERLAP — Every text bounding box must have min ${Math.max(8, Math.round(fonts.body * 0.5))}px gap from all other text
+2. ALL elements within canvas bounds: x >= 0, y >= 0, x+w <= ${canvasW}, y+h <= ${canvasH}
+3. Minimum ${safe}px from canvas edges for all text elements
+4. CTA text MUST be centered on CTA button (same x, same w, y vertically centered)
+5. Use ONLY colors from the style guide palette above — do NOT invent colors
+6. Element names must be unique and descriptive
+7. Elements ordered by z-index: background first, decorative last
+
+User prompt: "${userPrompt}"
+Write SHORT, impactful ad copy. No lorem ipsum. Real creative content.
 
 Return ONLY the render_banner tool call. No explanation.`;
 }
