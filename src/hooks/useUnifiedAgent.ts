@@ -195,11 +195,13 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
             if (dims) { canvasW = dims.width ?? 300; canvasH = dims.height ?? 250; }
         } catch { /* ok */ }
 
-        // ── Phase 2: Style guide + Template selection ──
-        const { selectStyleGuide } = await import('@/services/designStyleGuides');
-        const guide = selectStyleGuide(prompt);
-        const { selectTemplate } = await import('@/services/designTemplates');
-        const template = selectTemplate(canvasW, canvasH);
+        // ── Phase 2: AI Color Palette + Layout Selection ──
+        narrate(`I'll analyze your prompt to determine the best color palette and layout.`);
+        addCard('palette', 'Determining color palette', 'running');
+
+        const { generateColorPalette } = await import('@/services/designStyleGuides');
+        const abort = new AbortController();
+        const { palette: guide, reasoning: colorReasoning } = await generateColorPalette(prompt, abort.signal);
 
         // Build expandable style variable detail
         const styleDetail = [
@@ -208,18 +210,20 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
             `Text: ${guide.colors.foreground}`,
             `Font: ${guide.typography.primaryFont} / ${guide.typography.secondaryFont}`,
         ].join('\n');
+        updateCard('palette', 'done', guide.name, { reasoning: colorReasoning, expandedDetail: styleDetail });
+        narrate(colorReasoning || `Color palette: ${guide.name}`);
+        await new Promise(r => setTimeout(r, 600));
 
-        // AI reasoning for template choice
-        const templateReasoning = template
-            ? `This is a ${canvasW}x${canvasH} canvas. A structured template will produce consistent, professional results.`
-            : `No pre-built template for ${canvasW}x${canvasH} — using freestyle AI generation instead.`;
+        const { selectTemplate } = await import('@/services/designTemplates');
+        const template = selectTemplate(canvasW, canvasH);
 
-        narrate(`I'll set up the visual style and select the right layout approach.`);
-        addCard('guide', `Guide: ${guide.name}`, 'done', { expandedDetail: styleDetail });
-        addCard('template', template ? `Template: ${template.name}` : 'Freestyle generation', 'done', { reasoning: templateReasoning });
-        await new Promise(r => setTimeout(r, 800)); // Pacing: let user read style guide info
+        addCard('layout', template ? `Layout: ${template.name}` : 'Freestyle generation', 'done', {
+            reasoning: template
+                ? `Selected "${template.name}" — ${template.description}`
+                : `No matching layout for ${canvasW}x${canvasH} — using freestyle AI generation.`,
+        });
+        await new Promise(r => setTimeout(r, 400));
 
-        const abort = new AbortController();
         const { runVisionLoop } = await import('@/services/autoDesignLoop');
 
         let allElements: import('@/services/autoDesignService').RenderElement[] = [];
