@@ -21,7 +21,7 @@ import { resolveConstraints } from '@/schema/constraints.types';
 import { runSmartSizingQA } from '@/engine/smartSizingQA';
 import { classifyRatio } from '@/engine/smartSizing';
 import { useDesignStore } from '@/stores/designStore';
-import { analyzeDesign, captureElement } from '@/services/visionService';
+import { analyzeDesign } from '@/services/visionService';
 import type { DesignAnalysis } from '@/services/visionService';
 
 export type SmartCheckStatus = 'idle' | 'checking' | 'done' | 'error';
@@ -169,6 +169,139 @@ function clipOutOfBounds(
     };
 }
 
+// ── Render Variant to Canvas for Vision QA ───────
+
+/**
+ * Render a variant's elements to an offscreen <canvas> for Vision QA.
+ *
+ * The Size Dashboard renders banners with DOM elements, not canvas.
+ * This function programmatically draws each element using resolveConstraints
+ * so the Vision API can "see" the layout as a real image.
+ *
+ * Returns pure base64 (no data: prefix) or null on failure.
+ */
+function renderVariantToCanvas(variant: BannerVariant): string | null {
+    const w = variant.preset.width;
+    const h = variant.preset.height;
+
+    if (w === 0 || h === 0) return null;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    // Default background (dark, matching ACE editor)
+    ctx.fillStyle = '#1a1f2e';
+    ctx.fillRect(0, 0, w, h);
+
+    // Sort elements by zIndex for correct layering
+    const sorted = [...variant.elements]
+        .filter(el => el.visible !== false)
+        .sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
+
+    for (const el of sorted) {
+        const bounds = resolveConstraints(el.constraints, w, h);
+        const { x, y, width: elW, height: elH } = bounds;
+
+        ctx.save();
+        ctx.globalAlpha = el.opacity ?? 1;
+
+        if (el.type === 'shape') {
+            const shape = el as DesignElement & { fill?: string; borderRadius?: number; shapeType?: string };
+            ctx.fillStyle = shape.fill ?? '#6C63FF';
+            const r = Math.min(shape.borderRadius ?? 0, elW / 2, elH / 2);
+
+            if (shape.shapeType === 'circle') {
+                ctx.beginPath();
+                ctx.ellipse(x + elW / 2, y + elH / 2, elW / 2, elH / 2, 0, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (r > 0) {
+                roundRect(ctx, x, y, elW, elH, r);
+                ctx.fill();
+            } else {
+                ctx.fillRect(x, y, elW, elH);
+            }
+        } else if (el.type === 'text') {
+            const text = el as DesignElement & {
+                content?: string; fontSize?: number; fontWeight?: number;
+                fontFamily?: string; color?: string; textAlign?: string;
+            };
+            const fs = text.fontSize ?? 16;
+            const fw = text.fontWeight ?? 400;
+            const ff = text.fontFamily ?? 'Inter, sans-serif';
+            ctx.font = `${fw} ${fs}px ${ff}`;
+            ctx.fillStyle = text.color ?? '#FFFFFF';
+            ctx.textBaseline = 'top';
+
+            const align = text.textAlign ?? 'left';
+            let textX = x;
+            if (align === 'center') textX = x + elW / 2;
+            else if (align === 'right') textX = x + elW;
+            ctx.textAlign = align as CanvasTextAlign;
+
+            ctx.fillText(text.content ?? '', textX, y, elW);
+        } else if (el.type === 'button') {
+            const btn = el as DesignElement & {
+                label?: string; fontSize?: number; fontWeight?: number;
+                fontFamily?: string; color?: string; backgroundColor?: string;
+                borderRadius?: number;
+            };
+            const bg = btn.backgroundColor ?? '#FF5733';
+            const r = Math.min(btn.borderRadius ?? 8, elW / 2, elH / 2);
+            ctx.fillStyle = bg;
+            roundRect(ctx, x, y, elW, elH, r);
+            ctx.fill();
+
+            // Button label
+            const fs = btn.fontSize ?? 14;
+            ctx.font = `${btn.fontWeight ?? 600} ${fs}px ${btn.fontFamily ?? 'Inter, sans-serif'}`;
+            ctx.fillStyle = btn.color ?? '#FFFFFF';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(btn.label ?? '', x + elW / 2, y + elH / 2, elW - 16);
+        } else if (el.type === 'image') {
+            // Placeholder rectangle for images (actual images would need async loading)
+            ctx.fillStyle = '#2a3040';
+            ctx.fillRect(x, y, elW, elH);
+            // Cross lines to indicate image placeholder
+            ctx.strokeStyle = '#3a4050';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + elW, y + elH);
+            ctx.moveTo(x + elW, y);
+            ctx.lineTo(x, y + elH);
+            ctx.stroke();
+        }
+
+        ctx.restore();
+    }
+
+    const dataUrl = canvas.toDataURL('image/png');
+    const idx = dataUrl.indexOf(',');
+    return idx >= 0 ? dataUrl.slice(idx + 1) : dataUrl;
+}
+
+/** Draw a rounded rectangle path on canvas context */
+function roundRect(
+    ctx: CanvasRenderingContext2D,
+    x: number, y: number, w: number, h: number, r: number,
+) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+}
+
 // ── Main Hook ─────────────────────────────────────
 
 export function useSmartCheck() {
@@ -307,42 +440,35 @@ export function useSmartCheck() {
             const freshVariants = useDesignStore.getState().creativeSet?.variants ?? creativeSet.variants;
             const issues = runSmartSizingQA(freshVariants as BannerVariant[]);
 
-            // ── Step 5: Vision QA (screenshot → Claude Vision) ──
+            // ── Step 5: Vision QA (render to canvas → Claude Vision) ──
             const visionResults: VariantVisionResult[] = [];
             let totalVisionIssues = 0;
             const controller = new AbortController();
             abortRef.current = controller;
 
-            // Get all banner card DOM elements for screenshot capture
-            const cardElements = document.querySelectorAll('.banner-card') as NodeListOf<HTMLElement>;
             const allVariants = freshVariants as BannerVariant[];
 
             for (let i = 0; i < allVariants.length; i++) {
                 if (controller.signal.aborted) break;
                 const variant = allVariants[i]!;
-                const label = `${variant.preset.width}x${variant.preset.height}`;
+                const vW = variant.preset.width;
+                const vH = variant.preset.height;
+                const label = `${vW}x${vH}`;
 
                 setProgressMessage(`Vision QA: analyzing ${label} (${i + 1}/${allVariants.length})...`);
 
                 try {
-                    // Try to capture from DOM card
-                    const cardEl = cardElements[i];
-                    let base64: string | null = null;
-                    if (cardEl) {
-                        base64 = captureElement(cardEl);
-                    }
+                    // Render variant elements to an offscreen canvas
+                    const base64 = renderVariantToCanvas(variant);
 
                     if (base64) {
                         const analysis: DesignAnalysis | null = await analyzeDesign(
-                            base64,
-                            variant.preset.width,
-                            variant.preset.height,
-                            controller.signal,
+                            base64, vW, vH, controller.signal,
                         );
 
                         if (analysis) {
                             const variantIssues = analysis.issues.map(
-                                i => `[${i.severity}] ${i.type}: ${i.description}`,
+                                iss => `[${iss.severity}] ${iss.type}: ${iss.description}`,
                             );
                             totalVisionIssues += variantIssues.length;
                             visionResults.push({
@@ -355,7 +481,6 @@ export function useSmartCheck() {
                         }
                     }
                 } catch {
-                    // Vision failed for this variant — skip, don't block
                     console.warn(`[SmartCheck] Vision QA skipped for ${label}`);
                 }
             }
