@@ -516,3 +516,63 @@ export async function callAssetContext(
         additions: input.additions ?? [],
     };
 }
+
+// ── Template-Based Content Generation ─────────────────
+
+import type { GeneratedContent } from '@/services/designTemplates';
+import { buildContentPrompt } from '@/services/designTemplates';
+
+/**
+ * Lightweight AI call — generates ONLY content text.
+ * Positions come from the template, not from the AI.
+ * Response: { headline, subheadline, cta, tag }
+ */
+export async function callTemplateContent(
+    userPrompt: string,
+    canvasW: number,
+    canvasH: number,
+    templateName: string,
+    signal: AbortSignal,
+): Promise<GeneratedContent> {
+    const contentPrompt = buildContentPrompt(userPrompt, canvasW, canvasH, templateName);
+
+    const body = {
+        model: DEFAULT_CLAUDE_MODEL,
+        max_tokens: 256,
+        temperature: 0.7,
+        system: 'You are a professional copywriter. Return ONLY valid JSON.',
+        messages: [{ role: 'user' as const, content: contentPrompt }],
+    };
+
+    const data = await callAnthropicApi(body, signal) as {
+        content: Array<{ type: string; text?: string }>;
+    };
+
+    const textBlock = data.content.find(c => c.type === 'text');
+    if (!textBlock?.text) throw new Error('No content generated.');
+
+    // Parse the JSON from the response — handle markdown code fences
+    let raw = textBlock.text.trim();
+    if (raw.startsWith('```')) {
+        raw = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+    }
+
+    try {
+        const parsed = JSON.parse(raw) as GeneratedContent;
+        return {
+            headline: parsed.headline || 'Get Started Today',
+            subheadline: parsed.subheadline || 'Professional solutions for your business.',
+            cta: parsed.cta || 'Learn More',
+            tag: parsed.tag || 'NEW',
+        };
+    } catch {
+        // Fallback: extract fields from raw text
+        return {
+            headline: 'Get Started Today',
+            subheadline: 'Professional solutions for your business.',
+            cta: 'Learn More',
+            tag: 'NEW',
+        };
+    }
+}
+

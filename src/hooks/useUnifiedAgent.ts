@@ -156,12 +156,12 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         return { endpoint: 'https://openrouter.ai/api', model: model.id, maxToolRounds: 30 };
     }, [selectedRole]);
 
-    // ── Generate Design (via useAutoDesign pipeline) ──
+    // ── Generate Design (template-first pipeline) ──
     const runGenerateFlow = useCallback(async (prompt: string) => {
         const engine = engineRef.current?.current ?? engineRef.current;
         if (!engine) throw new Error('Canvas not connected.');
 
-        // Phase 1: Context scan
+        // ── Phase 1: Canvas scan ──
         narrate(`Starting design generation. Reading current canvas state...`);
         addCard('context', 'Reading canvas context', 'running');
         let elementCount = 0;
@@ -172,22 +172,6 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         } catch { /* ok */ }
         updateCard('context', 'done', `${elementCount} elements found`);
 
-        // Phase 2: Style guide selection — show WHICH guide and WHY
-        const { selectStyleGuide } = await import('@/services/designStyleGuides');
-        const guide = selectStyleGuide(prompt);
-
-        // Build a color summary like Pencil shows variables
-        const colorSummary = [
-            `Background: ${guide.colors.gradientStart} → ${guide.colors.gradientEnd}`,
-            `Accent: ${guide.colors.accent}`,
-            `Text: ${guide.colors.foreground}`,
-        ].join('\n');
-        narrate(`Style guide selected: "${guide.name}"\n${colorSummary}\nFont: ${guide.typography.primaryFont} / ${guide.typography.secondaryFont}`);
-
-        addCard('design', 'Generating layered composition', 'running');
-        const { callFromScratch } = await import('@/services/autoDesignService');
-        const { runVisionLoop } = await import('@/services/autoDesignLoop');
-
         // Get canvas dimensions
         let canvasW = 300, canvasH = 250;
         try {
@@ -195,112 +179,166 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
             if (dims) { canvasW = dims.width ?? 300; canvasH = dims.height ?? 250; }
         } catch { /* ok */ }
 
+        // ── Phase 2: Style guide + Template selection ──
+        const { selectStyleGuide } = await import('@/services/designStyleGuides');
+        const guide = selectStyleGuide(prompt);
+        const { selectTemplate } = await import('@/services/designTemplates');
+        const template = selectTemplate(canvasW, canvasH);
+
+        // Show variables like Pencil's set_variables step
+        const colorSummary = [
+            `Background: ${guide.colors.gradientStart} → ${guide.colors.gradientEnd}`,
+            `Accent: ${guide.colors.accent}`,
+            `Text: ${guide.colors.foreground}`,
+        ].join('\n');
+        narrate(
+            `Style guide: "${guide.name}"\n${colorSummary}\n` +
+            `Font: ${guide.typography.primaryFont} / ${guide.typography.secondaryFont}\n` +
+            (template ? `Template: "${template.name}" (${canvasW}x${canvasH})` : `No template match — using freestyle generation`)
+        );
+
+        addCard('template', template ? `Template: ${template.name}` : 'Freestyle generation', 'done');
+
         const abort = new AbortController();
+        const { runVisionLoop } = await import('@/services/autoDesignLoop');
 
-        // From-scratch generation
-        const { buildFewShotExamples, useDesignMemoryStore } = await import('@/stores/designMemoryStore');
-        const topExamples = useDesignMemoryStore.getState().getTopExamples(3);
-        const fewShotStr = buildFewShotExamples(topExamples);
+        let allElements: import('@/services/autoDesignService').RenderElement[] = [];
 
-        const result = await callFromScratch(prompt, canvasW, canvasH, abort.signal, fewShotStr);
-        updateCard('design', 'done', `${result.elements.length} elements planned`);
+        if (template) {
+            // ── Template-based path (PRIMARY) ──
 
-        // Phase 3: Render — narrate EACH element like Pencil shows operation results
-        // Group elements by layer for narration
-        const structureEls = result.elements.filter(el => ['background', 'accent_zone', 'accent_glow'].includes(el.name ?? ''));
-        const contentEls = result.elements.filter(el => ['headline', 'subheadline', 'body_text', 'tag_text'].includes(el.name ?? ''));
-        const actionEls = result.elements.filter(el => ['cta_button', 'cta_label'].includes(el.name ?? ''));
-        const polishEls = result.elements.filter(el => !structureEls.includes(el) && !contentEls.includes(el) && !actionEls.includes(el));
+            // Phase 3: AI generates ONLY content text
+            addCard('content', 'Generating creative copy with AI', 'running');
+            narrate(`Generating creative copy for "${prompt.slice(0, 60)}"...`);
 
-        narrate(`Composition ready. Placing ${result.elements.length} elements in 4 layers:\n` +
-            `Layer 1 — Structure: ${structureEls.length} elements\n` +
-            `Layer 2 — Content: ${contentEls.length} elements\n` +
-            `Layer 3 — Action: ${actionEls.length} elements\n` +
-            `Layer 4 — Polish: ${polishEls.length} elements`);
+            const { callTemplateContent } = await import('@/services/autoDesignService');
+            const content = await callTemplateContent(prompt, canvasW, canvasH, template.name, abort.signal);
+            updateCard('content', 'done', `Copy generated`);
+
+            narrate(
+                `Content ready:\n` +
+                `  Headline: "${content.headline}"\n` +
+                `  Subheadline: "${content.subheadline}"\n` +
+                `  CTA: "${content.cta}"\n` +
+                `  Tag: "${content.tag}"`
+            );
+
+            // Phase 4: Template fills positions
+            addCard('build', 'Building layout from template', 'running');
+            narrate(`Building layout from "${template.name}" template with ${guide.name} style...`);
+            allElements = template.build(canvasW, canvasH, guide, content);
+            updateCard('build', 'done', `${allElements.length} elements composed`);
+
+        } else {
+            // ── Freestyle path (FALLBACK for unusual sizes) ──
+            addCard('design', 'Generating layered composition', 'running');
+            narrate(`Using freestyle AI generation for ${canvasW}x${canvasH}...`);
+
+            const { callFromScratch } = await import('@/services/autoDesignService');
+            const { buildFewShotExamples, useDesignMemoryStore } = await import('@/stores/designMemoryStore');
+            const topExamples = useDesignMemoryStore.getState().getTopExamples(3);
+            const fewShotStr = buildFewShotExamples(topExamples);
+
+            const result = await callFromScratch(prompt, canvasW, canvasH, abort.signal, fewShotStr);
+            allElements = result.elements;
+            updateCard('design', 'done', `${allElements.length} elements planned`);
+        }
+
+        // ── Phase 5: Multi-pass render with live narration ──
+        // Group elements by layer
+        const structureNames = new Set(['background', 'accent_zone', 'accent_glow', 'accent_line', 'accent_divider', 'tag_underline', 'tag_line']);
+        const contentNames = new Set(['headline', 'subheadline', 'body_text', 'tag_text']);
+        const actionNames = new Set(['cta_button', 'cta_label']);
+
+        const layers: { name: string; elements: import('@/services/autoDesignService').RenderElement[] }[] = [
+            { name: 'Structure', elements: allElements.filter(el => structureNames.has(el.name ?? '')) },
+            { name: 'Content', elements: allElements.filter(el => contentNames.has(el.name ?? '')) },
+            { name: 'Action', elements: allElements.filter(el => actionNames.has(el.name ?? '')) },
+            { name: 'Polish', elements: allElements.filter(el => !structureNames.has(el.name ?? '') && !contentNames.has(el.name ?? '') && !actionNames.has(el.name ?? '')) },
+        ];
+
+        narrate(
+            `Composition ready. Rendering ${allElements.length} elements in 4 layers:\n` +
+            layers.map((l, i) => `  Layer ${i + 1} — ${l.name}: ${l.elements.length} elements`).join('\n')
+        );
 
         addCard('render', 'Placing elements on canvas', 'running');
         try { engine.clear_scene?.(); } catch { /* ok */ }
 
-        // Inline render with live per-element narration
         let rendered = 0;
-        let currentLayer = '';
-        for (const el of result.elements) {
-            // Detect layer transition and narrate it
-            const elLayer = structureEls.includes(el) ? 'Structure'
-                : contentEls.includes(el) ? 'Content'
-                : actionEls.includes(el) ? 'Action' : 'Polish';
-            if (elLayer !== currentLayer) {
-                currentLayer = elLayer;
-                updateCard('render', 'running', `Placing ${elLayer.toLowerCase()} layer...`);
-            }
+        for (const layer of layers) {
+            if (layer.elements.length === 0) continue;
+            updateCard('render', 'running', `Placing ${layer.name.toLowerCase()} layer (${layer.elements.length})...`);
 
-            moveCursor(el.x ?? 0, el.y ?? 0, el.name);
-            await new Promise(r => setTimeout(r, 150));
+            for (const el of layer.elements) {
+                moveCursor(el.x ?? 0, el.y ?? 0, el.name);
+                await new Promise(r => setTimeout(r, 120));
 
-            try {
-                let nodeId: number | null = null;
-                if (el.type === 'text') {
-                    const hexToRgb = (hex: string): [number, number, number] => {
-                        const c = hex.replace('#', '');
-                        return [parseInt(c.slice(0, 2), 16) / 255, parseInt(c.slice(2, 4), 16) / 255, parseInt(c.slice(4, 6), 16) / 255];
-                    };
-                    const [tr, tg, tb] = el.color_hex ? hexToRgb(el.color_hex) : [1, 1, 1];
-                    nodeId = engine.add_text(el.x ?? 0, el.y ?? 0, el.content || 'Text', el.font_size ?? 18, 'Inter, system-ui, sans-serif', el.font_weight ?? '700', tr, tg, tb, 1.0, (el.w && el.w > 0) ? el.w : canvasW * 0.85, el.text_align ?? 'center', el.name, el.line_height, el.letter_spacing) as number | null;
-                } else if (el.gradient_start_hex && el.gradient_end_hex) {
-                    nodeId = engine.add_gradient_rect(el.x ?? 0, el.y ?? 0, el.w ?? 100, el.h ?? 100, el.gradient_start_hex, el.gradient_end_hex, el.gradient_angle ?? 135, el.radius ?? 0, el.name) as number | null;
-                } else if (el.type === 'rounded_rect') {
-                    const sr = el.r ?? 0.5, sg = el.g ?? 0.5, sb = el.b ?? 0.5;
-                    nodeId = engine.add_rounded_rect(el.x ?? 0, el.y ?? 0, el.w ?? 100, el.h ?? 50, sr, sg, sb, el.a ?? 1, el.radius ?? 8, el.name) as number | null;
-                } else if (el.type === 'ellipse') {
-                    const sr = el.r ?? 0.5, sg = el.g ?? 0.5, sb = el.b ?? 0.5;
-                    nodeId = engine.add_ellipse?.((el.x ?? 0) + (el.w ?? 50) / 2, (el.y ?? 0) + (el.h ?? 50) / 2, (el.w ?? 50) / 2, (el.h ?? 50) / 2, sr, sg, sb, el.a ?? 1) as number | null;
-                } else {
-                    const sr = el.r ?? 0.5, sg = el.g ?? 0.5, sb = el.b ?? 0.5;
-                    nodeId = engine.add_rect(el.x ?? 0, el.y ?? 0, el.w ?? 100, el.h ?? 50, sr, sg, sb, el.a ?? 1, el.name) as number | null;
+                try {
+                    let nodeId: number | null = null;
+                    if (el.type === 'text') {
+                        const hexToRgb = (hx: string): [number, number, number] => {
+                            const c = hx.replace('#', '');
+                            return [parseInt(c.slice(0, 2), 16) / 255, parseInt(c.slice(2, 4), 16) / 255, parseInt(c.slice(4, 6), 16) / 255];
+                        };
+                        const [tr, tg, tb] = el.color_hex ? hexToRgb(el.color_hex) : [1, 1, 1];
+                        nodeId = engine.add_text(el.x ?? 0, el.y ?? 0, el.content || 'Text', el.font_size ?? 18, 'Inter, system-ui, sans-serif', el.font_weight ?? '700', tr, tg, tb, 1.0, (el.w && el.w > 0) ? el.w : canvasW * 0.85, el.text_align ?? 'center', el.name, el.line_height, el.letter_spacing) as number | null;
+                    } else if (el.gradient_start_hex && el.gradient_end_hex) {
+                        nodeId = engine.add_gradient_rect(el.x ?? 0, el.y ?? 0, el.w ?? 100, el.h ?? 100, el.gradient_start_hex, el.gradient_end_hex, el.gradient_angle ?? 135, el.radius ?? 0, el.name) as number | null;
+                    } else if (el.type === 'rounded_rect') {
+                        const sr = el.r ?? 0.5, sg = el.g ?? 0.5, sb = el.b ?? 0.5;
+                        nodeId = engine.add_rounded_rect(el.x ?? 0, el.y ?? 0, el.w ?? 100, el.h ?? 50, sr, sg, sb, el.a ?? 1, el.radius ?? 8, el.name) as number | null;
+                    } else if (el.type === 'ellipse') {
+                        const sr = el.r ?? 0.5, sg = el.g ?? 0.5, sb = el.b ?? 0.5;
+                        nodeId = engine.add_ellipse?.((el.x ?? 0) + (el.w ?? 50) / 2, (el.y ?? 0) + (el.h ?? 50) / 2, (el.w ?? 50) / 2, (el.h ?? 50) / 2, sr, sg, sb, el.a ?? 1) as number | null;
+                    } else {
+                        const sr = el.r ?? 0.5, sg = el.g ?? 0.5, sb = el.b ?? 0.5;
+                        nodeId = engine.add_rect(el.x ?? 0, el.y ?? 0, el.w ?? 100, el.h ?? 50, sr, sg, sb, el.a ?? 1, el.name) as number | null;
+                    }
+
+                    // Apply shadow if specified
+                    if (nodeId != null && el.shadow_blur && el.shadow_blur > 0) {
+                        try {
+                            engine.set_shadow?.(nodeId, el.shadow_offset_x ?? 2, el.shadow_offset_y ?? 4, el.shadow_blur, 0, 0, 0, el.shadow_opacity ?? 0.25);
+                        } catch { /* shadow not critical */ }
+                    }
+
+                    rendered++;
+                } catch (err) {
+                    console.warn('[UnifiedAgent] Failed to render:', el.name, err);
                 }
-
-                // Apply shadow if specified
-                if (nodeId != null && el.shadow_blur && el.shadow_blur > 0) {
-                    try {
-                        engine.set_shadow?.(
-                            nodeId,
-                            el.shadow_offset_x ?? 2,
-                            el.shadow_offset_y ?? 4,
-                            el.shadow_blur,
-                            0, 0, 0, el.shadow_opacity ?? 0.25,
-                        );
-                    } catch { /* shadow not critical */ }
-                }
-
-                rendered++;
-            } catch (err) {
-                console.warn('[UnifiedAgent] Failed to render:', el.name, err);
             }
         }
         hideCursor();
         updateCard('render', 'done', `${rendered} elements placed`);
 
-        // Build a summary of what was placed — like Pencil's operation results
-        const placedSummary = result.elements.slice(0, 6).map(el => {
-            if (el.type === 'text') return `  "${el.name}" — ${el.type} "${(el.content ?? '').slice(0, 30)}" ${el.font_size}px at (${el.x}, ${el.y})`;
-            if (el.gradient_start_hex) return `  "${el.name}" — gradient ${el.gradient_start_hex} → ${el.gradient_end_hex} at (${el.x}, ${el.y}) ${el.w}x${el.h}`;
+        // Build summary of placed elements — like Pencil's operation results
+        const placedSummary = allElements.slice(0, 8).map(el => {
+            if (el.type === 'text') return `  "${el.name}" — text "${(el.content ?? '').slice(0, 30)}" ${el.font_size}px at (${el.x}, ${el.y})`;
+            if (el.gradient_start_hex) return `  "${el.name}" — gradient ${el.gradient_start_hex} → ${el.gradient_end_hex} ${el.w}x${el.h}`;
             return `  "${el.name}" — ${el.type} at (${el.x}, ${el.y}) ${el.w}x${el.h}`;
         }).join('\n');
-        const moreCount = Math.max(0, result.elements.length - 6);
-        narrate(`${rendered} elements placed successfully:\n${placedSummary}${moreCount > 0 ? `\n  ... and ${moreCount} more` : ''}`);
+        const moreCount = Math.max(0, allElements.length - 8);
+        narrate(`${rendered} elements placed:\n${placedSummary}${moreCount > 0 ? `\n  + ${moreCount} more` : ''}`);
 
-        // Phase 4: Vision QA
-        narrate(`Running vision quality check on the ${canvasW}x${canvasH} canvas...`);
+        // ── Phase 6: Vision QA ──
+        narrate(`Running vision quality check on ${canvasW}x${canvasH} canvas...`);
         addCard('vision', 'Vision quality review', 'running');
         try {
             const loopResult = await runVisionLoop(engine, canvasW, canvasH, abort.signal, (msg) => {
                 updateCard('vision', 'running', msg);
             });
             updateCard('vision', 'done', `Score: ${loopResult.finalScore}/100`);
-            narrate(`Vision review complete — score ${loopResult.finalScore}/100.\nStyle: ${guide.name}\nElements: ${rendered}\nCanvas: ${canvasW}x${canvasH}px\n\nLet me know if you'd like to refine anything.`);
+            narrate(
+                `Vision review complete — score ${loopResult.finalScore}/100.\n` +
+                `Style: ${guide.name}\n` +
+                `Template: ${template?.name ?? 'freestyle'}\n` +
+                `Elements: ${rendered}\n` +
+                `Canvas: ${canvasW}x${canvasH}px`
+            );
         } catch {
             updateCard('vision', 'done', 'Vision check skipped');
-            narrate(`Design placed with ${rendered} elements using ${guide.name}.\nCanvas: ${canvasW}x${canvasH}px\n\nLet me know if you'd like to refine anything.`);
+            narrate(`Design placed with ${rendered} elements using ${guide.name}.\nCanvas: ${canvasW}x${canvasH}px`);
         }
 
         return `Design generated with ${rendered} elements.`;
