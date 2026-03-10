@@ -317,34 +317,23 @@ export function DetailEditorPage() {
                     onTriggerImageUpload={() => overlay.triggerImageUpload()}
                     onTriggerVideoUpload={() => overlay.triggerVideoUpload()}
                 />
-                <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
-                    {canvasRulerVisible && (
-                        <CanvasRuler
-                            width={width}
-                            height={height}
-                            zoom={1}
-                            showGrid={canvasRulerVisible}
-                            onToggleGrid={() => useUIStore.getState().toggleCanvasRuler()}
-                        />
-                    )}
-                    <EditorCanvas
-                        variant={variant}
-                        canvasRef={canvasRef}
-                        overlayRef={overlayRef}
-                        engineRef={engineRef}
-                        state={state}
-                        actions={actions}
-                        retryInit={retryInit}
-                        overlayElements={overlay.overlayElements}
-                        selectedOverlayId={overlay.selectedOverlayId}
-                        onOverlaySelect={handleOverlaySelect}
-                        onOverlayUpdate={overlay.updateElement}
-                        onOverlayDelete={overlay.deleteElement}
-                        onAddText={overlay.addText}
-                        onTriggerImageUpload={overlay.triggerImageUpload}
-                        onTriggerVideoUpload={overlay.triggerVideoUpload}
-                    />
-                </div>
+                <EditorCanvas
+                    variant={variant}
+                    canvasRef={canvasRef}
+                    overlayRef={overlayRef}
+                    engineRef={engineRef}
+                    state={state}
+                    actions={actions}
+                    retryInit={retryInit}
+                    overlayElements={overlay.overlayElements}
+                    selectedOverlayId={overlay.selectedOverlayId}
+                    onOverlaySelect={handleOverlaySelect}
+                    onOverlayUpdate={overlay.updateElement}
+                    onOverlayDelete={overlay.deleteElement}
+                    onAddText={overlay.addText}
+                    onTriggerImageUpload={overlay.triggerImageUpload}
+                    onTriggerVideoUpload={overlay.triggerVideoUpload}
+                />
                 {/* Right panel: Property editing + secondary panels */}
                 <aside className="ed-right-panel-wrapper">
                     <PropertyPanel

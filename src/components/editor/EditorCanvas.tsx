@@ -8,8 +8,10 @@ import type { CanvasEngineState, CanvasEngineActions } from '@/hooks/canvasTypes
 import type { OverlayElement } from '@/hooks/useOverlayElements';
 import { useAnimPresetStore } from '@/hooks/useAnimationPresets';
 import { useEditorStore } from '@/stores/editorStore';
+import { useUIStore } from '@/stores/uiStore';
 import { useAiMcpBridge } from '@/hooks/useAiMcpBridge';
 import { ResizeHandles, type HandleDir, overlayMessage, spinnerStyle, statusBarStyle, zoomBtnStyle } from './ResizeHandles';
+import { CanvasRuler } from './CanvasRuler';
 import type { SceneNodeInfo } from '@/ai/agentContext';
 
 interface Props {
@@ -39,6 +41,7 @@ export function EditorCanvas({
     const { width, height } = variant.preset;
     const activeTool = useEditorStore((s) => s.activeTool);
     const setTool = useEditorStore((s) => s.setTool);
+    const canvasRulerVisible = useUIStore((s) => s.canvasRulerVisible);
 
     // Animation
     const animCurrentTime = useAnimPresetStore((s) => s.currentTime);
@@ -425,6 +428,17 @@ export function EditorCanvas({
                     );
                 })}
             </div>
+
+            {/* Canvas Ruler overlay — inside canvas area for correct absolute positioning */}
+            {canvasRulerVisible && (
+                <CanvasRuler
+                    width={width}
+                    height={height}
+                    zoom={zoom}
+                    showGrid={true}
+                    onToggleGrid={() => useUIStore.getState().toggleCanvasRuler()}
+                />
+            )}
 
             {/* Status bar */}
             <div style={statusBarStyle}>
