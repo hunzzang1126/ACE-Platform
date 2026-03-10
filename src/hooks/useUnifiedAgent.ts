@@ -210,6 +210,7 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
 
         // ── Phase 2.5: Background Image Generation (if AI decided it's needed) ──
         let hasImageBackground = false;
+        let bgImageUrl: string | null = null; // ★ Deferred placement: save URL, place AFTER clear_scene
         if (needsBackgroundImage && backgroundImagePrompt) {
             narrate(`This design needs a background image. Generating with NANO Banana 2.0...`);
             addCard('bg-image', 'Generating background image', 'running', {
@@ -227,20 +228,17 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
                 );
 
                 if (bgResult.success && bgResult.imageUrl) {
-                    // Place image as the first canvas layer
-                    const engine = engineRef.current?.current ?? engineRef.current;
-                    if (engine?.add_image) {
-                        await engine.add_image(0, 0, bgResult.imageUrl, canvasW, canvasH, 'ai_background');
-                        hasImageBackground = true;
-                        updateCard('bg-image', 'done', bgResult.isFallback ? 'Gradient fallback' : 'Image generated', {
-                            expandedDetail: bgResult.isFallback
-                                ? 'API not available — using gradient fallback. Connect an OpenRouter API key for real AI images.'
-                                : `Generated ${canvasW}x${canvasH} background via ${bgResult.model}`,
-                        });
-                        narrate(`Background image placed on canvas.`);
-                    } else {
-                        updateCard('bg-image', 'error', 'Engine not ready');
-                    }
+                    // ★ REGRESSION GUARD: Do NOT place on canvas here.
+                    // clear_scene() in Phase 5 would destroy it.
+                    // Save URL and place after clear_scene.
+                    bgImageUrl = bgResult.imageUrl;
+                    hasImageBackground = true;
+                    updateCard('bg-image', 'done', bgResult.isFallback ? 'Gradient fallback' : 'Image generated', {
+                        expandedDetail: bgResult.isFallback
+                            ? 'API not available — using gradient fallback. Connect an OpenRouter API key for real AI images.'
+                            : `Generated ${canvasW}x${canvasH} background via ${bgResult.model}`,
+                    });
+                    narrate(`Background image ready — will place after layout setup.`);
                 } else {
                     updateCard('bg-image', 'error', bgResult.message || 'Generation failed');
                     narrate(`Background image failed — I'll use a gradient instead.`);
@@ -330,6 +328,17 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         const { clearGradientCache, cacheGradientData } = await import('@/engine/elementConverters');
         clearGradientCache();
         try { engine.clear_scene?.(); } catch { /* ok */ }
+
+        // ★ REGRESSION GUARD: Place background image AFTER clear_scene.
+        // Previously placed in Phase 2.5 but clear_scene destroyed it.
+        if (hasImageBackground && bgImageUrl) {
+            try {
+                await engine.add_image(0, 0, bgImageUrl, canvasW, canvasH, 'ai_background');
+                narrate(`Background image placed on canvas.`);
+            } catch (err) {
+                console.warn('[UnifiedAgent] Failed to place background image after clear:', err);
+            }
+        }
 
         let rendered = 0;
         for (const layer of layers) {
