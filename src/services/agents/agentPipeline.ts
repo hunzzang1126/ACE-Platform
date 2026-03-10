@@ -5,25 +5,47 @@
 //
 //  1. Planner: user prompt → DesignPlan
 //  2. Executor: DesignPlan → tool calls on canvas
-//  3. Critic: scene graph analysis → score + fixes
+//  3. Critic (dual-layer):
+//     a. Structural: math-based (overlap, spacing, clipping)
+//     b. Visual (NEW): screenshot → Claude Vision → quality check
+//     c. Combined score = structural * 0.4 + visual * 0.6
 //  4. If score < 82: apply fixes → re-critique (max 2 rounds)
 //
-// This replaces the direct callFromScratch approach
-// from autoDesignService.ts for new AI-powered designs.
+// The Vision QA Loop gives the AI "eyes" — it can now SEE
+// the canvas and self-correct visual issues that math can't detect.
 // ─────────────────────────────────────────────────
 
 import { runPlanner } from './plannerAgent';
 import { runExecutor, applyFixPatches } from './executorAgent';
-import { runStructuralCritic } from './criticAgent';
+import { runStructuralCritic, runVisionCritic } from './criticAgent';
 import { buildSceneGraph } from '@/services/sceneGraphBuilder';
+import { captureCanvas } from '@/services/visionService';
 import type { ToolContext } from '@/services/tools/toolTypes';
 import type { BrandKit } from '@/stores/brandKitStore';
 import type { SceneGraph } from '@/services/sceneGraphBuilder';
 import type { BannerVariant, CreativeSet } from '@/schema/design.types';
-import type { PipelineResult, DesignPlan, AgentStep, ProgressCallback } from './agentTypes';
+import type { PipelineResult, DesignPlan, AgentStep, ProgressCallback, CriticResult } from './agentTypes';
 
 const MAX_CRITIC_ROUNDS = 2;
 const PASS_SCORE = 82;
+
+/**
+ * Enable Vision QA in the critic loop.
+ * When true, captures a canvas screenshot after each round and sends
+ * it to Claude Vision for visual quality analysis.
+ *
+ * The combined score blends structural (40%) + visual (60%),
+ * because visual issues (contrast, balance, readability) are
+ * more impactful to end-user perception than pure geometry.
+ *
+ * Set to false to skip Vision API calls (saves cost, faster).
+ */
+const VISION_QA_ENABLED = true;
+
+/** Weight for structural score in combined scoring */
+const STRUCTURAL_WEIGHT = 0.4;
+/** Weight for visual score in combined scoring */
+const VISUAL_WEIGHT = 0.6;
 
 // ── Get Current Scene Graph ──
 
@@ -89,9 +111,12 @@ export async function runAgentPipeline(
         });
 
         // ═══════════════════════════════════════
-        // STEP 3: CRITIC (with fix loop)
+        // STEP 3: DUAL-LAYER CRITIC (with fix loop)
+        //   3a. Structural — math-based geometry checks
+        //   3b. Visual — screenshot → Claude Vision
+        //   3c. Combined score = structural * 0.4 + visual * 0.6
         // ═══════════════════════════════════════
-        let criticResult = null;
+        let criticResult: CriticResult | null = null;
         let iterationCount = 0;
 
         for (let round = 0; round < MAX_CRITIC_ROUNDS; round++) {
@@ -102,14 +127,62 @@ export async function runAgentPipeline(
             const sceneGraph = getCurrentSceneGraph(ctx);
             if (!sceneGraph) break;
 
-            onProgress?.(`Quality check (round ${round + 1})...`, 'critic');
-            criticResult = runStructuralCritic(sceneGraph, brandKit);
+            // ── 3a. Structural Critic (instant, no API) ──
+            onProgress?.(`Structural check (round ${round + 1})...`, 'critic');
+            const structuralResult = runStructuralCritic(sceneGraph, brandKit);
+
+            // ── 3b. Visual Critic (screenshot → Vision API) ──
+            let visualScore: number | null = null;
+            if (VISION_QA_ENABLED && !signal.aborted) {
+                onProgress?.('Capturing canvas for visual analysis...', 'critic');
+
+                const screenshot = captureCanvas();
+                if (screenshot) {
+                    onProgress?.('Analyzing design with AI Vision...', 'critic');
+                    try {
+                        const visionResult = await runVisionCritic(
+                            screenshot, sceneGraph, brandKit, signal, onProgress,
+                        );
+                        visualScore = visionResult.score;
+
+                        // Merge vision issues into structural issues
+                        // (deduplication by checking for similar descriptions)
+                        const existingDescs = new Set(
+                            structuralResult.issues.map(i => i.description.toLowerCase()),
+                        );
+                        for (const issue of visionResult.issues) {
+                            if (!existingDescs.has(issue.description.toLowerCase())) {
+                                structuralResult.issues.push(issue);
+                            }
+                        }
+                    } catch (err) {
+                        console.warn('[Pipeline] Vision critic failed, using structural only:', err);
+                    }
+                }
+            }
+
+            // ── 3c. Combined Score ──
+            const combinedScore = visualScore !== null
+                ? Math.round(structuralResult.score * STRUCTURAL_WEIGHT + visualScore * VISUAL_WEIGHT)
+                : structuralResult.score;
+
+            criticResult = {
+                ...structuralResult,
+                score: combinedScore,
+                pass: combinedScore >= PASS_SCORE,
+            };
+
+            const scoreBreakdown = visualScore !== null
+                ? `Combined: ${combinedScore}/100 (structural: ${structuralResult.score}, visual: ${visualScore})`
+                : `Structural: ${combinedScore}/100`;
 
             steps.push({
                 agent: 'critic',
-                action: `Score: ${criticResult.score}/100, ${criticResult.issues.length} issues`,
+                action: `${scoreBreakdown}, ${criticResult.issues.length} issues`,
                 output: {
                     score: criticResult.score,
+                    structuralScore: structuralResult.score,
+                    visualScore,
                     pass: criticResult.pass,
                     issueCount: criticResult.issues.length,
                     brandComplianceScore: criticResult.brandComplianceScore,
@@ -119,11 +192,11 @@ export async function runAgentPipeline(
             });
 
             if (criticResult.pass) {
-                onProgress?.(`Design approved: ${criticResult.score}/100`, 'critic');
+                onProgress?.(`Design approved: ${scoreBreakdown}`, 'critic');
                 break;
             }
 
-            // Apply fix patches from critic
+            // ── Apply fix patches from critic ──
             const fixPatches = criticResult.issues
                 .filter(i => i.fixTool && i.fixParams)
                 .map(i => ({ tool: i.fixTool!, params: i.fixParams! }));
