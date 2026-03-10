@@ -28,14 +28,14 @@ export interface AnimPresetConfig {
 
 export const ANIM_PRESETS: { label: string; value: AnimPresetType }[] = [
     { label: 'None', value: 'none' },
-    { label: 'Fade', value: 'fade' },
-    { label: 'Slide Left', value: 'slide-left' },
-    { label: 'Slide Right', value: 'slide-right' },
-    { label: 'Slide Up', value: 'slide-up' },
-    { label: 'Slide Down', value: 'slide-down' },
-    { label: 'Scale', value: 'scale' },
-    { label: 'Ascend', value: 'ascend' },
-    { label: 'Descend', value: 'descend' },
+    { label: 'Fade In', value: 'fade' },
+    { label: 'Slide to Left', value: 'slide-left' },
+    { label: 'Slide to Right', value: 'slide-right' },
+    { label: 'Slide to Top', value: 'slide-up' },
+    { label: 'Slide to Bottom', value: 'slide-down' },
+    { label: 'Scale Up', value: 'scale' },
+    { label: 'Rise Up (Fade)', value: 'ascend' },
+    { label: 'Drop Down (Fade)', value: 'descend' },
 ];
 
 /** Human-readable label for a preset type */
@@ -105,20 +105,20 @@ export function computeAnimStyle(
             return { opacity: t };
 
         case 'slide-left':
-            // Element slides leftward (enters from right, lands at position)
+            // Element slides leftward into position (enters from right)
             return { transform: `translateX(${1000 * (1 - t)}px)` };
 
         case 'slide-right':
-            // Element slides rightward (enters from left, lands at position)
+            // Element slides rightward into position (enters from left)
             return { transform: `translateX(${-1000 * (1 - t)}px)` };
 
         case 'slide-up':
-            // Element slides upward (enters from below, lands at position)
-            return { transform: `translateY(${-1000 * (1 - t)}px)` };
+            // Element slides upward into position (enters from below)
+            return { transform: `translateY(${1000 * (1 - t)}px)` };
 
         case 'slide-down':
-            // Element slides downward (enters from above, lands at position)
-            return { transform: `translateY(${1000 * (1 - t)}px)` };
+            // Element slides downward into position (enters from above)
+            return { transform: `translateY(${-1000 * (1 - t)}px)` };
 
         case 'scale':
             return { transform: `scale(${t})` };
@@ -127,14 +127,14 @@ export function computeAnimStyle(
             // Rises upward with fade (enters from below)
             return {
                 opacity: t,
-                transform: `translateY(${-1000 * (1 - t)}px)`,
+                transform: `translateY(${1000 * (1 - t)}px)`,
             };
 
         case 'descend':
             // Falls downward with fade (enters from above)
             return {
                 opacity: t,
-                transform: `translateY(${1000 * (1 - t)}px)`,
+                transform: `translateY(${-1000 * (1 - t)}px)`,
             };
 
         default:
