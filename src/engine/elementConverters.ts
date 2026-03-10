@@ -163,14 +163,18 @@ export function engineNodeToShapeElement(
 
     const coverage = (node.w * node.h) / (canvasW * canvasH);
     let name = node.name || `Shape ${node.id}`;
-    if (coverage > 0.7) name = 'Background';
-    else if (node.w > node.h * 3) name = 'Banner Strip';
-    else if (Math.abs(node.w - node.h) < 10) name = 'Square Shape';
+    if (!node.name) {
+        if (coverage > 0.7) name = 'Background';
+        else if (node.w > node.h * 3) name = 'Banner Strip';
+        else if (Math.abs(node.w - node.h) < 10) name = 'Square Shape';
+    }
 
     const animation = getAnimationForElement(`engine-${node.id}`);
 
-    // Check gradient cache — WASM doesn't serialize gradient metadata
-    const cached = gradientCache.get(name) || gradientCache.get(node.name || '');
+    // Gradient data: prefer EngineNode fields (from fabricToEngineNode), fallback to cache
+    const gStart = node.gradient_start || gradientCache.get(name)?.startHex || gradientCache.get(`engine-${node.id}`)?.startHex;
+    const gEnd = node.gradient_end || gradientCache.get(name)?.endHex || gradientCache.get(`engine-${node.id}`)?.endHex;
+    const gAngle = node.gradient_angle ?? gradientCache.get(name)?.angle ?? gradientCache.get(`engine-${node.id}`)?.angle;
 
     return {
         id: `engine-${node.id}`,
@@ -179,9 +183,9 @@ export function engineNodeToShapeElement(
         shapeType: nodeTypeToShapeType(node.type),
         constraints,
         fill,
-        gradientStart: cached?.startHex,
-        gradientEnd: cached?.endHex,
-        gradientAngle: cached?.angle,
+        gradientStart: gStart,
+        gradientEnd: gEnd,
+        gradientAngle: gAngle,
         opacity: node.opacity ?? 1,
         visible: true,
         locked: false,

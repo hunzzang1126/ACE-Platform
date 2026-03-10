@@ -166,8 +166,15 @@ export function useCanvasSync(
 
                 let nodeId: number;
                 if (shape.gradientStart && shape.gradientEnd) {
-                    // Gradient rect — restore with gradient data
-                    nodeId = engine.add_gradient_rect(x, y, w, h, shape.gradientStart, shape.gradientEnd, shape.gradientAngle ?? 135, shape.borderRadius ?? 0, shape.name);
+                    // Gradient rect — try shim's hex-based API first, fallback to WASM float API
+                    try {
+                        nodeId = engine.add_gradient_rect(x, y, w, h, shape.gradientStart, shape.gradientEnd, shape.gradientAngle ?? 135, shape.borderRadius ?? 0, shape.name);
+                    } catch {
+                        // WASM engine: convert hex → float RGB
+                        const [r1, g1, b1, a1] = hexToRgbFloat(shape.gradientStart);
+                        const [r2, g2, b2, a2] = hexToRgbFloat(shape.gradientEnd);
+                        nodeId = engine.add_gradient_rect(x, y, w, h, r1, g1, b1, a1, r2, g2, b2, a2, shape.gradientAngle ?? 135);
+                    }
                 } else if (shape.shapeType === 'ellipse') {
                     const [r, g, b, a] = hexToRgbFloat(shape.fill || '#808080');
                     // Engine expects cx, cy, rx, ry for ellipses
