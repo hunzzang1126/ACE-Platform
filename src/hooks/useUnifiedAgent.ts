@@ -201,7 +201,7 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
 
         const { generateColorPalette } = await import('@/services/designStyleGuides');
         const abort = new AbortController();
-        const { palette: guide, reasoning: colorReasoning } = await generateColorPalette(prompt, abort.signal);
+        const { palette: guide, reasoning: colorReasoning, needsBackgroundImage, backgroundImagePrompt } = await generateColorPalette(prompt, abort.signal);
 
         // Build expandable style variable detail
         const styleDetail = [
@@ -209,6 +209,7 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
             `Accent: ${guide.colors.accent}`,
             `Text: ${guide.colors.foreground}`,
             `Font: ${guide.typography.primaryFont} / ${guide.typography.secondaryFont}`,
+            needsBackgroundImage ? `Background Image: YES` : `Background Image: NO (gradient)`,
         ].join('\n');
         updateCard('palette', 'done', guide.name, { reasoning: colorReasoning, expandedDetail: styleDetail });
         narrate(colorReasoning || `Color palette: ${guide.name}`);
@@ -223,6 +224,51 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
                 : `No matching layout for ${canvasW}x${canvasH} — using freestyle AI generation.`,
         });
         await new Promise(r => setTimeout(r, 400));
+
+        // ── Phase 2.5: Background Image Generation (if AI decided it's needed) ──
+        let hasImageBackground = false;
+        if (needsBackgroundImage && backgroundImagePrompt) {
+            narrate(`This design needs a background image. Generating with NANO Banana 2.0...`);
+            addCard('bg-image', 'Generating background image', 'running', {
+                reasoning: backgroundImagePrompt,
+            });
+
+            try {
+                const { generateBackgroundImage } = await import('@/services/imageGenClient');
+                const bgResult = await generateBackgroundImage(
+                    backgroundImagePrompt,
+                    canvasW,
+                    canvasH,
+                    [guide.colors.accent, guide.colors.background, guide.colors.gradientEnd],
+                    abort.signal,
+                );
+
+                if (bgResult.success && bgResult.imageUrl) {
+                    // Place image as the first canvas layer
+                    const engine = engineRef.current?.current ?? engineRef.current;
+                    if (engine?.add_image) {
+                        await engine.add_image(0, 0, bgResult.imageUrl, canvasW, canvasH, 'ai_background');
+                        hasImageBackground = true;
+                        updateCard('bg-image', 'done', bgResult.isFallback ? 'Gradient fallback' : 'Image generated', {
+                            expandedDetail: bgResult.isFallback
+                                ? 'API not available — using gradient fallback. Connect an OpenRouter API key for real AI images.'
+                                : `Generated ${canvasW}x${canvasH} background via ${bgResult.model}`,
+                        });
+                        narrate(`Background image placed on canvas.`);
+                    } else {
+                        updateCard('bg-image', 'error', 'Engine not ready');
+                    }
+                } else {
+                    updateCard('bg-image', 'error', bgResult.message || 'Generation failed');
+                    narrate(`Background image failed — I'll use a gradient instead.`);
+                }
+            } catch (err) {
+                console.warn('[UnifiedAgent] Background image generation failed:', err);
+                updateCard('bg-image', 'error', 'Generation failed — using gradient');
+                narrate(`Background image failed — I'll use a gradient instead.`);
+            }
+            await new Promise(r => setTimeout(r, 400));
+        }
 
         const { runVisionLoop } = await import('@/services/autoDesignLoop');
 

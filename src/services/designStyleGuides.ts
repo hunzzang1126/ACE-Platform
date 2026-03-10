@@ -128,7 +128,12 @@ RULES:
    - Fashion/beauty → elegant dark or warm neutral
 4. ALWAYS ensure 4.5:1+ contrast between text and background.
 5. Dark backgrounds (< #333) should have white/light text. Light backgrounds (> #ccc) should have dark text.
-6. Return ONLY the JSON object, nothing else.`;
+6. Decide if a BACKGROUND IMAGE is needed:
+   - Brands with physical products (Nike shoes, Coca-Cola bottles) → YES
+   - Location/travel prompts → YES (scenic imagery)
+   - Abstract/data/SaaS/dashboard → NO (gradient is better)
+   - If YES, write a short Imagen prompt describing the ideal background.
+7. Return ONLY the JSON object, nothing else.`;
 
 interface AiColorResponse {
     name: string;
@@ -145,6 +150,8 @@ interface AiColorResponse {
     fontSecondary: string;
     radius: number;
     reasoning: string;
+    needsBackgroundImage: boolean;
+    backgroundImagePrompt: string;
 }
 
 /**
@@ -154,7 +161,7 @@ interface AiColorResponse {
 export async function generateColorPalette(
     prompt: string,
     signal: AbortSignal,
-): Promise<{ palette: DesignStyleGuide; reasoning: string }> {
+): Promise<{ palette: DesignStyleGuide; reasoning: string; needsBackgroundImage: boolean; backgroundImagePrompt: string }> {
     try {
         const body = {
             model: DEFAULT_CLAUDE_MODEL,
@@ -180,7 +187,9 @@ Return a JSON object with these exact keys:
   "fontPrimary": "font name for headlines",
   "fontSecondary": "font name for body",
   "radius": number (corner radius 0-12),
-  "reasoning": "1 sentence explaining why these colors"
+  "reasoning": "1 sentence explaining why these colors",
+  "needsBackgroundImage": true/false,
+  "backgroundImagePrompt": "if needsBackgroundImage is true, a short image-gen prompt (e.g. 'dark athletic field at night, dramatic lighting, moody sports atmosphere'). If false, empty string."
 }`,
             }],
         };
@@ -228,10 +237,10 @@ Return a JSON object with these exact keys:
             radius: parsed.radius ?? 6,
         };
 
-        return { palette, reasoning: parsed.reasoning || '' };
+        return { palette, reasoning: parsed.reasoning || '', needsBackgroundImage: !!parsed.needsBackgroundImage, backgroundImagePrompt: parsed.backgroundImagePrompt || '' };
     } catch (err) {
         console.warn('[ColorPalette] AI generation failed, using default:', err);
-        return { palette: { ...DEFAULT_PALETTE }, reasoning: 'Using default palette (AI unavailable)' };
+        return { palette: { ...DEFAULT_PALETTE }, reasoning: 'Using default palette (AI unavailable)', needsBackgroundImage: false, backgroundImagePrompt: '' };
     }
 }
 

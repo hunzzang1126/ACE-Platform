@@ -85,9 +85,9 @@ const MODEL_CONFIGS: Record<AceModelRole, ModelConfig> = {
         costPer1MOutput: 25.00,
     },
     image_fast: {
-        // Internal — not exposed in model selector
-        id: 'black-forest-labs/flux-1-schnell',
-        name: 'Flux Schnell',
+        // NANO Banana 2.0 — Gemini 2.5 Flash Image (free tier)
+        id: 'google/gemini-2.5-flash-image-preview:free',
+        name: 'NANO Banana 2.0',
         maxTokens: 0,
         supportsVision: false,
         supportsTools: false,

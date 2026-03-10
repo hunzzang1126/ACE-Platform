@@ -341,3 +341,44 @@ function getColorsForStyle(style: string): string[] {
             return ['#0a0e1a', '#1a2e4a', '#0d1b2a'];
     }
 }
+
+// ═══════════════════════════════════════════════════════════════
+// BACKGROUND IMAGE GENERATION — for AI design pipeline
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Generate a background image for the design pipeline.
+ * Uses NANO Banana 2.0 (Gemini 2.5 Flash Image) for fast generation.
+ *
+ * @param bgPrompt — AI-generated description of the ideal background
+ * @param canvasW — Canvas width
+ * @param canvasH — Canvas height
+ * @param accentColors — Brand colors to constrain the image
+ * @param signal — AbortSignal for cancellation
+ */
+export async function generateBackgroundImage(
+    bgPrompt: string,
+    canvasW: number,
+    canvasH: number,
+    accentColors: string[],
+    signal?: AbortSignal,
+): Promise<ImageGenResult> {
+    // Enhance the prompt for background-suitable output
+    const enhancedBgPrompt = [
+        bgPrompt,
+        'Background image for advertisement. No text, no logos, no watermarks.',
+        'Dark and moody with room for text overlay.',
+        'Professional quality, high resolution.',
+    ].join('. ');
+
+    return generateImage({
+        prompt: enhancedBgPrompt,
+        width: canvasW,
+        height: canvasH,
+        model: 'flux', // routes to image_fast = NANO Banana 2.0
+        colorConstraint: accentColors,
+        style: 'photography',
+        negativePrompt: 'text, logos, watermark, low quality, blurry, distorted',
+    }, signal);
+}
+

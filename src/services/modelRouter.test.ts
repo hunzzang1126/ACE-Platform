@@ -36,7 +36,7 @@ describe('modelRouter', () => {
         const fast = getModelId('image_fast');
         const quality = getModelId('image_quality');
         expect(fast).not.toBe(quality);
-        expect(fast).toContain('flux');
+        expect(fast).toContain('gemini'); // NANO Banana 2.0
         expect(quality).toContain('imagen');
     });
 
