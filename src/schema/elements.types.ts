@@ -92,6 +92,10 @@ export interface ShapeElement extends BaseElement {
     stroke?: string;
     strokeWidth?: number;
     borderRadius?: number;
+    /** Gradient support — if set, rendered with add_gradient_rect */
+    gradientStart?: string;
+    gradientEnd?: string;
+    gradientAngle?: number;
     /** 폴리곤의 경우 좌표 배열 */
     points?: { x: number; y: number }[];
 }

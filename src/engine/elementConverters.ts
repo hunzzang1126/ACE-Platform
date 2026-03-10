@@ -9,6 +9,22 @@ import type { EngineNode } from '@/hooks/useCanvasEngine';
 import type { OverlayElement } from '@/hooks/useOverlayElements';
 import { useAnimPresetStore } from '@/hooks/useAnimationPresets';
 
+// ── AI Element Cache (gradient data preservation) ──
+// WASM engine's get_all_nodes() doesn't include gradient metadata.
+// When the AI generates elements, we cache gradient data here so the
+// save converter can attach it to ShapeElements.
+interface CachedGradient { startHex: string; endHex: string; angle: number; }
+const gradientCache = new Map<string, CachedGradient>();
+
+/** Cache gradient data for an AI-generated element (call after engine.add_gradient_rect) */
+export function cacheGradientData(elementName: string, startHex: string, endHex: string, angle: number): void {
+    gradientCache.set(elementName, { startHex, endHex, angle });
+}
+/** Clear gradient cache (call when clearing scene) */
+export function clearGradientCache(): void {
+    gradientCache.clear();
+}
+
 // ── Constraint converters ──
 
 /**
@@ -153,6 +169,9 @@ export function engineNodeToShapeElement(
 
     const animation = getAnimationForElement(`engine-${node.id}`);
 
+    // Check gradient cache — WASM doesn't serialize gradient metadata
+    const cached = gradientCache.get(name) || gradientCache.get(node.name || '');
+
     return {
         id: `engine-${node.id}`,
         name,
@@ -160,6 +179,9 @@ export function engineNodeToShapeElement(
         shapeType: nodeTypeToShapeType(node.type),
         constraints,
         fill,
+        gradientStart: cached?.startHex,
+        gradientEnd: cached?.endHex,
+        gradientAngle: cached?.angle,
         opacity: node.opacity ?? 1,
         visible: true,
         locked: false,

@@ -51,50 +51,74 @@ const mediumRect: DesignTemplate = {
     build: (W, H, g, c) => {
         const pad = Math.round(W * 0.08); // ~24px at 300w
         const [ar, ag, ab] = hex(g.colors.accent);
-        const [afr, afg, afb] = hex(g.colors.accentForeground);
 
-        const headlineFs = Math.max(24, Math.min(40, Math.round(H * 0.15)));
-        const subFs = Math.max(11, Math.round(H * 0.05));
+        // ── Font sizes (capped to prevent overflow) ──
         const tagFs = Math.max(9, Math.round(H * 0.04));
+        const headlineFs = Math.max(22, Math.min(34, Math.round(H * 0.13)));
+        const subFs = Math.max(10, Math.round(H * 0.045));
         const ctaFs = Math.max(10, Math.round(H * 0.045));
         const ctaH = Math.round(H * 0.14);
         const ctaW = Math.round(W * 0.42);
+
+        // ── Layout waterfall: each Y depends on previous bottom ──
+        // Tag
+        const tagY = pad;
+        const tagH = Math.round(tagFs * 1.4);
+
+        // Accent zone (covers tag area)
+        const accentZoneH = tagY + tagH + Math.round(H * 0.04);
+
+        // Accent line (right below accent zone)
+        const accentLineY = accentZoneH;
+
+        // Headline (starts below accent line with gap)
+        const headlineY = accentLineY + 8;
+        // Estimate headline height: single line if short, 2 lines if long
+        const headlineLines = c.headline.length > 15 ? 2 : 1;
+        const headlineH = Math.round(headlineFs * 1.15 * headlineLines);
+
+        // Subheadline (starts after headline)
+        const subY = headlineY + headlineH + 6;
+        const subH = Math.round(subFs * 1.5) * 2; // up to 2 lines
+
+        // CTA (anchored to bottom)
+        const ctaY = H - pad - ctaH;
 
         return [
             // STRUCTURE
             { type: 'rect', name: 'background', x: 0, y: 0, w: W, h: H,
               gradient_start_hex: g.colors.gradientStart, gradient_end_hex: g.colors.gradientEnd, gradient_angle: g.colors.gradientAngle },
-            { type: 'rect', name: 'accent_zone', x: 0, y: 0, w: W, h: Math.round(H * 0.34),
+            { type: 'rect', name: 'accent_zone', x: 0, y: 0, w: W, h: accentZoneH,
               r: hex(g.colors.surface)[0], g: hex(g.colors.surface)[1], b: hex(g.colors.surface)[2], a: 0.4 },
-            { type: 'rect', name: 'accent_line', x: pad, y: Math.round(H * 0.34),
+            { type: 'rect', name: 'accent_line', x: pad, y: accentLineY,
               w: Math.round(W * 0.13), h: 2, r: ar, g: ag, b: ab, a: 1.0 },
 
             // CONTENT
-            { type: 'text', name: 'tag_text', x: pad, y: Math.round(H * 0.08), w: W - 2 * pad, h: Math.round(tagFs * 1.4),
+            { type: 'text', name: 'tag_text', x: pad, y: tagY, w: W - 2 * pad, h: tagH,
               content: c.tag.toUpperCase(), font_size: tagFs, font_weight: '600',
               color_hex: g.colors.accent, text_align: 'left', letter_spacing: 3 },
-            { type: 'text', name: 'headline', x: pad, y: Math.round(H * 0.38),
-              w: W - 2 * pad, h: Math.round(headlineFs * 2.2),
+            { type: 'text', name: 'headline', x: pad, y: headlineY,
+              w: W - 2 * pad, h: headlineH,
               content: c.headline, font_size: headlineFs, font_weight: '800',
-              color_hex: g.colors.foreground, text_align: 'left', letter_spacing: -0.5, line_height: 1.05 },
-            { type: 'text', name: 'subheadline', x: pad, y: Math.round(H * 0.63),
-              w: Math.round(W * 0.78), h: Math.round(subFs * 3),
+              color_hex: g.colors.foreground, text_align: 'left', letter_spacing: -0.5, line_height: 1.1 },
+            { type: 'text', name: 'subheadline', x: pad, y: subY,
+              w: Math.round(W * 0.82), h: subH,
               content: c.subheadline, font_size: subFs, font_weight: '400',
-              color_hex: g.colors.secondary, text_align: 'left', line_height: 1.5 },
+              color_hex: g.colors.secondary, text_align: 'left', line_height: 1.45 },
 
             // ACTION
-            { type: 'rounded_rect', name: 'cta_button', x: pad, y: H - pad - ctaH,
+            { type: 'rounded_rect', name: 'cta_button', x: pad, y: ctaY,
               w: ctaW, h: ctaH, r: ar, g: ag, b: ab, a: 1.0, radius: g.radius,
               shadow_offset_x: 2, shadow_offset_y: 4, shadow_blur: 10, shadow_opacity: 0.25 },
-            { type: 'text', name: 'cta_label', x: pad, y: H - pad - ctaH + Math.round((ctaH - ctaFs) / 2),
+            { type: 'text', name: 'cta_label', x: pad, y: ctaY + Math.round((ctaH - ctaFs) / 2),
               w: ctaW, h: ctaFs + 4,
               content: c.cta.toUpperCase(), font_size: ctaFs, font_weight: '700',
               color_hex: g.colors.accentForeground, text_align: 'center', letter_spacing: 1.5 },
 
-            // POLISH
-            { type: 'ellipse', name: 'decorative_circle', x: W - pad - 30, y: H - pad - 30,
+            // POLISH (decorative circle in top-right, away from content)
+            { type: 'ellipse', name: 'decorative_circle', x: W - 50, y: -10,
               w: 60, h: 60, r: ar, g: ag, b: ab, a: 0.06 },
-            { type: 'rect', name: 'bottom_border', x: 0, y: H - 4, w: W, h: 4,
+            { type: 'rect', name: 'bottom_border', x: 0, y: H - 3, w: W, h: 3,
               r: ar, g: ag, b: ab, a: 0.25 },
         ];
     },

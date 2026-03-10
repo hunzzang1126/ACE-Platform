@@ -163,15 +163,20 @@ export function useCanvasSync(
             if (el.type === 'shape') {
                 const shape = el as ShapeElement;
                 const { x, y, w, h } = constraintsToAbsolute(shape.constraints, canvasW, canvasH);
-                const [r, g, b, a] = hexToRgbFloat(shape.fill || '#808080');
 
                 let nodeId: number;
-                if (shape.shapeType === 'ellipse') {
+                if (shape.gradientStart && shape.gradientEnd) {
+                    // Gradient rect — restore with gradient data
+                    nodeId = engine.add_gradient_rect(x, y, w, h, shape.gradientStart, shape.gradientEnd, shape.gradientAngle ?? 135, shape.borderRadius ?? 0, shape.name);
+                } else if (shape.shapeType === 'ellipse') {
+                    const [r, g, b, a] = hexToRgbFloat(shape.fill || '#808080');
                     // Engine expects cx, cy, rx, ry for ellipses
                     nodeId = engine.add_ellipse(x + w / 2, y + h / 2, w / 2, h / 2, r, g, b, a);
                 } else if (shape.borderRadius && shape.borderRadius > 0) {
+                    const [r, g, b, a] = hexToRgbFloat(shape.fill || '#808080');
                     nodeId = engine.add_rounded_rect(x, y, w, h, r, g, b, a, shape.borderRadius);
                 } else {
+                    const [r, g, b, a] = hexToRgbFloat(shape.fill || '#808080');
                     nodeId = engine.add_rect(x, y, w, h, r, g, b, a);
                 }
 
