@@ -6,6 +6,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import { useDesignStore } from '@/stores/designStore';
 import { useEditorStore } from '@/stores/editorStore';
+import { useUIStore } from '@/stores/uiStore';
 import { EditorTopBar } from '@/components/editor/EditorTopBar';
 import { EditorToolbar } from '@/components/editor/EditorToolbar';
 import { EditorCanvas } from '@/components/editor/EditorCanvas';
@@ -13,6 +14,11 @@ import { PropertyPanel } from '@/components/panels/PropertyPanel';
 import { BottomPanel } from '@/components/editor/BottomPanel';
 // Vision check is now integrated into Auto-Design flow (autoDesignLoop.ts)
 import { AutoDesignPanel } from '@/components/ai/AutoDesignPanel';
+import { ExportPanel } from '@/components/editor/ExportPanel';
+import { CanvasRuler } from '@/components/editor/CanvasRuler';
+import { KeyframeInspector } from '@/components/editor/KeyframeInspector';
+import { BrandCompliancePanel } from '@/components/editor/BrandCompliancePanel';
+import { AuthModal } from '@/components/editor/AuthModal';
 import { useFabricCanvas } from '@/hooks/useFabricCanvas';
 import { useOverlayElements } from '@/hooks/useOverlayElements';
 import { useCanvasSync } from '@/hooks/useCanvasSync';
@@ -25,6 +31,17 @@ export function DetailEditorPage() {
     const setActiveVariant = useEditorStore((s) => s.setActiveVariant);
 
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+
+    // ── UI panel toggles ──
+    const exportPanelOpen = useUIStore(s => s.exportPanelOpen);
+    const canvasRulerVisible = useUIStore(s => s.canvasRulerVisible);
+    const keyframeInspectorOpen = useUIStore(s => s.keyframeInspectorOpen);
+    const brandComplianceOpen = useUIStore(s => s.brandComplianceOpen);
+    const authModalOpen = useUIStore(s => s.authModalOpen);
+    const toggleExportPanel = useUIStore(s => s.toggleExportPanel);
+    const toggleKeyframeInspector = useUIStore(s => s.toggleKeyframeInspector);
+    const toggleBrandCompliance = useUIStore(s => s.toggleBrandCompliance);
+    const toggleAuthModal = useUIStore(s => s.toggleAuthModal);
 
 
 
@@ -300,24 +317,35 @@ export function DetailEditorPage() {
                     onTriggerImageUpload={() => overlay.triggerImageUpload()}
                     onTriggerVideoUpload={() => overlay.triggerVideoUpload()}
                 />
-                <EditorCanvas
-                    variant={variant}
-                    canvasRef={canvasRef}
-                    overlayRef={overlayRef}
-                    engineRef={engineRef}
-                    state={state}
-                    actions={actions}
-                    retryInit={retryInit}
-                    overlayElements={overlay.overlayElements}
-                    selectedOverlayId={overlay.selectedOverlayId}
-                    onOverlaySelect={handleOverlaySelect}
-                    onOverlayUpdate={overlay.updateElement}
-                    onOverlayDelete={overlay.deleteElement}
-                    onAddText={overlay.addText}
-                    onTriggerImageUpload={overlay.triggerImageUpload}
-                    onTriggerVideoUpload={overlay.triggerVideoUpload}
-                />
-                {/* Right panel: Property editing + Vision Check */}
+                <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+                    {canvasRulerVisible && (
+                        <CanvasRuler
+                            width={width}
+                            height={height}
+                            zoom={1}
+                            showGrid={canvasRulerVisible}
+                            onToggleGrid={() => useUIStore.getState().toggleCanvasRuler()}
+                        />
+                    )}
+                    <EditorCanvas
+                        variant={variant}
+                        canvasRef={canvasRef}
+                        overlayRef={overlayRef}
+                        engineRef={engineRef}
+                        state={state}
+                        actions={actions}
+                        retryInit={retryInit}
+                        overlayElements={overlay.overlayElements}
+                        selectedOverlayId={overlay.selectedOverlayId}
+                        onOverlaySelect={handleOverlaySelect}
+                        onOverlayUpdate={overlay.updateElement}
+                        onOverlayDelete={overlay.deleteElement}
+                        onAddText={overlay.addText}
+                        onTriggerImageUpload={overlay.triggerImageUpload}
+                        onTriggerVideoUpload={overlay.triggerVideoUpload}
+                    />
+                </div>
+                {/* Right panel: Property editing + secondary panels */}
                 <aside className="ed-right-panel-wrapper">
                     <PropertyPanel
                         nodes={state.nodes}
@@ -333,9 +361,30 @@ export function DetailEditorPage() {
                         engine={engineRef.current}
                         canvasW={width}
                         canvasH={height}
-
                     />
+                    {/* Brand Compliance */}
+                    {brandComplianceOpen && (
+                        <BrandCompliancePanel
+                            nodes={state.nodes}
+                            onClose={toggleBrandCompliance}
+                        />
+                    )}
+                    {/* Keyframe Inspector */}
+                    {keyframeInspectorOpen && (
+                        <KeyframeInspector
+                            onClose={toggleKeyframeInspector}
+                        />
+                    )}
                 </aside>
+                {/* Export Panel — slide-over */}
+                {exportPanelOpen && (
+                    <ExportPanel
+                        nodes={state.nodes}
+                        canvasWidth={width}
+                        canvasHeight={height}
+                        onClose={toggleExportPanel}
+                    />
+                )}
             </div>
             {/* Bottom panel: Layers + Timeline integrated */}
             <BottomPanel
@@ -357,6 +406,13 @@ export function DetailEditorPage() {
                 onOverlayRename={overlay.renameOverlay}
                 onOverlayDelete={overlay.deleteElement}
             />
+            {/* Auth Modal — global overlay */}
+            {authModalOpen && (
+                <AuthModal
+                    onClose={toggleAuthModal}
+                    onSuccess={toggleAuthModal}
+                />
+            )}
         </div>
     );
 }

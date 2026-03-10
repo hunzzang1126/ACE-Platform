@@ -4,6 +4,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEditorStore } from '@/stores/editorStore';
+import { useUIStore } from '@/stores/uiStore';
 import { IcExport, IcImage, IcFilm, IcCode, IcBell, IcHelp, IcClose } from '@/components/ui/Icons';
 import { exportToHtml5, downloadExport } from '@/engine/html5Exporter';
 import type { EngineNode } from '@/hooks/canvasTypes';
@@ -25,6 +26,13 @@ export function EditorTopBar({ setName, variantLabel, canvasWidth = 300, canvasH
     const [exportOpen, setExportOpen] = useState(false);
     const [exporting, setExporting] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
+
+    // UI panel toggles
+    const toggleExportPanel = useUIStore(s => s.toggleExportPanel);
+    const toggleCanvasRuler = useUIStore(s => s.toggleCanvasRuler);
+    const toggleBrandCompliance = useUIStore(s => s.toggleBrandCompliance);
+    const toggleAuthModal = useUIStore(s => s.toggleAuthModal);
+    const canvasRulerVisible = useUIStore(s => s.canvasRulerVisible);
 
     useEffect(() => {
         if (!exportOpen) return;
@@ -139,8 +147,30 @@ export function EditorTopBar({ setName, variantLabel, canvasWidth = 300, canvasH
                     <button className="ed-zoom-btn" onClick={() => setZoom(zoom + 0.1)}>+</button>
                 </div>
 
+                {/* Ruler/Grid toggle */}
+                <button
+                    className="ed-topbar-icon-btn"
+                    title={canvasRulerVisible ? 'Hide Ruler & Grid' : 'Show Ruler & Grid'}
+                    onClick={toggleCanvasRuler}
+                    style={canvasRulerVisible ? { color: '#60a5fa' } : {}}
+                >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="3" y="3" width="18" height="18" rx="1" />
+                        <line x1="3" y1="9" x2="7" y2="9" /><line x1="3" y1="15" x2="7" y2="15" />
+                        <line x1="9" y1="3" x2="9" y2="7" /><line x1="15" y1="3" x2="15" y2="7" />
+                    </svg>
+                </button>
+
+                {/* Brand Compliance */}
+                <button className="ed-topbar-icon-btn" title="Brand Compliance" onClick={toggleBrandCompliance}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M12 2L3 7v7c0 5.25 3.75 10.74 9 12 5.25-1.26 9-6.75 9-12V7l-9-5z" />
+                        <polyline points="9 12 11 14 15 10" />
+                    </svg>
+                </button>
+
                 <button className="ed-topbar-icon-btn" title="Notifications"><IcBell size={15} /></button>
-                <div className="ed-topbar-avatar">YA</div>
+                <div className="ed-topbar-avatar" onClick={toggleAuthModal} style={{ cursor: 'pointer' }} title="Account">YA</div>
                 <span className="ed-saved-indicator">SAVED</span>
                 <button className="ed-topbar-icon-btn" title="Help"><IcHelp size={15} /></button>
                 <button className="ed-topbar-close" onClick={() => navigate('/editor')} title="Close"><IcClose size={14} /></button>

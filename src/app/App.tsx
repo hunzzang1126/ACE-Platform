@@ -12,6 +12,7 @@ import EffectsTestPage from './EffectsTestPage';
 import ExportTestPage from './ExportTestPage';
 import AiTestPage from './AiTestPage';
 
+import { TemplateGallery } from '../components/editor/TemplateGallery';
 import { GlobalAiPanel } from '../components/ai/GlobalAiPanel';
 import { ErrorBoundary } from '../components/ui/ErrorBoundary';
 import { ToastContainer } from '../components/ui/Toast';
@@ -32,6 +33,7 @@ export default function App() {
                             <Route path="/effects-test" element={<EffectsTestPage />} />
                             <Route path="/export-test" element={<ExportTestPage />} />
                             <Route path="/ai-test" element={<AiTestPage />} />
+                            <Route path="/templates" element={<div className="dashboard-layout"><div style={{ flex: 1, padding: 24 }}><TemplateGallery /></div></div>} />
                             <Route path="/trash" element={<TrashPage />} />
                         </Routes>
                     </div>

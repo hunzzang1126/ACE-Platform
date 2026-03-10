@@ -8,14 +8,14 @@
 import { useState, useCallback, useMemo } from 'react';
 
 interface Props {
-    canvasWidth: number;
-    canvasHeight: number;
-    zoom: number;
-    panX: number;
-    panY: number;
-    showGrid: boolean;
-    gridSize: number;
-    onToggleGrid: () => void;
+    width: number;
+    height: number;
+    zoom?: number;
+    panX?: number;
+    panY?: number;
+    showGrid?: boolean;
+    gridSize?: number;
+    onToggleGrid?: () => void;
 }
 
 const RULER_SIZE = 20; // px
@@ -23,7 +23,7 @@ const TICK_MINOR = 10; // px interval
 const TICK_MAJOR = 50; // px interval
 
 export function CanvasRuler({
-    canvasWidth, canvasHeight, zoom, panX, panY, showGrid, gridSize, onToggleGrid,
+    width: canvasWidth, height: canvasHeight, zoom = 1, panX = 0, panY = 0, showGrid = false, gridSize = 20, onToggleGrid,
 }: Props) {
     const [unit] = useState<'px' | 'mm'>('px');
 
@@ -79,7 +79,7 @@ export function CanvasRuler({
     }, [showGrid, gridSize, zoom, panX, panY, canvasWidth, canvasHeight]);
 
     const handleGridToggle = useCallback(() => {
-        onToggleGrid();
+        onToggleGrid?.();
     }, [onToggleGrid]);
 
     return (

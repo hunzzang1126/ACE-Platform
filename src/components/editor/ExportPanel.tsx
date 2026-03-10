@@ -6,16 +6,18 @@
 // ─────────────────────────────────────────────────
 
 import { useState, useCallback, useMemo } from 'react';
-import type { BannerVariant } from '@/schema/design.types';
+import type { EngineNode } from '@/hooks/canvasTypes';
 import {
     validateForNetwork, validateAllNetworks,
-    type AdNetwork, type ValidationResult, type ValidateInput,
+    type AdNetwork, type ValidateInput,
 } from '@/engine/adNetworkValidator';
 
 type ExportFormat = 'html5' | 'png' | 'jpg' | 'gif';
 
 interface Props {
-    variant: BannerVariant;
+    nodes?: EngineNode[];
+    canvasWidth?: number;
+    canvasHeight?: number;
     onExportHTML5?: () => void;
     onExportPNG?: (quality: number) => void;
     onExportJPG?: (quality: number) => void;
@@ -27,7 +29,7 @@ interface Props {
 }
 
 export function ExportPanel({
-    variant, onExportHTML5, onExportPNG, onExportJPG, onExportGIF,
+    nodes: _nodes, canvasWidth = 300, canvasHeight = 250, onExportHTML5, onExportPNG, onExportJPG, onExportGIF,
     onBatchExport, onClose, fileSizeEstimate = 0, animDuration = 5,
 }: Props) {
     const [format, setFormat] = useState<ExportFormat>('html5');
@@ -37,14 +39,14 @@ export function ExportPanel({
     const [showValidation, setShowValidation] = useState(true);
 
     const validationInput: ValidateInput = useMemo(() => ({
-        width: variant.preset.width,
-        height: variant.preset.height,
+        width: canvasWidth,
+        height: canvasHeight,
         fileSizeBytes: fileSizeEstimate,
         animDurationS: animDuration,
         loopCount: 1,
         hasClickTag: true,
         hasBackupImage: false,
-    }), [variant, fileSizeEstimate, animDuration]);
+    }), [canvasWidth, canvasHeight, fileSizeEstimate, animDuration]);
 
     const validation = useMemo(() =>
         validateForNetwork(network, validationInput),
@@ -65,7 +67,7 @@ export function ExportPanel({
         }
     }, [format, quality, gifFps, animDuration, onExportHTML5, onExportPNG, onExportJPG, onExportGIF]);
 
-    const sizeLabel = `${variant.preset.width} x ${variant.preset.height}`;
+    const sizeLabel = `${canvasWidth} x ${canvasHeight}`;
 
     return (
         <div style={styles.root}>
@@ -80,7 +82,6 @@ export function ExportPanel({
             {/* Size info */}
             <div style={styles.sizeRow}>
                 <span style={styles.sizeLabel}>{sizeLabel}</span>
-                <span style={styles.sizeName}>{variant.preset.name}</span>
             </div>
 
             {/* Format selector */}
