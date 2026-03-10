@@ -10,6 +10,7 @@ import { callAnthropicApi, DEFAULT_CLAUDE_MODEL } from '@/services/anthropicClie
 import { buildBrandContextForPlanner } from '@/services/brandContextBuilder';
 import { classifyRatio, LAYOUT_ZONES, classifyMasterGroup, getMasterGroupDescriptions } from '@/engine/smartSizing';
 import { getToolSchemasByCategory } from '@/services/toolRegistry';
+import { buildBannerStyleGuide } from '@/services/bannerDesignGuide';
 import type { BrandKit } from '@/stores/brandKitStore';
 import type { SceneGraph } from '@/services/sceneGraphBuilder';
 import type { DesignPlan, PlannedElement, ProgressCallback } from './agentTypes';
@@ -36,7 +37,12 @@ function buildPlannerSystemPrompt(
         ? `\nEXISTING ELEMENTS ON CANVAS:\n${sceneGraph.elements.map(e => `  - "${e.name}" (${e.type}) at (${e.bounds.x},${e.bounds.y}) ${e.bounds.w}x${e.bounds.h}`).join('\n')}`
         : '';
 
-    return `You are a senior banner ad planner. You create detailed design plans.
+    // Banner Design Intelligence (Pencil-inspired style guide)
+    const designGuide = buildBannerStyleGuide(canvasW, canvasH);
+
+    return `You are a world-class banner ad art director. You create designs that rival Apple, Nike, and premium agency work.
+
+${designGuide}
 
 CANVAS: ${canvasW}x${canvasH}px (${ratio} ratio, ${groupDesc})
 
@@ -51,14 +57,17 @@ ${brandContext}
 ${existingElements}
 
 INSTRUCTIONS:
-- Plan a complete banner layout
+- Follow the BANNER DESIGN INTELLIGENCE rules above precisely
+- Plan a PREMIUM banner layout that would stop someone scrolling
 - For each element, specify the EXACT tool name and parameters
 - All coordinates must be in PIXELS (not percentages)
 - Ensure no overlaps between elements
-- Keep 15px minimum padding from canvas edges
+- Respect safe margins from the banner profile
 - Use brand colors if brand kit is provided
 - Place logo if available in brand kit
 - Use brand CTA phrases if available
+- Apply RULE OF THIRDS for element placement
+- Create clear visual hierarchy: headline draws eye first, then visual, then CTA
 
 Return your response as JSON ONLY:
 {
@@ -69,7 +78,7 @@ Return your response as JSON ONLY:
       "type": "shape | text | button | brand_asset",
       "tool": "<tool name from available tools>",
       "params": { <exact params for the tool> },
-      "reasoning": "<why this element>"
+      "reasoning": "<why this element and these values>"
     }
   ],
   "colorPalette": ["#hex1", "#hex2", ...],
