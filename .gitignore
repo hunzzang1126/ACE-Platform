@@ -33,3 +33,4 @@ __pycache__/
 .venv/
 chroma_data/
 .openpencil-ref
+.pencil-analysis/
