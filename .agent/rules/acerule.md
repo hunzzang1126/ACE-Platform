@@ -2,6 +2,18 @@
 trigger: always_on
 ---
 
+# ACE PLATFORM IDENTITY — READ THIS FIRST
+
+> **ACE is a FULL CREATIVE PLATFORM — NOT a banner tool.**
+> Banners and banner resizing are ONE supplementary feature.
+> ACE enables creation of: social media creatives, video ads, static landing pages,
+> display banners, rich media, and ANY visual creative format.
+> NEVER refer to ACE as a "banner editor" or "banner tool" in code, comments, or UI.
+> The AI agent, design engine, and all features must be built with this
+> platform-level ambition in mind. Think Figma + Pencil.dev, not BannerFlow.
+
+---
+
 🛠️ ACE Project: AI Coding Rules & Guidelines
 1. General Principles & Architecture
 Module-First Approach: 모든 기능은 독립적인 모듈로 분리한다. 특정 기능을 수정할 때 다른 모듈에 영향을 주지 않도록 한다.
@@ -173,9 +185,9 @@ Reliability: Implement Zod for schema validation. AI Agent must interact via pre
 Performance: Use PixiJS (WebGPU) for rendering. Use OffscreenCanvas for heavy background tasks.
 
 
-# 🏆 Figma-Level Quality Standards — "사이징의 대가"
+# 🏆 Figma-Level Quality Standards — "크리에이티브의 정점"
 
-ACE는 단순한 배너 에디터가 아니라, **Smart Sizing의 정점**에 선 플랫폼이 되어야 한다.
+ACE는 풀 크리에이티브 플랫폼이다. 배너는 부가 기능일 뿐이며, 소셜, 비디오, 랜딩페이지까지 모든 크리에이티브를 커버한다.
 아래는 Figma / BannerFlow / Google Web Designer 수준의 품질을 달성하기 위한 기준.
 
 ## A. Performance Standards (60fps, Zero Jank)

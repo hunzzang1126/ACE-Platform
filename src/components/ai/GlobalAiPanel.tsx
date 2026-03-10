@@ -1,72 +1,58 @@
 // ─────────────────────────────────────────────────
-// GlobalAiPanel — Fixed right sidebar AI Agent (Cmd+K)
-// Docked to right edge, toggleable, no floating chat
+// GlobalAiPanel — THE Unified AI Agent (Pencil-style)
+// ─────────────────────────────────────────────────
+// One agent to rule them all: Chat + Generate + Scan + Modify + Check
+// Features: collapsible progress cards, inline image drop,
+// live cursor animation, intent-aware routing
+// NO EMOJIS. Clean, Apple/Figma/Linear aesthetic.
 // ─────────────────────────────────────────────────
 
 import { useState, useEffect, useRef, useCallback, type CSSProperties } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useDesignStore } from '@/stores/designStore';
-import { AiService, type AiConfig } from '@/ai/aiService';
-import { DASHBOARD_TOOL_NAMES } from '@/ai/dashboardTools';
-import { executeDashboardTool } from '@/ai/dashboardExecutor';
-import { getModelForRole, listModels, type AceModelRole } from '@/services/modelRouter';
-import type { AgentMessage, SceneNodeInfo } from '@/ai/agentContext';
-import type { ExecutionResult } from '@/ai/commandExecutor';
-import { IcAi, IcSend, IcClose, IcChevronLeft, IcChevronRight, IcLoader, IcCheck, IcError, IcSearch } from '@/components/ui/Icons';
-import type { ToolExecutorOverride } from '@/ai/aiService';
+import { useUnifiedAgent, detectIntent, type ProgressCard, type AgentIntent } from '@/hooks/useUnifiedAgent';
+import { getModelForRole, type AceModelRole } from '@/services/modelRouter';
+import type { AgentMessage } from '@/ai/agentContext';
+import {
+    IcAi, IcSend, IcClose, IcChevronRight,
+    IcLoader, IcCheck, IcError,
+} from '@/components/ui/Icons';
 
-// ── Model Selector Config ──
-const MODEL_OPTIONS: Array<{ role: AceModelRole; label: string }> = [
-    { role: 'planner', label: 'Planner (Advanced)' },
-    { role: 'design', label: 'Design (Full)' },
-    { role: 'executor', label: 'Executor (Fast)' },
-    { role: 'critic', label: 'Critic' },
-];
+// ── Constants ────────────────────────────────────
 
-// ── Types ────────────────────────────────────────
+const PANEL_WIDTH = 400;
 
-interface LiveState {
-    phase: 'idle' | 'scanning' | 'thinking' | 'planning' | 'executing' | 'reflecting' | 'done' | 'error';
-    canvasScan: string;
-    thinking: string;
-    plan: string[];
-    steps: { name: string; params: Record<string, unknown>; result?: ExecutionResult; status: 'pending' | 'running' | 'done' | 'error' }[];
-    reflection: string;
-    streamedText: string;
-    error: string;
-}
-
-const LIVE_INIT: LiveState = {
-    phase: 'idle', canvasScan: '', thinking: '', plan: [],
-    steps: [], reflection: '', streamedText: '', error: '',
+const INTENT_LABELS: Record<AgentIntent, string> = {
+    generate: 'Generating design',
+    scan: 'Scanning design',
+    modify: 'Modifying elements',
+    check: 'Running quality check',
+    general: 'Processing',
 };
 
-const PANEL_WIDTH = 360;
+const QUICK_ACTIONS = [
+    { id: 'generate', label: 'Generate', hint: 'Create a new design from a prompt' },
+    { id: 'scan', label: 'Scan Design', hint: 'Drop a screenshot to recreate' },
+    { id: 'check', label: 'Smart Check', hint: 'Vision QA on current canvas' },
+] as const;
 
 // ── Component ────────────────────────────────────
 
 export function GlobalAiPanel() {
     const [open, setOpen] = useState(false);
-    const [messages, setMessages] = useState<AgentMessage[]>([]);
-    const [input, setInput] = useState('');
-    const [live, setLive] = useState<LiveState>(LIVE_INIT);
+    const [showDropZone, setShowDropZone] = useState(false);
     const [selectedRole, setSelectedRole] = useState<AceModelRole>('design');
     const [showModelDropdown, setShowModelDropdown] = useState(false);
+    const [expandedCards, setExpandedCards] = useState(true);
+
     const activeModel = getModelForRole(selectedRole);
-    const [config, setConfig] = useState<AiConfig>({
-        endpoint: 'https://openrouter.ai/api',
-        model: activeModel.id,
-        maxToolRounds: 30,
-    });
+    const navigate = useNavigate();
+    const location = useLocation();
 
     const bottomRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
-    const serviceRef = useRef<AiService | null>(null);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const engineRef = useRef<any>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const location = useLocation();
-    const navigate = useNavigate();
+    const agent = useUnifiedAgent({ navigate, selectedRole });
 
     const currentPage = location.pathname.startsWith('/editor/detail') ? 'detail'
         : location.pathname === '/editor' ? 'editor'
@@ -75,6 +61,8 @@ export function GlobalAiPanel() {
     const contextLabel = currentPage === 'dashboard' ? 'Dashboard'
         : currentPage === 'editor' ? 'Creative Set'
             : 'Canvas Editor';
+
+    const isBusy = agent.state.phase !== 'idle' && agent.state.phase !== 'done' && agent.state.phase !== 'error';
 
     // ── Cmd+K Toggle ────────────────────────────
     useEffect(() => {
@@ -90,7 +78,7 @@ export function GlobalAiPanel() {
         return () => window.removeEventListener('keydown', handler);
     }, [open]);
 
-    // ── Engine bridge ────────────────────────
+    // ── Engine bridge ────────────────────────────
     useEffect(() => {
         // @ts-expect-error — global bridge
         const existing = window.__aceGlobalAi ?? {};
@@ -98,135 +86,61 @@ export function GlobalAiPanel() {
         window.__aceGlobalAi = {
             ...existing,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            setEngine: (e: any) => {
-                // e may be a React ref (has .current) or direct engine
-                engineRef.current = e?.current ?? e;
-            },
+            setEngine: (e: any) => agent.setEngine(e),
         };
-    }, []);
+    }, [agent.setEngine]);
 
-    // ── AI Service init ──────────────────────
-    useEffect(() => {
-        const saved = localStorage.getItem('ace-ai-config');
-        if (saved) {
-            try {
-                const parsed = JSON.parse(saved) as AiConfig;
-                setConfig(parsed);
-                const svc = new AiService([]);
-                svc.updateConfig(parsed);
-                serviceRef.current = svc;
-            } catch { /* ignore */ }
-        }
-    }, []);
-
+    // Auto-scroll
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages, live]);
+    }, [agent.messages, agent.state]);
 
-    // ── Context ──────────────────────────────
-    const buildContextSummary = useCallback((): string => {
-        const cs = useDesignStore.getState().creativeSet;
-        const lines: string[] = [`Page: ${currentPage}`];
-        if (cs) {
-            lines.push(`Set: "${cs.name}"`);
-            lines.push(`Variants: ${cs.variants.map(v => `${v.preset.width}x${v.preset.height}`).join(', ')}`);
+    // ── Image Drop Handler ───────────────────────
+    const handleImageDrop = useCallback(async (file: File) => {
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+        setShowDropZone(false);
+        agent.send('Scan this design', dataUrl);
+    }, [agent]);
+
+    const handleDrop = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        setShowDropZone(false);
+        const file = e.dataTransfer.files[0];
+        if (file?.type.startsWith('image/')) handleImageDrop(file);
+    }, [handleImageDrop]);
+
+    const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) handleImageDrop(file);
+        e.target.value = '';
+    }, [handleImageDrop]);
+
+    // ── Quick Action Handlers ────────────────────
+    const handleQuickAction = useCallback((actionId: string) => {
+        if (actionId === 'scan') {
+            fileInputRef.current?.click();
+        } else if (actionId === 'generate') {
+            inputRef.current?.focus();
+            agent.setInput('Create a ');
+        } else if (actionId === 'check') {
+            agent.send('Run a quality check on the current canvas');
         }
-        if (currentPage === 'detail' && engineRef.current) {
-            try { lines.push(`Canvas: ${engineRef.current.node_count?.() ?? 0} elements`); } catch { /* */ }
-        }
-        return lines.join('\n');
-    }, [currentPage]);
+    }, [agent]);
 
-    // ── Send ─────────────────────────────────
-    const handleSend = useCallback(async (text?: string) => {
-        const msg = text ?? input.trim();
-        if (!msg) return;
+    // ── Send Handler ─────────────────────────────
+    const handleSend = useCallback(() => {
+        agent.send();
+    }, [agent]);
 
-        if (!serviceRef.current) {
-            serviceRef.current = new AiService([]);
-        }
-        // ★ Always sync config → service so model dropdown changes take effect
-        serviceRef.current.updateConfig(config);
-
-        setInput('');
-        const userMsg: AgentMessage = { role: 'user', content: msg, timestamp: Date.now() };
-        setMessages(prev => [...prev, userMsg]);
-        setLive({ ...LIVE_INIT, phase: 'thinking' });
-
-        // Track whether an error occurred during the agentic loop
-        let hadError = '';
-
-        // Build executor override that routes dashboard tools properly
-        const dashboardOverride: ToolExecutorOverride = (toolName, params) => {
-            console.log(`[GlobalAiPanel] Tool override check: "${toolName}", isDashboardTool=${DASHBOARD_TOOL_NAMES.has(toolName)}, allNames=[${Array.from(DASHBOARD_TOOL_NAMES).join(',')}]`);
-            if (DASHBOARD_TOOL_NAMES.has(toolName)) {
-                const result = executeDashboardTool(toolName, params, navigate);
-                console.log(`[GlobalAiPanel] Dashboard tool "${toolName}" result:`, result);
-                return { success: result.success, message: result.message, data: result.data };
-            }
-            return null; // Fall through to default executor
-        };
-
-        try {
-            // Dereference engine — could be a ref wrapper or direct engine
-            const engine = engineRef.current?.current ?? engineRef.current;
-            console.log('[GlobalAiPanel] Engine for AI:', engine ? 'connected' : 'null');
-
-            // Inject design context so AI knows about the current creative set
-            const designState = useDesignStore.getState();
-            serviceRef.current.setDesignContext(
-                designState.creativeSet ?? null,
-                designState.creativeSet?.masterVariantId,
-            );
-
-            await serviceRef.current.chat(msg, engine, {
-                onCanvasScan: (s: string) => setLive(prev => ({ ...prev, phase: 'scanning', canvasScan: s })),
-                onThinking: (t: string) => setLive(prev => ({ ...prev, phase: 'thinking', thinking: t })),
-                onPlan: (steps: string[]) => setLive(prev => ({ ...prev, phase: 'planning', plan: steps })),
-                onStepStart: (idx: number, name: string, params: Record<string, unknown>) => {
-                    setLive(prev => {
-                        const steps = [...prev.steps]; steps[idx] = { name, params, status: 'running' };
-                        return { ...prev, phase: 'executing', steps };
-                    });
-                },
-                onStepComplete: (idx: number, result: ExecutionResult) => {
-                    setLive(prev => {
-                        const steps = [...prev.steps]; if (steps[idx]) steps[idx] = { ...steps[idx], result, status: result.success ? 'done' : 'error' };
-                        return { ...prev, steps };
-                    });
-                },
-                onReflection: (t: string) => setLive(prev => ({ ...prev, phase: 'reflecting', reflection: t })),
-                onToken: (token: string) => setLive(prev => ({ ...prev, streamedText: prev.streamedText + token })),
-                onComplete: () => setLive(prev => ({ ...prev, phase: 'done' })),
-                onError: (err: string) => {
-                    hadError = err;
-                    setLive(prev => ({ ...prev, phase: 'error', error: err }));
-                },
-            }, dashboardOverride);
-
-            // Show the actual reply, or the error, never a blind "Done."
-            const reply = serviceRef.current.getLastReply();
-            if (reply) {
-                setMessages(prev => [...prev, { role: 'assistant', content: reply, timestamp: Date.now() }]);
-            } else if (hadError) {
-                setMessages(prev => [...prev, { role: 'assistant', content: `[Warning] ${hadError}`, timestamp: Date.now() }]);
-            } else {
-                setMessages(prev => [...prev, { role: 'assistant', content: 'Request completed.', timestamp: Date.now() }]);
-            }
-            setLive(prev => ({ ...prev, phase: hadError ? 'error' : 'done' }));
-        } catch (err) {
-            const errMsg = String(err);
-            setMessages(prev => [...prev, { role: 'assistant', content: `[Warning] ${errMsg}`, timestamp: Date.now() }]);
-            setLive(prev => ({ ...prev, phase: 'error', error: errMsg }));
-        }
-    }, [input, config, buildContextSummary, navigate]);
-
-    const isBusy = live.phase !== 'idle' && live.phase !== 'done' && live.phase !== 'error';
-
-    // ── Render ───────────────────────────────
+    // ── Render ───────────────────────────────────
     return (
         <div style={{ ...wrapperStyle, width: open ? PANEL_WIDTH : 32 }}>
-            {/* Toggle tab — always visible */}
+            {/* Toggle tab */}
             <button
                 onClick={() => { setOpen(!open); setTimeout(() => inputRef.current?.focus(), 150); }}
                 style={toggleBtnStyle}
@@ -237,160 +151,179 @@ export function GlobalAiPanel() {
                     : <IcAi size={16} color="#c9d1d9" />}
             </button>
 
-            {/* Panel content — visible when open */}
+            {/* Panel content */}
             {open && (
                 <div style={panelInnerStyle}>
-                    {/* Header */}
+                    {/* ── Header ────────────────────── */}
                     <div style={headerStyle}>
                         <IcAi size={18} color="#c9d1d9" />
                         <div style={{ flex: 1 }}>
-                            <div style={{ fontWeight: 600, fontSize: 13, color: '#e6edf3' }}>ACE AI</div>
+                            <div style={{ fontWeight: 600, fontSize: 13, color: '#e6edf3', letterSpacing: -0.3 }}>ACE AI</div>
                             <div style={{ fontSize: 10, color: '#6e7681', marginTop: 1 }}>{contextLabel}</div>
                         </div>
+                        <button onClick={() => agent.clearChat()} style={headerBtnStyle} title="New conversation">
+                            <span style={{ fontSize: 12, color: '#6e7681' }}>+</span>
+                        </button>
                         <button onClick={() => setOpen(false)} style={headerBtnStyle} title="Close (Esc)">
                             <IcClose size={14} color="#6e7681" />
                         </button>
                     </div>
 
-
-                    {/* Messages */}
-                    <div style={msgAreaStyle}>
-                        {messages.length === 0 && (
+                    {/* ── Messages Area ─────────────── */}
+                    <div
+                        style={msgAreaStyle}
+                        onDragOver={(e) => { e.preventDefault(); setShowDropZone(true); }}
+                        onDragLeave={() => setShowDropZone(false)}
+                        onDrop={handleDrop}
+                    >
+                        {/* Empty state */}
+                        {agent.messages.length === 0 && agent.state.phase === 'idle' && (
                             <div style={emptyStyle}>
-                                <IcAi size={32} color="#30363d" />
-                                <div style={{ marginTop: 12, fontSize: 13 }}>Ask anything about your project.</div>
-                                <div style={{ fontSize: 11, color: '#484f58', marginTop: 4 }}>
-                                    Manage sets, sizes, canvas elements, effects, or animations.
+                                <IcAi size={36} color="#21262d" />
+                                <div style={{ marginTop: 16, fontSize: 14, fontWeight: 500, color: '#c9d1d9' }}>
+                                    What would you like to create?
+                                </div>
+                                <div style={{ fontSize: 12, color: '#484f58', marginTop: 6, lineHeight: 1.5 }}>
+                                    Design social creatives, ads, landing pages, or any visual format.
+                                    Drop a screenshot to reverse-engineer an existing design.
+                                </div>
+
+                                {/* Quick action buttons */}
+                                <div style={quickActionsStyle}>
+                                    {QUICK_ACTIONS.map(action => (
+                                        <button
+                                            key={action.id}
+                                            onClick={() => handleQuickAction(action.id)}
+                                            style={quickActionBtnStyle}
+                                        >
+                                            <span style={{ fontSize: 12, fontWeight: 500, color: '#c9d1d9' }}>{action.label}</span>
+                                            <span style={{ fontSize: 10, color: '#484f58', marginTop: 2 }}>{action.hint}</span>
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
                         )}
 
-                        {messages.map((m, i) => (
+                        {/* Image drop overlay */}
+                        {showDropZone && (
+                            <div style={dropOverlayStyle}>
+                                <div style={{ fontSize: 14, fontWeight: 500, color: '#58a6ff' }}>
+                                    Drop screenshot to scan
+                                </div>
+                                <div style={{ fontSize: 11, color: '#6e7681', marginTop: 4 }}>
+                                    AI will extract all elements as editable layers
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Conversation messages */}
+                        {agent.messages.map((m, i) => (
                             <div key={i} style={m.role === 'user' ? userBubbleStyle : assistantStyle}>
                                 {m.content}
                             </div>
                         ))}
 
-                        {/* Live progress — visible during active phases AND after completion */}
-                        {live.phase !== 'idle' && (
-                            <div style={progressStyle}>
-                                {/* Scanning phase */}
-                                {live.canvasScan && (
-                                    <div style={progressRow}>
-                                        {live.phase === 'scanning' ? <IcLoader size={12} color="#58a6ff" /> : <IcCheck size={12} color="#3fb950" />}
-                                        <span style={{ opacity: live.phase === 'scanning' ? 1 : 0.5 }}>Scanning canvas</span>
+                        {/* ── Progress Cards (Pencil-style) ── */}
+                        {agent.state.cards.length > 0 && (
+                            <div style={cardsContainerStyle}>
+                                {/* Intent label */}
+                                {agent.state.intent && isBusy && (
+                                    <div style={intentLabelStyle}>
+                                        <IcLoader size={12} color="#58a6ff" />
+                                        <span>{INTENT_LABELS[agent.state.intent]}</span>
                                     </div>
                                 )}
-                                {/* Thinking phase */}
-                                {(live.phase === 'thinking' || live.thinking) && (
-                                    <div style={progressRow}>
-                                        {live.phase === 'thinking' ? <IcLoader size={12} color="#58a6ff" /> : <IcCheck size={12} color="#3fb950" />}
-                                        <span style={{ opacity: live.phase === 'thinking' ? 1 : 0.5 }}>{live.thinking || 'Thinking...'}</span>
-                                    </div>
-                                )}
-                                {/* Planning phase */}
-                                {live.plan.length > 0 && (
-                                    <div style={progressRow}>
-                                        {live.phase === 'planning' ? <IcLoader size={12} color="#58a6ff" /> : <IcCheck size={12} color="#3fb950" />}
-                                        <span style={{ opacity: live.phase === 'planning' ? 1 : 0.5 }}>Planning: {live.plan.length} steps</span>
-                                    </div>
-                                )}
-                                {/* Executing phase — show each step */}
-                                {live.steps.length > 0 && live.steps.map((step, idx) => (
-                                    <div key={idx} style={{ ...progressRow, paddingLeft: 8 }}>
-                                        {step.status === 'running' ? <IcLoader size={12} color="#58a6ff" />
-                                            : step.status === 'done' ? <IcCheck size={12} color="#3fb950" />
-                                                : step.status === 'error' ? <IcError size={12} color="#f85149" />
-                                                    : <span style={{ width: 12, display: 'inline-block' }}>·</span>}
-                                        <span style={{ opacity: step.status === 'running' ? 1 : 0.6 }}>
-                                            {step.name}({Object.keys(step.params).length > 0 ? '…' : ''})
-                                        </span>
-                                        {step.result && (
-                                            <span style={{ fontSize: 10, color: step.result.success ? '#3fb950' : '#f85149', marginLeft: 4 }}>
-                                                {step.result.success ? 'Done' : 'Fail'}
-                                            </span>
-                                        )}
-                                    </div>
+
+                                {/* Cards */}
+                                {(expandedCards ? agent.state.cards : agent.state.cards.slice(-2)).map(card => (
+                                    <ProgressCardRow key={card.id} card={card} />
                                 ))}
-                                {/* Reflecting phase */}
-                                {live.reflection && (
-                                    <div style={progressRow}><IcCheck size={12} color="#3fb950" /> <span>{live.reflection}</span></div>
+
+                                {/* Collapse toggle */}
+                                {agent.state.cards.length > 3 && (
+                                    <button
+                                        onClick={() => setExpandedCards(!expandedCards)}
+                                        style={collapseToggleStyle}
+                                    >
+                                        {expandedCards ? 'Show less' : `Show all ${agent.state.cards.length} steps`}
+                                    </button>
                                 )}
-                                {/* Error */}
-                                {live.phase === 'error' && live.error && (
-                                    <div style={{ ...progressRow, color: '#f85149' }}><IcError size={12} color="#f85149" /> <span>{live.error}</span></div>
-                                )}
+                            </div>
+                        )}
+
+                        {/* Error */}
+                        {agent.state.phase === 'error' && agent.state.error && (
+                            <div style={errorStyle}>
+                                <IcError size={12} color="#f85149" />
+                                <span>{agent.state.error}</span>
                             </div>
                         )}
 
                         <div ref={bottomRef} />
                     </div>
 
-                    {/* Model Selector + Input */}
+                    {/* ── Bottom Bar ────────────────── */}
                     <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                        {/* Model Bar */}
+                        {/* Model selector */}
                         <div style={modelBarStyle}>
                             <button
                                 onClick={() => setShowModelDropdown(!showModelDropdown)}
                                 style={modelSelectorBtnStyle}
                             >
-                                <span style={{ fontSize: 11, color: '#6e7681' }}>{MODEL_OPTIONS.find(o => o.role === selectedRole)?.label ?? 'Design'}</span>
-                                <span style={{ fontSize: 11, color: '#8b949e', margin: '0 4px' }}>·</span>
                                 <span style={{ fontSize: 11, color: '#c9d1d9', fontWeight: 500 }}>{activeModel.name}</span>
                                 <IcChevronRight size={10} color="#6e7681" />
                             </button>
-                            {activeModel.costPer1MInput > 0 && (
-                                <span style={{ fontSize: 9, color: '#484f58', marginLeft: 'auto' }}>
-                                    ~${(activeModel.costPer1MInput * 0.002 + activeModel.costPer1MOutput * 0.001).toFixed(3)}/call
-                                </span>
-                            )}
+                            <button
+                                onClick={() => fileInputRef.current?.click()}
+                                style={{ ...headerBtnStyle, marginLeft: 'auto' }}
+                                title="Scan a screenshot"
+                            >
+                                <span style={{ fontSize: 11, color: '#6e7681' }}>Scan</span>
+                            </button>
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept="image/*"
+                                style={{ display: 'none' }}
+                                onChange={handleFileInput}
+                            />
                         </div>
 
-                        {/* Dropdown */}
+                        {/* Model dropdown */}
                         {showModelDropdown && (
-                            <div style={modelDropdownStyle}>
-                                {MODEL_OPTIONS.map(opt => {
-                                    const m = getModelForRole(opt.role);
-                                    const active = opt.role === selectedRole;
-                                    return (
-                                        <button
-                                            key={opt.role}
-                                            onClick={() => {
-                                                setSelectedRole(opt.role);
-                                                const newModel = getModelForRole(opt.role);
-                                                setConfig(prev => ({ ...prev, model: newModel.id }));
-                                                setShowModelDropdown(false);
-                                            }}
-                                            style={{
-                                                ...modelOptionStyle,
-                                                background: active ? 'rgba(56,139,253,0.1)' : 'transparent',
-                                                borderLeft: active ? '2px solid #388bfd' : '2px solid transparent',
-                                            }}
-                                        >
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                                                <span style={{ fontSize: 12, color: active ? '#e6edf3' : '#c9d1d9' }}>{opt.label}</span>
-                                                {m.costPer1MInput > 0 && (
-                                                    <span style={{ fontSize: 10, color: '#484f58' }}>
-                                                        ${m.costPer1MInput}/{m.costPer1MOutput}
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <div style={{ fontSize: 10, color: '#484f58', marginTop: 2 }}>{m.id}</div>
-                                        </button>
-                                    );
-                                })}
-                            </div>
+                            <ModelDropdown
+                                selectedRole={selectedRole}
+                                onSelect={(role) => {
+                                    setSelectedRole(role);
+                                    setShowModelDropdown(false);
+                                }}
+                            />
                         )}
 
-                        {/* Input Row */}
+                        {/* Input row */}
                         <div style={inputAreaStyle}>
-                            <input ref={inputRef} value={input}
-                                onChange={e => setInput(e.target.value)}
-                                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                                placeholder={`Message AI... (${contextLabel.toLowerCase()})`}
+                            <input
+                                ref={inputRef}
+                                value={agent.input}
+                                onChange={e => agent.setInput(e.target.value)}
+                                onKeyDown={e => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        handleSend();
+                                    }
+                                }}
+                                placeholder="Ask anything about your creative..."
+                                disabled={isBusy}
                                 style={inputFieldStyle}
                             />
-                            <button onClick={() => handleSend()} disabled={!input.trim() || isBusy} style={sendBtnStyle}>
+                            <button
+                                onClick={handleSend}
+                                disabled={!agent.input.trim() || isBusy}
+                                style={{
+                                    ...sendBtnStyle,
+                                    opacity: !agent.input.trim() || isBusy ? 0.4 : 1,
+                                }}
+                            >
                                 <IcSend size={14} color="#fff" />
                             </button>
                         </div>
@@ -401,9 +334,75 @@ export function GlobalAiPanel() {
     );
 }
 
-// ── Styles ──────────────────────────────────────
+// ── Sub-components ───────────────────────────────
 
-// Outer wrapper — flex child in the App layout
+function ProgressCardRow({ card }: { card: ProgressCard }) {
+    const icon = card.status === 'running' ? <IcLoader size={12} color="#58a6ff" />
+        : card.status === 'done' ? <IcCheck size={12} color="#3fb950" />
+            : card.status === 'error' ? <IcError size={12} color="#f85149" />
+                : <span style={{ width: 12, display: 'inline-block', textAlign: 'center', color: '#484f58' }}>·</span>;
+
+    return (
+        <div style={{
+            ...cardRowStyle,
+            opacity: card.status === 'done' ? 0.7 : 1,
+        }}>
+            {icon}
+            <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 11, color: card.status === 'error' ? '#f85149' : '#c9d1d9', fontWeight: 500 }}>
+                    {card.label}
+                </div>
+                {card.detail && (
+                    <div style={{ fontSize: 10, color: '#6e7681', marginTop: 1 }}>{card.detail}</div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+// ── Model Dropdown (extracted for readability) ───
+
+const MODEL_OPTIONS: Array<{ role: AceModelRole; label: string }> = [
+    { role: 'planner', label: 'Planner (Advanced)' },
+    { role: 'design', label: 'Design (Full)' },
+    { role: 'executor', label: 'Executor (Fast)' },
+    { role: 'critic', label: 'Critic' },
+];
+
+function ModelDropdown({ selectedRole, onSelect }: { selectedRole: AceModelRole; onSelect: (role: AceModelRole) => void }) {
+    return (
+        <div style={modelDropdownStyle}>
+            {MODEL_OPTIONS.map(opt => {
+                const m = getModelForRole(opt.role);
+                const active = opt.role === selectedRole;
+                return (
+                    <button
+                        key={opt.role}
+                        onClick={() => onSelect(opt.role)}
+                        style={{
+                            ...modelOptionStyle,
+                            background: active ? 'rgba(56,139,253,0.1)' : 'transparent',
+                            borderLeft: active ? '2px solid #388bfd' : '2px solid transparent',
+                        }}
+                    >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                            <span style={{ fontSize: 12, color: active ? '#e6edf3' : '#c9d1d9' }}>{opt.label}</span>
+                            {m.costPer1MInput > 0 && (
+                                <span style={{ fontSize: 10, color: '#484f58' }}>
+                                    ${m.costPer1MInput}/{m.costPer1MOutput}
+                                </span>
+                            )}
+                        </div>
+                        <div style={{ fontSize: 10, color: '#484f58', marginTop: 2 }}>{m.id}</div>
+                    </button>
+                );
+            })}
+        </div>
+    );
+}
+
+// ── Styles ───────────────────────────────────────
+
 const wrapperStyle: CSSProperties = {
     flexShrink: 0, height: '100%', display: 'flex',
     transition: 'width 0.3s cubic-bezier(0.4,0,0.2,1)',
@@ -435,34 +434,108 @@ const headerBtnStyle: CSSProperties = {
     display: 'flex', alignItems: 'center',
 };
 
-
-
 const msgAreaStyle: CSSProperties = {
     flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2, padding: '4px 0',
+    position: 'relative',
 };
 
 const emptyStyle: CSSProperties = {
     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-    color: '#30363d', padding: '60px 20px', textAlign: 'center',
+    color: '#30363d', padding: '40px 20px', textAlign: 'center',
+};
+
+const quickActionsStyle: CSSProperties = {
+    display: 'flex', flexDirection: 'column', gap: 6, width: '100%', marginTop: 20,
+};
+
+const quickActionBtnStyle: CSSProperties = {
+    display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
+    background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)',
+    borderRadius: 8, padding: '10px 14px', cursor: 'pointer',
+    transition: 'all 0.15s ease', textAlign: 'left', width: '100%',
+};
+
+const dropOverlayStyle: CSSProperties = {
+    position: 'absolute', inset: 0, zIndex: 10,
+    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+    background: 'rgba(13,17,23,0.92)',
+    border: '2px dashed #388bfd', borderRadius: 8,
+    margin: 8,
 };
 
 const userBubbleStyle: CSSProperties = {
-    padding: '8px 14px', margin: '2px 14px', alignSelf: 'flex-end',
+    padding: '8px 14px', margin: '4px 14px', alignSelf: 'flex-end',
     background: 'rgba(56,139,253,0.1)', borderRadius: '12px 12px 4px 12px',
     maxWidth: '85%', fontSize: 13, lineHeight: '1.6', color: '#c9d1d9',
 };
 
 const assistantStyle: CSSProperties = {
-    padding: '8px 14px', margin: '2px 14px', fontSize: 13, lineHeight: '1.7',
+    padding: '8px 14px', margin: '4px 14px', fontSize: 13, lineHeight: '1.7',
     color: '#e6edf3', whiteSpace: 'pre-wrap',
 };
 
-const progressStyle: CSSProperties = {
-    padding: '6px 14px', display: 'flex', flexDirection: 'column', gap: 4,
+const cardsContainerStyle: CSSProperties = {
+    margin: '4px 10px', padding: '8px 10px',
+    background: 'rgba(255,255,255,0.015)',
+    border: '1px solid rgba(255,255,255,0.04)',
+    borderRadius: 10, display: 'flex', flexDirection: 'column', gap: 4,
 };
 
-const progressRow: CSSProperties = {
-    display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#8b949e',
+const intentLabelStyle: CSSProperties = {
+    display: 'flex', alignItems: 'center', gap: 6,
+    fontSize: 11, fontWeight: 600, color: '#58a6ff',
+    padding: '2px 0 4px',
+    borderBottom: '1px solid rgba(255,255,255,0.04)',
+    marginBottom: 2,
+};
+
+const cardRowStyle: CSSProperties = {
+    display: 'flex', alignItems: 'flex-start', gap: 8,
+    padding: '4px 2px', transition: 'opacity 0.3s ease',
+};
+
+const collapseToggleStyle: CSSProperties = {
+    background: 'none', border: 'none', cursor: 'pointer',
+    fontSize: 10, color: '#6e7681', textAlign: 'center',
+    padding: '4px 0', marginTop: 2,
+};
+
+const errorStyle: CSSProperties = {
+    display: 'flex', alignItems: 'center', gap: 6,
+    margin: '4px 14px', padding: '8px 12px',
+    background: 'rgba(248,81,73,0.08)', border: '1px solid rgba(248,81,73,0.2)',
+    borderRadius: 8, fontSize: 12, color: '#f85149',
+};
+
+const modelBarStyle: CSSProperties = {
+    display: 'flex', alignItems: 'center', gap: 6,
+    padding: '6px 12px',
+    borderBottom: '1px solid rgba(255,255,255,0.04)',
+};
+
+const modelSelectorBtnStyle: CSSProperties = {
+    display: 'flex', alignItems: 'center', gap: 4,
+    background: 'none', border: 'none', cursor: 'pointer',
+    padding: '3px 6px', borderRadius: 4,
+};
+
+const modelDropdownStyle: CSSProperties = {
+    background: '#161b22',
+    border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: 8,
+    margin: '0 8px 4px',
+    padding: '6px 0',
+    boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+    maxHeight: 280,
+    overflowY: 'auto',
+};
+
+const modelOptionStyle: CSSProperties = {
+    display: 'flex', flexDirection: 'column',
+    width: '100%', textAlign: 'left',
+    background: 'none', border: 'none',
+    padding: '6px 12px', cursor: 'pointer',
+    transition: 'background 0.1s',
 };
 
 const inputAreaStyle: CSSProperties = {
@@ -479,44 +552,5 @@ const sendBtnStyle: CSSProperties = {
     width: 34, height: 34, borderRadius: 8,
     background: '#238636', border: 'none', cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-};
-
-// ── Model Selector Styles ──
-
-const modelBarStyle: CSSProperties = {
-    display: 'flex', alignItems: 'center', gap: 6,
-    padding: '6px 12px',
-    borderBottom: '1px solid rgba(255,255,255,0.04)',
-};
-
-const modelSelectorBtnStyle: CSSProperties = {
-    display: 'flex', alignItems: 'center', gap: 4,
-    background: 'none', border: 'none', cursor: 'pointer',
-    padding: '3px 6px', borderRadius: 4,
-    transition: 'background 0.15s',
-};
-
-const modelDropdownStyle: CSSProperties = {
-    background: '#161b22',
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 8,
-    margin: '0 8px 4px',
-    padding: '6px 0',
-    boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
-    maxHeight: 280,
-    overflowY: 'auto',
-};
-
-const modelGroupLabelStyle: CSSProperties = {
-    fontSize: 9, fontWeight: 600, letterSpacing: '0.8px',
-    textTransform: 'uppercase', color: '#484f58',
-    padding: '8px 12px 4px',
-};
-
-const modelOptionStyle: CSSProperties = {
-    display: 'flex', flexDirection: 'column',
-    width: '100%', textAlign: 'left',
-    background: 'none', border: 'none',
-    padding: '6px 12px', cursor: 'pointer',
-    transition: 'background 0.1s',
+    transition: 'opacity 0.15s ease',
 };

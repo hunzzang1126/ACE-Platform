@@ -13,7 +13,7 @@ import { EditorCanvas } from '@/components/editor/EditorCanvas';
 import { PropertyPanel } from '@/components/panels/PropertyPanel';
 import { BottomPanel } from '@/components/editor/BottomPanel';
 // Vision check is now integrated into Auto-Design flow (autoDesignLoop.ts)
-import { AutoDesignPanel } from '@/components/ai/AutoDesignPanel';
+// AI is now unified in GlobalAiPanel (App.tsx sidebar)
 import { ExportPanel } from '@/components/editor/ExportPanel';
 import { CanvasRuler } from '@/components/editor/CanvasRuler';
 import { KeyframeInspector } from '@/components/editor/KeyframeInspector';
@@ -345,12 +345,7 @@ export function DetailEditorPage() {
                         canvasWidth={width}
                         canvasHeight={height}
                     />
-                    {/* Auto-Design — prompt → Claude → full banner generation + auto vision */}
-                    <AutoDesignPanel
-                        engine={engineRef.current}
-                        canvasW={width}
-                        canvasH={height}
-                    />
+
                     {/* Keyframe Inspector */}
                     {keyframeInspectorOpen && (
                         <KeyframeInspector
