@@ -19,14 +19,13 @@ import type { NavigateFunction } from 'react-router-dom';
 
 export type AgentIntent = 'generate' | 'scan' | 'modify' | 'check' | 'general';
 
+// ProgressCard type kept for backward compat, data now lives inside AgentMessage.actionCard
 export interface ProgressCard {
     id: string;
     label: string;
     status: 'pending' | 'running' | 'done' | 'error';
     detail?: string;
-    /** AI reasoning/thinking text shown in collapsed view */
     reasoning?: string;
-    /** Expandable detail content (element list, variables, etc.) */
     expandedDetail?: string;
 }
 
@@ -40,7 +39,6 @@ export interface LiveCursor {
 export interface UnifiedAgentState {
     phase: 'idle' | 'scanning' | 'thinking' | 'planning' | 'executing' | 'reflecting' | 'done' | 'error';
     intent: AgentIntent | null;
-    cards: ProgressCard[];
     error: string;
     liveCursor: LiveCursor;
 }
@@ -48,7 +46,6 @@ export interface UnifiedAgentState {
 const INITIAL_STATE: UnifiedAgentState = {
     phase: 'idle',
     intent: null,
-    cards: [],
     error: '',
     liveCursor: { active: false, x: 0, y: 0 },
 };
@@ -114,18 +111,32 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         }]);
     }, []);
 
-    // ── Progress card helpers ────────────────────
+    // ── Progress card helpers — push into messages ─
+    // Cards are now interleaved with narration as action messages
     const addCard = useCallback((id: string, label: string, status: ProgressCard['status'] = 'running', opts?: { reasoning?: string; expandedDetail?: string }) => {
-        setState(prev => ({
-            ...prev,
-            cards: [...prev.cards.filter(c => c.id !== id), { id, label, status, reasoning: opts?.reasoning, expandedDetail: opts?.expandedDetail }],
-        }));
+        setMessages(prev => [...prev, {
+            role: 'action' as const,
+            content: label,
+            timestamp: Date.now(),
+            actionCard: { id, label, status, reasoning: opts?.reasoning, expandedDetail: opts?.expandedDetail },
+        }]);
     }, []);
 
     const updateCard = useCallback((id: string, status: ProgressCard['status'], detail?: string, opts?: { reasoning?: string; expandedDetail?: string }) => {
-        setState(prev => ({
-            ...prev,
-            cards: prev.cards.map(c => c.id === id ? { ...c, status, detail, ...(opts?.reasoning != null ? { reasoning: opts.reasoning } : {}), ...(opts?.expandedDetail != null ? { expandedDetail: opts.expandedDetail } : {}) } : c),
+        setMessages(prev => prev.map(m => {
+            if (m.role === 'action' && m.actionCard?.id === id) {
+                return {
+                    ...m,
+                    actionCard: {
+                        ...m.actionCard,
+                        status,
+                        ...(detail != null ? { detail } : {}),
+                        ...(opts?.reasoning != null ? { reasoning: opts.reasoning } : {}),
+                        ...(opts?.expandedDetail != null ? { expandedDetail: opts.expandedDetail } : {}),
+                    },
+                };
+            }
+            return m;
         }));
     }, []);
 
@@ -282,7 +293,6 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         narrate(`Now I'll render each element onto the canvas.`);
         await new Promise(r => setTimeout(r, 500));
 
-        addCard('render', 'Placing elements on canvas', 'running');
         // Clear scene and gradient cache
         const { clearGradientCache, cacheGradientData } = await import('@/engine/elementConverters');
         clearGradientCache();
@@ -291,12 +301,17 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         let rendered = 0;
         for (const layer of layers) {
             if (layer.elements.length === 0) continue;
-            updateCard('render', 'running', `Placing ${layer.name.toLowerCase()} layer (${layer.elements.length})...`);
-            await new Promise(r => setTimeout(r, 400)); // Pacing: pause between layers
+            await new Promise(r => setTimeout(r, 300)); // Pacing: pause between layers
 
             for (const el of layer.elements) {
+                // Add per-element action card
+                const elCardId = `design-${rendered}`;
+                const elType = el.gradient_start_hex ? 'gradient' : el.type ?? 'rect';
+                const elLabel = `Design: ${el.name || elType}`;
+                addCard(elCardId, elLabel, 'running');
+
                 moveCursor(el.x ?? 0, el.y ?? 0, el.name);
-                await new Promise(r => setTimeout(r, 100));
+                await new Promise(r => setTimeout(r, 150));
 
                 try {
                     let nodeId: number | null = null;
@@ -332,23 +347,21 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
                         } catch { /* shadow not critical */ }
                     }
 
+                    // Build detail for the action card
+                    const detail = el.type === 'text'
+                        ? `"${(el.content ?? '').slice(0, 25)}" ${el.font_size}px at (${Math.round(el.x ?? 0)}, ${Math.round(el.y ?? 0)})`
+                        : el.gradient_start_hex
+                            ? `${el.gradient_start_hex} -> ${el.gradient_end_hex} ${Math.round(el.w ?? 0)}x${Math.round(el.h ?? 0)}`
+                            : `${elType} at (${Math.round(el.x ?? 0)}, ${Math.round(el.y ?? 0)}) ${Math.round(el.w ?? 0)}x${Math.round(el.h ?? 0)}`;
+                    updateCard(elCardId, 'done', detail);
                     rendered++;
                 } catch (err) {
                     console.warn('[UnifiedAgent] Failed to render:', el.name, err);
+                    updateCard(elCardId, 'error', `Failed: ${el.name}`);
                 }
             }
         }
         hideCursor();
-        updateCard('render', 'done', `${rendered} elements placed`);
-
-        // Build summary of placed elements — like Pencil's operation results
-        const placedSummary = allElements.slice(0, 8).map(el => {
-            if (el.type === 'text') return `  "${el.name}" — text "${(el.content ?? '').slice(0, 30)}" ${el.font_size}px at (${el.x}, ${el.y})`;
-            if (el.gradient_start_hex) return `  "${el.name}" — gradient ${el.gradient_start_hex} → ${el.gradient_end_hex} ${el.w}x${el.h}`;
-            return `  "${el.name}" — ${el.type} at (${el.x}, ${el.y}) ${el.w}x${el.h}`;
-        }).join('\n');
-        const moreCount = Math.max(0, allElements.length - 8);
-        narrate(`${rendered} elements placed:\n${placedSummary}${moreCount > 0 ? `\n  + ${moreCount} more` : ''}`);
 
         // ── Phase 6: Vision QA ──
         narrate(`Running vision quality check on ${canvasW}x${canvasH} canvas...`);
@@ -498,7 +511,7 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
 
         // Detect intent
         const intent: AgentIntent = imageData ? 'scan' : detectIntent(msg);
-        setState({ ...INITIAL_STATE, phase: 'thinking', intent, cards: [] });
+        setState({ ...INITIAL_STATE, phase: 'thinking', intent });
 
         try {
             let reply = '';

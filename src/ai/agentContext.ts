@@ -13,13 +13,22 @@ import { buildSmartContext, contextToPromptSection, type SmartContext } from './
  * Chat message with tool execution history.
  */
 export interface AgentMessage {
-    role: 'user' | 'assistant' | 'system';
+    role: 'user' | 'assistant' | 'system' | 'action';
     content: string;
     timestamp: number;
     /** AI phases visible in live progress */
     phases?: AgentPhase[];
     /** Tool calls executed during this message */
     toolCalls?: ToolCallRecord[];
+    /** Action card data — only when role === 'action' */
+    actionCard?: {
+        id: string;
+        label: string;
+        status: 'pending' | 'running' | 'done' | 'error';
+        detail?: string;
+        reasoning?: string;
+        expandedDetail?: string;
+    };
 }
 
 export interface AgentPhase {

@@ -9,7 +9,7 @@
 
 import { useState, useEffect, useRef, useCallback, type CSSProperties } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useUnifiedAgent, detectIntent, type ProgressCard, type AgentIntent } from '@/hooks/useUnifiedAgent';
+import { useUnifiedAgent, detectIntent, type AgentIntent } from '@/hooks/useUnifiedAgent';
 import { getModelForRole, type AceModelRole } from '@/services/modelRouter';
 import type { AgentMessage } from '@/ai/agentContext';
 import {
@@ -41,7 +41,6 @@ export function GlobalAiPanel() {
     const [showDropZone, setShowDropZone] = useState(false);
     const [selectedRole, setSelectedRole] = useState<AceModelRole>('design');
     const [showModelDropdown, setShowModelDropdown] = useState(false);
-    const [expandedCards, setExpandedCards] = useState(true);
 
     const activeModel = getModelForRole(selectedRole);
     const navigate = useNavigate();
@@ -215,40 +214,25 @@ export function GlobalAiPanel() {
                             </div>
                         )}
 
-                        {/* Conversation messages */}
-                        {agent.messages.map((m, i) => (
-                            <div key={i} style={m.role === 'user' ? userBubbleStyle : assistantStyle}>
-                                {m.content}
-                            </div>
-                        ))}
-
-                        {/* ── Progress Cards (Pencil-style) ── */}
-                        {agent.state.cards.length > 0 && (
-                            <div style={cardsContainerStyle}>
-                                {/* Intent label */}
-                                {agent.state.intent && isBusy && (
-                                    <div style={intentLabelStyle}>
-                                        <IcLoader size={12} color="#58a6ff" />
-                                        <span>{INTENT_LABELS[agent.state.intent]}</span>
+                        {/* Conversation messages + action cards interleaved */}
+                        {agent.messages.map((m, i) => {
+                            if (m.role === 'user') {
+                                return (
+                                    <div key={i} style={userBubbleStyle}>
+                                        {m.content}
                                     </div>
-                                )}
-
-                                {/* Cards */}
-                                {(expandedCards ? agent.state.cards : agent.state.cards.slice(-2)).map(card => (
-                                    <ProgressCardRow key={card.id} card={card} />
-                                ))}
-
-                                {/* Collapse toggle */}
-                                {agent.state.cards.length > 3 && (
-                                    <button
-                                        onClick={() => setExpandedCards(!expandedCards)}
-                                        style={collapseToggleStyle}
-                                    >
-                                        {expandedCards ? 'Show less' : `Show all ${agent.state.cards.length} steps`}
-                                    </button>
-                                )}
-                            </div>
-                        )}
+                                );
+                            }
+                            if (m.role === 'action' && m.actionCard) {
+                                return <ActionCardInline key={`action-${m.actionCard.id}-${i}`} card={m.actionCard} />;
+                            }
+                            // assistant
+                            return (
+                                <div key={i} style={assistantStyle}>
+                                    {m.content}
+                                </div>
+                            );
+                        })}
 
                         {/* Error */}
                         {agent.state.phase === 'error' && agent.state.error && (
@@ -335,7 +319,16 @@ export function GlobalAiPanel() {
 
 // ── Sub-components ───────────────────────────────
 
-function ProgressCardRow({ card }: { card: ProgressCard }) {
+interface ActionCardData {
+    id: string;
+    label: string;
+    status: 'pending' | 'running' | 'done' | 'error';
+    detail?: string;
+    reasoning?: string;
+    expandedDetail?: string;
+}
+
+function ActionCardInline({ card }: { card: ActionCardData }) {
     const [expanded, setExpanded] = useState(false);
     const hasExpandable = !!card.expandedDetail;
 
@@ -346,11 +339,14 @@ function ProgressCardRow({ card }: { card: ProgressCard }) {
 
     return (
         <div style={{
-            ...cardRowStyle,
-            opacity: card.status === 'done' ? 0.85 : 1,
-            flexDirection: 'column',
+            ...actionCardStyle,
+            borderColor: card.status === 'done' ? 'rgba(63,185,80,0.15)'
+                : card.status === 'error' ? 'rgba(248,81,73,0.2)'
+                    : card.status === 'running' ? 'rgba(88,166,255,0.15)'
+                        : 'rgba(255,255,255,0.04)',
+            boxShadow: card.status === 'done' ? '0 0 8px rgba(63,185,80,0.08)' : 'none',
         }}>
-            {/* Main row — clickable to expand */}
+            {/* Main row */}
             <div
                 onClick={() => hasExpandable && setExpanded(!expanded)}
                 style={{
@@ -520,30 +516,14 @@ const assistantStyle: CSSProperties = {
     color: '#e6edf3', whiteSpace: 'pre-wrap',
 };
 
-const cardsContainerStyle: CSSProperties = {
-    margin: '4px 10px', padding: '8px 10px',
+const actionCardStyle: CSSProperties = {
+    margin: '3px 10px',
+    padding: '6px 10px',
     background: 'rgba(255,255,255,0.015)',
     border: '1px solid rgba(255,255,255,0.04)',
-    borderRadius: 10, display: 'flex', flexDirection: 'column', gap: 4,
-};
-
-const intentLabelStyle: CSSProperties = {
-    display: 'flex', alignItems: 'center', gap: 6,
-    fontSize: 11, fontWeight: 600, color: '#58a6ff',
-    padding: '2px 0 4px',
-    borderBottom: '1px solid rgba(255,255,255,0.04)',
-    marginBottom: 2,
-};
-
-const cardRowStyle: CSSProperties = {
-    display: 'flex', alignItems: 'flex-start', gap: 8,
-    padding: '4px 2px', transition: 'opacity 0.3s ease',
-};
-
-const collapseToggleStyle: CSSProperties = {
-    background: 'none', border: 'none', cursor: 'pointer',
-    fontSize: 10, color: '#6e7681', textAlign: 'center',
-    padding: '4px 0', marginTop: 2,
+    borderRadius: 8,
+    display: 'flex', flexDirection: 'column', gap: 4,
+    transition: 'border-color 0.3s ease, box-shadow 0.3s ease',
 };
 
 const errorStyle: CSSProperties = {
