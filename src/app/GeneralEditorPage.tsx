@@ -39,7 +39,7 @@ export function GeneralEditorPage() {
     }, []);
 
     // Smart Check (one-click auto-fix)
-    const { status: smartCheckStatus, result: smartCheckResult, error: smartCheckError, runSmartCheck, reset: resetSmartCheck } = useSmartCheck();
+    const { status: smartCheckStatus, result: smartCheckResult, error: smartCheckError, progressMessage: smartCheckProgress, runSmartCheck, reset: resetSmartCheck } = useSmartCheck();
 
     // Auto-dismiss toast after 4 seconds
     useEffect(() => {
@@ -146,6 +146,7 @@ export function GeneralEditorPage() {
                         masterVariantId={creativeSet.masterVariantId}
                         onRunSmartCheck={() => runSmartCheck(creativeSet)}
                         smartCheckStatus={smartCheckStatus}
+                        smartCheckProgress={smartCheckProgress}
                         externalPlaying={previewPlaying}
                     />
                 </main>
@@ -164,7 +165,9 @@ export function GeneralEditorPage() {
             {smartCheckStatus === 'checking' && (
                 <div className="vqa-loading-overlay">
                     <div className="vqa-loading-spinner" />
-                    <div className="vqa-loading-text">Checking all sizes...</div>
+                    <div className="vqa-loading-text">
+                        {smartCheckProgress || 'Checking all sizes...'}
+                    </div>
                 </div>
             )}
 
@@ -177,6 +180,14 @@ export function GeneralEditorPage() {
                     <div className="vqa-loading-text" style={{ fontSize: 18 }}>
                         {smartCheckResult.message}
                     </div>
+                    {smartCheckResult.avgVisionScore >= 0 && (
+                        <div className="vqa-loading-progress" style={{ marginTop: 8, fontSize: 14, opacity: 0.7 }}>
+                            Vision Quality: {smartCheckResult.avgVisionScore}/100
+                            {smartCheckResult.visionResults.length > 0 && (
+                                <> ({smartCheckResult.visionResults.map(r => r.impression).filter((v, i, a) => a.indexOf(v) === i).join(', ')})</>  
+                            )}
+                        </div>
+                    )}
                     <div className="vqa-loading-progress">Click to dismiss</div>
                 </div>
             )}

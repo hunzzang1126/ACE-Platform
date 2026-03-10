@@ -1,35 +1,46 @@
 // ─────────────────────────────────────────────────
-// useSmartCheck — One-click Smart Check hook (v2)
+// useSmartCheck — One-click Smart Check hook (v3)
 // ─────────────────────────────────────────────────
-// REWRITTEN: Previous version ran 4 systems that fought each other,
-// causing elements to misalign (fallbackConstraints moved them to center).
+// Now with Vision QA: after proportional scaling, captures each 
+// variant's canvas preview and sends to Claude Vision for
+// quality analysis (contrast, readability, clipping, hierarchy).
 //
-// New approach (safe proportional scale):
-//   1. For each slave variant: proportionally scale element positions
-//      from master dimensions → target dimensions (no role lookup)
-//   2. QA check: clip out-of-bounds only (don't relocate)
-//   3. Text contrast / font overflow heuristics (non-positional only)
-//   4. Report result
-//
-// Role-based smart layout only runs EXPLICITLY when user has assigned
-// roles to elements — never implicitly during Smart Check.
+// Pipeline:
+//   1. Proportional scale master → each slave variant
+//   2. Clip out-of-bounds elements
+//   3. Heuristic fixes for social sizes
+//   4. Math-based QA check
+//   5. Vision QA: screenshot each variant → Claude Vision → scoring
+//   6. Report combined results
 // ─────────────────────────────────────────────────
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import type { CreativeSet, BannerVariant } from '@/schema/design.types';
 import type { DesignElement } from '@/schema/elements.types';
 import { resolveConstraints } from '@/schema/constraints.types';
 import { runSmartSizingQA } from '@/engine/smartSizingQA';
 import { classifyRatio } from '@/engine/smartSizing';
 import { useDesignStore } from '@/stores/designStore';
+import { analyzeDesign, captureElement } from '@/services/visionService';
+import type { DesignAnalysis } from '@/services/visionService';
 
 export type SmartCheckStatus = 'idle' | 'checking' | 'done' | 'error';
+
+export interface VariantVisionResult {
+    variantId: string;
+    label: string;
+    score: number;
+    issues: string[];
+    impression: string;
+}
 
 export interface SmartCheckResult {
     issueCount: number;
     fixCount: number;
     resizedCount: number;
     visionIssueCount: number;
+    visionResults: VariantVisionResult[];
+    avgVisionScore: number;
     message: string;
 }
 
@@ -164,6 +175,8 @@ export function useSmartCheck() {
     const [status, setStatus] = useState<SmartCheckStatus>('idle');
     const [result, setResult] = useState<SmartCheckResult | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [progressMessage, setProgressMessage] = useState<string>('');
+    const abortRef = useRef<AbortController | null>(null);
 
     const updateVariantElement = useDesignStore((s) => s.updateVariantElement);
 
@@ -286,34 +299,102 @@ export function useSmartCheck() {
                 }
             }
 
-            // Yield to UI
+            // Yield to UI before Vision QA
             await new Promise(resolve => requestAnimationFrame(resolve));
 
-            // Run QA for informational reporting only (no additional patches)
+            // ── Step 4: Math-based QA ──
+            setProgressMessage('Running QA analysis...');
             const freshVariants = useDesignStore.getState().creativeSet?.variants ?? creativeSet.variants;
             const issues = runSmartSizingQA(freshVariants as BannerVariant[]);
 
-            // Build result
+            // ── Step 5: Vision QA (screenshot → Claude Vision) ──
+            const visionResults: VariantVisionResult[] = [];
+            let totalVisionIssues = 0;
+            const controller = new AbortController();
+            abortRef.current = controller;
+
+            // Get all banner card DOM elements for screenshot capture
+            const cardElements = document.querySelectorAll('.banner-card') as NodeListOf<HTMLElement>;
+            const allVariants = freshVariants as BannerVariant[];
+
+            for (let i = 0; i < allVariants.length; i++) {
+                if (controller.signal.aborted) break;
+                const variant = allVariants[i]!;
+                const label = `${variant.preset.width}x${variant.preset.height}`;
+
+                setProgressMessage(`Vision QA: analyzing ${label} (${i + 1}/${allVariants.length})...`);
+
+                try {
+                    // Try to capture from DOM card
+                    const cardEl = cardElements[i];
+                    let base64: string | null = null;
+                    if (cardEl) {
+                        base64 = captureElement(cardEl);
+                    }
+
+                    if (base64) {
+                        const analysis: DesignAnalysis | null = await analyzeDesign(
+                            base64,
+                            variant.preset.width,
+                            variant.preset.height,
+                            controller.signal,
+                        );
+
+                        if (analysis) {
+                            const variantIssues = analysis.issues.map(
+                                i => `[${i.severity}] ${i.type}: ${i.description}`,
+                            );
+                            totalVisionIssues += variantIssues.length;
+                            visionResults.push({
+                                variantId: variant.id,
+                                label,
+                                score: analysis.qualityScore,
+                                issues: variantIssues,
+                                impression: analysis.impression,
+                            });
+                        }
+                    }
+                } catch {
+                    // Vision failed for this variant — skip, don't block
+                    console.warn(`[SmartCheck] Vision QA skipped for ${label}`);
+                }
+            }
+
+            abortRef.current = null;
+
+            const avgVisionScore = visionResults.length > 0
+                ? Math.round(visionResults.reduce((sum, r) => sum + r.score, 0) / visionResults.length)
+                : -1;
+
+            // ── Build result ──
             const resizedCount = slaves.length;
             let message: string;
-            if (totalPatched === 0 && issues.length === 0) {
-                message = `All ${resizedCount} sizes already look great.`;
-            } else if (issues.length === 0) {
-                message = `Synced ${resizedCount} sizes proportionally — no issues found.`;
+            if (totalPatched === 0 && issues.length === 0 && totalVisionIssues === 0) {
+                message = `All ${resizedCount} sizes look great.`;
             } else {
-                message = `Synced ${resizedCount} sizes. ${totalClipped > 0 ? `Clipped ${totalClipped} out-of-bounds. ` : ''}${issues.length} QA note${issues.length !== 1 ? 's' : ''} remain.`;
+                const parts: string[] = [];
+                if (resizedCount > 0) parts.push(`Synced ${resizedCount} sizes`);
+                if (totalClipped > 0) parts.push(`clipped ${totalClipped} out-of-bounds`);
+                if (issues.length > 0) parts.push(`${issues.length} QA notes`);
+                if (avgVisionScore >= 0) parts.push(`Vision avg: ${avgVisionScore}/100`);
+                if (totalVisionIssues > 0) parts.push(`${totalVisionIssues} visual issues`);
+                message = parts.join(' · ') + '.';
             }
 
             setResult({
                 issueCount: issues.length,
                 fixCount: totalPatched,
                 resizedCount,
-                visionIssueCount: 0,
+                visionIssueCount: totalVisionIssues,
+                visionResults,
+                avgVisionScore,
                 message,
             });
+            setProgressMessage('');
             setStatus('done');
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Smart Check failed');
+            setProgressMessage('');
             setStatus('error');
         }
     }, [updateVariantElement]);
@@ -322,7 +403,10 @@ export function useSmartCheck() {
         setStatus('idle');
         setResult(null);
         setError(null);
+        setProgressMessage('');
+        // Cancel any in-progress Vision QA
+        abortRef.current?.abort();
     }, []);
 
-    return { status, result, error, runSmartCheck, reset };
+    return { status, result, error, progressMessage, runSmartCheck, reset };
 }

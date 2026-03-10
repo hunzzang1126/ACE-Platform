@@ -61,6 +61,7 @@ interface Props {
     masterVariantId: string;
     onRunSmartCheck?: () => void;
     smartCheckStatus?: SmartCheckStatus;
+    smartCheckProgress?: string;
     externalPlaying?: boolean;
 }
 
@@ -77,7 +78,7 @@ function getPreviewScale(w: number, h: number) {
     return Math.min(scaleW, scaleH, 1);
 }
 
-export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRunSmartCheck, smartCheckStatus, externalPlaying }: Props) {
+export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRunSmartCheck, smartCheckStatus, smartCheckProgress, externalPlaying }: Props) {
     const navigate = useNavigate();
     const [currentTime, setCurrentTime] = useState(0);
     const rafRef = useRef<number>(0);
@@ -249,9 +250,14 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                         className="banner-ai-qa-btn"
                         onClick={onRunSmartCheck}
                         disabled={smartCheckStatus === 'checking'}
-                        title="Auto-fix sizing issues across all variants"
+                        title="AI Vision QA: analyze all variants for visual quality"
                     >
-                        {smartCheckStatus === 'checking' ? 'Checking...' : 'Done: Smart Check'}
+                        {smartCheckStatus === 'checking'
+                            ? (smartCheckProgress || 'Checking...')
+                            : smartCheckStatus === 'done'
+                                ? 'Done: Smart Check'
+                                : 'Smart Check'
+                        }
                     </button>
                 )}
             </div>
