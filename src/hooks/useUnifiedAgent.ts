@@ -472,6 +472,17 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         serviceRef.current.updateConfig(config);
 
         const dashboardOverride: ToolExecutorOverride = (toolName, params) => {
+            // ★ Intercept generate_full_design → run structured layout pipeline
+            if (toolName === 'generate_full_design') {
+                const prompt = (params.prompt as string) ?? '';
+                // Run the full structured pipeline asynchronously
+                // Return a promise-like result that the chat loop can handle
+                return {
+                    success: true,
+                    message: `[GENERATE_FULL_DESIGN] Launching structured design pipeline for: "${prompt.slice(0, 80)}"`,
+                    data: { __meta_tool: 'generate_full_design', prompt },
+                };
+            }
             if (DASHBOARD_TOOL_NAMES.has(toolName)) {
                 const result = executeDashboardTool(toolName, params, navigate);
                 return { success: result.success, message: result.message, data: result.data };
@@ -492,6 +503,7 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         addCard('thinking', 'Processing request', 'running');
 
         let hadError = '';
+        let pendingDesignPrompt: string | null = null;
 
         await serviceRef.current.chat(msg, engine, {
             onCanvasScan: () => updateCard('thinking', 'running', 'Scanning canvas'),
@@ -506,9 +518,17 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
                 if (['add_rect', 'add_text', 'add_ellipse', 'move_node'].includes(name)) {
                     moveCursor(Math.random() * 200 + 50, Math.random() * 200 + 50, name);
                 }
+                // Capture generate_full_design prompt for post-chat execution
+                if (name === 'generate_full_design') {
+                    // The prompt is already captured via the override
+                }
             },
             onStepComplete: (idx: number, result) => {
                 updateCard(`step-${idx}`, result.success ? 'done' : 'error', result.success ? 'Done' : 'Failed');
+                // Check if this was a generate_full_design invocation
+                if (result.data && typeof result.data === 'object' && (result.data as Record<string, unknown>).__meta_tool === 'generate_full_design') {
+                    pendingDesignPrompt = (result.data as Record<string, unknown>).prompt as string;
+                }
             },
             onReflection: () => updateCard('reflection', 'done'),
             onToken: () => { /* streamed text handled by reply */ },
@@ -517,6 +537,12 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         }, dashboardOverride);
 
         hideCursor();
+
+        // ★ If LLM chose generate_full_design, run the structured pipeline
+        if (pendingDesignPrompt && !hadError) {
+            const designResult = await runGenerateFlow(pendingDesignPrompt);
+            return designResult || 'Design generated using structured layout pipeline.';
+        }
 
         const reply = serviceRef.current.getLastReply();
         if (hadError) throw new Error(hadError);

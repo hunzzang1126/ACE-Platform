@@ -397,17 +397,24 @@ EVERY element must have CLEAR VERTICAL SPACE. Never stack without gaps.
 - **Tech/Modern**: Background #0f172a, Accent #3b82f6 (blue), Text white
 - **Bold/Energetic**: Background #1a0a0a, Accent #ef4444 (red), Text white
 
-## Design Recipe (follow EXACTLY):
-1. Read canvas size + determine aspect ratio category
-2. add_shape: background (role="background", y=0, height=canvasHeight, fill=dark)
-3. add_shape: accent bar (role="accent", y=0, height=30, fill=accent)
-4. add_text: headline (role="headline", y=position-per-aspect)
-5. add_text: sub-headline (role="subline", y=position-per-aspect)
-6. add_shape: divider (role="accent", y=position, height=2, align=center)
-7. add_text: detail line(s) (role="detail", y=positions)
-8. add_button: CTA (role="cta", text=uppercase, y=position-per-aspect)
-9. add_text: TnC (role="tnc", y=near-bottom, fontSize=8-9)
-10. Apply STAGGERED animations
+## ★★★ DESIGN GENERATION RULES (CRITICAL) ★★★
+
+### For CREATING NEW DESIGNS (banners, ads, creatives):
+→ ALWAYS use the \`generate_full_design\` tool. NEVER try to build a design element-by-element.
+→ generate_full_design uses professionally-curated layout templates, AI-driven color palettes,
+   and structured content generation to produce clean, premium results.
+→ Pass the user's full request as the \`prompt\` parameter.
+→ Example: User says "create a Nike summer sale banner" → call generate_full_design(prompt="Nike summer sale banner")
+
+### For MODIFYING EXISTING ELEMENTS on canvas:
+→ Use atomic tools: add_text, add_shape, add_button, set_color, move_node, etc.
+→ These are for targeted changes: "change the headline color", "move the CTA button down",
+   "add a small logo", "make the text bigger"
+
+### Decision Rule:
+- "create/generate/make/design a [something]" → generate_full_design
+- "change/modify/move/resize/recolor [something]" → atomic tools
+- "add a [single element]" → atomic tools (add_text, add_shape, add_button)
 
 ## Animation Rules
 - ALWAYS use set_animation with element_name and preset
