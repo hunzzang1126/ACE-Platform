@@ -11,14 +11,16 @@
 // ─────────────────────────────────────────────────
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Canvas, Rect, Ellipse, Shadow, PencilBrush, Textbox, FabricImage, type FabricObject } from 'fabric';
+import { Canvas, Rect, Ellipse, Shadow, PencilBrush, Textbox, FabricImage, Line, type FabricObject } from 'fabric';
 import { useEditorStore } from '@/stores/editorStore';
+import { useHistoryStore } from '@/stores/historyStore';
 import type { EngineNode, CanvasEngineState, CanvasEngineActions, UseCanvasEngineResult } from './canvasTypes';
 import {
     nextId, nextColor, rgbToHex, hexToRgb01,
     isArtboard, fabricToEngineNode, patchAceProps, ACE_CUSTOM_PROPS,
 } from './fabricHelpers';
 import { createEngineShim } from './fabricEngineShim';
+import { snapToGuides, type GuideLine } from './useFabricGuides';
 
 /**
  * useFabricCanvas — Fabric.js canvas engine hook.
@@ -44,10 +46,9 @@ export function useFabricCanvas(
     const [nodeCount, setNodeCount] = useState(0);
     const [nodes, setNodes] = useState<EngineNode[]>([]);
 
-    const undoStack = useRef<string[]>([]);
-    const redoStack = useRef<string[]>([]);
     const skipHistory = useRef(false);
     const syncPending = useRef(false);
+    const guideLines = useRef<FabricObject[]>([]);
 
     const activeTool = useEditorStore((s) => s.activeTool);
     const setTool = useEditorStore((s) => s.setTool);
@@ -88,10 +89,10 @@ export function useFabricCanvas(
             }
         }
 
-        const hasUndo = undoStack.current.length > 0;
-        const hasRedo = redoStack.current.length > 0;
-        if (hasUndo !== canUndo) setCanUndo(hasUndo);
-        if (hasRedo !== canRedo) setCanRedo(hasRedo);
+        // Sync undo/redo state from historyStore
+        const hs = useHistoryStore.getState();
+        if (hs.canUndo !== canUndo) setCanUndo(hs.canUndo);
+        if (hs.canRedo !== canRedo) setCanRedo(hs.canRedo);
     }, [getUserObjects, canUndo, canRedo]);
 
     const syncState = useCallback(() => {
@@ -101,13 +102,49 @@ export function useFabricCanvas(
         }
     }, [doSync]);
 
-    const pushUndo = useCallback(() => {
+    const pushUndo = useCallback((label = 'Edit') => {
         const fc = fabricRef.current;
         if (!fc || skipHistory.current) return;
-        undoStack.current.push(JSON.stringify(fc.toObject(ACE_CUSTOM_PROPS)));
-        redoStack.current = [];
+        useHistoryStore.getState().pushState(label, JSON.stringify(fc.toObject(ACE_CUSTOM_PROPS)));
         setCanUndo(true);
         setCanRedo(false);
+    }, []);
+
+    // ── Smart guide rendering helpers ──
+    const renderGuideLines = useCallback((guides: GuideLine[]) => {
+        const fc = fabricRef.current;
+        if (!fc) return;
+        // Remove old guide lines
+        for (const line of guideLines.current) fc.remove(line);
+        guideLines.current = [];
+
+        for (const g of guides) {
+            const color = g.type === 'canvas-center' ? '#67d5ff' : g.type === 'center' ? '#67d5ff' : '#ff6b9d';
+            let fabricLine: FabricObject;
+            if (g.axis === 'vertical') {
+                fabricLine = new Line([g.position, 0, g.position, height], {
+                    stroke: color, strokeWidth: 1, selectable: false, evented: false,
+                    strokeDashArray: g.type === 'canvas-center' ? [4, 4] : undefined,
+                });
+            } else {
+                fabricLine = new Line([0, g.position, width, g.position], {
+                    stroke: color, strokeWidth: 1, selectable: false, evented: false,
+                    strokeDashArray: g.type === 'canvas-center' ? [4, 4] : undefined,
+                });
+            }
+            (fabricLine as any).__aceGuide = true;
+            fc.add(fabricLine);
+            guideLines.current.push(fabricLine);
+        }
+        fc.renderAll();
+    }, [width, height]);
+
+    const clearGuideLines = useCallback(() => {
+        const fc = fabricRef.current;
+        if (!fc) return;
+        for (const line of guideLines.current) fc.remove(line);
+        guideLines.current = [];
+        fc.renderAll();
     }, []);
 
     // ── Init Fabric Canvas ──
@@ -163,18 +200,37 @@ export function useFabricCanvas(
             fc.on('selection:created', () => syncState());
             fc.on('selection:updated', () => syncState());
             fc.on('selection:cleared', () => syncState());
-            fc.on('object:modified', () => { pushUndo(); syncState(); });
+            fc.on('object:modified', () => { pushUndo('Transform element'); clearGuideLines(); syncState(); });
             fc.on('object:added', (opt) => {
                 const obj = opt.target;
-                if (obj && !(obj as any).__aceId && !isArtboard(obj)) {
+                if (obj && !(obj as any).__aceId && !isArtboard(obj) && !(obj as any).__aceGuide) {
                     (obj as any).__aceId = nextId();
-                    (obj as any).__aceZIndex = fc.getObjects().filter(o => !isArtboard(o)).length;
+                    (obj as any).__aceZIndex = fc.getObjects().filter(o => !isArtboard(o) && !(o as any).__aceGuide).length;
                     patchAceProps(obj);
                 }
-                if (!skipHistory.current) pushUndo();
+                if (!skipHistory.current && !(obj as any)?.__aceGuide) pushUndo('Add element');
                 syncState();
             });
-            fc.on('object:removed', () => { pushUndo(); syncState(); });
+            fc.on('object:removed', () => { pushUndo('Remove element'); syncState(); });
+
+            // ── Smart guides on drag ──
+            fc.on('object:moving', (opt) => {
+                const obj = opt.target;
+                if (!obj || isArtboard(obj) || (obj as any).__aceGuide) return;
+                const others = fc.getObjects()
+                    .filter(o => o !== obj && !isArtboard(o) && !(o as any).__aceGuide)
+                    .map(o => ({ x: o.left ?? 0, y: o.top ?? 0, w: (o.width ?? 0) * (o.scaleX ?? 1), h: (o.height ?? 0) * (o.scaleY ?? 1) }));
+                const dragging = {
+                    x: obj.left ?? 0, y: obj.top ?? 0,
+                    w: (obj.width ?? 0) * (obj.scaleX ?? 1),
+                    h: (obj.height ?? 0) * (obj.scaleY ?? 1),
+                };
+                const result = snapToGuides(dragging, others, width, height, 6);
+                if (result.x !== null) obj.set('left', result.x);
+                if (result.y !== null) obj.set('top', result.y);
+                renderGuideLines(result.guides);
+            });
+            fc.on('mouse:up', () => clearGuideLines());
 
             // ── Zoom (Ctrl+Wheel) ──
             fc.on('mouse:wheel', (opt) => {
@@ -489,22 +545,26 @@ export function useFabricCanvas(
 
     const undo = useCallback(() => {
         const fc = fabricRef.current;
-        if (!fc || undoStack.current.length === 0) return;
-        redoStack.current.push(JSON.stringify(fc.toObject(ACE_CUSTOM_PROPS)));
-        const prev = undoStack.current.pop()!;
+        const hs = useHistoryStore.getState();
+        if (!fc || !hs.canUndo) return;
+        // Save current state for redo
+        hs.pushState('redo-save', JSON.stringify(fc.toObject(ACE_CUSTOM_PROPS)));
+        const entry = hs.undo();
+        if (!entry?.canvasState) return;
         skipHistory.current = true;
-        fc.loadFromJSON(prev).then(() => {
+        fc.loadFromJSON(entry.canvasState).then(() => {
             restoreArtboardFlags(fc); fc.renderAll(); skipHistory.current = false; syncState();
         });
     }, [syncState, restoreArtboardFlags]);
 
     const redo = useCallback(() => {
         const fc = fabricRef.current;
-        if (!fc || redoStack.current.length === 0) return;
-        undoStack.current.push(JSON.stringify(fc.toObject(ACE_CUSTOM_PROPS)));
-        const next = redoStack.current.pop()!;
+        const hs = useHistoryStore.getState();
+        if (!fc || !hs.canRedo) return;
+        const entry = hs.redo();
+        if (!entry?.canvasState) return;
         skipHistory.current = true;
-        fc.loadFromJSON(next).then(() => {
+        fc.loadFromJSON(entry.canvasState).then(() => {
             restoreArtboardFlags(fc); fc.renderAll(); skipHistory.current = false; syncState();
         });
     }, [syncState, restoreArtboardFlags]);
