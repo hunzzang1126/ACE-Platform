@@ -210,22 +210,40 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
             await new Promise(r => setTimeout(r, 150));
 
             try {
+                let nodeId: number | null = null;
                 if (el.type === 'text') {
                     const hexToRgb = (hex: string): [number, number, number] => {
                         const c = hex.replace('#', '');
                         return [parseInt(c.slice(0, 2), 16) / 255, parseInt(c.slice(2, 4), 16) / 255, parseInt(c.slice(4, 6), 16) / 255];
                     };
                     const [tr, tg, tb] = el.color_hex ? hexToRgb(el.color_hex) : [1, 1, 1];
-                    engine.add_text(el.x ?? 0, el.y ?? 0, el.content || 'Text', el.font_size ?? 18, 'Inter, system-ui, sans-serif', el.font_weight ?? '700', tr, tg, tb, 1.0, (el.w && el.w > 0) ? el.w : canvasW * 0.85, el.text_align ?? 'center', el.name, el.line_height, el.letter_spacing);
+                    nodeId = engine.add_text(el.x ?? 0, el.y ?? 0, el.content || 'Text', el.font_size ?? 18, 'Inter, system-ui, sans-serif', el.font_weight ?? '700', tr, tg, tb, 1.0, (el.w && el.w > 0) ? el.w : canvasW * 0.85, el.text_align ?? 'center', el.name, el.line_height, el.letter_spacing) as number | null;
                 } else if (el.gradient_start_hex && el.gradient_end_hex) {
-                    engine.add_gradient_rect(el.x ?? 0, el.y ?? 0, el.w ?? 100, el.h ?? 100, el.gradient_start_hex, el.gradient_end_hex, el.gradient_angle ?? 135, el.radius ?? 0, el.name);
+                    nodeId = engine.add_gradient_rect(el.x ?? 0, el.y ?? 0, el.w ?? 100, el.h ?? 100, el.gradient_start_hex, el.gradient_end_hex, el.gradient_angle ?? 135, el.radius ?? 0, el.name) as number | null;
                 } else if (el.type === 'rounded_rect') {
                     const sr = el.r ?? 0.5, sg = el.g ?? 0.5, sb = el.b ?? 0.5;
-                    engine.add_rounded_rect(el.x ?? 0, el.y ?? 0, el.w ?? 100, el.h ?? 50, sr, sg, sb, el.a ?? 1, el.radius ?? 8, el.name);
+                    nodeId = engine.add_rounded_rect(el.x ?? 0, el.y ?? 0, el.w ?? 100, el.h ?? 50, sr, sg, sb, el.a ?? 1, el.radius ?? 8, el.name) as number | null;
+                } else if (el.type === 'ellipse') {
+                    const sr = el.r ?? 0.5, sg = el.g ?? 0.5, sb = el.b ?? 0.5;
+                    nodeId = engine.add_ellipse?.((el.x ?? 0) + (el.w ?? 50) / 2, (el.y ?? 0) + (el.h ?? 50) / 2, (el.w ?? 50) / 2, (el.h ?? 50) / 2, sr, sg, sb, el.a ?? 1) as number | null;
                 } else {
                     const sr = el.r ?? 0.5, sg = el.g ?? 0.5, sb = el.b ?? 0.5;
-                    engine.add_rect(el.x ?? 0, el.y ?? 0, el.w ?? 100, el.h ?? 50, sr, sg, sb, el.a ?? 1, el.name);
+                    nodeId = engine.add_rect(el.x ?? 0, el.y ?? 0, el.w ?? 100, el.h ?? 50, sr, sg, sb, el.a ?? 1, el.name) as number | null;
                 }
+
+                // Apply shadow if specified
+                if (nodeId != null && el.shadow_blur && el.shadow_blur > 0) {
+                    try {
+                        engine.set_shadow?.(
+                            nodeId,
+                            el.shadow_offset_x ?? 2,
+                            el.shadow_offset_y ?? 4,
+                            el.shadow_blur,
+                            0, 0, 0, el.shadow_opacity ?? 0.25,
+                        );
+                    } catch { /* shadow not critical */ }
+                }
+
                 rendered++;
             } catch (err) {
                 console.warn('[UnifiedAgent] Failed to render:', el.name, err);

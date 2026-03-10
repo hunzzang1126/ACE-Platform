@@ -19,6 +19,7 @@
 import { callAnthropicApi, DEFAULT_CLAUDE_MODEL } from '@/services/anthropicClient';
 import { classifyRatio, LAYOUT_ZONES, classifyMasterGroup, getMasterGroupDescriptions } from '@/engine/smartSizing';
 import { selectStyleGuide, buildStylePromptForAI } from '@/services/designStyleGuides';
+import { buildGoldenExamplePrompt } from '@/services/goldenExamples';
 
 // ── Shared Types ────────────────────────────────────
 
@@ -46,6 +47,11 @@ export interface RenderElement {
     text_align?: string;
     letter_spacing?: number;
     line_height?: number;
+    // Shadow (applied post-render via engine.set_shadow)
+    shadow_offset_x?: number;
+    shadow_offset_y?: number;
+    shadow_blur?: number;
+    shadow_opacity?: number;
     // Naming
     name?: string;
 }
@@ -114,6 +120,10 @@ const RENDER_BANNER_TOOL = {
                         gradient_start_hex: { type: 'string' },
                         gradient_end_hex: { type: 'string' },
                         gradient_angle: { type: 'number' },
+                        shadow_offset_x: { type: 'number', description: 'Drop shadow offset X. 2-5 for subtle depth.' },
+                        shadow_offset_y: { type: 'number', description: 'Drop shadow offset Y. 3-8 for depth.' },
+                        shadow_blur: { type: 'number', description: 'Shadow blur radius. 6-15 for soft shadow.' },
+                        shadow_opacity: { type: 'number', description: 'Shadow opacity 0.0-0.5. 0.2-0.3 for subtle.' },
                     },
                 },
             },
@@ -220,7 +230,7 @@ ${layoutHints[ratio] ?? 'Balanced layout.'}
 ${masterGroupDesc}
 
 ${stylePrompt}
-
+${buildGoldenExamplePrompt(guide.id, canvasW, canvasH)}
 ═══════════════════════════════════════════════════
 DESIGN PRINCIPLES (Pencil-grade quality)
 ═══════════════════════════════════════════════════
@@ -305,6 +315,7 @@ ABSOLUTE RULES — NEVER VIOLATE:
 5. Use ONLY colors from the style guide palette above — do NOT invent colors
 6. Element names must be unique and descriptive
 7. Elements ordered by z-index: background first, decorative last
+8. CTA button gets a subtle shadow: shadow_offset_x=2, shadow_offset_y=4, shadow_blur=10, shadow_opacity=0.25
 
 User prompt: "${userPrompt}"
 Write SHORT, impactful ad copy. No lorem ipsum. Real creative content.
