@@ -590,7 +590,8 @@ const generate_full_design: ToolDefinition = {
     category: 'compound',
 };
 
-export const ALL_TOOLS: ToolDefinition[] = [
+// Build canvas tools first (these take priority)
+const CANVAS_TOOLS: ToolDefinition[] = [
     // Create
     add_rect, add_rounded_rect, add_ellipse, add_gradient_rect,
     // Text
@@ -614,8 +615,15 @@ export const ALL_TOOLS: ToolDefinition[] = [
     generate_image, set_canvas_background, add_image_layer,
     // Full Design Pipeline
     generate_full_design,
-    // Dashboard (app-level)
-    ...DASHBOARD_TOOLS,
+];
+
+// Deduplicate: canvas tools take priority, skip dashboard tools with same name
+const canvasToolNames = new Set(CANVAS_TOOLS.map(t => t.name));
+const uniqueDashboardTools = DASHBOARD_TOOLS.filter(t => !canvasToolNames.has(t.name));
+
+export const ALL_TOOLS: ToolDefinition[] = [
+    ...CANVAS_TOOLS,
+    ...uniqueDashboardTools,
 ];
 
 
