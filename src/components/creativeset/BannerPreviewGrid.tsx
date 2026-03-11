@@ -321,18 +321,17 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                                                 (el) => el.type === 'shape'
                                                     && (el.constraints?.vertical?.offset ?? 0) === 0
                                                     && (el.constraints?.size?.height ?? 0) >= height * 0.8
-                                            );
-                                            return (bgShape as { fill?: string } | undefined)?.fill || variant.backgroundColor || '#FFFFFF';
+                                            ) as import('@/schema/elements.types').ShapeElement | undefined;
+                                            // Don't set backgroundColor when gradient exists — the shape element handles it
+                                            if (bgShape?.gradientStart && bgShape?.gradientEnd) return 'transparent';
+                                            return bgShape?.fill || variant.backgroundColor || '#FFFFFF';
                                         })(),
                                     }}
                                 >
-                                    {/* Render elements sorted: shapes first, video/image, text/buttons on top */}
+                                    {/* Render elements sorted by zIndex for correct layering */}
                                     {[...variant.elements]
-                                        .sort((a, b) => {
-                                            const order = { shape: 0, video: 1, image: 2, text: 3, button: 4 } as Record<string, number>;
-                                            return (order[a.type] ?? 1) - (order[b.type] ?? 1);
-                                        })
-                                        .map((el, sortedIdx) => {
+                                        .sort((a, b) => a.zIndex - b.zIndex)
+                                        .map((el) => {
                                             const resolved = resolveConstraints(el.constraints, width, height);
 
                                             // Compute animation style if playing
@@ -346,6 +345,18 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                                                 );
                                             }
 
+                                            // ★ Shape background: support gradients (CSS linear-gradient)
+                                            const shapeStyle: React.CSSProperties = el.type === 'shape' ? (() => {
+                                                const s = el as import('@/schema/elements.types').ShapeElement;
+                                                const base: React.CSSProperties = { borderRadius: s.borderRadius ?? 0 };
+                                                if (s.gradientStart && s.gradientEnd) {
+                                                    base.background = `linear-gradient(${s.gradientAngle ?? 135}deg, ${s.gradientStart}, ${s.gradientEnd})`;
+                                                } else {
+                                                    base.backgroundColor = s.fill || '#ccc';
+                                                }
+                                                return base;
+                                            })() : {};
+
                                             return (
                                                 <div
                                                     key={el.id}
@@ -357,11 +368,11 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                                                         width: resolved.width,
                                                         height: resolved.height,
                                                         opacity: el.opacity,
-                                                        zIndex: sortedIdx,
+                                                        zIndex: el.zIndex,
                                                         transition: isPlaying ? 'none' : undefined,
                                                         ...animStyle,
-                                                        ...(el.type === 'shape' ? { backgroundColor: el.fill || '#ccc', borderRadius: el.borderRadius ?? 0 } : {}),
-                                                        ...(el.type === 'text' ? { color: el.color, fontSize: el.fontSize, fontFamily: el.fontFamily, fontWeight: el.fontWeight, display: 'flex', alignItems: 'flex-start', justifyContent: el.textAlign === 'center' ? 'center' : el.textAlign === 'right' ? 'flex-end' : 'flex-start', overflow: 'visible', whiteSpace: 'normal' as const, wordBreak: 'break-word' as const, lineHeight: el.lineHeight ?? 1.2, letterSpacing: el.letterSpacing ? `${el.letterSpacing}px` : undefined, textAlign: el.textAlign as 'left' | 'center' | 'right' } : {}),
+                                                        ...shapeStyle,
+                                                        ...(el.type === 'text' ? { color: el.color, fontSize: el.fontSize, fontFamily: el.fontFamily, fontWeight: el.fontWeight, fontStyle: el.fontStyle ?? 'normal', display: 'flex', alignItems: 'flex-start', justifyContent: el.textAlign === 'center' ? 'center' : el.textAlign === 'right' ? 'flex-end' : 'flex-start', overflow: 'visible', whiteSpace: 'normal' as const, wordBreak: 'break-word' as const, lineHeight: el.lineHeight ?? 1.2, letterSpacing: el.letterSpacing ? `${el.letterSpacing}px` : undefined, textAlign: el.textAlign as 'left' | 'center' | 'right' } : {}),
                                                         ...(el.type === 'button' ? { backgroundColor: el.backgroundColor, borderRadius: el.borderRadius ?? 0, color: el.color, fontSize: el.fontSize, fontFamily: el.fontFamily, fontWeight: el.fontWeight, display: 'flex', alignItems: 'center', justifyContent: 'center' } : {}),
                                                         ...(el.type === 'image' ? { overflow: 'hidden' } : {}),
                                                         ...(el.type === 'video' ? { overflow: 'hidden' } : {}),
