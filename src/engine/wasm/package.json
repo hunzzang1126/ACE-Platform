@@ -1,0 +1,16 @@
+{
+  "name": "ace-engine",
+  "type": "module",
+  "description": "ACE rendering engine — WebGPU via wgpu",
+  "version": "0.1.0",
+  "files": [
+    "ace_engine_bg.wasm",
+    "ace_engine.js",
+    "ace_engine.d.ts"
+  ],
+  "main": "ace_engine.js",
+  "types": "ace_engine.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}
