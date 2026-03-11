@@ -63,6 +63,13 @@ export function useCanvasSync(
             try {
                 const raw = engine.get_all_nodes();
                 const nodes: EngineNode[] = JSON.parse(raw);
+                console.log('[useCanvasSync] RAW engine nodes:', nodes.map(n => ({
+                    id: n.id, type: n.type, name: n.name,
+                    x: Math.round(n.x), y: Math.round(n.y),
+                    w: Math.round(n.w), h: Math.round(n.h),
+                    z_index: n.z_index,
+                    src: n.src ? n.src.substring(0, 50) + '...' : undefined,
+                })));
                 for (const node of nodes) {
                     if (node.type === 'text') {
                         elements.push(engineNodeToTextElement(node, canvasW, canvasH));
@@ -84,6 +91,13 @@ export function useCanvasSync(
 
         // 3. Sort by zIndex
         elements.sort((a, b) => a.zIndex - b.zIndex);
+
+        console.log('[useCanvasSync] FINAL elements to save:', elements.map(e => ({
+            id: e.id, type: e.type, name: e.name, zIndex: e.zIndex,
+            ...(e.type === 'image' ? { src: (e as any).src?.substring(0, 50) + '...' } : {}),
+            ...(e.type === 'text' ? { content: (e as any).content?.substring(0, 30) } : {}),
+            ...(e.type === 'shape' ? { fill: (e as any).fill, gradientStart: (e as any).gradientStart } : {}),
+        })));
 
         // 4. Write to store (triggers smart sizing propagation if master)
         replaceVariantElements(variantId, elements);
@@ -271,8 +285,13 @@ export function useCanvasSync(
                 }
 
                 // Restore image as Fabric-native Image (async — may appear slightly after shapes)
+                // ★ REGRESSION GUARD: Pass stored zIndex to preserve original layer order.
+                // Images load asynchronously — by the time they're added to canvas,
+                // all synchronous elements (shapes, text) are already present.
+                // Without passing zIndex, the image gets userObjects().length as its z-index,
+                // making background images render ON TOP of all other elements.
                 if (img.src) {
-                    engine.add_image(x, y, img.src, w, h, img.name).then((nodeId: number) => {
+                    engine.add_image(x, y, img.src, w, h, img.name, img.zIndex).then((nodeId: number) => {
                         if (img.opacity !== undefined && img.opacity !== 1) {
                             try { engine.set_opacity(nodeId, img.opacity); } catch { /* ok */ }
                         }

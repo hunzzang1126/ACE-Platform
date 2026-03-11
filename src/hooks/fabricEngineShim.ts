@@ -177,7 +177,7 @@ export function createEngineShim(
         },
 
         // ── Create: image (async) ────────────────────────
-        add_image: async (x: number, y: number, src: string, w?: number, h?: number, name?: string): Promise<number> => {
+        add_image: async (x: number, y: number, src: string, w?: number, h?: number, name?: string, zIndex?: number): Promise<number> => {
             const id = nextId();
             try {
                 const isDataUrl = src.startsWith('data:');
@@ -215,13 +215,16 @@ export function createEngineShim(
                 });
                 (img as any).__aceId = id;
                 (img as any).__aceName = name || `Image #${id}`;
-                (img as any).__aceZIndex = userObjects().length;
+                // ★ REGRESSION GUARD: Use provided zIndex (from restore) to preserve original layer order.
+                // Without this, async image loading causes background images to get the highest zIndex
+                // because all synchronous elements are added before the image Promise resolves.
+                (img as any).__aceZIndex = zIndex ?? userObjects().length;
                 patchAceProps(img);
                 fc.add(img);
                 fc.setActiveObject(img);
                 fc.renderAll();
                 syncState();
-                console.log(`[EngineShim] Image added: id=${id} name="${name}" at (${x},${y}) size=${Math.round(targetW)}x${Math.round(targetH)}`);
+                console.log(`[EngineShim] Image added: id=${id} name="${name}" at (${x},${y}) size=${Math.round(targetW)}x${Math.round(targetH)} zIndex=${(img as any).__aceZIndex}`);
             } catch (err) {
                 console.error('[EngineShim] Failed to load image:', err);
             }
