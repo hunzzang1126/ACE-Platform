@@ -72,7 +72,8 @@ interface DesignState {
 
     /** 특정 변형의 요소 전체 교체 (Canvas Save 용) */
     /** 마스터에 저장 시 Smart Sizing으로 모든 슬레이브에 전파 */
-    replaceVariantElements: (variantId: string, elements: DesignElement[]) => void;
+    /** fabricJSON: Raw Fabric.js canvas JSON — SINGLE SOURCE OF TRUTH when present */
+    replaceVariantElements: (variantId: string, elements: DesignElement[], fabricJSON?: string) => void;
 
     /** 모든 저장된 크리에이티브 셋 목록 가져오기 */
     getAllCreativeSets: () => CreativeSet[];
@@ -334,7 +335,7 @@ export const useDesignStore = create<DesignState>()(
                     });
                 },
 
-                replaceVariantElements: (variantId, elements) => {
+                replaceVariantElements: (variantId, elements, fabricJSON) => {
                     set((state) => {
                         const cs = getActiveCS(state);
                         if (!cs) return;
@@ -343,6 +344,11 @@ export const useDesignStore = create<DesignState>()(
 
                         // 해당 변형의 요소 교체
                         variant.elements = elements;
+                        // ★ SINGLE SOURCE OF TRUTH: Store raw Fabric JSON when provided.
+                        // On restore, loadFromJSON() will be used instead of element-by-element reconstruction.
+                        if (fabricJSON) {
+                            variant.fabricJSON = fabricJSON;
+                        }
 
                         // 마스터인 경우 → Smart Sizing으로 모든 슬레이브에 전파
                         if (variantId === cs.masterVariantId) {

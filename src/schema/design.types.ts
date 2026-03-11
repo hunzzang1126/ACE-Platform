@@ -16,7 +16,7 @@ export interface BannerPreset {
 export interface BannerVariant {
     id: string;
     preset: BannerPreset;
-    /** 이 배너의 디자인 요소들 */
+    /** 이 배너의 디자인 요소들 (derived view — computed from fabricJSON when present) */
     elements: DesignElement[];
     /** 배경색 */
     backgroundColor: string;
@@ -32,6 +32,14 @@ export interface BannerVariant {
      * Guarantees pixel-perfect fidelity with the canvas editor.
      */
     screenshotUrl?: string;
+    /**
+     * ★ SINGLE SOURCE OF TRUTH — Raw Fabric.js canvas JSON from fc.toObject().
+     * When present, this is the CANONICAL representation of the canvas.
+     * `elements` is derived from this for backward compatibility with SmartSizing/AI.
+     * Restore uses fc.loadFromJSON() directly — zero conversion, zero data loss.
+     * If null/undefined, falls back to legacy DesignElement restore path.
+     */
+    fabricJSON?: string;
 }
 
 

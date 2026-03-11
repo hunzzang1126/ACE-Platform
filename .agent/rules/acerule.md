@@ -239,3 +239,48 @@ ACE는 풀 크리에이티브 플랫폼이다. 배너는 부가 기능일 뿐이
 - **Schema validation on load**: if saved data is corrupted, show warning + load what's possible
 - **Network errors (AI agent)**: show friendly message, retry button, never hang
 - **Console must be CLEAN**: no red errors during normal flows — warnings are acceptable only if documented
+
+9. **Mandatory Test Coverage (ABSOLUTE RULE — No Code Without Tests)**:
+
+   **Core Principle: Every code change MUST include corresponding test updates.**
+   The agent MUST NOT consider any task complete until tests are written/updated.
+   The user should NEVER have to ask "did you write tests for this?"
+
+   **When Adding a New Feature:**
+   - Write unit tests for ALL exported functions, hooks, and utilities
+   - Test file MUST be created alongside the source: `myModule.ts` → `myModule.test.ts`
+   - Cover: happy path, edge cases, error conditions, boundary values
+   - For hooks: test state transitions, side effects, and return values
+   - For stores: test all actions, computed values, and persistence behavior
+   - Minimum: 3+ test cases per exported function
+
+   **When Fixing a Bug:**
+   - **FIRST** write a failing test that reproduces the exact bug
+   - Then fix the code so the test passes
+   - The test serves as a permanent regression guard — the bug can never return
+   - Name the test descriptively: `it('should not lose z-index after manual layer reorder (regression #xyz)')`
+
+   **When Refactoring:**
+   - Run `npm run test:coverage` BEFORE and AFTER refactoring
+   - Coverage percentage must NOT decrease after refactoring
+   - If moving code between files, move the corresponding tests too
+   - If splitting a file, split the test file to match
+
+   **Test Quality Standards:**
+   - **No `test.todo()` or skipped tests** — write the test or don't commit
+   - **Descriptive test names**: `it('returns 400 fontWeight for bold keyword')` not `it('works')`
+   - **Isolated tests**: no test should depend on another test's state
+   - **Mock external dependencies**: Fabric.js, API calls, localStorage — never rely on browser APIs in unit tests
+   - **Test the contract, not the implementation**: test what a function DOES, not HOW it does it
+
+   **Coverage Targets:**
+   - Stores (`/stores/*.ts`): 90%+ coverage
+   - Engine (`/engine/*.ts`): 85%+ coverage
+   - Hooks (`/hooks/*.ts`): 80%+ coverage (pure logic portions)
+   - Converters/Serializers: 95%+ coverage (these are the most bug-prone)
+   - UI Components: E2E tests via Playwright for critical user flows
+
+   **Commit Sequence (updated):**
+   ```
+   code change → write/update tests → npm test → all pass → npm run test:coverage (periodic) → git commit
+   ```

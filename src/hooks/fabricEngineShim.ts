@@ -12,7 +12,7 @@ import {
 } from 'fabric';
 import { useAnimPresetStore } from './useAnimationPresets';
 import {
-    nextId, rgbToHex, isArtboard, fabricToEngineNode, patchAceProps,
+    nextId, rgbToHex, isArtboard, fabricToEngineNode, patchAceProps, ACE_CUSTOM_PROPS,
 } from './fabricHelpers';
 
 /**
@@ -35,6 +35,22 @@ export function createEngineShim(
             const nodes = userObjects().map(fabricToEngineNode);
             return JSON.stringify(nodes);
         },
+
+        // ★ SINGLE SOURCE OF TRUTH: Fabric-native serialization.
+        // Returns fc.toObject() with all ACE custom props included.
+        // This JSON is the canonical representation — no lossy conversion.
+        getCanvasJSON: (): string => {
+            return JSON.stringify(fc.toObject(ACE_CUSTOM_PROPS));
+        },
+
+        // ★ SINGLE SOURCE OF TRUTH: Fabric-native deserialization.
+        // Restores the canvas from a JSON string created by getCanvasJSON().
+        // Returns a Promise that resolves when all objects (including images) are loaded.
+        loadCanvasJSON: async (jsonStr: string): Promise<void> => {
+            await fc.loadFromJSON(jsonStr);
+            fc.renderAll();
+        },
+
         node_count: () => userObjects().length,
         get_selection: () => {
             const active = fc.getActiveObjects();

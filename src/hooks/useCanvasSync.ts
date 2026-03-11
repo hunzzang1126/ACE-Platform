@@ -1,9 +1,3 @@
-// ─────────────────────────────────────────────────
-// useCanvasSync — Bridge between WASM Canvas Engine ↔ designStore
-// Converts engine nodes + overlay elements → DesignElements on Save
-// Restores saved elements → engine on Load
-// ─────────────────────────────────────────────────
-
 import { useCallback } from 'react';
 import { useDesignStore } from '@/stores/designStore';
 import { loadVideoBlob } from '@/stores/videoStorage';
@@ -23,6 +17,7 @@ import {
     overlayToDesignElement,
     getAnimationForElement,
 } from '@/engine/elementConverters';
+import { fabricJsonToElements } from '@/engine/fabricSerializer';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Engine = any;
@@ -43,7 +38,8 @@ export function useCanvasSync(
     const creativeSetForRestore = useDesignStore((s) => s.creativeSet);
 
     /**
-     * Save current canvas state → designStore
+     * ★ SINGLE SOURCE OF TRUTH — Save via Fabric-native toObject().
+     * Saves both fabricJSON (canonical) and derived DesignElement[] (for SmartSizing/AI).
      */
     const saveToStore = useCallback((
         engineRef: React.RefObject<Engine | null>,
@@ -56,20 +52,31 @@ export function useCanvasSync(
         }
 
         const engine = engineRef.current;
+        if (!engine) {
+            return { success: false, message: 'Engine not ready.' };
+        }
+
+        // ── Step 1: Get canonical Fabric JSON ──
+        let fabricJSON: string | undefined;
+        try {
+            fabricJSON = engine.getCanvasJSON();
+            console.log('[useCanvasSync] Fabric JSON captured:', fabricJSON!.length, 'bytes');
+        } catch (err) {
+            console.warn('[useCanvasSync] Failed to get Fabric JSON, falling back to legacy:', err);
+        }
+
+        // ── Step 2: Derive DesignElement[] for SmartSizing/AI/Preview backward compat ──
         const elements: DesignElement[] = [];
 
-        // 1. Convert engine nodes → DesignElements based on type
-        if (engine) {
+        if (fabricJSON) {
+            // Derive from Fabric JSON — single conversion point
+            const derived = fabricJsonToElements(fabricJSON, canvasW, canvasH);
+            elements.push(...derived);
+        } else {
+            // Fallback to legacy conversion if getCanvasJSON failed
             try {
                 const raw = engine.get_all_nodes();
                 const nodes: EngineNode[] = JSON.parse(raw);
-                console.log('[useCanvasSync] RAW engine nodes:', nodes.map(n => ({
-                    id: n.id, type: n.type, name: n.name,
-                    x: Math.round(n.x), y: Math.round(n.y),
-                    w: Math.round(n.w), h: Math.round(n.h),
-                    z_index: n.z_index,
-                    src: n.src ? n.src.substring(0, 50) + '...' : undefined,
-                })));
                 for (const node of nodes) {
                     if (node.type === 'text') {
                         elements.push(engineNodeToTextElement(node, canvasW, canvasH));
@@ -89,7 +96,7 @@ export function useCanvasSync(
             elements.push(overlayToDesignElement(oel, canvasW, canvasH));
         }
 
-        // 3. Sort by zIndex
+        // Sort by zIndex
         elements.sort((a, b) => a.zIndex - b.zIndex);
 
         console.log('[useCanvasSync] FINAL elements to save:', elements.map(e => ({
@@ -99,13 +106,13 @@ export function useCanvasSync(
             ...(e.type === 'shape' ? { fill: (e as any).fill, gradientStart: (e as any).gradientStart } : {}),
         })));
 
-        // 4. Write to store (triggers smart sizing propagation if master)
-        replaceVariantElements(variantId, elements);
+        // Write to store (triggers smart sizing propagation if master)
+        replaceVariantElements(variantId, elements, fabricJSON);
 
         const isMaster = cs.masterVariantId === variantId;
         const msg = isMaster
-            ? `Saved ${elements.length} elements to master. Propagated to ${cs.variants.length - 1} sizes.`
-            : `Saved ${elements.length} elements to variant.`;
+            ? `Saved ${elements.length} elements to master (fabricJSON=${!!fabricJSON}). Propagated to ${cs.variants.length - 1} sizes.`
+            : `Saved ${elements.length} elements to variant (fabricJSON=${!!fabricJSON}).`;
 
         console.log(`[useCanvasSync] ${msg}`);
         return { success: true, message: msg };
@@ -159,8 +166,9 @@ export function useCanvasSync(
     }, [variantId, canvasW, canvasH, replaceVariantElements]);
 
     /**
-     * Restore saved elements from designStore → engine + overlay
-     * Returns overlay elements (text/image) that should be added to the overlay system
+     * ★ SINGLE SOURCE OF TRUTH — Restore via Fabric-native loadFromJSON() when fabricJSON is present.
+     * Falls back to legacy element-by-element reconstruction for old saved projects.
+     * Returns overlay elements (videos) that should be added to the overlay system.
      */
     const restoreFromStore = useCallback(async (
         engine: Engine,
@@ -172,12 +180,102 @@ export function useCanvasSync(
         }
 
         const variant = cs.variants.find((v) => v.id === variantId);
-        if (!variant || !variant.elements || variant.elements.length === 0) {
+        if (!variant || (!variant.elements?.length && !variant.fabricJSON)) {
             console.log('[useCanvasSync] No saved elements to restore');
             return { restoredShapes: 0, overlayElements: [] };
         }
 
-        console.log(`[useCanvasSync] Restoring ${variant.elements.length} elements from store...`);
+        // ── Fabric-native restore path (PREFERRED) ──
+        if (variant.fabricJSON && typeof engine.loadCanvasJSON === 'function') {
+            console.log(`[useCanvasSync] ★ FABRIC-NATIVE restore: ${variant.fabricJSON.length} bytes`);
+            try {
+                await engine.loadCanvasJSON(variant.fabricJSON);
+
+                // Count restored objects (excluding artboard)
+                const nodeCount = engine.node_count?.() ?? 0;
+
+                // Restore animation presets from saved elements
+                // (animations are stored in separate useAnimPresetStore, not in Fabric JSON)
+                if (variant.elements) {
+                    for (const el of variant.elements) {
+                        if (el.animation && el.animation.preset !== 'none') {
+                            useAnimPresetStore.getState().setPreset(el.id, {
+                                anim: el.animation.preset,
+                                animDuration: el.animation.duration,
+                                startTime: el.animation.startTime,
+                            });
+                        }
+                    }
+                }
+
+                // Handle video overlays (they're HTML-based, not in Fabric JSON)
+                const overlayElements: OverlayElement[] = [];
+                const pendingBlobLoads: Promise<void>[] = [];
+
+                if (variant.elements) {
+                    for (const el of variant.elements) {
+                        if (el.type === 'video') {
+                            const vid = el as VideoElement;
+                            let { x, y, w, h } = constraintsToAbsolute(vid.constraints, canvasW, canvasH);
+
+                            const isOutOfCanvas = w <= 0 || h <= 0
+                                || x >= canvasW || y >= canvasH
+                                || x + w <= 0 || y + h <= 0;
+                            if (isOutOfCanvas) {
+                                x = 0; y = 0; w = canvasW; h = canvasH;
+                            }
+
+                            const oel: OverlayElement = {
+                                id: vid.id,
+                                type: 'video',
+                                x, y, w, h,
+                                name: vid.name,
+                                videoSrc: vid.videoSrc || '',
+                                posterSrc: vid.posterSrc,
+                                fileName: vid.fileName,
+                                objectFit: (vid.fit === 'cover' || vid.fit === 'contain' || vid.fit === 'fill') ? vid.fit : 'cover',
+                                muted: vid.muted ?? true,
+                                loop: vid.loop ?? true,
+                                autoplay: vid.autoplay ?? true,
+                                opacity: vid.opacity ?? 1,
+                                visible: vid.visible !== false,
+                                locked: vid.locked ?? false,
+                                zIndex: vid.zIndex ?? 1,
+                            };
+                            overlayElements.push(oel);
+
+                            if (!oel.videoSrc || oel.videoSrc.startsWith('blob:')) {
+                                pendingBlobLoads.push(
+                                    loadVideoBlob(vid.id).then((freshUrl) => {
+                                        if (freshUrl) oel.videoSrc = freshUrl;
+                                    }).catch(() => {/* IndexedDB unavailable */})
+                                );
+                            }
+
+                            if (el.animation && el.animation.preset !== 'none') {
+                                useAnimPresetStore.getState().setPreset(vid.id, {
+                                    anim: el.animation.preset,
+                                    animDuration: el.animation.duration,
+                                    startTime: el.animation.startTime,
+                                });
+                            }
+                        }
+                    }
+                }
+
+                await Promise.all(pendingBlobLoads);
+
+                console.log(`[useCanvasSync] ★ FABRIC-NATIVE restore complete: ${nodeCount} Fabric objects, ${overlayElements.length} overlays`);
+                return { restoredShapes: nodeCount, overlayElements };
+
+            } catch (err) {
+                console.error('[useCanvasSync] Fabric-native restore failed, falling back to legacy:', err);
+                // Fall through to legacy path
+            }
+        }
+
+        // ── Legacy restore path (for old saved projects without fabricJSON) ──
+        console.log(`[useCanvasSync] Legacy restore: ${variant.elements.length} elements from store...`);
 
         let restoredShapes = 0;
         const overlayElements: OverlayElement[] = [];
@@ -201,7 +299,6 @@ export function useCanvasSync(
                     }
                 } else if (shape.shapeType === 'ellipse') {
                     const [r, g, b, a] = hexToRgbFloat(shape.fill || '#808080');
-                    // Engine expects cx, cy, rx, ry for ellipses
                     nodeId = engine.add_ellipse(x + w / 2, y + h / 2, w / 2, h / 2, r, g, b, a);
                 } else if (shape.borderRadius && shape.borderRadius > 0) {
                     const [r, g, b, a] = hexToRgbFloat(shape.fill || '#808080');
@@ -216,9 +313,7 @@ export function useCanvasSync(
                 }
 
                 restoredShapes++;
-                console.log(`[useCanvasSync] Restored shape: ${shape.name} (id=${nodeId}) at ${x},${y} ${w}x${h} color=${shape.fill}`);
 
-                // Restore animation preset for this shape
                 if (el.animation && el.animation.preset !== 'none') {
                     useAnimPresetStore.getState().setPreset(`engine-${nodeId}`, {
                         anim: el.animation.preset,
@@ -231,14 +326,10 @@ export function useCanvasSync(
                 const text = el as TextElement;
                 const { x, y, w } = constraintsToAbsolute(text.constraints, canvasW, canvasH);
 
-                // Convert stored hex color → r,g,b floats for engine
                 const [tr, tg, tb] = hexToRgbFloat(text.color || '#ffffff');
 
-                // IMPORTANT: engine.add_text takes POSITIONAL args, not an options object:
-                // (x, y, content, fontSize, fontFamily, fontWeight, r, g, b, a, width, textAlign, name?, lineHeight?, letterSpacing?)
                 const nodeId = engine.add_text(
-                    x,
-                    y,
+                    x, y,
                     text.content || '',
                     text.fontSize || 16,
                     text.fontFamily || 'Inter',
@@ -256,9 +347,7 @@ export function useCanvasSync(
                 }
 
                 restoredShapes++;
-                console.log(`[useCanvasSync] Restored text: "${text.name}" (id=${nodeId}) at ${x},${y} fontSize=${text.fontSize} color=${text.color}`);
 
-                // Restore animation preset for this text element
                 if (el.animation && el.animation.preset !== 'none') {
                     useAnimPresetStore.getState().setPreset(`engine-${nodeId}`, {
                         anim: el.animation.preset,
@@ -271,43 +360,30 @@ export function useCanvasSync(
                 const img = el as ImageElement;
                 let { x, y, w, h } = constraintsToAbsolute(img.constraints, canvasW, canvasH);
 
-                // ★ Guard: if constraints resolve to invalid position, fall back to center.
-                // This handles corrupt constraints or mismatched canvas sizes.
                 const isOutOfCanvas = w <= 0 || h <= 0
                     || x >= canvasW || y >= canvasH
                     || x + w <= 0 || y + h <= 0;
                 if (isOutOfCanvas) {
-                    console.warn(`[useCanvasSync] Image "${img.name}" resolved out-of-canvas (${x},${y} ${w}x${h}) — centering`);
                     w = Math.min(canvasW * 0.5, img.naturalWidth ?? canvasW * 0.5);
                     h = Math.min(canvasH * 0.5, img.naturalHeight ?? canvasH * 0.5);
                     x = Math.round((canvasW - w) / 2);
                     y = Math.round((canvasH - h) / 2);
                 }
 
-                // ★ REGRESSION GUARD: Collect image load Promises so we can await ALL of them.
-                // Previously images were fire-and-forget — whichever resolved last ended up on top.
-                // Now we await every image, then call reorder_by_z_index() for a definitive sort.
                 if (img.src) {
-                    // ★ Pass stored naturalWidth/naturalHeight so add_image can compute correct
-                    // scaleX/scaleY for SVGs. SVGs without explicit dimensions may report 0 or
-                    // inconsistent naturalWidth/Height on second load — using stored values fixes this.
                     const imgPromise = engine.add_image(
                         x, y, img.src, w, h, img.name, img.zIndex,
-                        img.naturalWidth, img.naturalHeight,  // storedNatW, storedNatH
+                        img.naturalWidth, img.naturalHeight,
                     ).then((nodeId: number) => {
                         if (img.opacity !== undefined && img.opacity !== 1) {
                             try { engine.set_opacity(nodeId, img.opacity); } catch { /* ok */ }
                         }
                     });
                     pendingBlobLoads.push(imgPromise);
-                } else {
-                    console.warn(`[useCanvasSync] Image "${img.name}" has empty src — skipping restore`);
                 }
 
                 restoredShapes++;
-                console.log(`[useCanvasSync] Queued image restore: "${img.name}" at ${x},${y} ${w}x${h} zIndex=${img.zIndex}`);
 
-                // Restore animation preset
                 if (el.animation && el.animation.preset !== 'none') {
                     useAnimPresetStore.getState().setPreset(img.id, {
                         anim: el.animation.preset,
@@ -320,17 +396,12 @@ export function useCanvasSync(
                 const vid = el as VideoElement;
                 let { x, y, w, h } = constraintsToAbsolute(vid.constraints, canvasW, canvasH);
 
-                // ★ Guard: if constraints resolve to invalid position (off-canvas or zero size),
-                // fall back to full-canvas fill. This handles corrupt constraints from
-                // mismatched canvas sizes or bad mouse-coordinate saves.
                 const isOutOfCanvas = w <= 0 || h <= 0
                     || x >= canvasW || y >= canvasH
                     || x + w <= 0 || y + h <= 0;
                 if (isOutOfCanvas) {
-                    console.warn(`[useCanvasSync] Video "${vid.name}" resolved out-of-canvas (${x},${y} ${w}x${h}) — using full-canvas fallback`);
                     x = 0; y = 0; w = canvasW; h = canvasH;
                 } else {
-                    // Clamp to canvas bounds (allow small overflow for edge cases)
                     x = Math.max(0, Math.min(x, canvasW - 10));
                     y = Math.max(0, Math.min(y, canvasH - 10));
                     w = Math.min(w, canvasW - x);
@@ -356,17 +427,14 @@ export function useCanvasSync(
                 };
                 overlayElements.push(oel);
 
-                // ★ If videoSrc is empty or a stale blob, eagerly load a fresh blob URL
-                // We store a promise so we can await ALL of them before returning
                 if (!oel.videoSrc || oel.videoSrc.startsWith('blob:')) {
                     pendingBlobLoads.push(
                         loadVideoBlob(vid.id).then((freshUrl) => {
-                            if (freshUrl) oel.videoSrc = freshUrl; // safe — still modifying before restoreElements() is called
+                            if (freshUrl) oel.videoSrc = freshUrl;
                         }).catch(() => {/* IndexedDB unavailable */ })
                     );
                 }
 
-                // Restore animation preset
                 if (el.animation && el.animation.preset !== 'none') {
                     useAnimPresetStore.getState().setPreset(vid.id, {
                         anim: el.animation.preset,
@@ -381,15 +449,12 @@ export function useCanvasSync(
         await Promise.all(pendingBlobLoads);
 
         // ★ REGRESSION GUARD: After all async image loads complete, do a definitive
-        // reorder of the Fabric stack by __aceZIndex. Images load asynchronously,
-        // so even with individual moveObjectTo calls, timing variations can cause
-        // wrong ordering when multiple images load concurrently.
-        // This final pass guarantees correct layer order.
+        // reorder of the Fabric stack by __aceZIndex.
         if (typeof engine.reorder_by_z_index === 'function') {
             engine.reorder_by_z_index();
         }
 
-        console.log(`[useCanvasSync] Restored ${restoredShapes} shapes, ${overlayElements.length} overlays`);
+        console.log(`[useCanvasSync] Legacy restored ${restoredShapes} shapes, ${overlayElements.length} overlays`);
         return { restoredShapes, overlayElements };
     }, [variantId, canvasW, canvasH]);
 
