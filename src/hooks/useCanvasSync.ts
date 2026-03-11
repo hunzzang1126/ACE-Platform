@@ -288,7 +288,13 @@ export function useCanvasSync(
                 // Previously images were fire-and-forget — whichever resolved last ended up on top.
                 // Now we await every image, then call reorder_by_z_index() for a definitive sort.
                 if (img.src) {
-                    const imgPromise = engine.add_image(x, y, img.src, w, h, img.name, img.zIndex).then((nodeId: number) => {
+                    // ★ Pass stored naturalWidth/naturalHeight so add_image can compute correct
+                    // scaleX/scaleY for SVGs. SVGs without explicit dimensions may report 0 or
+                    // inconsistent naturalWidth/Height on second load — using stored values fixes this.
+                    const imgPromise = engine.add_image(
+                        x, y, img.src, w, h, img.name, img.zIndex,
+                        img.naturalWidth, img.naturalHeight,  // storedNatW, storedNatH
+                    ).then((nodeId: number) => {
                         if (img.opacity !== undefined && img.opacity !== 1) {
                             try { engine.set_opacity(nodeId, img.opacity); } catch { /* ok */ }
                         }

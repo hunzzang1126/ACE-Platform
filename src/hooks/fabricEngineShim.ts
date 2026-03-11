@@ -183,14 +183,20 @@ export function createEngineShim(
         // added, so the image lands on top of everything after load.
         // Fix: after fc.add(), immediately call fc.moveObjectTo(img, rank+1)
         // where rank is this image's position in the __aceZIndex-sorted list.
-        add_image: async (x: number, y: number, src: string, w?: number, h?: number, name?: string, zIndex?: number): Promise<number> => {
+        // ★ REGRESSION GUARD: storedNatW/storedNatH preserve the SVG natural dimensions
+        // captured at first load time. SVGs without explicit width/height attributes may
+        // report naturalWidth/naturalHeight=0 on second load (browser varies).
+        // Using stored dims ensures scaleX/scaleY are computed consistently.
+        add_image: async (x: number, y: number, src: string, w?: number, h?: number, name?: string, zIndex?: number, storedNatW?: number, storedNatH?: number): Promise<number> => {
             const id = nextId();
             try {
                 const isDataUrl = src.startsWith('data:');
                 const imgOptions = isDataUrl ? {} : { crossOrigin: 'anonymous' as const };
                 const img = await FabricImage.fromURL(src, imgOptions);
-                const natW = img.width ?? 200;
-                const natH = img.height ?? 200;
+                // ★ Use stored natural dims if provided (for SVG restore fidelity).
+                // Fall back to freshly-loaded img dimensions if not stored yet.
+                const natW = (storedNatW && storedNatW > 0) ? storedNatW : (img.width ?? 200);
+                const natH = (storedNatH && storedNatH > 0) ? storedNatH : (img.height ?? 200);
 
                 let targetW: number;
                 let targetH: number;

@@ -155,21 +155,30 @@ export function fabricToEngineNode(obj: FabricObject): EngineNode {
         if (imgEl?.src) {
             node.src = imgEl.src;
         }
-        if (imgEl?.naturalWidth) node.naturalWidth = imgEl.naturalWidth;
-        if (imgEl?.naturalHeight) node.naturalHeight = imgEl.naturalHeight;
+        // ★ REGRESSION GUARD: SVGs without explicit width/height attributes report
+        // naturalWidth/naturalHeight=0 from the HTMLImageElement on subsequent loads.
+        // Use Fabric object's stored .width/.height as authoritative source, since
+        // Fabric correctly reads the SVG viewBox dimensions on initial load.
+        // Always prefer the non-zero value to avoid clipping on restore.
+        const fabricW = (obj as any).width ?? 0;
+        const fabricH = (obj as any).height ?? 0;
+        const htmlNatW = imgEl?.naturalWidth ?? 0;
+        const htmlNatH = imgEl?.naturalHeight ?? 0;
+        node.naturalWidth = htmlNatW > 0 ? htmlNatW : (fabricW > 0 ? fabricW : undefined);
+        node.naturalHeight = htmlNatH > 0 ? htmlNatH : (fabricH > 0 ? fabricH : undefined);
 
         // ★ REGRESSION GUARD: Detect objectFit from scale ratio.
         // Fabric stores images as width/height (natural size) + scaleX/scaleY.
         // When user resizes a background to fill the artboard, scaleX ≠ scaleY * (natW/natH)
         // meaning the image is STRETCHED (not cropped). CSS objectFit must be 'fill' to match.
         // When scaleX/scaleY maintain the aspect ratio → 'cover' (default CSS crop behavior).
-        if (imgEl?.naturalWidth && imgEl?.naturalHeight) {
+        const effectiveNatW = node.naturalWidth ?? 0;
+        const effectiveNatH = node.naturalHeight ?? 0;
+        if (effectiveNatW > 0 && effectiveNatH > 0) {
             const sx = obj.scaleX ?? 1;
             const sy = obj.scaleY ?? 1;
-            const natW = imgEl.naturalWidth;
-            const natH = imgEl.naturalHeight;
             // Check if scale ratio matches natural aspect ratio (within 1% tolerance)
-            const expectedScaleRatio = natW / natH;  // if uniform: scaleX/scaleY == natW/natH
+            const expectedScaleRatio = effectiveNatW / effectiveNatH;
             const actualScaleRatio = sx / sy;
             const isStretched = Math.abs(actualScaleRatio - expectedScaleRatio) / expectedScaleRatio > 0.02;
             node.objectFit = isStretched ? 'fill' : 'cover';
