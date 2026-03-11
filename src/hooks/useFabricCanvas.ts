@@ -268,30 +268,13 @@ export function useFabricCanvas(
             });
             fc.on('mouse:up', () => clearGuideLines());
 
-            // ── Zoom (Ctrl+Wheel) ──
-            // ★ CSS artboard clip: after each render, compute artboard screen position
-            // and apply CSS inset() clip-path to the canvas HTML element.
-            // This safely clips elements outside the artboard without Fabric internals.
-            const updateArtboardClip = () => {
-                const canvasEl = fc.getElement() as HTMLCanvasElement;
-                if (!canvasEl) return;
-                const vpt = fc.viewportTransform!;
-                const zoom = fc.getZoom();
-                // Artboard screen position (vpt[4]=translateX, vpt[5]=translateY)
-                const ax = vpt[4];
-                const ay = vpt[5];
-                const aw = width * zoom;
-                const ah = height * zoom;
-                const cw2 = canvasEl.width / (window.devicePixelRatio || 1);
-                const ch2 = canvasEl.height / (window.devicePixelRatio || 1);
-                // inset(top right bottom left)
-                const top = Math.max(0, ay);
-                const left = Math.max(0, ax);
-                const bottom = Math.max(0, ch2 - ay - ah);
-                const right = Math.max(0, cw2 - ax - aw);
-                canvasEl.style.clipPath = `inset(${top}px ${right}px ${bottom}px ${left}px)`;
-            };
-            fc.on('after:render', updateArtboardClip);
+
+            // ──────────────────────────────────────────────────────────────────
+            // ★ REMOVED: CSS inset() clip-path approach (was causing SVG clipping).
+            // The clip-path was applied with wrong inset values (e.g. inset(301px 864px 153px)),
+            // cutting into the artboard and clipping images inside it.
+            // Artboard boundaries are shown via the artboard shadow Rect only.
+            // ──────────────────────────────────────────────────────────────────
 
             fc.on('mouse:wheel', (opt) => {
                 const e = opt.e as WheelEvent;
