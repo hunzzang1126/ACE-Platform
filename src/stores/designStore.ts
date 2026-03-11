@@ -421,10 +421,25 @@ export const useDesignStore = create<DesignState>()(
                 // Persist all creative sets and active ID
                 // Images are persisted as-is (data URLs included)
                 // localStorage quota is handled by the setItem try/catch wrapper
-                partialize: (state) => ({
-                    allCreativeSets: state.allCreativeSets,
-                    activeCreativeSetId: state.activeCreativeSetId,
-                }),
+                // ★ Strip fabricJSON from variants before persisting to localStorage.
+                // fabricJSON contains base64 image data (~1.8MB per variant) that would
+                // exceed the ~5MB localStorage limit. Keep it in memory only.
+                partialize: (state) => {
+                    const cleaned: Record<string, any> = {};
+                    for (const [id, cs] of Object.entries(state.allCreativeSets)) {
+                        cleaned[id] = {
+                            ...cs,
+                            variants: (cs as any).variants.map((v: any) => {
+                                const { fabricJSON: _drop, ...rest } = v;
+                                return rest;
+                            }),
+                        };
+                    }
+                    return {
+                        allCreativeSets: cleaned as any,
+                        activeCreativeSetId: state.activeCreativeSetId,
+                    };
+                },
                 // On rehydration, restore the creativeSet computed field
                 onRehydrateStorage: () => (state) => {
                     if (state && state.activeCreativeSetId) {

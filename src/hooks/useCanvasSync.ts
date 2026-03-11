@@ -38,8 +38,11 @@ export function useCanvasSync(
     const creativeSetForRestore = useDesignStore((s) => s.creativeSet);
 
     /**
-     * ★ SINGLE SOURCE OF TRUTH — Save via Fabric-native toObject().
-     * Saves both fabricJSON (canonical) and derived DesignElement[] (for SmartSizing/AI).
+     * Save current canvas state → designStore.
+     * ★ NOTE: fabricJSON save is DISABLED for now because Fabric toObject()
+     * includes base64 image data, causing localStorage quota overflow (~1.8MB per variant).
+     * We keep the fabricSerializer module for future use when storage moves to IndexedDB.
+     * Currently uses the proven legacy conversion pipeline.
      */
     const saveToStore = useCallback((
         engineRef: React.RefObject<Engine | null>,
@@ -56,39 +59,23 @@ export function useCanvasSync(
             return { success: false, message: 'Engine not ready.' };
         }
 
-        // ── Step 1: Get canonical Fabric JSON ──
-        let fabricJSON: string | undefined;
-        try {
-            fabricJSON = engine.getCanvasJSON();
-            console.log('[useCanvasSync] Fabric JSON captured:', fabricJSON!.length, 'bytes');
-        } catch (err) {
-            console.warn('[useCanvasSync] Failed to get Fabric JSON, falling back to legacy:', err);
-        }
-
-        // ── Step 2: Derive DesignElement[] for SmartSizing/AI/Preview backward compat ──
         const elements: DesignElement[] = [];
 
-        if (fabricJSON) {
-            // Derive from Fabric JSON — single conversion point
-            const derived = fabricJsonToElements(fabricJSON, canvasW, canvasH);
-            elements.push(...derived);
-        } else {
-            // Fallback to legacy conversion if getCanvasJSON failed
-            try {
-                const raw = engine.get_all_nodes();
-                const nodes: EngineNode[] = JSON.parse(raw);
-                for (const node of nodes) {
-                    if (node.type === 'text') {
-                        elements.push(engineNodeToTextElement(node, canvasW, canvasH));
-                    } else if (node.type === 'image') {
-                        elements.push(engineNodeToImageElement(node, canvasW, canvasH));
-                    } else {
-                        elements.push(engineNodeToShapeElement(node, canvasW, canvasH));
-                    }
+        // Convert engine nodes → DesignElements using proven legacy pipeline
+        try {
+            const raw = engine.get_all_nodes();
+            const nodes: EngineNode[] = JSON.parse(raw);
+            for (const node of nodes) {
+                if (node.type === 'text') {
+                    elements.push(engineNodeToTextElement(node, canvasW, canvasH));
+                } else if (node.type === 'image') {
+                    elements.push(engineNodeToImageElement(node, canvasW, canvasH));
+                } else {
+                    elements.push(engineNodeToShapeElement(node, canvasW, canvasH));
                 }
-            } catch (err) {
-                console.warn('[useCanvasSync] Failed to read engine nodes:', err);
             }
+        } catch (err) {
+            console.warn('[useCanvasSync] Failed to read engine nodes:', err);
         }
 
         // Save video overlays — they are HTML-based but still need persistence
@@ -107,12 +94,13 @@ export function useCanvasSync(
         })));
 
         // Write to store (triggers smart sizing propagation if master)
-        replaceVariantElements(variantId, elements, fabricJSON);
+        // ★ fabricJSON disabled — do NOT pass fabricJSON to avoid localStorage quota issues
+        replaceVariantElements(variantId, elements);
 
         const isMaster = cs.masterVariantId === variantId;
         const msg = isMaster
-            ? `Saved ${elements.length} elements to master (fabricJSON=${!!fabricJSON}). Propagated to ${cs.variants.length - 1} sizes.`
-            : `Saved ${elements.length} elements to variant (fabricJSON=${!!fabricJSON}).`;
+            ? `Saved ${elements.length} elements to master. Propagated to ${cs.variants.length - 1} sizes.`
+            : `Saved ${elements.length} elements to variant.`;
 
         console.log(`[useCanvasSync] ${msg}`);
         return { success: true, message: msg };
@@ -166,9 +154,11 @@ export function useCanvasSync(
     }, [variantId, canvasW, canvasH, replaceVariantElements]);
 
     /**
-     * ★ SINGLE SOURCE OF TRUTH — Restore via Fabric-native loadFromJSON() when fabricJSON is present.
-     * Falls back to legacy element-by-element reconstruction for old saved projects.
-     * Returns overlay elements (videos) that should be added to the overlay system.
+     * Restore saved elements from designStore → engine + overlay.
+     * ★ NOTE: Fabric-native loadFromJSON() restore is DISABLED for now because:
+     * - fabricJSON includes artboard object, causing duplication
+     * - loadFromJSON clears the canvas (including artboard setup done by useFabricCanvas)
+     * Uses the proven legacy element-by-element reconstruction.
      */
     const restoreFromStore = useCallback(async (
         engine: Engine,
@@ -180,102 +170,12 @@ export function useCanvasSync(
         }
 
         const variant = cs.variants.find((v) => v.id === variantId);
-        if (!variant || (!variant.elements?.length && !variant.fabricJSON)) {
+        if (!variant || !variant.elements || variant.elements.length === 0) {
             console.log('[useCanvasSync] No saved elements to restore');
             return { restoredShapes: 0, overlayElements: [] };
         }
 
-        // ── Fabric-native restore path (PREFERRED) ──
-        if (variant.fabricJSON && typeof engine.loadCanvasJSON === 'function') {
-            console.log(`[useCanvasSync] ★ FABRIC-NATIVE restore: ${variant.fabricJSON.length} bytes`);
-            try {
-                await engine.loadCanvasJSON(variant.fabricJSON);
-
-                // Count restored objects (excluding artboard)
-                const nodeCount = engine.node_count?.() ?? 0;
-
-                // Restore animation presets from saved elements
-                // (animations are stored in separate useAnimPresetStore, not in Fabric JSON)
-                if (variant.elements) {
-                    for (const el of variant.elements) {
-                        if (el.animation && el.animation.preset !== 'none') {
-                            useAnimPresetStore.getState().setPreset(el.id, {
-                                anim: el.animation.preset,
-                                animDuration: el.animation.duration,
-                                startTime: el.animation.startTime,
-                            });
-                        }
-                    }
-                }
-
-                // Handle video overlays (they're HTML-based, not in Fabric JSON)
-                const overlayElements: OverlayElement[] = [];
-                const pendingBlobLoads: Promise<void>[] = [];
-
-                if (variant.elements) {
-                    for (const el of variant.elements) {
-                        if (el.type === 'video') {
-                            const vid = el as VideoElement;
-                            let { x, y, w, h } = constraintsToAbsolute(vid.constraints, canvasW, canvasH);
-
-                            const isOutOfCanvas = w <= 0 || h <= 0
-                                || x >= canvasW || y >= canvasH
-                                || x + w <= 0 || y + h <= 0;
-                            if (isOutOfCanvas) {
-                                x = 0; y = 0; w = canvasW; h = canvasH;
-                            }
-
-                            const oel: OverlayElement = {
-                                id: vid.id,
-                                type: 'video',
-                                x, y, w, h,
-                                name: vid.name,
-                                videoSrc: vid.videoSrc || '',
-                                posterSrc: vid.posterSrc,
-                                fileName: vid.fileName,
-                                objectFit: (vid.fit === 'cover' || vid.fit === 'contain' || vid.fit === 'fill') ? vid.fit : 'cover',
-                                muted: vid.muted ?? true,
-                                loop: vid.loop ?? true,
-                                autoplay: vid.autoplay ?? true,
-                                opacity: vid.opacity ?? 1,
-                                visible: vid.visible !== false,
-                                locked: vid.locked ?? false,
-                                zIndex: vid.zIndex ?? 1,
-                            };
-                            overlayElements.push(oel);
-
-                            if (!oel.videoSrc || oel.videoSrc.startsWith('blob:')) {
-                                pendingBlobLoads.push(
-                                    loadVideoBlob(vid.id).then((freshUrl) => {
-                                        if (freshUrl) oel.videoSrc = freshUrl;
-                                    }).catch(() => {/* IndexedDB unavailable */})
-                                );
-                            }
-
-                            if (el.animation && el.animation.preset !== 'none') {
-                                useAnimPresetStore.getState().setPreset(vid.id, {
-                                    anim: el.animation.preset,
-                                    animDuration: el.animation.duration,
-                                    startTime: el.animation.startTime,
-                                });
-                            }
-                        }
-                    }
-                }
-
-                await Promise.all(pendingBlobLoads);
-
-                console.log(`[useCanvasSync] ★ FABRIC-NATIVE restore complete: ${nodeCount} Fabric objects, ${overlayElements.length} overlays`);
-                return { restoredShapes: nodeCount, overlayElements };
-
-            } catch (err) {
-                console.error('[useCanvasSync] Fabric-native restore failed, falling back to legacy:', err);
-                // Fall through to legacy path
-            }
-        }
-
-        // ── Legacy restore path (for old saved projects without fabricJSON) ──
-        console.log(`[useCanvasSync] Legacy restore: ${variant.elements.length} elements from store...`);
+        console.log(`[useCanvasSync] Restoring ${variant.elements.length} elements from store...`);
 
         let restoredShapes = 0;
         const overlayElements: OverlayElement[] = [];
