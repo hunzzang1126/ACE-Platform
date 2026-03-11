@@ -34,3 +34,5 @@ __pycache__/
 chroma_data/
 .openpencil-ref
 .pencil-analysis/
+.openpencil-ref/
+DEV REPORT/
