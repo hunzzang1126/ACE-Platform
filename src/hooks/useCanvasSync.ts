@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { extractAssets, resolveAsset, isAssetRef } from '@/services/assetService';
 import { useDesignStore } from '@/stores/designStore';
 import { loadVideoBlob } from '@/stores/videoStorage';
 import type { DesignElement, ShapeElement, TextElement, ImageElement, VideoElement, ElementAnimation } from '@/schema/elements.types';
@@ -86,16 +87,22 @@ export function useCanvasSync(
         // Sort by zIndex
         elements.sort((a, b) => a.zIndex - b.zIndex);
 
-        console.log('[useCanvasSync] FINAL elements to save:', elements.map(e => ({
-            id: e.id, type: e.type, name: e.name, zIndex: e.zIndex,
-            ...(e.type === 'image' ? { src: (e as any).src?.substring(0, 50) + '...' } : {}),
-            ...(e.type === 'text' ? { content: (e as any).content?.substring(0, 30) } : {}),
-            ...(e.type === 'shape' ? { fill: (e as any).fill, gradientStart: (e as any).gradientStart } : {}),
-        })));
-
-        // Write to store (triggers smart sizing propagation if master)
-        // ★ fabricJSON disabled — do NOT pass fabricJSON to avoid localStorage quota issues
+        // ★ Phase 2: Extract base64 images → idb:// refs (async, non-blocking)
+        // Save immediately with raw data, then async-extract in background
         replaceVariantElements(variantId, elements);
+
+        // Background: replace data URLs with idb:// refs
+        extractAssets(elements).then(extracted => {
+            const hasChanges = extracted.some((el, i) =>
+                el.type === 'image' && (el as any).src !== (elements[i] as any).src
+            );
+            if (hasChanges) {
+                replaceVariantElements(variantId, extracted);
+                console.log('[useCanvasSync] Asset extraction complete — base64 → idb:// refs');
+            }
+        }).catch(err => {
+            console.warn('[useCanvasSync] Asset extraction failed:', err);
+        });
 
         const isMaster = cs.masterVariantId === variantId;
         const msg = isMaster
@@ -271,14 +278,19 @@ export function useCanvasSync(
                 }
 
                 if (img.src) {
-                    const imgPromise = engine.add_image(
-                        x, y, img.src, w, h, img.name, img.zIndex,
-                        img.naturalWidth, img.naturalHeight,
-                    ).then((nodeId: number) => {
+                    // ★ Phase 2: resolve idb:// refs → blob URLs before rendering
+                    const imgPromise = (async () => {
+                        const resolvedSrc = isAssetRef(img.src)
+                            ? await resolveAsset(img.src)
+                            : img.src;
+                        const nodeId = await engine.add_image(
+                            x, y, resolvedSrc, w, h, img.name, img.zIndex,
+                            img.naturalWidth, img.naturalHeight,
+                        );
                         if (img.opacity !== undefined && img.opacity !== 1) {
                             try { engine.set_opacity(nodeId, img.opacity); } catch { /* ok */ }
                         }
-                    });
+                    })();
                     pendingBlobLoads.push(imgPromise);
                 }
 
