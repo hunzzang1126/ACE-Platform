@@ -110,6 +110,17 @@ export function useFabricCanvas(
         setCanRedo(false);
     }, []);
 
+    // ── Z-index resync (hook-level, accessible to all useCallbacks) ──
+    // ★ REGRESSION GUARD: This MUST be a hook-level function, NOT scoped inside useEffect.
+    // All z-order mutations (bringToFront, sendToBack, etc.) call this after Fabric stack changes.
+    // fabricToEngineNode reads __aceZIndex during save — if stale, saved z_index is wrong.
+    const resyncZIndices = useCallback(() => {
+        const fc = fabricRef.current;
+        if (!fc) return;
+        const userObjs = fc.getObjects().filter(o => !isArtboard(o) && !(o as any).__aceGuide);
+        userObjs.forEach((o, i) => { (o as any).__aceZIndex = i; });
+    }, []);
+
     // ── Smart guide rendering helpers ──
     const renderGuideLines = useCallback((guides: GuideLine[]) => {
         const fc = fabricRef.current;
@@ -206,11 +217,7 @@ export function useFabricCanvas(
             // __aceZIndex for ALL objects based on actual Fabric stack position.
             // Previously, __aceZIndex was set only at add-time and never updated,
             // causing z-index corruption when objects were reordered.
-            const resyncZIndices = () => {
-                const userObjs = fc.getObjects().filter(o => !isArtboard(o) && !(o as any).__aceGuide);
-                userObjs.forEach((o, i) => { (o as any).__aceZIndex = i; });
-            };
-
+            // Use hook-level resyncZIndices (accessible from all useCallback hooks).
             fc.on('object:modified', () => {
                 resyncZIndices();
                 pushUndo('Transform element');
@@ -529,26 +536,35 @@ export function useFabricCanvas(
     }, [findById, syncState]);
 
     // ── Z-index ──
+    // ★ REGRESSION GUARD: After every Fabric stack reorder call (bringObjectToFront etc.),
+    // resyncZIndices() MUST be called to update __aceZIndex on ALL objects.
+    // fabricToEngineNode reads __aceZIndex to determine z_index during save.
+    // If __aceZIndex is stale, the saved z_index is wrong and layer order reverts on re-enter.
     const bringToFront = useCallback((id: number) => {
         const fc = fabricRef.current; const obj = findById(id);
         if (!fc || !obj) return;
-        fc.bringObjectToFront(obj); fc.renderAll(); syncState();
-    }, [findById, syncState]);
+        fc.bringObjectToFront(obj);
+        resyncZIndices(); // ★ MUST call after every Fabric stack change
+        fc.renderAll(); syncState();
+    }, [findById, syncState, resyncZIndices]);
 
     const sendToBack = useCallback((id: number) => {
         const fc = fabricRef.current; const obj = findById(id);
         if (!fc || !obj) return;
         fc.sendObjectToBack(obj);
         const artboard = fc.getObjects().find(isArtboard);
-        if (artboard) fc.sendObjectToBack(artboard);
+        if (artboard) fc.sendObjectToBack(artboard); // Artboard must stay at the very back
+        resyncZIndices(); // ★ MUST call after every Fabric stack change
         fc.renderAll(); syncState();
-    }, [findById, syncState]);
+    }, [findById, syncState, resyncZIndices]);
 
     const bringForward = useCallback((id: number) => {
         const fc = fabricRef.current; const obj = findById(id);
         if (!fc || !obj) return;
-        fc.bringObjectForward(obj); fc.renderAll(); syncState();
-    }, [findById, syncState]);
+        fc.bringObjectForward(obj);
+        resyncZIndices(); // ★ MUST call after every Fabric stack change
+        fc.renderAll(); syncState();
+    }, [findById, syncState, resyncZIndices]);
 
     const sendBackward = useCallback((id: number) => {
         const fc = fabricRef.current; const obj = findById(id);
@@ -556,8 +572,9 @@ export function useFabricCanvas(
         fc.sendObjectBackwards(obj);
         const artboard = fc.getObjects().find(isArtboard);
         if (artboard) fc.sendObjectToBack(artboard);
+        resyncZIndices(); // ★ MUST call after every Fabric stack change
         fc.renderAll(); syncState();
-    }, [findById, syncState]);
+    }, [findById, syncState, resyncZIndices]);
 
     // ── Effects ──
     const setShadow = useCallback((id: number, ox: number, oy: number, blur: number, r: number, g: number, b: number, a: number) => {
