@@ -175,20 +175,21 @@ export function useFabricCanvas(
             (fc as any).selectionBorderColor = '#4a9eff';
             (fc as any).selectionLineWidth = 1;
 
-            // ── Artboard background ──
+            // ★ Artboard: white background with shadow
             skipHistory.current = true;
             const artboard = new Rect({
                 left: 0, top: 0, width, height,
                 fill: '#ffffff',
-                selectable: false, evented: false,
+                selectable: false, evented: true, // evented:true to catch clicks
                 hasControls: false, hasBorders: false,
                 lockMovementX: true, lockMovementY: true,
                 hoverCursor: 'default',
-                shadow: new Shadow({ color: 'rgba(0,0,0,0.3)', blur: 20, offsetX: 0, offsetY: 4 }),
+                shadow: new Shadow({ color: 'rgba(0,0,0,0.35)', blur: 24, offsetX: 0, offsetY: 6 }),
             });
             (artboard as any).__aceArtboard = true;
             patchAceProps(artboard);
             fc.add(artboard);
+
 
             const vpt = fc.viewportTransform!;
             vpt[4] = (cw - width) / 2;
@@ -200,7 +201,22 @@ export function useFabricCanvas(
             fc.on('selection:created', () => syncState());
             fc.on('selection:updated', () => syncState());
             fc.on('selection:cleared', () => syncState());
-            fc.on('object:modified', () => { pushUndo('Transform element'); clearGuideLines(); syncState(); });
+
+            // ★ REGRESSION GUARD: After any transform (move/resize/rotate), recompute
+            // __aceZIndex for ALL objects based on actual Fabric stack position.
+            // Previously, __aceZIndex was set only at add-time and never updated,
+            // causing z-index corruption when objects were reordered.
+            const resyncZIndices = () => {
+                const userObjs = fc.getObjects().filter(o => !isArtboard(o) && !(o as any).__aceGuide);
+                userObjs.forEach((o, i) => { (o as any).__aceZIndex = i; });
+            };
+
+            fc.on('object:modified', () => {
+                resyncZIndices();
+                pushUndo('Transform element');
+                clearGuideLines();
+                syncState();
+            });
             fc.on('object:added', (opt) => {
                 const obj = opt.target;
                 if (obj && !(obj as any).__aceId && !isArtboard(obj) && !(obj as any).__aceGuide) {
@@ -211,7 +227,20 @@ export function useFabricCanvas(
                 if (!skipHistory.current && !(obj as any)?.__aceGuide) pushUndo('Add element');
                 syncState();
             });
-            fc.on('object:removed', () => { pushUndo('Remove element'); syncState(); });
+            fc.on('object:removed', () => { resyncZIndices(); pushUndo('Remove element'); syncState(); });
+
+            // Deselect on background/artboard click (outside any user object)
+            fc.on('mouse:down', (opt) => {
+                const e = opt.e as MouseEvent;
+                if (e.altKey || e.button === 1) return; // handled below for pan
+                const target = opt.target;
+                // Click hit the artboard rect or nothing (gray surround) → deselect all
+                if (!target || isArtboard(target)) {
+                    fc.discardActiveObject();
+                    fc.renderAll();
+                    syncState();
+                }
+            });
 
             // ── Smart guides on drag ──
             fc.on('object:moving', (opt) => {
@@ -233,6 +262,30 @@ export function useFabricCanvas(
             fc.on('mouse:up', () => clearGuideLines());
 
             // ── Zoom (Ctrl+Wheel) ──
+            // ★ CSS artboard clip: after each render, compute artboard screen position
+            // and apply CSS inset() clip-path to the canvas HTML element.
+            // This safely clips elements outside the artboard without Fabric internals.
+            const updateArtboardClip = () => {
+                const canvasEl = fc.getElement() as HTMLCanvasElement;
+                if (!canvasEl) return;
+                const vpt = fc.viewportTransform!;
+                const zoom = fc.getZoom();
+                // Artboard screen position (vpt[4]=translateX, vpt[5]=translateY)
+                const ax = vpt[4];
+                const ay = vpt[5];
+                const aw = width * zoom;
+                const ah = height * zoom;
+                const cw2 = canvasEl.width / (window.devicePixelRatio || 1);
+                const ch2 = canvasEl.height / (window.devicePixelRatio || 1);
+                // inset(top right bottom left)
+                const top = Math.max(0, ay);
+                const left = Math.max(0, ax);
+                const bottom = Math.max(0, ch2 - ay - ah);
+                const right = Math.max(0, cw2 - ax - aw);
+                canvasEl.style.clipPath = `inset(${top}px ${right}px ${bottom}px ${left}px)`;
+            };
+            fc.on('after:render', updateArtboardClip);
+
             fc.on('mouse:wheel', (opt) => {
                 const e = opt.e as WheelEvent;
                 if (e.ctrlKey || e.metaKey) {
