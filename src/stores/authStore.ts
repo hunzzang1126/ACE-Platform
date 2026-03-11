@@ -192,6 +192,15 @@ export const useAuthStore = create<AuthState>()(
                 return role === 'admin' || role === 'user';
             },
         }),
-        { name: 'ace-auth', storage: createJSONStorage(() => idbStorage) },
+        {
+            name: 'ace-auth',
+            storage: createJSONStorage(() => idbStorage),
+            // Don't persist transient state — always starts fresh
+            partialize: (state) => ({
+                user: state.user,
+                session: state.session,
+                role: state.role,
+            }),
+        },
     ),
 );
