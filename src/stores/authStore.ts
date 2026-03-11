@@ -1,13 +1,22 @@
 // ─────────────────────────────────────────────────
-// authStore — Authentication state management
+// authStore — Authentication + Role Management
 // ─────────────────────────────────────────────────
-// Zustand store for user auth. Supports email/password
-// and Google SSO via Supabase.
+// Zustand store for user auth, session, and RBAC.
+// Supports: Email, Google SSO, GitHub SSO via Supabase.
 // ─────────────────────────────────────────────────
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { idbStorage } from './idbStorageAdapter';
+import {
+    getSupabase,
+    signInWithOAuth,
+    signInWithEmail as sbSignInWithEmail,
+    signUpWithEmail as sbSignUpWithEmail,
+    signOut as sbSignOut,
+    fetchUserRole,
+    type UserRole,
+} from '@/services/supabaseClient';
 
 export interface User {
     id: string;
@@ -27,12 +36,14 @@ export interface Session {
 interface AuthState {
     user: User | null;
     session: Session | null;
+    role: UserRole | null;
     isLoading: boolean;
     error: string | null;
 
     // Actions
     setUser: (user: User | null) => void;
     setSession: (session: Session | null) => void;
+    setRole: (role: UserRole | null) => void;
     setLoading: (loading: boolean) => void;
     setError: (error: string | null) => void;
 
@@ -40,12 +51,18 @@ interface AuthState {
     signInWithEmail: (email: string, password: string) => Promise<void>;
     signUpWithEmail: (email: string, password: string, name: string) => Promise<void>;
     signInWithGoogle: () => Promise<void>;
+    signInWithGitHub: () => Promise<void>;
     signOut: () => Promise<void>;
     refreshSession: () => Promise<void>;
+
+    // Session sync (called after OAuth callback)
+    syncSessionFromSupabase: () => Promise<void>;
 
     // Helpers
     isAuthenticated: () => boolean;
     isSessionValid: () => boolean;
+    isAdmin: () => boolean;
+    isApproved: () => boolean;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -53,132 +70,114 @@ export const useAuthStore = create<AuthState>()(
         (set, get) => ({
             user: null,
             session: null,
+            role: null,
             isLoading: false,
             error: null,
 
             setUser: (user) => set({ user }),
             setSession: (session) => set({ session }),
+            setRole: (role) => set({ role }),
             setLoading: (isLoading) => set({ isLoading }),
             setError: (error) => set({ error }),
 
             signInWithEmail: async (email, password) => {
                 set({ isLoading: true, error: null });
-                try {
-                    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-                    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-                    if (!supabaseUrl || !supabaseKey) {
-                        // Offline mode: create mock session
-                        set({
-                            user: { id: 'local', email, displayName: email.split('@')[0] ?? 'User', plan: 'free', createdAt: new Date().toISOString() },
-                            session: { accessToken: 'local', refreshToken: 'local', expiresAt: Date.now() + 86400000 },
-                            isLoading: false,
-                        });
-                        return;
-                    }
-
-                    const res = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', apikey: supabaseKey },
-                        body: JSON.stringify({ email, password }),
-                    });
-                    if (!res.ok) { const err = await res.json(); throw new Error(err.error_description || 'Sign in failed'); }
-                    const data = await res.json();
-                    set({
-                        user: {
-                            id: data.user.id,
-                            email: data.user.email,
-                            displayName: data.user.user_metadata?.display_name ?? email.split('@')[0] ?? 'User',
-                            avatarUrl: data.user.user_metadata?.avatar_url,
-                            plan: 'free',
-                            createdAt: data.user.created_at,
-                        },
-                        session: {
-                            accessToken: data.access_token,
-                            refreshToken: data.refresh_token,
-                            expiresAt: Date.now() + data.expires_in * 1000,
-                        },
-                        isLoading: false,
-                    });
-                } catch (err) {
-                    set({ error: String(err instanceof Error ? err.message : err), isLoading: false });
+                const { error } = await sbSignInWithEmail(email, password);
+                if (error) {
+                    set({ error, isLoading: false });
+                    return;
                 }
+                // syncSessionFromSupabase will be called by auth listener
+                await get().syncSessionFromSupabase();
             },
 
             signUpWithEmail: async (email, password, name) => {
                 set({ isLoading: true, error: null });
-                try {
-                    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-                    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-                    if (!supabaseUrl || !supabaseKey) {
-                        set({
-                            user: { id: 'local', email, displayName: name, plan: 'free', createdAt: new Date().toISOString() },
-                            session: { accessToken: 'local', refreshToken: 'local', expiresAt: Date.now() + 86400000 },
-                            isLoading: false,
-                        });
-                        return;
-                    }
-
-                    const res = await fetch(`${supabaseUrl}/auth/v1/signup`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', apikey: supabaseKey },
-                        body: JSON.stringify({ email, password, data: { display_name: name } }),
-                    });
-                    if (!res.ok) { const err = await res.json(); throw new Error(err.error_description || 'Sign up failed'); }
-                    const data = await res.json();
-                    set({
-                        user: { id: data.user?.id ?? 'pending', email, displayName: name, plan: 'free', createdAt: new Date().toISOString() },
-                        isLoading: false,
-                    });
-                } catch (err) {
-                    set({ error: String(err instanceof Error ? err.message : err), isLoading: false });
+                const { error } = await sbSignUpWithEmail(email, password, name);
+                if (error) {
+                    set({ error, isLoading: false });
+                    return;
                 }
+                set({ isLoading: false, error: null });
             },
 
             signInWithGoogle: async () => {
                 set({ isLoading: true, error: null });
-                try {
-                    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-                    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-                    if (!supabaseUrl || !supabaseKey) {
-                        set({ error: 'Supabase not configured. Using offline mode.', isLoading: false });
-                        return;
-                    }
-                    // Redirect to Supabase Google OAuth
-                    window.location.href = `${supabaseUrl}/auth/v1/authorize?provider=google&redirect_to=${window.location.origin}/auth/callback&apikey=${supabaseKey}`;
-                } catch (err) {
-                    set({ error: String(err instanceof Error ? err.message : err), isLoading: false });
-                }
+                const { error } = await signInWithOAuth('google');
+                if (error) set({ error, isLoading: false });
+                // Redirect happens — page will reload at /auth/callback
+            },
+
+            signInWithGitHub: async () => {
+                set({ isLoading: true, error: null });
+                const { error } = await signInWithOAuth('github');
+                if (error) set({ error, isLoading: false });
+                // Redirect happens — page will reload at /auth/callback
             },
 
             signOut: async () => {
-                set({ user: null, session: null, error: null });
+                await sbSignOut();
+                set({ user: null, session: null, role: null, error: null });
+            },
+
+            syncSessionFromSupabase: async () => {
+                const sb = getSupabase();
+                if (!sb) {
+                    set({ isLoading: false });
+                    return;
+                }
+
+                const { data: { session } } = await sb.auth.getSession();
+                if (!session) {
+                    set({ user: null, session: null, role: null, isLoading: false });
+                    return;
+                }
+
+                const supaUser = session.user;
+                const user: User = {
+                    id: supaUser.id,
+                    email: supaUser.email ?? '',
+                    displayName:
+                        supaUser.user_metadata?.full_name ??
+                        supaUser.user_metadata?.name ??
+                        supaUser.email?.split('@')[0] ?? 'User',
+                    avatarUrl: supaUser.user_metadata?.avatar_url,
+                    plan: 'free',
+                    createdAt: supaUser.created_at,
+                };
+
+                const role = await fetchUserRole(supaUser.id);
+
+                set({
+                    user,
+                    session: {
+                        accessToken: session.access_token,
+                        refreshToken: session.refresh_token,
+                        expiresAt: Date.now() + (session.expires_in ?? 3600) * 1000,
+                    },
+                    role,
+                    isLoading: false,
+                    error: null,
+                });
             },
 
             refreshSession: async () => {
-                const { session } = get();
-                if (!session) return;
-                try {
-                    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-                    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-                    if (!supabaseUrl || !supabaseKey) return;
+                const sb = getSupabase();
+                if (!sb) return;
 
-                    const res = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=refresh_token`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', apikey: supabaseKey },
-                        body: JSON.stringify({ refresh_token: session.refreshToken }),
-                    });
-                    if (!res.ok) { get().signOut(); return; }
-                    const data = await res.json();
-                    set({
-                        session: {
-                            accessToken: data.access_token,
-                            refreshToken: data.refresh_token,
-                            expiresAt: Date.now() + data.expires_in * 1000,
-                        },
-                    });
-                } catch {
-                    // Silent fail on refresh
+                const { data: { session } } = await sb.auth.refreshSession();
+                if (!session) {
+                    get().signOut();
+                    return;
                 }
+
+                set({
+                    session: {
+                        accessToken: session.access_token,
+                        refreshToken: session.refresh_token,
+                        expiresAt: Date.now() + (session.expires_in ?? 3600) * 1000,
+                    },
+                });
             },
 
             isAuthenticated: () => get().user !== null,
@@ -186,6 +185,11 @@ export const useAuthStore = create<AuthState>()(
                 const { session } = get();
                 if (!session) return false;
                 return session.expiresAt > Date.now();
+            },
+            isAdmin: () => get().role === 'admin',
+            isApproved: () => {
+                const role = get().role;
+                return role === 'admin' || role === 'user';
             },
         }),
         { name: 'ace-auth', storage: createJSONStorage(() => idbStorage) },

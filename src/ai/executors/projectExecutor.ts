@@ -210,7 +210,7 @@ export function executeProjectTool(
             if (!navigate) return { success: false, message: 'Navigation not available.' };
 
             if (page === 'dashboard') {
-                navigate('/');
+                navigate('/dashboard');
                 return { success: true, message: 'Navigated to Dashboard.' };
             } else if (page === 'editor') {
                 navigate('/editor');

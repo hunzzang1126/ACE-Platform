@@ -60,7 +60,7 @@ export function AppSidebar() {
     return (
         <aside className="sidebar">
             {/* Gradient Logo */}
-            <div className="sidebar-logo" onClick={() => navigate('/')}>
+            <div className="sidebar-logo" onClick={() => navigate('/dashboard')}>
                 <span className="sidebar-logo-text">ACE</span>
             </div>
 
