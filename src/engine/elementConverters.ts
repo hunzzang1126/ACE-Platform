@@ -142,7 +142,32 @@ export function hexToRgbFloat(hex: string): [number, number, number, number] {
     return [r, g, b, 1.0];
 }
 
-// ── Type converters ──
+// ── Font weight resolver ──
+/**
+ * Convert any fontWeight representation to a CSS-valid number.
+ * Handles: numeric strings ('400', '700'), keywords ('bold', 'normal', 'semibold', etc.)
+ *
+ * ★ REGRESSION GUARD: parseInt('bold', 10) = NaN → falls back to 400, silently losing
+ * bold styling. This function correctly maps 'bold' → 700, 'normal' → 400, etc.
+ */
+export function resolveFontWeight(fw: string | number | undefined | null): number {
+    if (fw === null || fw === undefined) return 400;
+    if (typeof fw === 'number') return fw;
+    const n = parseInt(fw, 10);
+    if (!isNaN(n)) return n;
+    // Keyword mapping
+    const kw = fw.toLowerCase().trim();
+    if (kw === 'bold') return 700;
+    if (kw === 'bolder') return 800;
+    if (kw === 'lighter') return 300;
+    if (kw === 'semibold' || kw === 'semi-bold' || kw === 'medium') return 600;
+    if (kw === 'light') return 300;
+    if (kw === 'thin' || kw === 'hairline') return 100;
+    if (kw === 'extrabold' || kw === 'extra-bold') return 800;
+    if (kw === 'black' || kw === 'heavy') return 900;
+    return 400; // normal fallback
+}
+
 
 export function nodeTypeToShapeType(type: string): 'rectangle' | 'ellipse' {
     if (type === 'ellipse') return 'ellipse';
@@ -215,7 +240,7 @@ export function engineNodeToTextElement(
         content: node.content ?? '',
         fontFamily: node.fontFamily ?? 'Inter',
         fontSize: node.fontSize ?? 16,
-        fontWeight: parseInt(node.fontWeight ?? '400', 10) || 400,
+        fontWeight: resolveFontWeight(node.fontWeight),
         // ★ REGRESSION GUARD: Read fontStyle from node — previously hardcoded 'normal',
         // causing italic text to lose its styling in the preview.
         fontStyle: (node.fontStyle as 'normal' | 'italic') ?? 'normal',
@@ -280,8 +305,9 @@ export function overlayToDesignElement(
             content: oel.content || '',
             fontFamily: oel.fontFamily || 'Inter',
             fontSize: oel.fontSize || 16,
-            fontWeight: parseInt(oel.fontWeight || '400', 10) || 400,
-            fontStyle: 'normal',
+            fontWeight: resolveFontWeight((oel as any).fontWeight),
+            // ★ REGRESSION GUARD: Preserve fontStyle from overlay (was hardcoded 'normal').
+            fontStyle: ((oel as any).fontStyle as 'normal' | 'italic') ?? 'normal',
             color: oel.color || '#000000',
             textAlign: oel.textAlign || 'left',
             lineHeight: oel.lineHeight ?? 1.4,
