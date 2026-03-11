@@ -123,11 +123,15 @@ export const useAuthStore = create<AuthState>()(
             syncSessionFromSupabase: async () => {
                 const sb = getSupabase();
                 if (!sb) {
+                    console.warn('[syncSession] Supabase not configured');
                     set({ isLoading: false });
                     return;
                 }
 
+                console.log('[syncSession] Getting session from Supabase SDK...');
                 const { data: { session } } = await sb.auth.getSession();
+                console.log('[syncSession] Session found:', !!session, session?.user?.email);
+
                 if (!session) {
                     set({ user: null, session: null, role: null, isLoading: false });
                     return;
@@ -146,7 +150,9 @@ export const useAuthStore = create<AuthState>()(
                     createdAt: supaUser.created_at,
                 };
 
+                console.log('[syncSession] Fetching role for:', supaUser.id);
                 const role = await fetchUserRole(supaUser.id);
+                console.log('[syncSession] Role result:', role);
 
                 set({
                     user,

@@ -89,13 +89,20 @@ export type UserRole = 'admin' | 'user' | 'pending' | 'rejected';
 
 export async function fetchUserRole(userId: string): Promise<UserRole> {
     const sb = getSupabase();
-    if (!sb) return 'pending';
+    if (!sb) {
+        console.warn('[fetchUserRole] Supabase not configured');
+        return 'pending';
+    }
+
+    console.log('[fetchUserRole] Fetching role for userId:', userId);
 
     const { data, error } = await sb
         .from('user_roles')
         .select('role')
         .eq('user_id', userId)
-        .single();
+        .maybeSingle();
+
+    console.log('[fetchUserRole] Result:', { data, error: error?.message });
 
     if (error || !data) return 'pending';
     return data.role as UserRole;
