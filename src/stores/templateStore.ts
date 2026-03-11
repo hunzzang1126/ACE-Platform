@@ -5,8 +5,10 @@
 // Templates include layout, elements, animations, brand settings.
 // ─────────────────────────────────────────────────
 
+import { idbStorage } from './idbStorageAdapter';
+import { v4 as uuid } from 'uuid';
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import type { BannerVariant } from '@/schema/design.types';
 
@@ -173,6 +175,6 @@ export const useTemplateStore = create<TemplateState>()(
                 }
             },
         })),
-        { name: 'ace-templates' },
+        { name: 'ace-templates', storage: createJSONStorage(() => idbStorage) },
     ),
 );

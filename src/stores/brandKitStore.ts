@@ -7,7 +7,8 @@
 // ─────────────────────────────────────────────────
 
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { idbStorage } from './idbStorageAdapter';
 import { immer } from 'zustand/middleware/immer';
 
 // ── Asset Types ──
@@ -349,6 +350,6 @@ export const useBrandKitStore = create<BrandKitState>()(
                 });
             },
         })),
-        { name: 'ace-brand-kits' },
+        { name: 'ace-brand-kits', storage: createJSONStorage(() => idbStorage) },
     ),
 );

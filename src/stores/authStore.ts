@@ -6,7 +6,8 @@
 // ─────────────────────────────────────────────────
 
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { idbStorage } from './idbStorageAdapter';
 
 export interface User {
     id: string;
@@ -187,6 +188,6 @@ export const useAuthStore = create<AuthState>()(
                 return session.expiresAt > Date.now();
             },
         }),
-        { name: 'ace-auth' },
+        { name: 'ace-auth', storage: createJSONStorage(() => idbStorage) },
     ),
 );

@@ -6,7 +6,8 @@
 // ─────────────────────────────────────────────────
 
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { idbStorage } from './idbStorageAdapter';
 import { immer } from 'zustand/middleware/immer';
 
 /** Override entry: one element in one variant */
@@ -134,6 +135,6 @@ export const useSizingOverrideStore = create<SizingOverrideState>()(
                 return (get().overrides[variantId] ?? []).length;
             },
         })),
-        { name: 'ace-sizing-overrides' },
+        { name: 'ace-sizing-overrides', storage: createJSONStorage(() => idbStorage) },
     ),
 );

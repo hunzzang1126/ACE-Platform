@@ -8,7 +8,8 @@
 
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
-import { persist, type StorageValue } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { idbStorage } from './idbStorageAdapter';
 import { immer } from 'zustand/middleware/immer';
 import { v4 as uuid } from 'uuid';
 import type { CreativeSet, BannerVariant, BannerPreset } from '@/schema/design.types';
@@ -418,61 +419,17 @@ export const useDesignStore = create<DesignState>()(
             })),
             {
                 name: 'ace-design-store',
-                // Persist all creative sets and active ID
-                // Images are persisted as-is (data URLs included)
-                // localStorage quota is handled by the setItem try/catch wrapper
-                // ★ Strip fabricJSON from variants before persisting to localStorage.
-                // fabricJSON contains base64 image data (~1.8MB per variant) that would
-                // exceed the ~5MB localStorage limit. Keep it in memory only.
-                partialize: (state) => {
-                    const cleaned: Record<string, any> = {};
-                    for (const [id, cs] of Object.entries(state.allCreativeSets)) {
-                        cleaned[id] = {
-                            ...cs,
-                            variants: (cs as any).variants.map((v: any) => {
-                                const { fabricJSON: _drop, ...rest } = v;
-                                return rest;
-                            }),
-                        };
-                    }
-                    return {
-                        allCreativeSets: cleaned as any,
-                        activeCreativeSetId: state.activeCreativeSetId,
-                    };
-                },
+                // ★ IndexedDB storage — no 5MB limit, async I/O
+                storage: createJSONStorage(() => idbStorage),
+                partialize: (state) => ({
+                    allCreativeSets: state.allCreativeSets,
+                    activeCreativeSetId: state.activeCreativeSetId,
+                }),
                 // On rehydration, restore the creativeSet computed field
                 onRehydrateStorage: () => (state) => {
                     if (state && state.activeCreativeSetId) {
                         state.creativeSet = state.allCreativeSets[state.activeCreativeSetId] ?? null;
                     }
-                },
-                storage: {
-                    getItem: (name): StorageValue<Partial<DesignState>> | null => {
-                        const raw = localStorage.getItem(name);
-                        if (!raw) return null;
-                        try {
-                            return JSON.parse(raw);
-                        } catch {
-                            return null;
-                        }
-                    },
-                    setItem: (name, value) => {
-                        try {
-                            localStorage.setItem(name, JSON.stringify(value));
-                        } catch (e) {
-                            // QuotaExceededError — localStorage is full
-                            console.warn('[designStore] localStorage full, clearing and retrying...', e);
-                            try {
-                                localStorage.clear();
-                                localStorage.setItem(name, JSON.stringify(value));
-                            } catch (e2) {
-                                console.error('[designStore] Still cannot save after clear:', e2);
-                            }
-                        }
-                    },
-                    removeItem: (name) => {
-                        localStorage.removeItem(name);
-                    },
                 },
             },
         ),

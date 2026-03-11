@@ -3,7 +3,8 @@
 // Saves user-rated designs to localStorage for future AI learning
 // ─────────────────────────────────────────────────────────
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { idbStorage } from './idbStorageAdapter';
 import type { RenderElement } from '@/services/autoDesignService';
 
 const MEMORY_KEY = 'ace_design_memory';
@@ -64,6 +65,7 @@ export const useDesignMemoryStore = create<DesignMemoryState>()(
         }),
         {
             name: MEMORY_KEY,
+            storage: createJSONStorage(() => idbStorage),
         }
     )
 );

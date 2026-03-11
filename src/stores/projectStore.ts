@@ -6,7 +6,8 @@
 
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
-import { persist, type StorageValue } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { idbStorage } from './idbStorageAdapter';
 import { enableMapSet } from 'immer';
 import { useDesignStore } from './designStore';
 
@@ -256,30 +257,14 @@ export const useProjectStore = create<ProjectState>()(
         })),
         {
             name: 'ace-project-store',
+            // ★ IndexedDB storage — no 5MB limit, async I/O
+            storage: createJSONStorage(() => idbStorage),
             // Only persist data, not UI state like selection/search/page
             partialize: (state) => ({
                 creativeSets: state.creativeSets,
                 folders: state.folders,
                 trash: state.trash,
             }),
-            // Custom storage to handle Set<string> and ensure JSON compat
-            storage: {
-                getItem: (name): StorageValue<Partial<ProjectState>> | null => {
-                    const raw = localStorage.getItem(name);
-                    if (!raw) return null;
-                    try {
-                        return JSON.parse(raw);
-                    } catch {
-                        return null;
-                    }
-                },
-                setItem: (name, value) => {
-                    localStorage.setItem(name, JSON.stringify(value));
-                },
-                removeItem: (name) => {
-                    localStorage.removeItem(name);
-                },
-            },
         },
     ),
 );

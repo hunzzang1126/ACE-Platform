@@ -6,7 +6,8 @@
 // ─────────────────────────────────────────────────
 
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { idbStorage } from './idbStorageAdapter';
 import { immer } from 'zustand/middleware/immer';
 
 export interface DesignVersion {
@@ -141,6 +142,6 @@ export const useVersionStore = create<VersionState>()(
                 return { diff, percentage };
             },
         })),
-        { name: 'ace-versions' },
+        { name: 'ace-versions', storage: createJSONStorage(() => idbStorage) },
     ),
 );
