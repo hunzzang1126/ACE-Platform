@@ -191,12 +191,46 @@ export function createEngineShim(
             const id = nextId();
             try {
                 const isDataUrl = src.startsWith('data:');
+                const isSvg = src.startsWith('data:image/svg') || (src.startsWith('http') && src.endsWith('.svg'));
                 const imgOptions = isDataUrl ? {} : { crossOrigin: 'anonymous' as const };
                 const img = await FabricImage.fromURL(src, imgOptions);
-                // ★ Use stored natural dims if provided (for SVG restore fidelity).
-                // Fall back to freshly-loaded img dimensions if not stored yet.
-                const natW = (storedNatW && storedNatW > 0) ? storedNatW : (img.width ?? 200);
-                const natH = (storedNatH && storedNatH > 0) ? storedNatH : (img.height ?? 200);
+
+                // ★ REGRESSION GUARD: SVGs with only viewBox (no width/height attributes)
+                // report naturalWidth/naturalHeight=0 from Fabric's internal Image element.
+                // We must resolve true dimensions by parsing the SVG viewBox directly.
+                // This guarantees consistent scaleX/scaleY between first-add and restore.
+                let resolvedNatW = (storedNatW && storedNatW > 0) ? storedNatW : (img.width ?? 0);
+                let resolvedNatH = (storedNatH && storedNatH > 0) ? storedNatH : (img.height ?? 0);
+
+                if (isSvg && (resolvedNatW === 0 || resolvedNatH === 0)) {
+                    // Parse SVG viewBox to get true dimensions
+                    try {
+                        const svgText = isSvg && isDataUrl
+                            ? atob(src.split(',')[1] ?? '') || decodeURIComponent(src.split(',')[1] ?? '')
+                            : '';
+                        const vbMatch = svgText.match(/viewBox=["']([^"']+)["']/);
+                        if (vbMatch) {
+                            const parts = vbMatch[1].trim().split(/[,\s]+/).map(Number);
+                            if (parts.length >= 4 && parts[2] > 0 && parts[3] > 0) {
+                                resolvedNatW = resolvedNatW > 0 ? resolvedNatW : parts[2];
+                                resolvedNatH = resolvedNatH > 0 ? resolvedNatH : parts[3];
+                                console.log(`[EngineShim] SVG viewBox dimensions: ${resolvedNatW}x${resolvedNatH}`);
+                            }
+                        }
+                        // Also check explicit width/height attributes
+                        const wMatch = svgText.match(/\bwidth=["'](\d+(?:\.\d+)?)/);
+                        const hMatch = svgText.match(/\bheight=["'](\d+(?:\.\d+)?)/);
+                        if (wMatch && resolvedNatW === 0) resolvedNatW = parseFloat(wMatch[1]);
+                        if (hMatch && resolvedNatH === 0) resolvedNatH = parseFloat(hMatch[1]);
+                    } catch {
+                        // SVG parse failed — use default fallback
+                    }
+                }
+
+                // Final fallback: use 200x200 if everything else fails
+                const natW = resolvedNatW > 0 ? resolvedNatW : 200;
+                const natH = resolvedNatH > 0 ? resolvedNatH : 200;
+                console.log(`[EngineShim] add_image natW=${natW} natH=${natH} storedNatW=${storedNatW} img.width=${img.width} isSvg=${isSvg}`);
 
                 let targetW: number;
                 let targetH: number;
