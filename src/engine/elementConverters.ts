@@ -216,7 +216,9 @@ export function engineNodeToTextElement(
         fontFamily: node.fontFamily ?? 'Inter',
         fontSize: node.fontSize ?? 16,
         fontWeight: parseInt(node.fontWeight ?? '400', 10) || 400,
-        fontStyle: 'normal',
+        // ★ REGRESSION GUARD: Read fontStyle from node — previously hardcoded 'normal',
+        // causing italic text to lose its styling in the preview.
+        fontStyle: (node.fontStyle as 'normal' | 'italic') ?? 'normal',
         color: node.color ?? '#000000',
         textAlign: node.textAlign ?? 'left',
         lineHeight: node.lineHeight ?? 1.4,

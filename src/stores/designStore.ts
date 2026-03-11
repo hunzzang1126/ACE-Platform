@@ -408,6 +408,7 @@ export const useDesignStore = create<DesignState>()(
                 getAllCreativeSets: () => {
                     return Object.values(get().allCreativeSets);
                 },
+
             })),
             {
                 name: 'ace-design-store',

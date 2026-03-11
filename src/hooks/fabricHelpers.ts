@@ -144,6 +144,9 @@ export function fabricToEngineNode(obj: FabricObject): EngineNode {
         node.textAlign = obj.textAlign ?? 'left';
         node.lineHeight = obj.lineHeight ?? 1.4;
         node.letterSpacing = (obj.charSpacing ?? 0) / 10;
+        // ★ REGRESSION GUARD: Preserve fontStyle — Fabric stores 'italic' or 'normal'.
+        // engineNodeToTextElement was hardcoding 'normal', losing italic styling.
+        node.fontStyle = (obj.fontStyle as string) || 'normal';
     }
 
     // Image-specific properties
@@ -154,6 +157,26 @@ export function fabricToEngineNode(obj: FabricObject): EngineNode {
         }
         if (imgEl?.naturalWidth) node.naturalWidth = imgEl.naturalWidth;
         if (imgEl?.naturalHeight) node.naturalHeight = imgEl.naturalHeight;
+
+        // ★ REGRESSION GUARD: Detect objectFit from scale ratio.
+        // Fabric stores images as width/height (natural size) + scaleX/scaleY.
+        // When user resizes a background to fill the artboard, scaleX ≠ scaleY * (natW/natH)
+        // meaning the image is STRETCHED (not cropped). CSS objectFit must be 'fill' to match.
+        // When scaleX/scaleY maintain the aspect ratio → 'cover' (default CSS crop behavior).
+        if (imgEl?.naturalWidth && imgEl?.naturalHeight) {
+            const sx = obj.scaleX ?? 1;
+            const sy = obj.scaleY ?? 1;
+            const natW = imgEl.naturalWidth;
+            const natH = imgEl.naturalHeight;
+            // Check if scale ratio matches natural aspect ratio (within 1% tolerance)
+            const expectedScaleRatio = natW / natH;  // if uniform: scaleX/scaleY == natW/natH
+            const actualScaleRatio = sx / sy;
+            const isStretched = Math.abs(actualScaleRatio - expectedScaleRatio) / expectedScaleRatio > 0.02;
+            node.objectFit = isStretched ? 'fill' : 'cover';
+        } else {
+            // No natural dimensions — assume cover (standard behavior)
+            node.objectFit = 'cover';
+        }
     }
 
     return node;

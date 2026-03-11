@@ -27,6 +27,7 @@ export interface EngineNode {
     fontSize?: number;
     fontFamily?: string;
     fontWeight?: string;
+    fontStyle?: string;  // 'normal' | 'italic'
     color?: string;
     textAlign?: string;
     lineHeight?: number;

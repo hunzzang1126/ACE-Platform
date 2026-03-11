@@ -26,7 +26,14 @@ export interface BannerVariant {
     overriddenElementIds: string[];
     /** 개별 편집 잠금 상태 */
     syncLocked: boolean;
+    /**
+     * ★ SCREENSHOT PREVIEW — Fabric canvas toDataURL() captured at save time.
+     * Used as the authoritative preview instead of HTML/CSS reconstruction.
+     * Guarantees pixel-perfect fidelity with the canvas editor.
+     */
+    screenshotUrl?: string;
 }
+
 
 /** 크리에이티브 셋 (마스터 + 모든 변형) */
 export interface CreativeSet {
