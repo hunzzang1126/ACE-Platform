@@ -284,24 +284,22 @@ export function useCanvasSync(
                     y = Math.round((canvasH - h) / 2);
                 }
 
-                // Restore image as Fabric-native Image (async — may appear slightly after shapes)
-                // ★ REGRESSION GUARD: Pass stored zIndex to preserve original layer order.
-                // Images load asynchronously — by the time they're added to canvas,
-                // all synchronous elements (shapes, text) are already present.
-                // Without passing zIndex, the image gets userObjects().length as its z-index,
-                // making background images render ON TOP of all other elements.
+                // ★ REGRESSION GUARD: Collect image load Promises so we can await ALL of them.
+                // Previously images were fire-and-forget — whichever resolved last ended up on top.
+                // Now we await every image, then call reorder_by_z_index() for a definitive sort.
                 if (img.src) {
-                    engine.add_image(x, y, img.src, w, h, img.name, img.zIndex).then((nodeId: number) => {
+                    const imgPromise = engine.add_image(x, y, img.src, w, h, img.name, img.zIndex).then((nodeId: number) => {
                         if (img.opacity !== undefined && img.opacity !== 1) {
                             try { engine.set_opacity(nodeId, img.opacity); } catch { /* ok */ }
                         }
                     });
+                    pendingBlobLoads.push(imgPromise);
                 } else {
-                    console.warn(`[useCanvasSync] Image "${img.name}" has empty src — skipping restore (data may have been stripped from localStorage)`);
+                    console.warn(`[useCanvasSync] Image "${img.name}" has empty src — skipping restore`);
                 }
 
                 restoredShapes++;
-                console.log(`[useCanvasSync] Restored image: "${img.name}" at ${x},${y} ${w}x${h}`);
+                console.log(`[useCanvasSync] Queued image restore: "${img.name}" at ${x},${y} ${w}x${h} zIndex=${img.zIndex}`);
 
                 // Restore animation preset
                 if (el.animation && el.animation.preset !== 'none') {
@@ -373,8 +371,17 @@ export function useCanvasSync(
             }
         }
 
-        // Wait for all video blob URL loads to complete before returning
+        // Wait for all video blob URL loads AND image loads to complete
         await Promise.all(pendingBlobLoads);
+
+        // ★ REGRESSION GUARD: After all async image loads complete, do a definitive
+        // reorder of the Fabric stack by __aceZIndex. Images load asynchronously,
+        // so even with individual moveObjectTo calls, timing variations can cause
+        // wrong ordering when multiple images load concurrently.
+        // This final pass guarantees correct layer order.
+        if (typeof engine.reorder_by_z_index === 'function') {
+            engine.reorder_by_z_index();
+        }
 
         console.log(`[useCanvasSync] Restored ${restoredShapes} shapes, ${overlayElements.length} overlays`);
         return { restoredShapes, overlayElements };

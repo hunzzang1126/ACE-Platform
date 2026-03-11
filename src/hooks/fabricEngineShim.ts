@@ -177,6 +177,12 @@ export function createEngineShim(
         },
 
         // ── Create: image (async) ────────────────────────
+        // ★ REGRESSION GUARD: fc.add() ALWAYS places objects at the TOP of the
+        // Fabric stack — regardless of __aceZIndex. When images load async
+        // (FabricImage.fromURL), all sync elements (shapes, text) are already
+        // added, so the image lands on top of everything after load.
+        // Fix: after fc.add(), immediately call fc.moveObjectTo(img, rank+1)
+        // where rank is this image's position in the __aceZIndex-sorted list.
         add_image: async (x: number, y: number, src: string, w?: number, h?: number, name?: string, zIndex?: number): Promise<number> => {
             const id = nextId();
             try {
@@ -207,28 +213,48 @@ export function createEngineShim(
                     scaleX = scaleY = targetW / Math.max(natW, 1);
                 }
 
-                img.set({
-                    left: x,
-                    top: y,
-                    scaleX,
-                    scaleY,
-                });
+                img.set({ left: x, top: y, scaleX, scaleY });
                 (img as any).__aceId = id;
                 (img as any).__aceName = name || `Image #${id}`;
-                // ★ REGRESSION GUARD: Use provided zIndex (from restore) to preserve original layer order.
-                // Without this, async image loading causes background images to get the highest zIndex
-                // because all synchronous elements are added before the image Promise resolves.
-                (img as any).__aceZIndex = zIndex ?? userObjects().length;
+                const targetZIndex = zIndex ?? userObjects().length;
+                (img as any).__aceZIndex = targetZIndex;
                 patchAceProps(img);
                 fc.add(img);
-                fc.setActiveObject(img);
+
+                // ★ Move to correct stack position IMMEDIATELY after fc.add().
+                // Artboard is always at Fabric index 0. User objects start at index 1.
+                // Sort all current user objects by __aceZIndex, find this image's rank,
+                // then move it to rank+1 (skipping artboard at 0).
+                const sortedByZ = userObjects().sort(
+                    (a, b) => ((a as any).__aceZIndex ?? 0) - ((b as any).__aceZIndex ?? 0)
+                );
+                const rank = sortedByZ.indexOf(img);
+                if (rank >= 0) {
+                    fc.moveObjectTo(img, rank + 1); // +1: artboard at index 0
+                }
+
+                // Auto-select only when user adds a NEW image (no saved zIndex)
+                if (zIndex === undefined) {
+                    fc.setActiveObject(img);
+                }
                 fc.renderAll();
                 syncState();
-                console.log(`[EngineShim] Image added: id=${id} name="${name}" at (${x},${y}) size=${Math.round(targetW)}x${Math.round(targetH)} zIndex=${(img as any).__aceZIndex}`);
+                console.log(`[EngineShim] Image added: id=${id} name="${name}" zIndex=${targetZIndex} fabricIndex=${rank + 1}`);
             } catch (err) {
                 console.error('[EngineShim] Failed to load image:', err);
             }
             return id;
+        },
+
+        // Utility: re-sort all Fabric objects by __aceZIndex.
+        // Call after all async image loads to fix any ordering issues.
+        reorder_by_z_index: () => {
+            const objs = userObjects().sort(
+                (a, b) => ((a as any).__aceZIndex ?? 0) - ((b as any).__aceZIndex ?? 0)
+            );
+            objs.forEach((o, i) => fc.moveObjectTo(o, i + 1)); // +1: artboard at 0
+            fc.renderAll();
+            syncState();
         },
 
         // ── Grouping ─────────────────────────────────────

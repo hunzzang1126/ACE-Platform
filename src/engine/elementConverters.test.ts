@@ -107,3 +107,41 @@ describe('absoluteToConstraints + constraintsToAbsolute — Round-Trip', () => {
         expect(abs.h).toBeCloseTo(250, 0);
     });
 });
+
+// ── resolveFontWeight — Regression Tests ──────────
+// ★ REGRESSION GUARD: parseInt('bold', 10) = NaN → NaN || 400 = 400.
+// AI-generated text with fontWeight:'bold' was silently downgraded to
+// normal weight (400) in the preview. resolveFontWeight() must handle
+// both numeric strings and CSS keyword values.
+
+import { resolveFontWeight } from './elementConverters';
+
+describe('resolveFontWeight — keyword and numeric conversion', () => {
+    // Numeric passthrough
+    it('number 700 → 700', () => expect(resolveFontWeight(700)).toBe(700));
+    it('number 400 → 400', () => expect(resolveFontWeight(400)).toBe(400));
+
+    // Numeric strings
+    it('"700" → 700', () => expect(resolveFontWeight('700')).toBe(700));
+    it('"400" → 400', () => expect(resolveFontWeight('400')).toBe(400));
+    it('"900" → 900', () => expect(resolveFontWeight('900')).toBe(900));
+
+    // ★ KEY REGRESSION: These previously returned 400 due to parseInt('bold') = NaN
+    it('"bold" → 700 (was broken: returned 400)', () => expect(resolveFontWeight('bold')).toBe(700));
+    it('"BOLD" → 700 (case insensitive)', () => expect(resolveFontWeight('BOLD')).toBe(700));
+    it('"normal" → 400', () => expect(resolveFontWeight('normal')).toBe(400));
+    it('"semibold" → 600', () => expect(resolveFontWeight('semibold')).toBe(600));
+    it('"semi-bold" → 600', () => expect(resolveFontWeight('semi-bold')).toBe(600));
+    it('"medium" → 600', () => expect(resolveFontWeight('medium')).toBe(600));
+    it('"light" → 300', () => expect(resolveFontWeight('light')).toBe(300));
+    it('"lighter" → 300', () => expect(resolveFontWeight('lighter')).toBe(300));
+    it('"thin" → 100', () => expect(resolveFontWeight('thin')).toBe(100));
+    it('"bolder" → 800', () => expect(resolveFontWeight('bolder')).toBe(800));
+    it('"extrabold" → 800', () => expect(resolveFontWeight('extrabold')).toBe(800));
+    it('"black" → 900', () => expect(resolveFontWeight('black')).toBe(900));
+
+    // Null/undefined fallback
+    it('undefined → 400', () => expect(resolveFontWeight(undefined)).toBe(400));
+    it('null → 400', () => expect(resolveFontWeight(null)).toBe(400));
+    it('empty string → 400', () => expect(resolveFontWeight('')).toBe(400));
+});
