@@ -166,7 +166,13 @@ export function buildLayoutFromSpec(
     // ★ CENTER OVERRIDE: center headline box on canvas
     if (spec.alignment === 'center') headlineX = Math.round((canvasW - headlineW) / 2);
     const headlineY = Math.round(canvasH * spec.headlineZone.yPct);
-    const headlineH = Math.round(spec.headlineFontSize * 1.3 * Math.ceil(content.headline.length / (headlineW / (spec.headlineFontSize * 0.55))));
+    // ★ Accurate multi-line height: account for actual line breaks + word wrapping
+    const charsPerLine = Math.max(1, Math.floor(headlineW / (spec.headlineFontSize * 0.55)));
+    // Count explicit line breaks AND estimated word-wrap lines
+    const explicitLines = content.headline.split(/\n/).length;
+    const wrapLines = Math.ceil(content.headline.replace(/\n/g, '').length / charsPerLine);
+    const lineCount = Math.max(explicitLines, wrapLines);
+    const headlineH = Math.round(spec.headlineFontSize * 1.45 * lineCount + 12);
 
     elements.push({
         type: 'text',

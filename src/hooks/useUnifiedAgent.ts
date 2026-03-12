@@ -439,7 +439,7 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         }
         hideCursor();
 
-        // ── Phase 7: Vision QA (Report-Only) ──
+        // ── Phase 7: Vision QA (Fix-Apply Gate) ──
         narrate(`Running vision quality check on ${canvasW}x${canvasH} canvas...`);
         addCard('vision', 'Vision quality review', 'running');
         try {
@@ -447,12 +447,20 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
             const loopResult = await runVisionLoop(engine, canvasW, canvasH, abort.signal, (msg: string) => {
                 updateCard('vision', 'running', msg);
             });
-            const suggestionNote = loopResult.suggestions.length > 0
-                ? ` · ${loopResult.suggestions.length} suggestion(s)`
-                : '';
-            updateCard('vision', 'done', `Score: ${loopResult.finalScore}/100${suggestionNote}`);
+
+            const fixNote = loopResult.fixesApplied > 0 ? ` · ${loopResult.fixesApplied} fix(es) applied` : '';
+            const issueNote = loopResult.suggestions.length > 0 ? ` · ${loopResult.suggestions.length} remaining issue(s)` : '';
+
+            // ★ Score gate: 80+ = approved, <80 = warning
+            if (loopResult.finalScore >= 80) {
+                updateCard('vision', 'done', `Score: ${loopResult.finalScore}/100${fixNote} — Approved`);
+            } else {
+                updateCard('vision', 'error', `Score: ${loopResult.finalScore}/100${fixNote}${issueNote} — Below quality threshold`);
+                narrate(`Design scored ${loopResult.finalScore}/100 — below 80 threshold. The design may need manual adjustment. Issues: ${loopResult.reasoning}`);
+            }
+
             narrate(
-                `Vision review complete — score ${loopResult.finalScore}/100.\n` +
+                `Vision review complete — score ${loopResult.finalScore}/100.${fixNote}\n` +
                 `Style: ${guide.name}\n` +
                 `Layout: ${spec.layoutType} (${spec.alignment})\n` +
                 `Elements: ${rendered}\n` +
