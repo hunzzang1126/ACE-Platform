@@ -5,6 +5,7 @@ import { useCallback, useMemo, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useProjectStore } from '@/stores/projectStore';
 import { useDesignStore } from '@/stores/designStore';
+import { useAuthStore } from '@/stores/authStore';
 import { BANNER_PRESETS } from '@/schema/presets';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { ProjectCard } from '@/components/dashboard/ProjectCard';
@@ -20,6 +21,10 @@ function getGreeting(): string {
 export function DashboardPage() {
     const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('');
+
+    // Auth store — dynamic user name
+    const displayName = useAuthStore((s) => s.user?.displayName ?? '');
+    const firstName = displayName?.split(' ')[0] || 'there';
 
     // Project store
     const creativeSets = useProjectStore((s) => s.creativeSets);
@@ -46,14 +51,14 @@ export function DashboardPage() {
                 } else {
                     state.creativeSets.push({
                         id: cs.id, name: cs.name, variantCount: cs.variants.length,
-                        createdAt: cs.createdAt, updatedAt: cs.updatedAt, createdBy: 'Young An',
+                        createdAt: cs.createdAt, updatedAt: cs.updatedAt, createdBy: displayName || 'User',
                     });
                 }
             }
             const validIds = new Set(allCS.map(cs => cs.id));
             state.creativeSets = state.creativeSets.filter(s => validIds.has(s.id));
         });
-    }, []);
+    }, [displayName]);
 
     // ── Computed ──
     const { displaySets, displayFolders, totalSizes } = useMemo(() => {
@@ -112,20 +117,26 @@ export function DashboardPage() {
         <div className="dashboard-layout">
             <AppSidebar />
             <main className="dashboard-main">
-                {/* Hero Greeting */}
+                {/* Hero Greeting — glassmorphism card */}
                 <section className="dashboard-hero">
-                    <div className="dashboard-hero__content">
-                        <h1 className="dashboard-hero__title">{getGreeting()}, Young</h1>
-                        <p className="dashboard-hero__subtitle">
-                            {creativeSets.length} project{creativeSets.length !== 1 ? 's' : ''}, {totalSizes} size{totalSizes !== 1 ? 's' : ''}
-                        </p>
+                    <div className="dashboard-hero__glass">
+                        <div className="dashboard-hero__content">
+                            <h1 className="dashboard-hero__title">
+                                <span className="dashboard-hero__greeting">{getGreeting()}</span>, {firstName}
+                            </h1>
+                            <p className="dashboard-hero__subtitle">
+                                {creativeSets.length} project{creativeSets.length !== 1 ? 's' : ''} · {totalSizes} size{totalSizes !== 1 ? 's' : ''}
+                            </p>
+                        </div>
+                        <button className="dashboard-hero__cta" onClick={handleNewCreativeSet}>
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                                <line x1="8" y1="2" x2="8" y2="14" /><line x1="2" y1="8" x2="14" y2="8" />
+                            </svg>
+                            New Project
+                        </button>
                     </div>
-                    <button className="dashboard-hero__cta" onClick={handleNewCreativeSet}>
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                            <line x1="8" y1="2" x2="8" y2="14" /><line x1="2" y1="8" x2="14" y2="8" />
-                        </svg>
-                        New Project
-                    </button>
+                    <div className="dashboard-hero__orb dashboard-hero__orb--1" />
+                    <div className="dashboard-hero__orb dashboard-hero__orb--2" />
                 </section>
 
                 {/* Search */}
