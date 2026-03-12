@@ -59,7 +59,11 @@ ${nameList}
 Check for these issues and DEDUCT points accordingly:
 1. TEXT READABILITY — ALL text must be clearly readable against its background.
    Text on a busy image without contrast overlay = -25 points (CRITICAL)
-2. OVERLAP — elements covering each other = -20 points per overlap
+2. OVERLAP — ANY text overlapping another text element = -30 points per instance (CRITICAL)
+   Look VERY carefully: if ANY part of one text element's characters touch or overlap
+   with characters from another text element, this is overlap. Even partial overlap counts.
+   If headline text and subheadline text share the same vertical space, that IS overlap.
+   A design with ANY text-on-text overlap can NEVER score above 45.
 3. TEXT CLIPPED — text going outside canvas bounds = -15 points
 4. HIERARCHY — headline must be largest/most prominent. If not = -10 points
 5. CTA — CTA button must be clearly visible with strong contrast = -10 if weak
@@ -69,9 +73,10 @@ Check for these issues and DEDUCT points accordingly:
 
 Scoring rules:
 - Start at 100, subtract for each issue found
-- Score above 80 ONLY if ALL text is clearly readable
+- ANY text overlap = AUTOMATIC cap at 45 (no exceptions)
+- Score above 80 ONLY if ALL text is clearly readable AND no overlaps exist
 - Score above 90 ONLY if ALL elements are properly aligned and spaced
-- Be STRICT — a banner with unreadable text should NEVER score above 60
+- Be EXTREMELY STRICT about overlap — look at every text element pair carefully
 
 IMPORTANT: For each fix, provide the EXACT pixel coordinates that would resolve the issue.
 Keep all values within canvas bounds: x 0-${canvasW}, y 0-${canvasH}.

@@ -308,7 +308,7 @@ Return JSON:
 {
   "layoutType": "<one from the list>",
   "alignment": "left|center|right",
-  "accentStrategy": "top-bar|side-bar|diagonal|circle|overlay|bottom-line|none",
+  "accentStrategy": "top-bar|side-bar|circle|bottom-line|none",
   "spacing": "tight|balanced|generous",
   "mood": "<1 word: luxury, energetic, tech, promotional, minimal, creative, professional>",
   "reasoning": "<1 sentence>"
@@ -343,6 +343,10 @@ Return JSON:
             content.headline, canvasW, canvasH, availableWidthPct,
         );
 
+        // ★ Sanitize: block ugly accent strategies that create bad rectangles
+        const badAccents = new Set(['diagonal', 'overlay']);
+        const sanitizedAccent = badAccents.has(parsed.accentStrategy) ? 'none' : (parsed.accentStrategy || 'none');
+
         const spec: LayoutSpec = {
             layoutType: parsed.layoutType || 'centered-stack',
             alignment: parsed.alignment || 'center',
@@ -350,7 +354,7 @@ Return JSON:
             ctaZone: getCtaZone(parsed.layoutType || 'centered-stack', ratio),
             headlineFontSize: headlineFs,
             subheadlineFontSize: subheadlineFs,
-            accentStrategy: parsed.accentStrategy || 'none',
+            accentStrategy: sanitizedAccent as AccentStrategy,
             spacing: parsed.spacing || 'balanced',
             mood: parsed.mood || 'professional',
             reasoning: parsed.reasoning || '',
