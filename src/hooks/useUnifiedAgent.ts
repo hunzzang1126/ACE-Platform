@@ -285,6 +285,35 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
 
         let allElements = buildLayoutFromSpec(spec, content, guide, canvasW, canvasH);
 
+        // ★ CONTRAST GUARD: When background image is present, inject a semi-transparent
+        // dark overlay behind text to guarantee readability. This is deterministic — no
+        // AI guessing needed. The overlay covers the text area with 55% opacity.
+        if (hasImageBackground) {
+            // Find the topmost text element to determine overlay coverage
+            const textEls = allElements.filter(el =>
+                el.type === 'text' && el.name !== 'tag_text'
+            );
+            if (textEls.length > 0) {
+                const topY = Math.min(...textEls.map(el => el.y ?? 0));
+                const overlayPadding = Math.round(canvasH * 0.06);
+                const overlayY = Math.max(0, topY - overlayPadding);
+
+                // Insert contrast overlay right after background element
+                const bgIndex = allElements.findIndex(el => el.name === 'background');
+                const contrastOverlay: import('@/services/autoDesignService').RenderElement = {
+                    type: 'rect',
+                    name: 'contrast_overlay',
+                    x: 0,
+                    y: overlayY,
+                    w: canvasW,
+                    h: canvasH - overlayY,
+                    r: 0, g: 0, b: 0, a: 0.55, // Semi-transparent black
+                };
+                allElements.splice(bgIndex + 1, 0, contrastOverlay);
+                narrate(`Added contrast overlay for text readability on image background.`);
+            }
+        }
+
         // Math-based validation: fix overlaps, clipping, hierarchy
         const validation = validateLayout(allElements, canvasW, canvasH);
         allElements = validation.elements;
@@ -307,7 +336,7 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
 
         // ── Phase 5: Multi-pass render with live narration ──
         // Group elements by layer
-        const structureNames = new Set(['background', 'accent_zone', 'accent_glow', 'accent_line', 'accent_divider', 'tag_underline', 'tag_line']);
+        const structureNames = new Set(['background', 'contrast_overlay', 'text_overlay', 'accent_zone', 'accent_glow', 'accent_line', 'accent_divider', 'tag_underline', 'tag_line']);
         const contentNames = new Set(['headline', 'subheadline', 'body_text', 'tag_text']);
         const actionNames = new Set(['cta_button', 'cta_label']);
 
