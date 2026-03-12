@@ -96,3 +96,72 @@ export function scaleRenderElements(
         return scaled;
     });
 }
+
+// ── RenderElement → DesignElement converter ──────
+// Converts the pipeline's flat RenderElement[] format into the
+// designStore's constraint-based DesignElement[] format.
+// Used by Phase 8 (Smart Sizing) to store scaled variants.
+
+import type { DesignElement, ShapeElement, TextElement } from '@/schema/elements.types';
+import { absoluteToConstraints } from '@/engine/elementConverters';
+
+function rgbFloatToHex(r: number, g: number, b: number): string {
+    const toHex = (v: number) => Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16).padStart(2, '0');
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+export function renderElementsToDesignElements(
+    elements: RenderElement[],
+    canvasW: number,
+    canvasH: number,
+): DesignElement[] {
+    return elements.map((el, idx) => {
+        const constraints = absoluteToConstraints(el.x, el.y, el.w, el.h, canvasW, canvasH);
+        const baseName = el.name || `element_${idx}`;
+
+        if (el.type === 'text') {
+            return {
+                id: `scaled-${baseName}-${idx}`,
+                name: baseName,
+                type: 'text',
+                constraints,
+                content: el.content ?? '',
+                fontFamily: 'Inter',
+                fontSize: el.font_size ?? 16,
+                fontWeight: parseInt(el.font_weight ?? '400', 10) || 400,
+                fontStyle: 'normal' as const,
+                color: el.color_hex ?? '#ffffff',
+                textAlign: el.text_align ?? 'left',
+                lineHeight: el.line_height ?? 1.4,
+                letterSpacing: el.letter_spacing ?? 0,
+                autoShrink: true,
+                opacity: el.a ?? 1,
+                visible: true,
+                locked: false,
+                zIndex: idx,
+            } as TextElement;
+        }
+
+        // Shape (rect, rounded_rect, ellipse)
+        const fill = el.gradient_start_hex
+            ? el.gradient_start_hex
+            : rgbFloatToHex(el.r ?? 0.5, el.g ?? 0.5, el.b ?? 0.5);
+
+        return {
+            id: `scaled-${baseName}-${idx}`,
+            name: baseName,
+            type: 'shape',
+            shapeType: el.type === 'ellipse' ? 'ellipse' : 'rectangle',
+            constraints,
+            fill,
+            gradientStart: el.gradient_start_hex,
+            gradientEnd: el.gradient_end_hex,
+            gradientAngle: el.gradient_angle,
+            opacity: el.a ?? 1,
+            visible: true,
+            locked: false,
+            zIndex: idx,
+            borderRadius: el.radius ?? 0,
+        } as ShapeElement;
+    });
+}

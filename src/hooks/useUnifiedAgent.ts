@@ -285,33 +285,33 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
 
         let allElements = buildLayoutFromSpec(spec, content, guide, canvasW, canvasH);
 
-        // ★ CONTRAST GUARD: When background image is present, inject a semi-transparent
-        // dark overlay behind text to guarantee readability. This is deterministic — no
-        // AI guessing needed. The overlay covers the text area with 55% opacity.
+        // ★ CONTRAST GUARD: When background image is present, inject a cinematic
+        // two-layer dark overlay to guarantee text readability. Covers full canvas
+        // with lighter top (15% opacity) and darker bottom (60% opacity).
         if (hasImageBackground) {
-            // Find the topmost text element to determine overlay coverage
-            const textEls = allElements.filter(el =>
-                el.type === 'text' && el.name !== 'tag_text'
-            );
-            if (textEls.length > 0) {
-                const topY = Math.min(...textEls.map(el => el.y ?? 0));
-                const overlayPadding = Math.round(canvasH * 0.06);
-                const overlayY = Math.max(0, topY - overlayPadding);
+            const bgIndex = allElements.findIndex(el => el.name === 'background');
+            const insertAt = bgIndex + 1;
 
-                // Insert contrast overlay right after background element
-                const bgIndex = allElements.findIndex(el => el.name === 'background');
-                const contrastOverlay: import('@/services/autoDesignService').RenderElement = {
-                    type: 'rect',
-                    name: 'contrast_overlay',
-                    x: 0,
-                    y: overlayY,
-                    w: canvasW,
-                    h: canvasH - overlayY,
-                    r: 0, g: 0, b: 0, a: 0.55, // Semi-transparent black
-                };
-                allElements.splice(bgIndex + 1, 0, contrastOverlay);
-                narrate(`Added contrast overlay for text readability on image background.`);
-            }
+            // Layer 1: light veil over top half — keeps image visible
+            const overlayTop: import('@/services/autoDesignService').RenderElement = {
+                type: 'rect',
+                name: 'contrast_overlay',
+                x: 0, y: 0,
+                w: canvasW,
+                h: Math.round(canvasH * 0.5),
+                r: 0, g: 0, b: 0, a: 0.15,
+            };
+            // Layer 2: darker veil over bottom half — text readability zone
+            const overlayBottom: import('@/services/autoDesignService').RenderElement = {
+                type: 'rect',
+                name: 'contrast_overlay_bottom',
+                x: 0, y: Math.round(canvasH * 0.5),
+                w: canvasW,
+                h: canvasH - Math.round(canvasH * 0.5),
+                r: 0, g: 0, b: 0, a: 0.60,
+            };
+            allElements.splice(insertAt, 0, overlayTop, overlayBottom);
+            narrate(`Added contrast overlay for text readability on image background.`);
         }
 
         // Math-based validation: fix overlaps, clipping, hierarchy
@@ -336,7 +336,7 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
 
         // ── Phase 5: Multi-pass render with live narration ──
         // Group elements by layer
-        const structureNames = new Set(['background', 'contrast_overlay', 'text_overlay', 'accent_zone', 'accent_glow', 'accent_line', 'accent_divider', 'tag_underline', 'tag_line']);
+        const structureNames = new Set(['background', 'contrast_overlay', 'contrast_overlay_bottom', 'text_overlay', 'accent_zone', 'accent_glow', 'accent_line', 'accent_diagonal', 'accent_divider', 'tag_underline', 'tag_line']);
         const contentNames = new Set(['headline', 'subheadline', 'body_text', 'tag_text']);
         const actionNames = new Set(['cta_button', 'cta_label']);
 
@@ -464,7 +464,7 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
             narrate(`Scaling design to ${otherVariants.length} variant(s)...`);
             addCard('sizing', `Scaling to ${otherVariants.length} variant(s)`, 'running');
 
-            const { scaleRenderElements } = await import('@/engine/renderElementScaler');
+            const { scaleRenderElements, renderElementsToDesignElements } = await import('@/engine/renderElementScaler');
 
             const sizeResults: string[] = [];
             for (const variant of otherVariants) {
@@ -481,9 +481,10 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
                 const fixes = variantValidation.isClean ? '' : ` (${variantValidation.fixes.length} fix)`;
                 sizeResults.push(`${targetW}x${targetH}: ${scaledElements.length} elements${fixes}`);
 
-                // Store the scaled elements for this variant
-                // (The actual rendering to variant canvases is handled by the
-                // existing save/sync mechanism in the design store)
+                // ★ FIX: Actually store scaled elements to designStore
+                // Previously this was only a comment — elements were computed but never stored.
+                const variantDesignElements = renderElementsToDesignElements(scaledElements, targetW, targetH);
+                designState.replaceVariantElements(variant.id, variantDesignElements);
             }
 
             updateCard('sizing', 'done', `${otherVariants.length} variant(s) scaled`, {

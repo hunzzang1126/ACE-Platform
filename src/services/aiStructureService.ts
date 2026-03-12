@@ -75,19 +75,28 @@ function calculateContentAwareFontSize(
     availableWidthPct: number,
 ): { headlineFs: number; subheadlineFs: number } {
     const availableW = canvasW * availableWidthPct;
-    const charCount = text.length;
+
+    // ★ FIX: Split by line breaks — use LONGEST line, not total char count.
+    // "CANADA vs USA\nEPIC SHOWDOWN" → longest=13, not total=27
+    const lines = text.split(/\n/);
+    const longestLine = Math.max(...lines.map(l => l.trim().length));
+    const charsPerLine = Math.max(8, longestLine);
 
     // Approximate: each character is ~0.55x the font size in width
     // We want the headline to fit in 1-2 lines max
-    const charsPerLine = Math.max(10, charCount); // at least 10 chars
     const maxFontForWidth = Math.round((availableW / (charsPerLine * 0.55)));
 
     // Also constrain by canvas height (headline shouldn't be > 25% of canvas height)
     const maxFontForHeight = Math.round(canvasH * 0.25);
 
-    // Global min/max
-    const headlineFs = Math.max(14, Math.min(maxFontForWidth, maxFontForHeight, 80));
-    const subheadlineFs = Math.max(10, Math.round(headlineFs * 0.42));
+    // ★ FIX: Canvas-based minimum floor (8% of smallest dimension)
+    // 300x250 → min 20px, 728x90 → min 7px, 160x600 → min 13px
+    // Hard cap at 80px — for large canvases the min floor shouldn't exceed max
+    const minFontForCanvas = Math.min(80, Math.round(Math.min(canvasW, canvasH) * 0.08));
+    const headlineFs = Math.max(minFontForCanvas, Math.min(maxFontForWidth, maxFontForHeight, 80));
+
+    // ★ FIX: Subheadline ratio 0.42 → 0.52 (Figma/BannerFlow use 0.5-0.6x)
+    const subheadlineFs = Math.max(11, Math.round(headlineFs * 0.52));
 
     return { headlineFs, subheadlineFs };
 }
@@ -203,9 +212,11 @@ function getHeadlineZone(layout: LayoutType, _ratio: string): LayoutSpec['headli
             return { xPct: 0.08, yPct: 0.2, wPct: 0.84, hPct: 0.3 };
         case 'left-aligned':
         case 'bold-headline':
-        case 'diagonal-split':
         case 'top-down-cascade':
             return { xPct: 0.08, yPct: 0.2, wPct: 0.7, hPct: 0.3 };
+        case 'diagonal-split':
+            // ★ Unique: text in left 60%, accent on right
+            return { xPct: 0.08, yPct: 0.18, wPct: 0.55, hPct: 0.35 };
         case 'right-aligned':
             return { xPct: 0.08, yPct: 0.2, wPct: 0.84, hPct: 0.3 };
         case 'split-horizontal':
@@ -231,9 +242,11 @@ function getCtaZone(layout: LayoutType, _ratio: string): LayoutSpec['ctaZone'] {
             return { xPct: 0.25, yPct: 0.78, wPct: 0.5, hPct: 0.12 };
         case 'left-aligned':
         case 'bold-headline':
-        case 'diagonal-split':
         case 'top-down-cascade':
             return { xPct: 0.08, yPct: 0.78, wPct: 0.4, hPct: 0.12 };
+        case 'diagonal-split':
+            // ★ Unique: CTA in left 55%, avoid accent area on right
+            return { xPct: 0.08, yPct: 0.78, wPct: 0.45, hPct: 0.12 };
         case 'right-aligned':
             return { xPct: 0.52, yPct: 0.78, wPct: 0.4, hPct: 0.12 };
         case 'split-horizontal':

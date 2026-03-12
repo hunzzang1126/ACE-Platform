@@ -49,18 +49,28 @@ const PASS_SCORE = 82;
 
 function buildReviewPrompt(canvasW: number, canvasH: number, elementNames: string[]): string {
     const nameList = elementNames.map(n => `  - "${n}"`).join('\n');
-    return `You are a professional banner designer doing a quality review.
+    return `You are a professional creative designer doing a strict quality review.
 
 Canvas: ${canvasW}×${canvasH}px
 Elements present:
 ${nameList}
 
-Look at the banner image. Check for:
-1. OVERLAP — elements covering each other (critical error)
-2. TEXT CLIPPED — text going outside canvas bounds
-3. HIERARCHY — headline should be largest/most prominent
-4. CTA — CTA button should be clearly visible with good contrast
-5. SPACING — no crowding, minimum 12px padding between elements
+Check for these issues and DEDUCT points accordingly:
+1. TEXT READABILITY — ALL text must be clearly readable against its background.
+   Text on a busy image without contrast overlay = -25 points (CRITICAL)
+2. OVERLAP — elements covering each other = -20 points per overlap
+3. TEXT CLIPPED — text going outside canvas bounds = -15 points
+4. HIERARCHY — headline must be largest/most prominent. If not = -10 points
+5. CTA — CTA button must be clearly visible with strong contrast = -10 if weak
+6. ALIGNMENT — if elements should be centered but aren't = -15 points
+7. FONT SIZE — any text smaller than 12px on banners = -10 points
+8. SPACING — elements crowded with < 8px gap = -10 points
+
+Scoring rules:
+- Start at 100, subtract for each issue found
+- Score above 80 ONLY if ALL text is clearly readable
+- Score above 90 ONLY if ALL elements are properly aligned and spaced
+- Be STRICT — a banner with unreadable text should NEVER score above 60
 
 Return JSON only:
 {

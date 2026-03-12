@@ -108,17 +108,27 @@ export function buildLayoutFromSpec(
             });
             break;
         case 'diagonal': {
-            // Simulated with a rotated rectangle effect — approximated as a tall thin accent
-            const dw = Math.round(canvasW * 0.08);
+            // Bold angular accent — two offset bars creating depth
+            const dw = Math.round(canvasW * 0.15);
             elements.push({
                 type: 'rect',
                 name: 'accent_diagonal',
-                x: Math.round(canvasW * 0.75),
+                x: Math.round(canvasW * 0.65),
                 y: 0,
                 w: dw,
                 h: canvasH,
                 ...accentColor,
-                a: 0.15,
+                a: 0.25,
+            });
+            elements.push({
+                type: 'rect',
+                name: 'accent_divider',
+                x: Math.round(canvasW * 0.65) + dw,
+                y: 0,
+                w: Math.round(dw * 0.3),
+                h: canvasH,
+                ...accentColor,
+                a: 0.10,
             });
             break;
         }
@@ -129,13 +139,17 @@ export function buildLayoutFromSpec(
 
     // ── 3. Tag/label text (if present) ──
     if (content.tag) {
+        const tagW = Math.round(canvasW * spec.headlineZone.wPct);
+        let tagX = Math.round(canvasW * spec.headlineZone.xPct);
+        // ★ CENTER OVERRIDE: center tag on canvas
+        if (spec.alignment === 'center') tagX = Math.round((canvasW - tagW) / 2);
         const tagY = Math.round(canvasH * spec.headlineZone.yPct - canvasH * 0.06);
         elements.push({
             type: 'text',
             name: 'tag_text',
-            x: Math.round(canvasW * spec.headlineZone.xPct),
+            x: tagX,
             y: Math.max(4, tagY),
-            w: Math.round(canvasW * spec.headlineZone.wPct),
+            w: tagW,
             h: Math.round(spec.subheadlineFontSize * 1.4),
             content: content.tag.toUpperCase(),
             font_size: Math.round(spec.subheadlineFontSize * 0.85),
@@ -147,9 +161,11 @@ export function buildLayoutFromSpec(
     }
 
     // ── 4. Headline ──
-    const headlineX = Math.round(canvasW * spec.headlineZone.xPct);
-    const headlineY = Math.round(canvasH * spec.headlineZone.yPct);
     const headlineW = Math.round(canvasW * spec.headlineZone.wPct);
+    let headlineX = Math.round(canvasW * spec.headlineZone.xPct);
+    // ★ CENTER OVERRIDE: center headline box on canvas
+    if (spec.alignment === 'center') headlineX = Math.round((canvasW - headlineW) / 2);
+    const headlineY = Math.round(canvasH * spec.headlineZone.yPct);
     const headlineH = Math.round(spec.headlineFontSize * 1.3 * Math.ceil(content.headline.length / (headlineW / (spec.headlineFontSize * 0.55))));
 
     elements.push({
@@ -168,13 +184,17 @@ export function buildLayoutFromSpec(
     });
 
     // ── 5. Subheadline ──
+    const subW = headlineW;
+    let subX = headlineX;
+    // ★ CENTER OVERRIDE: center subheadline too
+    if (spec.alignment === 'center') subX = Math.round((canvasW - subW) / 2);
     const subY = headlineY + Math.min(headlineH, Math.round(canvasH * spec.headlineZone.hPct)) + 8;
     elements.push({
         type: 'text',
         name: 'subheadline',
-        x: headlineX,
+        x: subX,
         y: subY,
-        w: headlineW,
+        w: subW,
         h: Math.round(spec.subheadlineFontSize * 2.2),
         content: content.subheadline,
         font_size: spec.subheadlineFontSize,
@@ -184,9 +204,11 @@ export function buildLayoutFromSpec(
     });
 
     // ── 6. CTA Button ──
-    const ctaX = Math.round(canvasW * spec.ctaZone.xPct);
-    const ctaY = Math.round(canvasH * spec.ctaZone.yPct);
     const ctaW = Math.round(canvasW * spec.ctaZone.wPct);
+    let ctaX = Math.round(canvasW * spec.ctaZone.xPct);
+    // ★ CENTER OVERRIDE: center CTA on canvas
+    if (spec.alignment === 'center') ctaX = Math.round((canvasW - ctaW) / 2);
+    const ctaY = Math.round(canvasH * spec.ctaZone.yPct);
     const ctaH = Math.round(canvasH * spec.ctaZone.hPct);
     const ctaColor = hexToRgba(colors.accent);
 
