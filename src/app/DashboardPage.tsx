@@ -41,30 +41,60 @@ export function DashboardPage() {
     // ── Sync: add NEW creative sets from designStore that projectStore doesn't know about ──
     // ★ REGRESSION GUARD: projectStore is AUTHORITATIVE for names, trash, and deletions.
     // NEVER overwrite names or remove items — only ADD missing entries.
+    // ★★ CRITICAL: Must wait for IDB hydration to complete BEFORE syncing.
+    //    IDB is async — stores start with defaults ([]) and hydrate later.
+    //    If we sync before hydration, we add entries with stale names from designStore.
     useEffect(() => {
-        const allCS = useDesignStore.getState().getAllCreativeSets();
-        const trash = useProjectStore.getState().trash;
-        const trashIds = new Set(trash.map(t => t.item.id));
-        useProjectStore.setState((state) => {
-            const existingIds = new Set(state.creativeSets.map(s => s.id));
-            for (const cs of allCS) {
-                // Skip if already in projectStore or in trash
-                if (existingIds.has(cs.id) || trashIds.has(cs.id)) continue;
-                // Only ADD new entries — don't overwrite existing ones
-                state.creativeSets.push({
-                    id: cs.id, name: cs.name, variantCount: cs.variants.length,
-                    createdAt: cs.createdAt, updatedAt: cs.updatedAt, createdBy: displayName || 'User',
+        let cancelled = false;
+
+        // Wait for BOTH stores to finish IDB hydration
+        const waitForHydration = async () => {
+            // Zustand persist exposes onFinishHydration via the persist API
+            const projectPersist = (useProjectStore as any).persist;
+            const designPersist = (useDesignStore as any).persist;
+
+            // If not yet hydrated, wait for hydration
+            if (projectPersist?.hasHydrated && !projectPersist.hasHydrated()) {
+                await new Promise<void>(resolve => {
+                    const unsub = projectPersist.onFinishHydration(() => { unsub(); resolve(); });
                 });
             }
-            // Update variant counts only (not names!) for existing sets
-            for (const cs of allCS) {
-                const existing = state.creativeSets.find(s => s.id === cs.id);
-                if (existing) {
-                    existing.variantCount = cs.variants.length;
-                    existing.updatedAt = cs.updatedAt;
-                }
+            if (designPersist?.hasHydrated && !designPersist.hasHydrated()) {
+                await new Promise<void>(resolve => {
+                    const unsub = designPersist.onFinishHydration(() => { unsub(); resolve(); });
+                });
             }
-        });
+
+            if (cancelled) return;
+
+            // NOW safe to sync — both stores have their persisted data
+            const allCS = useDesignStore.getState().getAllCreativeSets();
+            const trash = useProjectStore.getState().trash;
+            const trashIds = new Set(trash.map(t => t.item.id));
+            useProjectStore.setState((state) => {
+                const existingIds = new Set(state.creativeSets.map(s => s.id));
+                for (const cs of allCS) {
+                    // Skip if already in projectStore or in trash
+                    if (existingIds.has(cs.id) || trashIds.has(cs.id)) continue;
+                    // Only ADD new entries — don't overwrite existing ones
+                    state.creativeSets.push({
+                        id: cs.id, name: cs.name, variantCount: cs.variants.length,
+                        createdAt: cs.createdAt, updatedAt: cs.updatedAt, createdBy: displayName || 'User',
+                    });
+                }
+                // Update variant counts only (not names!) for existing sets
+                for (const cs of allCS) {
+                    const existing = state.creativeSets.find(s => s.id === cs.id);
+                    if (existing) {
+                        existing.variantCount = cs.variants.length;
+                        existing.updatedAt = cs.updatedAt;
+                    }
+                }
+            });
+        };
+
+        waitForHydration();
+        return () => { cancelled = true; };
     }, [displayName]);
 
     // ── Computed ──
