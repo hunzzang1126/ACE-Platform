@@ -127,6 +127,38 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
         return () => { cancelled = true; };
     }, [visibleVariants]);
 
+    // ── Resolve idb:// image URLs to blob URLs ──
+    // ★ Images stored via assetService use idb://{hash} references which
+    //   browsers CANNOT load directly. Resolve them to blob: URLs here.
+    const [resolvedImageUrls, setResolvedImageUrls] = useState<Record<string, string>>({});
+    useEffect(() => {
+        let cancelled = false;
+        const toResolve: { elId: string; src: string }[] = [];
+        for (const v of visibleVariants) {
+            for (const el of v.elements) {
+                if (el.type === 'image' && el.src?.startsWith('idb://')) {
+                    toResolve.push({ elId: el.id, src: el.src });
+                }
+            }
+        }
+        if (toResolve.length === 0) return;
+
+        (async () => {
+            const { resolveAsset } = await import('@/services/assetService');
+            for (const { elId, src } of toResolve) {
+                if (cancelled) break;
+                try {
+                    const blobUrl = await resolveAsset(src);
+                    if (!cancelled && blobUrl !== src) {
+                        setResolvedImageUrls(prev => ({ ...prev, [elId]: blobUrl }));
+                    }
+                } catch { /* skip */ }
+            }
+        })();
+
+        return () => { cancelled = true; };
+    }, [visibleVariants]);
+
     // Check if any element across all visible variants has an animation
     const hasAnyAnimation = useMemo(() => {
         return visibleVariants.some((v) =>
@@ -380,18 +412,22 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                                                 >
                                                     {el.type === 'text' && el.content}
                                                     {el.type === 'button' && el.label}
-                                                    {el.type === 'image' && el.src && (
-                                                        <img
-                                                            src={el.src}
-                                                            alt=""
-                                                            style={{
-                                                                width: '100%',
-                                                                height: '100%',
-                                                                objectFit: el.fit || 'cover',
-                                                                display: 'block',
-                                                            }}
-                                                        />
-                                                    )}
+                                                    {el.type === 'image' && (() => {
+                                                        // ★ Use resolved blob URL for idb:// images
+                                                        const imgSrc = resolvedImageUrls[el.id] || (el.src?.startsWith('idb://') ? '' : el.src);
+                                                        return imgSrc ? (
+                                                            <img
+                                                                src={imgSrc}
+                                                                alt=""
+                                                                style={{
+                                                                    width: '100%',
+                                                                    height: '100%',
+                                                                    objectFit: el.fit || 'cover',
+                                                                    display: 'block',
+                                                                }}
+                                                            />
+                                                        ) : null;
+                                                    })()}
                                                     {el.type === 'video' && (() => {
                                                         const videoSrc = videoUrls[el.id] || el.videoSrc || '';
                                                         return videoSrc ? (
