@@ -6,11 +6,12 @@
 //
 // Replaces AI pixel-guessing with deterministic rules:
 //   1. Boundary clamping (all elements within canvas)
-//   2. Overlap detection + nudge (text boxes)
-//   3. Hierarchy enforcement (headline = largest font)
-//   4. CTA alignment (label centered on button)
-//   5. Minimum font size enforcement
-//   6. Proportional guard (no single element > 95% canvas)
+//   2. Text edge padding
+//   3. Overlap detection + FONT SHRINK (not just nudge)
+//   4. Hierarchy enforcement (headline = largest font)
+//   5. CTA alignment (label centered on button)
+//   6. Minimum font size enforcement
+//   7. Proportional guard (no single element > 95% canvas)
 //
 // Used in:
 //   - Phase 5: After combine, before render
@@ -116,49 +117,108 @@ function enforceTextPadding(
     }
 }
 
-// ── Rule 3: Overlap Detection + Nudge ────────────
+// ── Helper: Estimate text height from font size + content ──
+
+function estimateTextHeight(el: RenderElement): number {
+    if (!el.font_size || !el.content || !el.w) return el.h;
+    const charWidth = el.font_size * 0.55;
+    const charsPerLine = Math.max(1, Math.floor(el.w / charWidth));
+    const textLen = el.content.replace(/\n/g, '').length;
+    const explicitLines = el.content.split(/\n/).length;
+    const wrapLines = Math.ceil(textLen / charsPerLine);
+    const lines = Math.max(explicitLines, wrapLines);
+    return Math.round(el.font_size * 1.45 * lines + 8);
+}
+
+// ── Rule 3: Overlap Detection + Font Shrink ──────
+// ★ KEY FIX: When text elements overlap, SHRINK font sizes to reduce
+//   line count. Only falls back to Y-nudge if fonts are at minimum.
+//   Runs multiple passes until no overlaps remain.
 
 function fixOverlaps(
     elements: RenderElement[],
     canvasH: number,
     fixes: string[],
 ): void {
-    // Collect text bounding boxes
-    const textBoxes: BBox[] = [];
-    for (let i = 0; i < elements.length; i++) {
-        const el = elements[i]!;
-        if (el.type !== 'text') continue;
-        textBoxes.push({ x: el.x, y: el.y, w: el.w, h: el.h, name: el.name ?? `text_${i}`, idx: i });
-    }
+    const MAX_PASSES = 10;
 
-    // Sort by Y position (top to bottom)
-    textBoxes.sort((a, b) => a.y - b.y);
-
-    // Check each pair for vertical overlap
-    for (let i = 0; i < textBoxes.length - 1; i++) {
-        const a = textBoxes[i]!;
-        const b = textBoxes[i + 1]!;
-
-        // Skip non-overlapping horizontally (different columns)
-        const hOverlap = a.x < b.x + b.w && b.x < a.x + a.w;
-        if (!hOverlap) continue;
-
-        // Check vertical gap
-        const gap = b.y - (a.y + a.h);
-        if (gap < MIN_TEXT_GAP) {
-            const nudge = MIN_TEXT_GAP - gap;
-            const elB = elements[b.idx]!;
-            elB.y += nudge;
-            b.y += nudge; // Update the BBox too for subsequent checks
-
-            // Prevent nudging past canvas bottom
-            if (elB.y + elB.h > canvasH) {
-                elB.y = canvasH - elB.h;
-                b.y = elB.y;
-            }
-
-            fixes.push(`Nudged "${b.name}" down ${nudge}px to avoid overlap with "${a.name}"`);
+    for (let pass = 0; pass < MAX_PASSES; pass++) {
+        // Refresh text bounding boxes each pass (sizes may have changed)
+        const textBoxes: BBox[] = [];
+        for (let i = 0; i < elements.length; i++) {
+            const el = elements[i]!;
+            if (el.type !== 'text') continue;
+            textBoxes.push({ x: el.x, y: el.y, w: el.w, h: el.h, name: el.name ?? `text_${i}`, idx: i });
         }
+        textBoxes.sort((a, b) => a.y - b.y);
+
+        let hadOverlap = false;
+
+        for (let i = 0; i < textBoxes.length - 1; i++) {
+            const a = textBoxes[i]!;
+            const b = textBoxes[i + 1]!;
+
+            // Skip non-overlapping horizontally (different columns)
+            const hOverlap = a.x < b.x + b.w && b.x < a.x + a.w;
+            if (!hOverlap) continue;
+
+            // Check vertical gap
+            const gap = b.y - (a.y + a.h);
+            if (gap >= MIN_TEXT_GAP) continue;
+
+            hadOverlap = true;
+
+            const elA = elements[a.idx]!;
+            const elB = elements[b.idx]!;
+
+            // ★ Strategy 1: SHRINK fonts to reduce line count
+            const canShrinkA = (elA.font_size ?? 0) > MIN_FONT_SIZE;
+            const canShrinkB = (elB.font_size ?? 0) > MIN_FONT_SIZE;
+
+            if (canShrinkA || canShrinkB) {
+                if (canShrinkA && elA.font_size) {
+                    const oldFs = elA.font_size;
+                    elA.font_size = Math.max(MIN_FONT_SIZE, elA.font_size - 2);
+                    elA.h = estimateTextHeight(elA);
+                    a.h = elA.h;
+                    if (elA.font_size !== oldFs) {
+                        fixes.push(`Shrunk "${a.name}" font ${oldFs}->${elA.font_size}px to fix overlap`);
+                    }
+                }
+                if (canShrinkB && elB.font_size) {
+                    const oldFs = elB.font_size;
+                    elB.font_size = Math.max(MIN_FONT_SIZE, elB.font_size - 2);
+                    elB.h = estimateTextHeight(elB);
+                    b.h = elB.h;
+                    if (elB.font_size !== oldFs) {
+                        fixes.push(`Shrunk "${b.name}" font ${oldFs}->${elB.font_size}px to fix overlap`);
+                    }
+                }
+
+                // Reposition B below A with proper gap
+                elB.y = elA.y + elA.h + MIN_TEXT_GAP;
+                b.y = elB.y;
+
+                // Clamp to canvas bottom
+                if (elB.y + elB.h > canvasH) {
+                    elB.y = Math.max(0, canvasH - elB.h);
+                    b.y = elB.y;
+                }
+            } else {
+                // ★ Strategy 2: Last resort — nudge Y (fonts at minimum)
+                const nudge = MIN_TEXT_GAP - gap;
+                elB.y += nudge;
+                b.y += nudge;
+
+                if (elB.y + elB.h > canvasH) {
+                    elB.y = Math.max(0, canvasH - elB.h);
+                    b.y = elB.y;
+                }
+                fixes.push(`Nudged "${b.name}" down ${nudge}px (fonts at minimum)`);
+            }
+        }
+
+        if (!hadOverlap) break; // All clean — done
     }
 }
 
@@ -180,7 +240,7 @@ function enforceHierarchy(
         if (el.font_size > headline.font_size) {
             const oldSize = el.font_size;
             el.font_size = Math.round(headline.font_size * 0.7);
-            fixes.push(`Reduced "${el.name}" font ${oldSize}→${el.font_size}px (headline must be largest)`);
+            fixes.push(`Reduced "${el.name}" font ${oldSize}->${el.font_size}px (headline must be largest)`);
         }
     }
 }
@@ -224,7 +284,7 @@ function enforceMinFont(
 
         const old = el.font_size;
         el.font_size = MIN_FONT_SIZE;
-        fixes.push(`Increased "${el.name}" font ${old}→${MIN_FONT_SIZE}px (minimum)`);
+        fixes.push(`Increased "${el.name}" font ${old}->${MIN_FONT_SIZE}px (minimum)`);
     }
 }
 
