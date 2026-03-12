@@ -10,6 +10,7 @@ import { BANNER_PRESETS } from '@/schema/presets';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { ProjectCard } from '@/components/dashboard/ProjectCard';
 import { IcFolder } from '@/components/ui/Icons';
+import { APP_VERSION } from '@/version';
 
 function getGreeting(): string {
     const h = new Date().getHours();
@@ -205,6 +206,11 @@ export function DashboardPage() {
                         )}
                     </div>
                 </div>
+
+                {/* Version Footer */}
+                <footer className="dashboard-footer">
+                    <span className="dashboard-footer__version">{APP_VERSION}</span>
+                </footer>
             </main>
         </div>
     );

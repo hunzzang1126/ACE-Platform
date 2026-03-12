@@ -311,3 +311,15 @@ ACE는 풀 크리에이티브 플랫폼이다. 배너는 부가 기능일 뿐이
    **Rationale:** The user has strong product vision but relies on the agent for technical expertise.
    Honest feedback prevents wasted cycles and produces a better product.
    The user explicitly requested this — respect that trust by being genuinely direct.
+
+11. **Version Increment on Git Push (MANDATORY)**:
+
+   **Before EVERY `git push`, the agent MUST increment the build number in `src/version.ts`.**
+
+   - Version format: `v{major}.{minor}.{patch}.{build}` (e.g., `v0.0.0.3`)
+   - Only the **build** number (last digit) increments automatically on each push
+   - `major`, `minor`, `patch` are changed manually by the user for releases
+   - The version is displayed in the dashboard footer for deployment tracking
+   - **Commit sequence**: code changes → tests → increment version → commit → push
+   - **File**: `src/version.ts` — single source of truth for `APP_VERSION`
+   - **NEVER push without incrementing** — the user tracks deployments by version number
