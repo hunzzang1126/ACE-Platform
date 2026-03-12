@@ -99,6 +99,13 @@ Rules for fixes:
 - Only provide fixes for actual problems found
 - If score >= ${PASS_SCORE}, return empty fixes array
 
+CRITICAL FIX STRATEGY for OVERLAPPING TEXT:
+- If two text elements overlap: REDUCE fontSize of both (not just reposition)
+- Headline wrapping to too many lines? Reduce headline fontSize so it wraps to fewer lines
+- Subheadline too long? Reduce subheadline fontSize so it takes fewer lines
+- After reducing font sizes, adjust Y positions so elements stack cleanly with 8-12px gaps
+- NEVER just nudge Y position without also checking if font size should shrink
+
 Return ONLY the JSON object.`;
 }
 

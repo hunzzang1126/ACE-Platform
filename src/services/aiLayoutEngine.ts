@@ -160,19 +160,29 @@ export function buildLayoutFromSpec(
         });
     }
 
-    // ── 4. Headline ──
+    // ── 4. Headline (auto-shrink to fit zone) ──
     const headlineW = Math.round(canvasW * spec.headlineZone.wPct);
     let headlineX = Math.round(canvasW * spec.headlineZone.xPct);
-    // ★ CENTER OVERRIDE: center headline box on canvas
     if (spec.alignment === 'center') headlineX = Math.round((canvasW - headlineW) / 2);
     const headlineY = Math.round(canvasH * spec.headlineZone.yPct);
-    // ★ Accurate multi-line height: account for actual line breaks + word wrapping
-    const charsPerLine = Math.max(1, Math.floor(headlineW / (spec.headlineFontSize * 0.55)));
-    // Count explicit line breaks AND estimated word-wrap lines
-    const explicitLines = content.headline.split(/\n/).length;
-    const wrapLines = Math.ceil(content.headline.replace(/\n/g, '').length / charsPerLine);
-    const lineCount = Math.max(explicitLines, wrapLines);
-    const headlineH = Math.round(spec.headlineFontSize * 1.45 * lineCount + 12);
+    const headlineMaxH = Math.round(canvasH * spec.headlineZone.hPct);
+
+    // ★ Auto-shrink: reduce font size until headline fits within zone.
+    // 4 lines → shrink font → 3 lines → shrink → 2 lines, etc.
+    let headlineFs = spec.headlineFontSize;
+    let headlineH: number = 0;
+    const MIN_HEADLINE_FS = 16;
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+        const cpl = Math.max(1, Math.floor(headlineW / (headlineFs * 0.55)));
+        const explicit = content.headline.split(/\n/).length;
+        const wrapped = Math.ceil(content.headline.replace(/\n/g, '').length / cpl);
+        const lines = Math.max(explicit, wrapped);
+        headlineH = Math.round(headlineFs * 1.45 * lines + 12);
+        if (headlineH <= headlineMaxH || headlineFs <= MIN_HEADLINE_FS) break;
+        headlineFs -= 2;
+    }
+    headlineH = Math.min(headlineH, headlineMaxH);
 
     elements.push({
         type: 'text',
@@ -180,30 +190,50 @@ export function buildLayoutFromSpec(
         x: headlineX,
         y: headlineY,
         w: headlineW,
-        h: Math.min(headlineH, Math.round(canvasH * spec.headlineZone.hPct)),
+        h: headlineH,
         content: content.headline,
-        font_size: spec.headlineFontSize,
+        font_size: headlineFs,
         font_weight: palette.typography.weights.bold,
         color_hex: colors.foreground,
         text_align: spec.alignment,
         letter_spacing: palette.typography.letterSpacing.tight,
     });
 
-    // ── 5. Subheadline ──
+    // ── 5. Subheadline (auto-shrink to fit before CTA) ──
     const subW = headlineW;
     let subX = headlineX;
-    // ★ CENTER OVERRIDE: center subheadline too
     if (spec.alignment === 'center') subX = Math.round((canvasW - subW) / 2);
-    const subY = headlineY + Math.min(headlineH, Math.round(canvasH * spec.headlineZone.hPct)) + 8;
+    const subY = headlineY + headlineH + 8;
+
+    // Available space: from subY to CTA top (or 80% of canvas)
+    const ctaTopY = Math.round(canvasH * spec.ctaZone.yPct);
+    const subMaxH = Math.max(30, ctaTopY - subY - 12);
+
+    // ★ Auto-shrink subheadline: reduce font until it fits before CTA
+    let subFs = spec.subheadlineFontSize;
+    let subH: number = 0;
+    const MIN_SUB_FS = 10;
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+        const cpl = Math.max(1, Math.floor(subW / (subFs * 0.5)));
+        const explicit = content.subheadline.split(/\n/).length;
+        const wrapped = Math.ceil(content.subheadline.replace(/\n/g, '').length / cpl);
+        const lines = Math.max(explicit, wrapped);
+        subH = Math.round(subFs * 1.4 * lines + 8);
+        if (subH <= subMaxH || subFs <= MIN_SUB_FS) break;
+        subFs -= 2;
+    }
+    subH = Math.min(subH, subMaxH);
+
     elements.push({
         type: 'text',
         name: 'subheadline',
         x: subX,
         y: subY,
         w: subW,
-        h: Math.round(spec.subheadlineFontSize * 2.2),
+        h: subH,
         content: content.subheadline,
-        font_size: spec.subheadlineFontSize,
+        font_size: subFs,
         font_weight: palette.typography.weights.normal,
         color_hex: colors.secondary,
         text_align: spec.alignment,
