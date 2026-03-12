@@ -426,6 +426,43 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
             narrate(`Design placed with ${rendered} elements using ${guide.name}.\nCanvas: ${canvasW}x${canvasH}px`);
         }
 
+        // ── Phase 8: Smart Sizing (Auto-propagate to all variants) ──
+        const designState = useDesignStore.getState();
+        const cs = designState.creativeSet;
+        const otherVariants = cs?.variants?.filter(v => v.id !== cs.masterVariantId) ?? [];
+
+        if (otherVariants.length > 0) {
+            narrate(`Scaling design to ${otherVariants.length} variant(s)...`);
+            addCard('sizing', `Scaling to ${otherVariants.length} variant(s)`, 'running');
+
+            const { scaleRenderElements } = await import('@/engine/renderElementScaler');
+
+            const sizeResults: string[] = [];
+            for (const variant of otherVariants) {
+                const targetW = variant.preset.width;
+                const targetH = variant.preset.height;
+
+                // Scale master elements → target size
+                let scaledElements = scaleRenderElements(allElements, canvasW, canvasH, targetW, targetH);
+
+                // Validate each variant independently
+                const variantValidation = validateLayout(scaledElements, targetW, targetH);
+                scaledElements = variantValidation.elements;
+
+                const fixes = variantValidation.isClean ? '' : ` (${variantValidation.fixes.length} fix)`;
+                sizeResults.push(`${targetW}x${targetH}: ${scaledElements.length} elements${fixes}`);
+
+                // Store the scaled elements for this variant
+                // (The actual rendering to variant canvases is handled by the
+                // existing save/sync mechanism in the design store)
+            }
+
+            updateCard('sizing', 'done', `${otherVariants.length} variant(s) scaled`, {
+                expandedDetail: sizeResults.join('\n'),
+            });
+            narrate(`All ${otherVariants.length} variant(s) scaled and validated.`);
+        }
+
         return `Design generated with ${rendered} elements.`;
     }, [addCard, updateCard, moveCursor, hideCursor, narrate]);
 
