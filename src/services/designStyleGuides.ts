@@ -128,17 +128,28 @@ RULES:
    - Fashion/beauty → elegant dark or warm neutral
 4. ALWAYS ensure 4.5:1+ contrast between text and background.
 5. Dark backgrounds (< #333) should have white/light text. Light backgrounds (> #ccc) should have dark text.
-6. Decide if a BACKGROUND IMAGE is needed:
+6. Decide if a BACKGROUND IMAGE is needed. Be SELECTIVE — only use images when a real visual scene adds value:
+   USE IMAGE (true):
    - User explicitly asks for background/image/photo → ALWAYS YES
-   - Brands with physical products (Nike shoes, Coca-Cola bottles) → YES
-   - Location/travel prompts → YES (scenic imagery)
-   - Food/restaurant/lifestyle → YES (appetizing or lifestyle imagery)
-   - Fashion/beauty → YES (model or product imagery)
-   - Sport/fitness → YES (athletic imagery)
-   - Abstract/data/SaaS/dashboard/fintech → NO (gradient is better)
-   - Simple text-only or minimalist requests → NO
-   - When in doubt and the prompt is visual/emotional → YES
-   - If YES, write a short Imagen prompt describing the ideal background.
+   - Sports/athletics (stadiums, fields, athletes in action) → YES
+   - Food/restaurant (appetizing dishes, dining scenes) → YES
+   - Travel/tourism (scenic destinations, landmarks) → YES
+   - Fashion/beauty (model shots, product lifestyle) → YES
+   - Automotive (cars, showrooms) → YES
+   - Real estate/architecture (buildings, interiors) → YES
+   - Entertainment/events (concerts, festivals, movies) → YES
+   
+   DO NOT USE IMAGE (false) — gradient backgrounds work better:
+   - Finance/fintech/banking/insurance → NO (use dark gradient)
+   - SaaS/software/dashboard/analytics → NO (use gradient)
+   - B2B/enterprise/consulting → NO (use gradient)
+   - Abstract concepts (innovation, growth, AI) → NO (use gradient)
+   - Simple sale/discount/promo ads → NO (bold colors, no image needed)
+   - Minimalist/clean/Apple-style → NO (gradient is more elegant)
+   - Data/charts/statistics → NO
+   - When the prompt has NO physical/visual subject → NO
+   
+   If YES, write a short Imagen prompt describing the ideal background.
 7. Return ONLY the JSON object, nothing else.`;
 
 interface AiColorResponse {

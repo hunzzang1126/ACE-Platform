@@ -285,6 +285,14 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
 
         let allElements = buildLayoutFromSpec(spec, content, guide, canvasW, canvasH);
 
+        // ★ When NanoBanana image background is active, remove the gradient rect
+        // background — the ai_background image replaces it entirely.
+        // This prevents the gradient rect from sitting on top of the image and
+        // causing z-order conflicts on save/reload.
+        if (hasImageBackground && bgImageUrl) {
+            allElements = allElements.filter(el => el.name !== 'background');
+        }
+
         // ★ CONTRAST GUARD: When background image is present, inject a cinematic
         // two-layer dark overlay to guarantee text readability. Covers full canvas
         // with lighter top (15% opacity) and darker bottom (60% opacity).
