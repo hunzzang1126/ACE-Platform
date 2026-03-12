@@ -186,7 +186,12 @@ export function useCanvasSync(
 
         let restoredShapes = 0;
         const overlayElements: OverlayElement[] = [];
-        const pendingBlobLoads: Promise<void>[] = [];
+        // ★ Collect async image/video loads to await SEQUENTIALLY (not parallel).
+        // Loading images in parallel causes z-order race conditions:
+        // each add_image() calls moveObjectTo() based on userObjects() at that instant,
+        // but concurrent loads mean userObjects() is stale between resolves.
+        const pendingImageLoads: (() => Promise<void>)[] = [];
+        const pendingVideoLoads: Promise<void>[] = [];
 
         for (const el of variant.elements) {
             if (el.type === 'shape') {
@@ -278,20 +283,21 @@ export function useCanvasSync(
                 }
 
                 if (img.src) {
-                    // ★ Phase 2: resolve idb:// refs → blob URLs before rendering
-                    const imgPromise = (async () => {
-                        const resolvedSrc = isAssetRef(img.src)
-                            ? await resolveAsset(img.src)
-                            : img.src;
+                    // ★ SEQUENTIAL IMAGE LOADING: capture closure vars, load one at a time
+                    const capturedX = x, capturedY = y, capturedW = w, capturedH = h;
+                    const capturedImg = img;
+                    pendingImageLoads.push(async () => {
+                        const resolvedSrc = isAssetRef(capturedImg.src!)
+                            ? await resolveAsset(capturedImg.src!)
+                            : capturedImg.src!;
                         const nodeId = await engine.add_image(
-                            x, y, resolvedSrc, w, h, img.name, img.zIndex,
-                            img.naturalWidth, img.naturalHeight,
+                            capturedX, capturedY, resolvedSrc, capturedW, capturedH, capturedImg.name, capturedImg.zIndex,
+                            capturedImg.naturalWidth, capturedImg.naturalHeight,
                         );
-                        if (img.opacity !== undefined && img.opacity !== 1) {
-                            try { engine.set_opacity(nodeId, img.opacity); } catch { /* ok */ }
+                        if (capturedImg.opacity !== undefined && capturedImg.opacity !== 1) {
+                            try { engine.set_opacity(nodeId, capturedImg.opacity); } catch { /* ok */ }
                         }
-                    })();
-                    pendingBlobLoads.push(imgPromise);
+                    });
                 }
 
                 restoredShapes++;
@@ -340,7 +346,7 @@ export function useCanvasSync(
                 overlayElements.push(oel);
 
                 if (!oel.videoSrc || oel.videoSrc.startsWith('blob:')) {
-                    pendingBlobLoads.push(
+                    pendingVideoLoads.push(
                         loadVideoBlob(vid.id).then((freshUrl) => {
                             if (freshUrl) oel.videoSrc = freshUrl;
                         }).catch(() => {/* IndexedDB unavailable */ })
@@ -357,11 +363,17 @@ export function useCanvasSync(
             }
         }
 
-        // Wait for all video blob URL loads AND image loads to complete
-        await Promise.all(pendingBlobLoads);
+        // ★ SEQUENTIAL IMAGE LOADING: Load images one by one so each add_image()
+        // sees the correct Fabric stack state. This prevents z-order race conditions.
+        for (const loadFn of pendingImageLoads) {
+            await loadFn();
+        }
 
-        // ★ REGRESSION GUARD: After all async image loads complete, do a definitive
-        // reorder of the Fabric stack by __aceZIndex.
+        // Wait for video blob loads too
+        await Promise.all(pendingVideoLoads);
+
+        // ★ DEFINITIVE REORDER: After ALL objects are added, do a final z-order sort.
+        // This is the authoritative pass — any interim ordering issues are corrected here.
         if (typeof engine.reorder_by_z_index === 'function') {
             engine.reorder_by_z_index();
         }
