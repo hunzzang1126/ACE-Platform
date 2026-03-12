@@ -43,7 +43,7 @@ export interface VisionLoopResult {
 // ★ FIX-APPLY MODE: 2 passes max, apply fixes from Vision AI.
 // Vision AI sees the actual screenshot and KNOWS where overlaps are.
 // After applying, we bounds-check each fix to prevent off-canvas elements.
-const MAX_PASSES = 2;
+const MAX_PASSES = 3;
 const PASS_SCORE = 80;
 
 // ── Vision review prompt ──────────────────────────

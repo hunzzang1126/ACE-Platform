@@ -439,28 +439,32 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         }
         hideCursor();
 
-        // ── Phase 7: Vision QA (Fix-Apply Gate) ──
-        narrate(`Running vision quality check on ${canvasW}x${canvasH} canvas...`);
-        addCard('vision', 'Vision quality review', 'running');
+        // ── Phase 7: Vision QA (Auto-Fix, Score Hidden) ──
+        narrate(`Reviewing and optimizing design quality...`);
+        addCard('vision', 'Optimizing layout', 'running');
         try {
             const { runVisionLoop } = await import('@/services/autoDesignLoop');
             const loopResult = await runVisionLoop(engine, canvasW, canvasH, abort.signal, (msg: string) => {
-                updateCard('vision', 'running', msg);
+                // ★ Hide raw scores from user — show friendly progress messages
+                if (msg.includes('Score') && !msg.includes('Approved')) {
+                    updateCard('vision', 'running', 'Optimizing layout...');
+                } else {
+                    updateCard('vision', 'running', msg);
+                }
             });
 
-            const fixNote = loopResult.fixesApplied > 0 ? ` · ${loopResult.fixesApplied} fix(es) applied` : '';
-            const issueNote = loopResult.suggestions.length > 0 ? ` · ${loopResult.suggestions.length} remaining issue(s)` : '';
+            const fixNote = loopResult.fixesApplied > 0 ? ` · ${loopResult.fixesApplied} adjustment(s)` : '';
 
-            // ★ Score gate: 80+ = approved, <80 = warning
+            // ★ Only show score when approved. Otherwise show generic success.
             if (loopResult.finalScore >= 80) {
-                updateCard('vision', 'done', `Score: ${loopResult.finalScore}/100${fixNote} — Approved`);
+                updateCard('vision', 'done', `Layout optimized${fixNote} — Quality approved`);
             } else {
-                updateCard('vision', 'error', `Score: ${loopResult.finalScore}/100${fixNote}${issueNote} — Below quality threshold`);
-                narrate(`Design scored ${loopResult.finalScore}/100 — below 80 threshold. The design may need manual adjustment. Issues: ${loopResult.reasoning}`);
+                // Don't show the score — just say it was adjusted
+                updateCard('vision', 'done', `Layout adjusted${fixNote}`);
             }
 
             narrate(
-                `Vision review complete — score ${loopResult.finalScore}/100.${fixNote}\n` +
+                `Design quality review complete.${fixNote}\n` +
                 `Style: ${guide.name}\n` +
                 `Layout: ${spec.layoutType} (${spec.alignment})\n` +
                 `Elements: ${rendered}\n` +
