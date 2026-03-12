@@ -439,32 +439,27 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         }
         hideCursor();
 
-        // ── Phase 7: Vision QA (Auto-Fix, Score Hidden) ──
+        // ── Phase 7: Vision QA (Auto-Fix + Score Display) ──
         narrate(`Reviewing and optimizing design quality...`);
         addCard('vision', 'Optimizing layout', 'running');
         try {
             const { runVisionLoop } = await import('@/services/autoDesignLoop');
             const loopResult = await runVisionLoop(engine, canvasW, canvasH, abort.signal, (msg: string) => {
-                // ★ Hide raw scores from user — show friendly progress messages
-                if (msg.includes('Score') && !msg.includes('Approved')) {
-                    updateCard('vision', 'running', 'Optimizing layout...');
-                } else {
-                    updateCard('vision', 'running', msg);
-                }
+                updateCard('vision', 'running', msg);
             });
 
-            const fixNote = loopResult.fixesApplied > 0 ? ` · ${loopResult.fixesApplied} adjustment(s)` : '';
+            const fixNote = loopResult.fixesApplied > 0 ? ` · ${loopResult.fixesApplied} fix(es) applied` : '';
 
-            // ★ Only show score when approved. Otherwise show generic success.
+            // ★ Always show score — user wants transparency
             if (loopResult.finalScore >= 80) {
-                updateCard('vision', 'done', `Layout optimized${fixNote} — Quality approved`);
+                updateCard('vision', 'done', `Score: ${loopResult.finalScore}/100${fixNote} — Approved`);
             } else {
-                // Don't show the score — just say it was adjusted
-                updateCard('vision', 'done', `Layout adjusted${fixNote}`);
+                // Show score + auto-fix status
+                updateCard('vision', 'error', `Score: ${loopResult.finalScore}/100${fixNote} — Auto-adjusted`);
             }
 
             narrate(
-                `Design quality review complete.${fixNote}\n` +
+                `Design quality review complete — score ${loopResult.finalScore}/100.${fixNote}\n` +
                 `Style: ${guide.name}\n` +
                 `Layout: ${spec.layoutType} (${spec.alignment})\n` +
                 `Elements: ${rendered}\n` +

@@ -778,7 +778,7 @@ Brief: "${userPrompt}"
 Generate EXACTLY this JSON object:
 {
   "headline": "${headlineLimit}. Bold, impactful, no period at end",
-  "subheadline": "${subLimit}. Supporting the headline, professional tone",
+  "subheadline": "${subLimit}. Supporting the headline, professional tone. If the headline is already clear and the canvas is small, set to empty string.",
   "cta": "1-3 word action verb. Examples: Learn More, Get Started, Shop Now, Try Free",
   "tag": "1-2 word category label. Examples: NEW, PREMIUM, LIMITED, 2026"
 }
@@ -789,5 +789,7 @@ Rules:
 - CTA must be a clear call to action  
 - Tag is a tiny category marker, always uppercase
 - All text must be in English
+- IMPORTANT: If the headline already conveys the full message (e.g. "SUMMER SALE 40% OFF"), the subheadline is OPTIONAL — set it to "" (empty string) to keep the layout clean
+- ${isSmall ? 'This canvas is very SMALL — subheadline should be empty "" to avoid crowding' : 'Only include subheadline if it adds genuine value'}
 - Return ONLY the JSON object, no explanation`;
 }

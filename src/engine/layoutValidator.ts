@@ -121,7 +121,10 @@ function enforceTextPadding(
 
 function estimateTextHeight(el: RenderElement): number {
     if (!el.font_size || !el.content || !el.w) return el.h;
-    const charWidth = el.font_size * 0.55;
+    // ★ Bold/headline text is wider per character than normal text
+    const isBold = el.font_weight && parseInt(el.font_weight) >= 600;
+    const charWidthRatio = isBold ? 0.65 : 0.50;
+    const charWidth = el.font_size * charWidthRatio;
     const charsPerLine = Math.max(1, Math.floor(el.w / charWidth));
     const textLen = el.content.replace(/\n/g, '').length;
     const explicitLines = el.content.split(/\n/).length;

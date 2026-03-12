@@ -174,7 +174,7 @@ export function buildLayoutFromSpec(
     const MIN_HEADLINE_FS = 16;
     // eslint-disable-next-line no-constant-condition
     while (true) {
-        const cpl = Math.max(1, Math.floor(headlineW / (headlineFs * 0.55)));
+        const cpl = Math.max(1, Math.floor(headlineW / (headlineFs * 0.65)));
         const explicit = content.headline.split(/\n/).length;
         const wrapped = Math.ceil(content.headline.replace(/\n/g, '').length / cpl);
         const lines = Math.max(explicit, wrapped);
@@ -200,6 +200,8 @@ export function buildLayoutFromSpec(
     });
 
     // ── 5. Subheadline (auto-shrink to fit before CTA) ──
+    // ★ Skip entirely if AI decided subheadline is not needed
+    if (content.subheadline && content.subheadline.trim().length > 0) {
     const subW = headlineW;
     let subX = headlineX;
     if (spec.alignment === 'center') subX = Math.round((canvasW - subW) / 2);
@@ -215,7 +217,7 @@ export function buildLayoutFromSpec(
     const MIN_SUB_FS = 10;
     // eslint-disable-next-line no-constant-condition
     while (true) {
-        const cpl = Math.max(1, Math.floor(subW / (subFs * 0.5)));
+        const cpl = Math.max(1, Math.floor(subW / (subFs * 0.50)));
         const explicit = content.subheadline.split(/\n/).length;
         const wrapped = Math.ceil(content.subheadline.replace(/\n/g, '').length / cpl);
         const lines = Math.max(explicit, wrapped);
@@ -238,6 +240,7 @@ export function buildLayoutFromSpec(
         color_hex: colors.secondary,
         text_align: spec.alignment,
     });
+    } // end subheadline if-block
 
     // ── 6. CTA Button ──
     const ctaW = Math.round(canvasW * spec.ctaZone.wPct);
