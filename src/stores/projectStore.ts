@@ -144,6 +144,17 @@ export const useProjectStore = create<ProjectState>()(
                     const s = state.creativeSets.find((s) => s.id === id);
                     if (s) { s.name = name; s.updatedAt = new Date().toISOString(); }
                 });
+                // ★ Cross-store sync: also update designStore so name persists on reload.
+                // Called AFTER set() to avoid Zustand deadlock (REGRESSION GUARD).
+                // Guard: only sync if name actually differs (prevents infinite loop).
+                try {
+                    const { useDesignStore } = require('@/stores/designStore');
+                    const ds = useDesignStore.getState();
+                    const designCS = ds.allCreativeSets[id];
+                    if (designCS && designCS.name !== name) {
+                        useDesignStore.getState().renameCreativeSet(id, name);
+                    }
+                } catch { /* designStore not yet loaded */ }
             },
 
             renameFolder: (id, name) => {

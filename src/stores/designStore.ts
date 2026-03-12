@@ -171,6 +171,16 @@ export const useDesignStore = create<DesignState>()(
                             }
                         }
                     });
+                    // ★ Cross-store sync: also update projectStore so name persists on reload.
+                    // Called AFTER set() to avoid Zustand deadlock (REGRESSION GUARD).
+                    try {
+                        const { useProjectStore } = require('@/stores/projectStore');
+                        const ps = useProjectStore.getState();
+                        const match = ps.creativeSets.find((s: { id: string }) => s.id === id);
+                        if (match && match.name !== name) {
+                            useProjectStore.getState().renameCreativeSet(id, name);
+                        }
+                    } catch { /* projectStore not yet loaded */ }
                 },
 
                 addElementToMaster: (element) => {
