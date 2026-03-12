@@ -179,15 +179,55 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
             if (dims) { canvasW = dims.width ?? 300; canvasH = dims.height ?? 250; }
         } catch { /* ok */ }
 
-        // ── Phase 2: AI Color Palette + Layout Selection ──
-        narrate(`I'll analyze your prompt to determine the best color palette and layout.`);
+        // ── Phase 2: AI Copywriting (Content-First) ──
+        // Content comes FIRST so structure can adapt to actual text length.
+        narrate(`I'll generate the ad copy tailored for your prompt.`);
+        addCard('content', 'Generating creative copy', 'running');
+        await new Promise(r => setTimeout(r, 400));
+
+        const abort = new AbortController();
+        const { callTemplateContent } = await import('@/services/autoDesignService');
+        const content = await callTemplateContent(prompt, canvasW, canvasH, 'AI Pipeline', abort.signal);
+
+        const copyDetail = [
+            `Headline: "${content.headline}" (${content.headline.length} chars)`,
+            `Subheadline: "${content.subheadline}"`,
+            `CTA: "${content.cta}"`,
+            content.tag ? `Tag: "${content.tag}"` : '',
+        ].filter(Boolean).join('\n');
+        updateCard('content', 'done', 'Copy generated', { expandedDetail: copyDetail });
+        narrate(`Copy ready: "${content.headline}"`);
+        await new Promise(r => setTimeout(r, 400));
+
+        // ── Phase 3: AI Structure Decision ──
+        // AI sees the actual headline length → picks optimal font size and layout.
+        narrate(`Choosing the best layout structure for this content...`);
+        addCard('structure', 'Determining layout structure', 'running');
+
+        const { generateLayoutSpec } = await import('@/services/aiStructureService');
+        const spec = await generateLayoutSpec(prompt, content, canvasW, canvasH, abort.signal);
+
+        const structDetail = [
+            `Layout: ${spec.layoutType}`,
+            `Alignment: ${spec.alignment}`,
+            `Headline Font: ${spec.headlineFontSize}px`,
+            `Accent: ${spec.accentStrategy}`,
+            `Mood: ${spec.mood}`,
+        ].join('\n');
+        updateCard('structure', 'done', spec.layoutType, {
+            reasoning: spec.reasoning,
+            expandedDetail: structDetail,
+        });
+        await new Promise(r => setTimeout(r, 400));
+
+        // ── Phase 4: AI Color Palette (Mood-Aware) ──
+        // Colors are chosen LAST, informed by the structure's mood.
+        narrate(`Selecting colors that match the "${spec.mood}" mood...`);
         addCard('palette', 'Determining color palette', 'running');
 
         const { generateColorPalette } = await import('@/services/designStyleGuides');
-        const abort = new AbortController();
         const { palette: guide, reasoning: colorReasoning, needsBackgroundImage, backgroundImagePrompt } = await generateColorPalette(prompt, abort.signal);
 
-        // Build expandable style variable detail
         const styleDetail = [
             `Background: ${guide.colors.gradientStart} -> ${guide.colors.gradientEnd}`,
             `Accent: ${guide.colors.accent}`,
@@ -197,23 +237,13 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         ].join('\n');
         updateCard('palette', 'done', guide.name, { reasoning: colorReasoning, expandedDetail: styleDetail });
         narrate(colorReasoning || `Color palette: ${guide.name}`);
-        await new Promise(r => setTimeout(r, 600));
-
-        const { selectTemplate } = await import('@/services/designTemplates');
-        const template = selectTemplate(canvasW, canvasH);
-
-        addCard('layout', template ? `Layout: ${template.name}` : 'Freestyle generation', 'done', {
-            reasoning: template
-                ? `Selected "${template.name}" — ${template.description}`
-                : `No matching layout for ${canvasW}x${canvasH} — using freestyle AI generation.`,
-        });
         await new Promise(r => setTimeout(r, 400));
 
-        // ── Phase 2.5: Background Image Generation (if AI decided it's needed) ──
+        // ── Phase 4.5: Background Image Generation (if needed) ──
         let hasImageBackground = false;
-        let bgImageUrl: string | null = null; // ★ Deferred placement: save URL, place AFTER clear_scene
+        let bgImageUrl: string | null = null;
         if (needsBackgroundImage && backgroundImagePrompt) {
-            narrate(`This design needs a background image. Generating with NANO Banana 2.0...`);
+            narrate(`This design needs a background image. Generating...`);
             addCard('bg-image', 'Generating background image', 'running', {
                 reasoning: backgroundImagePrompt,
             });
@@ -229,85 +259,51 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
                 );
 
                 if (bgResult.success && bgResult.imageUrl) {
-                    // ★ REGRESSION GUARD: Do NOT place on canvas here.
-                    // clear_scene() in Phase 5 would destroy it.
-                    // Save URL and place after clear_scene.
                     bgImageUrl = bgResult.imageUrl;
                     hasImageBackground = true;
                     updateCard('bg-image', 'done', bgResult.isFallback ? 'Gradient fallback' : 'Image generated', {
                         expandedDetail: bgResult.isFallback
-                            ? 'API not available — using gradient fallback. Connect an OpenRouter API key for real AI images.'
+                            ? 'API not available — using gradient fallback.'
                             : `Generated ${canvasW}x${canvasH} background via ${bgResult.model}`,
                     });
-                    narrate(`Background image ready — will place after layout setup.`);
                 } else {
                     updateCard('bg-image', 'error', bgResult.message || 'Generation failed');
-                    narrate(`Background image failed — I'll use a gradient instead.`);
                 }
             } catch (err) {
                 console.warn('[UnifiedAgent] Background image generation failed:', err);
                 updateCard('bg-image', 'error', 'Generation failed — using gradient');
-                narrate(`Background image failed — I'll use a gradient instead.`);
             }
-            await new Promise(r => setTimeout(r, 400));
+            await new Promise(r => setTimeout(r, 300));
         }
 
-        const { runVisionLoop } = await import('@/services/autoDesignLoop');
+        // ── Phase 5: Combine + Validate ──
+        narrate(`Building the layout: ${spec.layoutType} with ${spec.alignment} alignment...`);
+        addCard('build', 'Combining layout', 'running');
 
-        let allElements: import('@/services/autoDesignService').RenderElement[] = [];
+        const { buildLayoutFromSpec } = await import('@/services/aiLayoutEngine');
+        const { validateLayout } = await import('@/engine/layoutValidator');
 
-        if (template) {
-            // ── Template-based path (PRIMARY) ──
+        let allElements = buildLayoutFromSpec(spec, content, guide, canvasW, canvasH);
 
-            // Phase 3: AI generates ONLY content text
-            addCard('content', 'Generating creative copy', 'running');
-            narrate(`Now I'll generate the ad copy for your prompt.`);
-            await new Promise(r => setTimeout(r, 400));
+        // Math-based validation: fix overlaps, clipping, hierarchy
+        const validation = validateLayout(allElements, canvasW, canvasH);
+        allElements = validation.elements;
 
-            const { callTemplateContent } = await import('@/services/autoDesignService');
-            const content = await callTemplateContent(prompt, canvasW, canvasH, template.name, abort.signal);
+        const elementBreakdown = allElements.map(el => {
+            const type = el.gradient_start_hex ? 'gradient' : el.type ?? 'rect';
+            const pos = `(${Math.round(el.x ?? 0)}, ${Math.round(el.y ?? 0)})`;
+            const size = `${Math.round(el.w ?? 0)}x${Math.round(el.h ?? 0)}`;
+            const extra = el.content ? ` "${el.content.slice(0, 30)}"` : el.gradient_start_hex ? ` ${el.gradient_start_hex} -> ${el.gradient_end_hex}` : '';
+            return `"${el.name}" — ${type} at ${pos} ${size}${extra}`;
+        }).join('\n');
 
-            const copyDetail = [
-                `Headline: "${content.headline}"`,
-                `Subheadline: "${content.subheadline}"`,
-                `CTA: "${content.cta}"`,
-                `Tag: "${content.tag}"`,
-            ].join('\n');
-            updateCard('content', 'done', 'Copy generated', { expandedDetail: copyDetail });
-            await new Promise(r => setTimeout(r, 600));
-
-            // Phase 4: Template fills positions  
-            narrate(`Building the layout now. I'll place each element precisely using the template.`);
-            addCard('build', 'Building layout', 'running');
-            await new Promise(r => setTimeout(r, 400));
-            allElements = template.build(canvasW, canvasH, guide, content);
-
-            // Build per-element breakdown for expandable detail
-            const elementBreakdown = allElements.map(el => {
-                const type = el.gradient_start_hex ? 'gradient' : el.type ?? 'rect';
-                const pos = `(${Math.round(el.x ?? 0)}, ${Math.round(el.y ?? 0)})`;
-                const size = `${Math.round(el.w ?? 0)}x${Math.round(el.h ?? 0)}`;
-                const extra = el.content ? ` "${el.content.slice(0, 30)}"` : el.gradient_start_hex ? ` ${el.gradient_start_hex} -> ${el.gradient_end_hex}` : '';
-                return `"${el.name}" — ${type} at ${pos} ${size}${extra}`;
-            }).join('\n');
-            updateCard('build', 'done', `${allElements.length} elements composed`, { expandedDetail: elementBreakdown });
-            await new Promise(r => setTimeout(r, 600));
-
-        } else {
-            // ── Freestyle path (FALLBACK for unusual sizes) ──
-            addCard('design', 'Generating layered composition', 'running');
-            narrate(`Using freestyle AI generation for ${canvasW}x${canvasH}...`);
-
-            const { callFromScratch } = await import('@/services/autoDesignService');
-            const { buildFewShotExamples, useDesignMemoryStore } = await import('@/stores/designMemoryStore');
-            const topExamples = useDesignMemoryStore.getState().getTopExamples(3);
-            const fewShotStr = buildFewShotExamples(topExamples);
-
-            const result = await callFromScratch(prompt, canvasW, canvasH, abort.signal, fewShotStr);
-            allElements = result.elements;
-            updateCard('design', 'done', `${allElements.length} elements planned`);
-            await new Promise(r => setTimeout(r, 400)); // Pacing
-        }
+        const validationNote = validation.isClean
+            ? 'Layout validated — no issues'
+            : `Layout validated — ${validation.fixes.length} auto-fix(es)`;
+        updateCard('build', 'done', `${allElements.length} elements · ${validationNote}`, {
+            expandedDetail: elementBreakdown + (validation.fixes.length > 0 ? '\n\nFixes:\n' + validation.fixes.join('\n') : ''),
+        });
+        await new Promise(r => setTimeout(r, 400));
 
         // ── Phase 5: Multi-pass render with live narration ──
         // Group elements by layer
@@ -406,18 +402,22 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         }
         hideCursor();
 
-        // ── Phase 6: Vision QA ──
+        // ── Phase 7: Vision QA (Report-Only) ──
         narrate(`Running vision quality check on ${canvasW}x${canvasH} canvas...`);
         addCard('vision', 'Vision quality review', 'running');
         try {
-            const loopResult = await runVisionLoop(engine, canvasW, canvasH, abort.signal, (msg) => {
+            const { runVisionLoop } = await import('@/services/autoDesignLoop');
+            const loopResult = await runVisionLoop(engine, canvasW, canvasH, abort.signal, (msg: string) => {
                 updateCard('vision', 'running', msg);
             });
-            updateCard('vision', 'done', `Score: ${loopResult.finalScore}/100`);
+            const suggestionNote = loopResult.suggestions.length > 0
+                ? ` · ${loopResult.suggestions.length} suggestion(s)`
+                : '';
+            updateCard('vision', 'done', `Score: ${loopResult.finalScore}/100${suggestionNote}`);
             narrate(
                 `Vision review complete — score ${loopResult.finalScore}/100.\n` +
                 `Style: ${guide.name}\n` +
-                `Template: ${template?.name ?? 'freestyle'}\n` +
+                `Layout: ${spec.layoutType} (${spec.alignment})\n` +
                 `Elements: ${rendered}\n` +
                 `Canvas: ${canvasW}x${canvasH}px`
             );
