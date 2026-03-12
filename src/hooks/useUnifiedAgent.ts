@@ -15,6 +15,7 @@ import { getModelForRole, type AceModelRole } from '@/services/modelRouter';
 import type { AgentMessage } from '@/ai/agentContext';
 import type { NavigateFunction } from 'react-router-dom';
 import { useLocation } from 'react-router-dom';
+import { buildContext, enrichMessageWithContext, buildContextSystemPrompt } from '@/ai/contextRouter';
 
 // ── Types ────────────────────────────────────────
 
@@ -593,22 +594,25 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
                 // add_text, set_color, or any other tool.
                 const config = getConfig();
 
-                // Build context snapshot for LLM
+                // ── Phase 0: Context Router ──
                 const currentPath = location.pathname;
-                let locationLabel = 'Main Dashboard';
-                if (currentPath.includes('/editor/detail/')) locationLabel = 'Canvas Editor';
-                else if (currentPath.includes('/editor')) locationLabel = 'Size Dashboard';
+                const ctx = buildContext(currentPath);
 
+                // Enrich the message with structured context
+                const enrichedMsg = enrichMessageWithContext(msg, ctx);
+
+                // Set context-aware system prompt on the service
                 const designState = useDesignStore.getState();
-                const cs = designState.creativeSet;
-                const masterVariant = cs?.variants?.find(v => v.id === cs.masterVariantId);
-                const contextPrefix = [
-                    `[CONTEXT] Location: ${locationLabel}`,
-                    masterVariant ? `Canvas: ${masterVariant.preset.width}x${masterVariant.preset.height}` : '',
-                    cs?.name ? `Project: ${cs.name}` : '',
-                ].filter(Boolean).join(' | ');
+                if (serviceRef.current) {
+                    // Context system prompt is available for future use:
+                    // const _contextPrompt = buildContextSystemPrompt(ctx);
+                    serviceRef.current.setDesignContext(
+                        designState.creativeSet ?? null,
+                        designState.creativeSet?.masterVariantId,
+                    );
+                    console.log(`[ContextRouter] Page: ${ctx.pageLabel}, Pipeline: ${ctx.useDesignPipeline ? 'design' : 'direct'}, Tools: ${ctx.relevantToolHint.slice(0, 60)}...`);
+                }
 
-                const enrichedMsg = `${contextPrefix}\n\nUser request: ${msg}`;
                 reply = await runChatFlow(enrichedMsg, config);
             }
 
