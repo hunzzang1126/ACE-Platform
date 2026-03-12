@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">55.31% </span>
+                <span class="strong">55.97% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>78/141</span>
+                <span class='fraction'>75/134</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">31.66% </span>
+                <span class="strong">31.03% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>19/60</span>
-            </div>
-        
-            
-            <div class='fl pad1y space-right2'>
-                <span class="strong">60% </span>
-                <span class="quiet">Functions</span>
-                <span class='fraction'>33/55</span>
+                <span class='fraction'>18/58</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">60.37% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>32/53</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">62% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>64/106</span>
+                <span class='fraction'>62/100</span>
             </div>
         
             
@@ -388,22 +388,8 @@
 <a name='L323'></a><a href='#L323'>323</a>
 <a name='L324'></a><a href='#L324'>324</a>
 <a name='L325'></a><a href='#L325'>325</a>
-<a name='L326'></a><a href='#L326'>326</a>
-<a name='L327'></a><a href='#L327'>327</a>
-<a name='L328'></a><a href='#L328'>328</a>
-<a name='L329'></a><a href='#L329'>329</a>
-<a name='L330'></a><a href='#L330'>330</a>
-<a name='L331'></a><a href='#L331'>331</a>
-<a name='L332'></a><a href='#L332'>332</a>
-<a name='L333'></a><a href='#L333'>333</a>
-<a name='L334'></a><a href='#L334'>334</a>
-<a name='L335'></a><a href='#L335'>335</a>
-<a name='L336'></a><a href='#L336'>336</a>
-<a name='L337'></a><a href='#L337'>337</a>
-<a name='L338'></a><a href='#L338'>338</a>
-<a name='L339'></a><a href='#L339'>339</a>
-<a name='L340'></a><a href='#L340'>340</a>
-<a name='L341'></a><a href='#L341'>341</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L326'></a><a href='#L326'>326</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -662,27 +648,11 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">39x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">39x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -751,7 +721,8 @@
 &nbsp;
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
-import { persist, type StorageValue } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { idbStorage } from './idbStorageAdapter';
 import { enableMapSet } from 'immer';
 import { useDesignStore } from './designStore';
 &nbsp;
@@ -1001,30 +972,14 @@ export const useProjectStore = create&lt;ProjectState&gt;()(
         })),
         {
             name: 'ace-project-store',
+            // ★ IndexedDB storage — no 5MB limit, async I/O
+            storage: createJSONStorage(() =&gt; idbStorage),
             // Only persist data, not UI state like selection/search/page
             partialize: (state) =&gt; ({
                 creativeSets: state.creativeSets,
                 folders: state.folders,
                 trash: state.trash,
             }),
-            // Custom storage to handle Set&lt;string&gt; and ensure JSON compat
-            storage: {
-                getItem: (name): StorageValue&lt;Partial&lt;ProjectState&gt;&gt; | null =&gt; {
-                    const raw = localStorage.getItem(name);
-                    <span class="missing-if-branch" title="else path not taken" >E</span>if (!raw) return null;
-<span class="cstat-no" title="statement not covered" >                    try {</span>
-<span class="cstat-no" title="statement not covered" >                        return JSON.parse(raw);</span>
-                    } catch {
-<span class="cstat-no" title="statement not covered" >                        return null;</span>
-                    }
-                },
-                setItem: (name, value) =&gt; {
-                    localStorage.setItem(name, JSON.stringify(value));
-                },
-                removeItem: <span class="fstat-no" title="function not covered" >(n</span>ame) =&gt; {
-<span class="cstat-no" title="statement not covered" >                    localStorage.removeItem(name);</span>
-                },
-            },
         },
     ),
 );
@@ -1090,7 +1045,7 @@ let _channel: BroadcastChannel | null = null;
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-03-09T18:16:02.566Z
+                at 2026-03-12T14:04:49.400Z
             </div>
         <script src="../prettify.js"></script>
         <script>

@@ -53,21 +53,20 @@ export async function pushToCloud(userId: string): Promise<boolean> {
 
     try {
         // Get current local state
-        const { projects } = useProjectStore.getState();
+        const { creativeSets } = useProjectStore.getState();
         const { creativeSet } = useDesignStore.getState();
 
-        // Push all projects
-        for (const proj of projects) {
-            if (proj.deletedAt) continue; // skip trashed items for now
+        // Push all creative sets as projects
+        for (const cs of creativeSets) {
 
             const { error: projErr } = await sb
                 .from('projects')
                 .upsert({
-                    id: proj.id,
+                    id: cs.id,
                     user_id: userId,
-                    name: proj.name,
-                    folder_id: proj.folderId ?? null,
-                    variant_count: proj.variantCount ?? 1,
+                    name: cs.name,
+                    folder_id: cs.folderId ?? null,
+                    variant_count: cs.variantCount ?? 1,
                     updated_at: new Date().toISOString(),
                 }, { onConflict: 'id' });
 
@@ -149,18 +148,13 @@ export async function pullFromCloud(userId: string): Promise<boolean> {
 
         // Merge into local stores (cloud data wins for now — last-write-wins)
         if (cloudProjects && cloudProjects.length > 0) {
-            const localProjects = useProjectStore.getState().projects;
-            const localIds = new Set(localProjects.map(p => p.id));
+            const localSets = useProjectStore.getState().creativeSets;
+            const localIds = new Set(localSets.map((s: { id: string }) => s.id));
 
             for (const cp of cloudProjects) {
                 if (!localIds.has(cp.id)) {
-                    // New from cloud — add locally
-                    useProjectStore.getState().addProject({
-                        id: cp.id,
-                        name: cp.name,
-                        folderId: cp.folder_id ?? undefined,
-                        variantCount: cp.variant_count ?? 1,
-                    });
+                    // New from cloud — create locally
+                    useProjectStore.getState().createCreativeSet(cp.name);
                 }
             }
             console.log(`[cloudSync] Pulled ${cloudProjects.length} projects`);
