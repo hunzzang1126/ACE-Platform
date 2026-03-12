@@ -38,26 +38,32 @@ export function DashboardPage() {
     const createCreativeSet = useDesignStore((s) => s.createCreativeSet);
     const openCreativeSet = useDesignStore((s) => s.openCreativeSet);
 
-    // ── Sync projectStore from designStore on mount ──
+    // ── Sync: add NEW creative sets from designStore that projectStore doesn't know about ──
+    // ★ REGRESSION GUARD: projectStore is AUTHORITATIVE for names, trash, and deletions.
+    // NEVER overwrite names or remove items — only ADD missing entries.
     useEffect(() => {
         const allCS = useDesignStore.getState().getAllCreativeSets();
+        const trash = useProjectStore.getState().trash;
+        const trashIds = new Set(trash.map(t => t.item.id));
         useProjectStore.setState((state) => {
-            const existingMap = new Map(state.creativeSets.map(s => [s.id, s]));
+            const existingIds = new Set(state.creativeSets.map(s => s.id));
             for (const cs of allCS) {
-                const existing = existingMap.get(cs.id);
+                // Skip if already in projectStore or in trash
+                if (existingIds.has(cs.id) || trashIds.has(cs.id)) continue;
+                // Only ADD new entries — don't overwrite existing ones
+                state.creativeSets.push({
+                    id: cs.id, name: cs.name, variantCount: cs.variants.length,
+                    createdAt: cs.createdAt, updatedAt: cs.updatedAt, createdBy: displayName || 'User',
+                });
+            }
+            // Update variant counts only (not names!) for existing sets
+            for (const cs of allCS) {
+                const existing = state.creativeSets.find(s => s.id === cs.id);
                 if (existing) {
                     existing.variantCount = cs.variants.length;
-                    existing.name = cs.name;
                     existing.updatedAt = cs.updatedAt;
-                } else {
-                    state.creativeSets.push({
-                        id: cs.id, name: cs.name, variantCount: cs.variants.length,
-                        createdAt: cs.createdAt, updatedAt: cs.updatedAt, createdBy: displayName || 'User',
-                    });
                 }
             }
-            const validIds = new Set(allCS.map(cs => cs.id));
-            state.creativeSets = state.creativeSets.filter(s => validIds.has(s.id));
         });
     }, [displayName]);
 
