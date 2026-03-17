@@ -43,17 +43,24 @@ export interface BannerVariant {
 }
 
 
-/** 크리에이티브 셋 (마스터 + 모든 변형) */
+/** 크리에이티브 셋 (오리진 + 플러그 연결된 변형들) */
 export interface CreativeSet {
     id: string;
     name: string;
     description?: string;
     /** 소속 폴더 ID */
     folderId?: string;
-    /** 마스터 배너의 variant ID */
+    /** @deprecated Use plugConnections instead. Kept for backward compat (auto-derived). */
     masterVariantId: string;
-    /** 모든 배너 변형 (마스터 포함) */
+    /** 모든 배너 변형 (오리진 포함) */
     variants: BannerVariant[];
+    /**
+     * ★ Plug connections: maps targetVariantId → originVariantId.
+     * A target "plugs into" its origin and inherits layout DNA.
+     * Variants NOT in this map (as keys) are either origins or independent.
+     * Example: { "v2": "v1", "v3": "v1" } means v2 and v3 are plugged into v1.
+     */
+    plugConnections: Record<string, string>;
     /** 브랜드 설정 */
     brand: BrandConfig;
     /** 생성 일시 */

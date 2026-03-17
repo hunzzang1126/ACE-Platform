@@ -3,8 +3,8 @@
 // ─────────────────────────────────────────────────
 // 모든 디자인 데이터의 최상위 저장소.
 // 모든 크리에이티브 셋을 저장하고, 활성 셋만 편집 가능.
-// Master 요소 변경 → Slave 배너 자동 전파.
-// localStorage에 persist하여 데이터 손실 방지.
+// Plug connection system: origin → plugged targets.
+// IndexedDB에 persist하여 데이터 손실 방지.
 
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
@@ -72,12 +72,22 @@ interface DesignState {
     replaceCreativeSet: (set: CreativeSet) => void;
 
     /** 특정 변형의 요소 전체 교체 (Canvas Save 용) */
-    /** 마스터에 저장 시 Smart Sizing으로 모든 슬레이브에 전파 */
+    /** Origin 저장 시 Smart Sizing으로 plugged targets에 전파 */
     /** fabricJSON: Raw Fabric.js canvas JSON — SINGLE SOURCE OF TRUTH when present */
     replaceVariantElements: (variantId: string, elements: DesignElement[], fabricJSON?: string) => void;
 
     /** 모든 저장된 크리에이티브 셋 목록 가져오기 */
     getAllCreativeSets: () => CreativeSet[];
+
+    // ── Plug Connection Actions ──
+    /** Connect target to origin — target inherits origin's layout DNA */
+    connectPlug: (originId: string, targetId: string) => void;
+    /** Disconnect target — becomes independent */
+    disconnectPlug: (targetId: string) => void;
+    /** Get the origin variant for a given target (or undefined if independent/origin) */
+    getOriginForVariant: (variantId: string) => string | undefined;
+    /** Get all targets plugged into a given origin */
+    getPluggedTargets: (originId: string) => string[];
 }
 
 // Helper: get the active creative set from state
@@ -113,6 +123,7 @@ export const useDesignStore = create<DesignState>()(
                         name,
                         masterVariantId,
                         variants: [masterVariant],
+                        plugConnections: {},
                         brand: {
                             primaryColor: '#000000',
                             secondaryColor: '#FFFFFF',
@@ -272,9 +283,10 @@ export const useDesignStore = create<DesignState>()(
                         );
                         if (!master) return;
 
-                        // 마스터의 요소를 복제하여 신규 변형 생성
+                        // Origin의 요소를 복제하여 신규 변형 생성
+                        const newVariantId = uuid();
                         const newVariant: BannerVariant = {
-                            id: uuid(),
+                            id: newVariantId,
                             preset,
                             elements: JSON.parse(JSON.stringify(master.elements)),
                             backgroundColor: master.backgroundColor,
@@ -283,6 +295,9 @@ export const useDesignStore = create<DesignState>()(
                         };
 
                         cs.variants.push(newVariant);
+                        // ★ Auto-plug: new variant plugs into the master/origin
+                        if (!cs.plugConnections) cs.plugConnections = {};
+                        cs.plugConnections[newVariantId] = cs.masterVariantId;
                         cs.updatedAt = new Date().toISOString();
                         state.creativeSet = cs;
                     });
@@ -292,11 +307,21 @@ export const useDesignStore = create<DesignState>()(
                     set((state) => {
                         const cs = getActiveCS(state);
                         if (!cs) return;
-                        // 마스터는 삭제 불가
+                        // Origin(마스터)는 삭제 불가
                         if (variantId === cs.masterVariantId) return;
                         cs.variants = cs.variants.filter(
                             (v) => v.id !== variantId,
                         );
+                        // ★ Clean up plug connections for removed variant
+                        if (cs.plugConnections) {
+                            delete cs.plugConnections[variantId];
+                            // Also remove any variants that were plugged INTO the removed variant
+                            for (const [target, origin] of Object.entries(cs.plugConnections)) {
+                                if (origin === variantId) {
+                                    delete cs.plugConnections[target];
+                                }
+                            }
+                        }
                         cs.updatedAt = new Date().toISOString();
                         state.creativeSet = cs;
                     });
@@ -361,55 +386,64 @@ export const useDesignStore = create<DesignState>()(
                             variant.fabricJSON = fabricJSON;
                         }
 
-                        // 마스터인 경우 → Smart Sizing으로 모든 슬레이브에 전파
-                        if (variantId === cs.masterVariantId) {
-                            const masterW = variant.preset.width;
-                            const masterH = variant.preset.height;
+                        // ★ Plug-aware propagation: propagate to variants plugged INTO this one
+                        const plugs = cs.plugConnections ?? {};
+                        // Find all targets that plug into this variant
+                        const pluggedTargetIds = Object.entries(plugs)
+                            .filter(([, originId]) => originId === variantId)
+                            .map(([targetId]) => targetId);
 
-                            for (const slave of cs.variants) {
-                                if (slave.id === cs.masterVariantId) continue;
-                                if (slave.syncLocked) continue;
+                        // Also: backward compat — if this is masterVariantId, propagate to un-plugged targets too
+                        const isLegacyMaster = variantId === cs.masterVariantId;
 
-                                const slaveW = slave.preset.width;
-                                const slaveH = slave.preset.height;
+                        if (pluggedTargetIds.length > 0 || isLegacyMaster) {
+                            const originW = variant.preset.width;
+                            const originH = variant.preset.height;
 
-                                // Smart Sizing: adapt master elements → slave size
+                            for (const target of cs.variants) {
+                                if (target.id === variantId) continue;
+                                if (target.syncLocked) continue;
+
+                                // Only propagate to plugged targets
+                                // (or all non-master if legacy mode and no plug connections exist)
+                                const isPluggedToThis = pluggedTargetIds.includes(target.id);
+                                const isLegacyTarget = isLegacyMaster && Object.keys(plugs).length === 0;
+                                if (!isPluggedToThis && !isLegacyTarget) continue;
+
+                                const targetW = target.preset.width;
+                                const targetH = target.preset.height;
+
+                                // Smart Sizing: adapt origin elements → target size
                                 const adapted = smartSizeElements(
                                     elements,
-                                    masterW, masterH,
-                                    slaveW, slaveH,
+                                    originW, originH,
+                                    targetW, targetH,
                                 );
 
-                                // ── Phase 3A: Auto-QA sweep (Pencil-inspired) ──
-                                // Run layout QA on the adapted elements and auto-fix issues
-                                // (out-of-bounds, overlaps, clipped text) before saving.
-                                const slaveWithAdapted: BannerVariant = { ...slave, elements: adapted };
-                                const qaIssues = runSmartSizingQA([slaveWithAdapted]);
+                                // ── Auto-QA sweep ──
+                                const targetWithAdapted: BannerVariant = { ...target, elements: adapted };
+                                const qaIssues = runSmartSizingQA([targetWithAdapted]);
                                 let finalElements = adapted;
                                 if (qaIssues.length > 0) {
-                                    const fixes = generateFixes(qaIssues, [slaveWithAdapted]);
+                                    const fixes = generateFixes(qaIssues, [targetWithAdapted]);
                                     if (fixes.length > 0) {
-                                        // Apply patches on top of adapted elements
                                         finalElements = adapted.map((el) => {
                                             const fix = fixes.find(f => f.elementId === el.id);
                                             return fix ? { ...el, ...fix.patch } as DesignElement : el;
                                         });
-                                        // Notify canvas to re-render (A2 fix: GAP-4)
-                                        // Dispatch after Zustand state update tick
                                         setTimeout(() => {
                                             window.dispatchEvent(new CustomEvent('ace:canvas-refresh', {
-                                                detail: { variantId: slave.id, fixCount: fixes.length },
+                                                detail: { variantId: target.id, fixCount: fixes.length },
                                             }));
                                         }, 50);
                                     }
                                 }
 
                                 // Preserve overridden elements
-                                const overridden = new Set(slave.overriddenElementIds);
-                                slave.elements = finalElements.map((adaptedEl) => {
+                                const overridden = new Set(target.overriddenElementIds);
+                                target.elements = finalElements.map((adaptedEl) => {
                                     if (overridden.has(adaptedEl.id)) {
-                                        // Keep the overridden version
-                                        const existing = slave.elements.find(e => e.id === adaptedEl.id);
+                                        const existing = target.elements.find(e => e.id === adaptedEl.id);
                                         return existing ?? adaptedEl;
                                     }
                                     return adaptedEl;
@@ -426,6 +460,49 @@ export const useDesignStore = create<DesignState>()(
                     return Object.values(get().allCreativeSets);
                 },
 
+                // ── Plug Connection Actions ──
+
+                connectPlug: (originId, targetId) => {
+                    set((state) => {
+                        const cs = getActiveCS(state);
+                        if (!cs) return;
+                        // Validate both variants exist
+                        const hasOrigin = cs.variants.some(v => v.id === originId);
+                        const hasTarget = cs.variants.some(v => v.id === targetId);
+                        if (!hasOrigin || !hasTarget || originId === targetId) return;
+                        // Prevent circular: target can't be an origin that originId plugs into
+                        if (cs.plugConnections[originId] === targetId) return;
+                        if (!cs.plugConnections) cs.plugConnections = {};
+                        cs.plugConnections[targetId] = originId;
+                        cs.updatedAt = new Date().toISOString();
+                        state.creativeSet = cs;
+                    });
+                },
+
+                disconnectPlug: (targetId) => {
+                    set((state) => {
+                        const cs = getActiveCS(state);
+                        if (!cs || !cs.plugConnections) return;
+                        delete cs.plugConnections[targetId];
+                        cs.updatedAt = new Date().toISOString();
+                        state.creativeSet = cs;
+                    });
+                },
+
+                getOriginForVariant: (variantId) => {
+                    const cs = get().creativeSet;
+                    if (!cs?.plugConnections) return undefined;
+                    return cs.plugConnections[variantId];
+                },
+
+                getPluggedTargets: (originId) => {
+                    const cs = get().creativeSet;
+                    if (!cs?.plugConnections) return [];
+                    return Object.entries(cs.plugConnections)
+                        .filter(([, oId]) => oId === originId)
+                        .map(([targetId]) => targetId);
+                },
+
             })),
             {
                 name: 'ace-design-store',
@@ -435,9 +512,22 @@ export const useDesignStore = create<DesignState>()(
                     allCreativeSets: state.allCreativeSets,
                     activeCreativeSetId: state.activeCreativeSetId,
                 }),
-                // On rehydration, restore the creativeSet computed field
+                // On rehydration, restore creativeSet + migrate old data to plug model
                 onRehydrateStorage: () => (state) => {
-                    if (state && state.activeCreativeSetId) {
+                    if (!state) return;
+                    // ★ Auto-migrate: add plugConnections to old creative sets
+                    for (const cs of Object.values(state.allCreativeSets)) {
+                        if (!cs.plugConnections) {
+                            cs.plugConnections = {};
+                            // Migrate: all non-master variants plug into master
+                            for (const v of cs.variants) {
+                                if (v.id !== cs.masterVariantId) {
+                                    cs.plugConnections[v.id] = cs.masterVariantId;
+                                }
+                            }
+                        }
+                    }
+                    if (state.activeCreativeSetId) {
                         state.creativeSet = state.allCreativeSets[state.activeCreativeSetId] ?? null;
                     }
                 },
