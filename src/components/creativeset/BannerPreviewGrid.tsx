@@ -706,8 +706,23 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                                 boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
                             }}
                         >
-                            <button className="banner-ctx-item" onClick={() => handleExportPNG(ctxMenu.variantId)}>
-                                PNG (Static Image)
+                            <button className="banner-ctx-item" onClick={async () => {
+                                setCtxMenu(null);
+                                // Export all selected sizes (including the right-clicked one)
+                                const idsToExport = selectedIds.size > 0 ? Array.from(selectedIds) : [ctxMenu.variantId];
+                                for (const vid of idsToExport) {
+                                    const v = variants.find(v => v.id === vid);
+                                    if (!v) continue;
+                                    const cardEl = cardRefs.current[vid]?.querySelector('.banner-card-canvas') as HTMLElement;
+                                    if (!cardEl) continue;
+                                    try {
+                                        const dataURL = await captureBannerCard(cardEl, v.preset.width, v.preset.height);
+                                        downloadDataURL(dataURL, `banner_${v.preset.width}x${v.preset.height}.png`);
+                                        if (idsToExport.length > 1) await new Promise(r => setTimeout(r, 300));
+                                    } catch { /* skip */ }
+                                }
+                            }}>
+                                PNG (Static Image){selectedIds.size > 1 ? ` (${selectedIds.size})` : ''}
                             </button>
                             <button className="banner-ctx-item" onClick={() => { setCtxMenu(null); alert('GIF export coming soon'); }}>
                                 GIF (Animated)
@@ -752,24 +767,28 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                         </button>
                     )}
 
-                    {/* Delete variant */}
-                    {visibleVariants.length > 1 && (
-                        <>
-                            <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', margin: '4px 0' }} />
-                            <button
-                                className="banner-ctx-item banner-ctx-item--danger"
-                                onClick={() => {
-                                    const confirmed = window.confirm('Are you sure you want to permanently delete this size variant? This cannot be undone.');
-                                    if (confirmed) {
-                                        useDesignStore.getState().removeVariant(ctxMenu.variantId);
-                                        setCtxMenu(null);
-                                    }
-                                }}
-                            >
-                                Delete Size
-                            </button>
-                        </>
-                    )}
+                    {/* Delete variant(s) — respects multi-selection */}
+                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', margin: '4px 0' }} />
+                    <button
+                        className="banner-ctx-item banner-ctx-item--danger"
+                        onClick={() => {
+                            const idsToDelete = selectedIds.size > 0 ? Array.from(selectedIds) : [ctxMenu.variantId];
+                            const count = idsToDelete.length;
+                            const msg = count > 1
+                                ? `Are you sure you want to permanently delete ${count} size variants? This cannot be undone.`
+                                : 'Are you sure you want to permanently delete this size variant? This cannot be undone.';
+                            const confirmed = window.confirm(msg);
+                            if (confirmed) {
+                                for (const vid of idsToDelete) {
+                                    useDesignStore.getState().removeVariant(vid);
+                                }
+                                setSelectedIds(new Set());
+                                setCtxMenu(null);
+                            }
+                        }}
+                    >
+                        Delete {selectedIds.size > 1 ? `${selectedIds.size} Sizes` : 'Size'}
+                    </button>
 
                     {/* Label as Master (cosmetic) */}
                     <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', margin: '4px 0' }} />
