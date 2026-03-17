@@ -99,9 +99,15 @@ interface DesignState {
 // ★ BUG 3/6 FIX: Merge visual properties from origin → target WITHOUT touching layout.
 // Only syncs: fill, color, opacity, content, fontWeight, fontFamily, fontSize, src, gradients.
 // Preserves: constraints (position/size), overridden elements, zIndex.
+// Also handles: element deletion (origin removed → target removes) and
+// element addition (origin added → target gets smart-sized copy).
 function mergePropertyChanges(
     targetElements: DesignElement[],
     originElements: DesignElement[],
+    originW: number,
+    originH: number,
+    targetW: number,
+    targetH: number,
 ): DesignElement[] {
     // Build lookup by name (primary) and id (fallback)
     const originByName = new Map<string, DesignElement>();
@@ -111,11 +117,32 @@ function mergePropertyChanges(
         originById.set(el.id, el);
     }
 
-    return targetElements.map(targetEl => {
+    const targetByName = new Map<string, DesignElement>();
+    const targetById = new Map<string, DesignElement>();
+    for (const el of targetElements) {
+        if (el.name) targetByName.set(el.name, el);
+        targetById.set(el.id, el);
+    }
+
+    // Track which origin elements are matched (to detect new additions)
+    const matchedOriginNames = new Set<string>();
+    const matchedOriginIds = new Set<string>();
+
+    // 1. Process existing target elements: update or remove
+    const result: DesignElement[] = [];
+    for (const targetEl of targetElements) {
         // Match by name first (more reliable across sizes), then by id
         const originEl = (targetEl.name ? originByName.get(targetEl.name) : undefined)
             || originById.get(targetEl.id);
-        if (!originEl) return targetEl; // No match found — keep as-is
+
+        if (!originEl) {
+            // ★ Element was DELETED from origin → remove from target
+            continue;
+        }
+
+        // Track matched origin elements
+        if (originEl.name) matchedOriginNames.add(originEl.name);
+        matchedOriginIds.add(originEl.id);
 
         // Deep clone target to avoid mutating
         const merged = JSON.parse(JSON.stringify(targetEl)) as DesignElement;
@@ -136,8 +163,25 @@ function mergePropertyChanges(
         if ('letterSpacing' in originEl) (merged as any).letterSpacing = (originEl as any).letterSpacing;
 
         // ★ Do NOT touch: constraints, zIndex, name, id, type
-        return merged;
-    });
+        result.push(merged);
+    }
+
+    // 2. Add NEW elements from origin that don't exist in target (smart-sized)
+    for (const originEl of originElements) {
+        const alreadyMatched = (originEl.name && matchedOriginNames.has(originEl.name))
+            || matchedOriginIds.has(originEl.id);
+        if (alreadyMatched) continue;
+
+        // ★ New element — smart-size it for the target dimensions
+        const adaptedArr = smartSizeElements(
+            [originEl],
+            originW, originH,
+            targetW, targetH,
+        );
+        if (adaptedArr[0]) result.push(adaptedArr[0]);
+    }
+
+    return result;
 }
 
 // Helper: get the active creative set from state
@@ -469,7 +513,7 @@ export const useDesignStore = create<DesignState>()(
 
                                 if (targetHasExisting) {
                                     // ── Property-only merge: preserve layout, sync appearances ──
-                                    finalElements = mergePropertyChanges(target.elements, elements);
+                                    finalElements = mergePropertyChanges(target.elements, elements, originW, originH, targetW, targetH);
                                 } else {
                                     // ── First time: full smart sizing ──
                                     const adapted = smartSizeElements(
