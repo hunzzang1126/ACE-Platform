@@ -640,7 +640,7 @@ export interface VisionResult {
 
 /**
  * @deprecated Use analyzeDesign() for new code.
- * Preserved for backward compatibility with useSmartSizingVision.
+ * Preserved for backward compatibility with autoDesignLoop.
  */
 export async function callVisionCheck(
     base64Png: string,

@@ -204,6 +204,64 @@ export class AiService {
     }
 
     /**
+     * Vision Healing — AI Agent fixes design quality issues.
+     * Called by autoDesignLoop when Vision QA scores below threshold.
+     * Uses the same agenticLoop but with a healing-specific prompt.
+     */
+    async healDesign(
+        engine: Engine,
+        issues: Array<{ type: string; severity: string; element?: string; description: string; suggestion?: string }>,
+        score: number,
+        canvasW: number,
+        canvasH: number,
+        progress: LiveProgress,
+    ): Promise<void> {
+        if (!engine) {
+            progress.onError('Cannot heal: no canvas engine');
+            return;
+        }
+
+        // Scan current canvas state
+        this.trackedNodes = AgentContext.extractSceneNodes(engine);
+
+        // Build healing-specific system prompt
+        const healingPrompt = AgentContext.buildHealingPrompt(
+            issues,
+            this.trackedNodes,
+            canvasW,
+            canvasH,
+            score,
+        );
+
+        // Inject a synthetic "user message" for the healing loop
+        // (Not added to conversation history — healing is an internal pipeline step)
+        const healingInstruction = `Fix the ${issues.length} design quality issues identified by Vision QA. Current score: ${score}/100. Target: 80+. Use atomic tools only.`;
+
+        // Temporarily inject the healing message for Claude
+        const savedHistory = [...this.context.getHistory()];
+        this.context.addMessage({
+            role: 'user',
+            content: healingInstruction,
+            timestamp: Date.now(),
+        });
+
+        progress.onThinking(`Vision Healer analyzing ${issues.length} issues...`);
+        await nextFrame();
+
+        try {
+            await this.agenticLoop(engine, healingPrompt, progress);
+        } catch (err) {
+            console.warn('[VisionHealer] Agent healing failed:', err);
+        }
+
+        // Restore conversation history — healing messages should not pollute user chat
+        this.context.clear();
+        for (const msg of savedHistory) {
+            this.context.addMessage(msg);
+        }
+    }
+
+    /**
      * The core agentic loop — handles multi-round tool calling with Claude.
      */
     private async agenticLoop(

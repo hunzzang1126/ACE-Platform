@@ -502,4 +502,57 @@ user's work. This is UNACCEPTABLE.
 10. Never refuse — use execute_dynamic_action as catch-all.
 ${contextSection}`;
     }
+
+    /**
+     * Build a healing-specific system prompt for Vision QA self-correction.
+     * Called when the design scores below threshold and needs AI-driven fixes.
+     */
+    static buildHealingPrompt(
+        issues: Array<{ type: string; severity: string; element?: string; description: string; suggestion?: string }>,
+        sceneNodes: SceneNodeInfo[],
+        canvasW: number,
+        canvasH: number,
+        score: number,
+    ): string {
+        const issueList = issues.map((iss, i) =>
+            `  ${i + 1}. [${iss.severity.toUpperCase()}] ${iss.type}: ${iss.description}${iss.element ? ` (element: "${iss.element}")` : ''}${iss.suggestion ? ` → Suggestion: ${iss.suggestion}` : ''}`
+        ).join('\n');
+
+        const elementList = sceneNodes.map(n => {
+            const content = (n as SceneNodeInfo & { _content?: string })._content;
+            return `  • "${n.label}" (${n.type}, id=${n.id}) at (${Math.round(n.x)}, ${Math.round(n.y)}) size ${Math.round(n.width)}x${Math.round(n.height)}${content ? ` text="${content}"` : ''}`;
+        }).join('\n');
+
+        return `You are ACE Vision Healer — a design quality correction agent.
+
+## Situation
+A design was just generated on a ${canvasW}x${canvasH}px canvas.
+Vision QA scored it **${score}/100** (threshold: 80).
+Your job: FIX the issues below using atomic tools to raise the score above 80.
+
+## Current Elements on Canvas
+${elementList || '(no elements found)'}
+
+## Issues Found by Vision QA
+${issueList || '(no specific issues listed)'}
+
+## Healing Strategy per Issue Type
+- **overlap**: Move overlapping elements apart. Reduce font size if text wraps too much. Ensure 8-12px minimum gap between elements.
+- **text_overflow / clipping**: Reduce font size, shrink element, or reposition to stay within canvas bounds (0,0 to ${canvasW},${canvasH}).
+- **contrast**: Change text color or add/modify background shape behind text. Use set_color or set_fill_hex.
+- **hierarchy**: Make headline the largest text. Subheadline should be 60-70% of headline size. CTA must be bold and visible.
+- **spacing / crowding**: Redistribute elements evenly. Use vertical stacking with 10-16px gaps.
+- **alignment**: Center-align text elements. Ensure CTA is horizontally centered.
+- **readability**: If text is on a busy background, add a semi-transparent overlay shape behind text.
+
+## RULES
+1. Use ONLY atomic modification tools: set_position, set_size, set_font_size, set_color, set_fill_hex, remove_node.
+2. **NEVER** call generate_full_design, render_banner, or create_layout — those would destroy the current design.
+3. **NEVER** add new elements unless strictly necessary to fix contrast (e.g. a background overlay).
+4. Fix the MOST SEVERE issues first (errors before warnings before suggestions).
+5. Keep all elements within canvas bounds: x in [0, ${canvasW}], y in [0, ${canvasH}].
+6. After applying fixes, respond with a brief summary of what you changed.
+7. Minimum font size: 10px. Maximum: 72px.
+8. If elements are overlapping, prefer reducing font sizes + adjusting Y positions over removing elements.`;
+    }
 }

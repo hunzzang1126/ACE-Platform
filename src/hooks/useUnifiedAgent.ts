@@ -441,27 +441,50 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         }
         hideCursor();
 
-        // ── Phase 7: Vision QA (Auto-Fix + Score Display) ──
+        // ── Phase 7: Vision QA (Patch + Agent Healing + Rollback) ──
         narrate(`Reviewing and optimizing design quality...`);
         addCard('vision', 'Optimizing layout', 'running');
         try {
-            const { runVisionLoop } = await import('@/services/autoDesignLoop');
-            const loopResult = await runVisionLoop(engine, canvasW, canvasH, abort.signal, (msg: string) => {
-                updateCard('vision', 'running', msg);
-            });
+            const { runVisionHealingLoop } = await import('@/services/autoDesignLoop');
+            const { AiService } = await import('@/ai/aiService');
 
-            const fixNote = loopResult.fixesApplied > 0 ? ` · ${loopResult.fixesApplied} fix(es) applied` : '';
+            // Create a healer callback — uses a dedicated AiService instance
+            const healerFn = async (eng: unknown, issues: Array<{ type: string; severity: string; element?: string; description: string; suggestion?: string }>, score: number, cw: number, ch: number) => {
+                const healer = new AiService([]);
+                const silentProgress = {
+                    onThinking: () => {},
+                    onCanvasScan: () => {},
+                    onPlan: () => {},
+                    onStepStart: () => {},
+                    onStepComplete: () => {},
+                    onReflection: () => {},
+                    onToken: () => {},
+                    onComplete: () => {},
+                    onToolCalls: () => {},
+                    onToolResult: () => {},
+                    onNarration: () => {},
+                    onError: (msg: string) => console.warn('[VisionHealer]', msg),
+                };
+                await healer.healDesign(eng, issues, score, cw, ch, silentProgress);
+            };
+
+            const loopResult = await runVisionHealingLoop(engine, canvasW, canvasH, abort.signal, (msg: string) => {
+                updateCard('vision', 'running', msg);
+            }, healerFn);
+
+            const fixNote = loopResult.fixesApplied > 0 ? ` · ${loopResult.fixesApplied} fix(es)` : '';
+            const methodNote = loopResult.healingMethod === 'agent' ? ' (AI healed)' :
+                               loopResult.healingMethod === 'patch' ? ' (auto-patched)' : '';
 
             // ★ Always show score — user wants transparency
             if (loopResult.finalScore >= 80) {
-                updateCard('vision', 'done', `Score: ${loopResult.finalScore}/100${fixNote} — Approved`);
+                updateCard('vision', 'done', `Score: ${loopResult.finalScore}/100${fixNote}${methodNote} — Approved`);
             } else {
-                // Show score + auto-fix status
-                updateCard('vision', 'error', `Score: ${loopResult.finalScore}/100${fixNote} — Auto-adjusted`);
+                updateCard('vision', 'error', `Score: ${loopResult.finalScore}/100${fixNote}${methodNote} — Best result`);
             }
 
             narrate(
-                `Design quality review complete — score ${loopResult.finalScore}/100.${fixNote}\n` +
+                `Design quality review complete — score ${loopResult.finalScore}/100.${fixNote}${methodNote}\n` +
                 `Style: ${guide.name}\n` +
                 `Layout: ${spec.layoutType} (${spec.alignment})\n` +
                 `Elements: ${rendered}\n` +

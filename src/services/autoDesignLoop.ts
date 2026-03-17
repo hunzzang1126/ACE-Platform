@@ -1,16 +1,15 @@
 // ─────────────────────────────────────────────────
-// autoDesignLoop.ts — Vision Feedback Loop
+// autoDesignLoop.ts — Vision Healing Loop
 // ─────────────────────────────────────────────────
 // After initial layout is placed on canvas:
 //
-//  1. engine.get_screenshot() → artboard PNG
-//  2. Claude Vision analyzes for overlap/readability/hierarchy
-//  3. Returns VisionFix[] with precise pixel corrections
-//  4. Apply fixes via engine (set_position, set_size, set_font_size, set_fill_hex)
-//  5. Re-screenshot and re-score (up to MAX_PASSES)
+//  Phase A: Quick patch (1 pass, low-level coordinate fixes)
+//  Phase B: Agent healing (AI Agent uses atomic tools to fix)
+//  Phase C: Quality gate (best-score tracking + rollback)
 //
-// Vision AI sees the ACTUAL screenshot — it KNOWS where overlaps are.
-// Fixes are applied with bounds-checking safety net.
+// Two exported functions:
+//   - runVisionLoop()        — legacy patch-only loop (kept for compat)
+//   - runVisionHealingLoop() — new: patch + Agent healing + rollback
 // ─────────────────────────────────────────────────
 
 import { callAnthropicApi, DEFAULT_CLAUDE_MODEL } from '@/services/anthropicClient';
@@ -38,12 +37,28 @@ export interface VisionLoopResult {
     /** Remaining suggestions after fix attempts */
     suggestions: VisionFix[];
     reasoning: string;
+    /** Healing method that produced the final result */
+    healingMethod: 'patch' | 'agent' | 'none';
 }
 
-// ★ FIX-APPLY MODE: 2 passes max, apply fixes from Vision AI.
-// Vision AI sees the actual screenshot and KNOWS where overlaps are.
-// After applying, we bounds-check each fix to prevent off-canvas elements.
-const MAX_PASSES = 3;
+/** Issue format from Vision analyzeDesign() */
+export interface VisionIssue {
+    type: string;
+    severity: string;
+    element?: string;
+    description: string;
+    suggestion?: string;
+}
+
+/** Callback for Agent-based healing — provided by the caller */
+export type HealerFn = (
+    engine: Engine,
+    issues: VisionIssue[],
+    score: number,
+    canvasW: number,
+    canvasH: number,
+) => Promise<void>;
+
 const PASS_SCORE = 80;
 
 // ── Vision review prompt ──────────────────────────
@@ -52,7 +67,7 @@ function buildReviewPrompt(canvasW: number, canvasH: number, elementNames: strin
     const nameList = elementNames.map(n => `  - "${n}"`).join('\n');
     return `You are a professional creative designer doing a strict quality review.
 
-Canvas: ${canvasW}×${canvasH}px
+Canvas: ${canvasW}x${canvasH}px
 Elements present:
 ${nameList}
 
@@ -84,6 +99,15 @@ Keep all values within canvas bounds: x 0-${canvasW}, y 0-${canvasH}.
 Return JSON only:
 {
   "score": <0-100>,
+  "issues": [
+    {
+      "type": "<overlap|text_overflow|contrast|hierarchy|spacing|alignment|clipping|readability|crowding>",
+      "severity": "<error|warning|suggestion>",
+      "element": "<element name or omit>",
+      "description": "<what's wrong>",
+      "suggestion": "<how to fix>"
+    }
+  ],
   "fixes": [
     {
       "elementName": "<exact name from list>",
@@ -131,9 +155,8 @@ function applyFix(engine: Engine, fix: VisionFix, canvasW: number, canvasH: numb
                 id: number; x: number; y: number; width: number; height: number;
             }>;
             const node = nodes.find((n) => n.id === id);
-            // ★ Bounds-check: clamp to canvas
-            let newX = Math.max(0, Math.min(fix.x ?? node?.x ?? 0, canvasW - 10));
-            let newY = Math.max(0, Math.min(fix.y ?? node?.y ?? 0, canvasH - 10));
+            const newX = Math.max(0, Math.min(fix.x ?? node?.x ?? 0, canvasW - 10));
+            const newY = Math.max(0, Math.min(fix.y ?? node?.y ?? 0, canvasH - 10));
             engine.set_position(id, newX, newY);
             applied = true;
         } catch {
@@ -147,7 +170,6 @@ function applyFix(engine: Engine, fix: VisionFix, canvasW: number, canvasH: numb
     }
 
     if (fix.w !== undefined && fix.h !== undefined) {
-        // ★ Bounds-check: min 10px, max canvas size
         const clampW = Math.max(10, Math.min(fix.w, canvasW));
         const clampH = Math.max(10, Math.min(fix.h, canvasH));
         engine.set_size(id, clampW, clampH);
@@ -155,7 +177,6 @@ function applyFix(engine: Engine, fix: VisionFix, canvasW: number, canvasH: numb
     }
 
     if (fix.fontSize !== undefined) {
-        // ★ Bounds-check: min 8px, max 80px
         const clampFs = Math.max(8, Math.min(80, fix.fontSize));
         engine.set_font_size?.(id, clampFs);
         applied = true;
@@ -169,10 +190,236 @@ function applyFix(engine: Engine, fix: VisionFix, canvasW: number, canvasH: numb
     return applied;
 }
 
-// ── Main loop (FIX-APPLY MODE) ──────────────────────
-// ★ Vision AI sees the screenshot, identifies issues, provides pixel fixes.
-//   Fixes are applied to canvas with bounds-checking safety net.
-//   Up to 2 passes: if first pass scores < 80, apply fixes and re-check.
+// ── Call Vision API for scoring + issues ──────────
+
+interface VisionReviewResult {
+    score: number;
+    issues: VisionIssue[];
+    fixes: VisionFix[];
+    reasoning: string;
+}
+
+async function callVisionReview(
+    engine: Engine,
+    canvasW: number,
+    canvasH: number,
+    signal?: AbortSignal,
+): Promise<VisionReviewResult | null> {
+    // 1. Screenshot
+    let screenshot: string;
+    try {
+        screenshot = engine.get_screenshot() as string;
+    } catch (err) {
+        console.warn('[VisionLoop] get_screenshot failed:', err);
+        return null;
+    }
+
+    // 2. Get element names
+    let elementNames: string[] = [];
+    try {
+        const nodes = JSON.parse(engine.get_all_nodes() as string) as Array<{ name?: string }>;
+        elementNames = nodes.map((n) => n.name ?? '').filter(Boolean);
+    } catch { /* ok */ }
+
+    if (elementNames.length === 0) return null;
+
+    // 3. Call Claude Vision
+    const pureBase64 = screenshot.startsWith('data:')
+        ? screenshot.split(',')[1] ?? screenshot
+        : screenshot;
+
+    const body = {
+        model: DEFAULT_CLAUDE_MODEL,
+        max_tokens: 1024,
+        messages: [{
+            role: 'user',
+            content: [
+                { type: 'image', source: { type: 'base64', media_type: 'image/png', data: pureBase64 } },
+                { type: 'text', text: buildReviewPrompt(canvasW, canvasH, elementNames) },
+            ],
+        }],
+    };
+
+    const data = await callAnthropicApi(body, signal) as {
+        content: Array<{ type: string; text?: string }>;
+    };
+    const rawText = data.content.find((c) => c.type === 'text')?.text ?? '';
+    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('No JSON in vision response');
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    return {
+        score: parsed.score ?? 0,
+        issues: parsed.issues ?? [],
+        fixes: parsed.fixes ?? [],
+        reasoning: parsed.reasoning ?? '',
+    };
+}
+
+// ── Save/restore canvas state for rollback ────────
+
+function saveCanvasState(engine: Engine): string | null {
+    try {
+        return engine.get_all_nodes() as string;
+    } catch {
+        return null;
+    }
+}
+
+function restoreCanvasState(engine: Engine, snapshot: string): void {
+    try {
+        const nodes = JSON.parse(snapshot) as Array<{
+            id: number; x: number; y: number; w: number; h: number;
+            fill_r?: number; fill_g?: number; fill_b?: number;
+            fontSize?: number;
+        }>;
+        for (const n of nodes) {
+            engine.set_position?.(n.id, n.x, n.y);
+            if (n.w && n.h) engine.set_size?.(n.id, n.w, n.h);
+            if (n.fontSize) engine.set_font_size?.(n.id, n.fontSize);
+        }
+    } catch (err) {
+        console.warn('[VisionLoop] Canvas restore failed:', err);
+    }
+}
+
+// ═══════════════════════════════════════════════════
+// NEW: runVisionHealingLoop — Patch → Agent Healing → Rollback
+// ═══════════════════════════════════════════════════
+
+export async function runVisionHealingLoop(
+    engine: Engine,
+    canvasW: number,
+    canvasH: number,
+    signal: AbortSignal,
+    onProgress: (msg: string) => void,
+    healerFn?: HealerFn,
+): Promise<VisionLoopResult> {
+    let bestScore = 0;
+    let bestSnapshot: string | null = null;
+    let totalFixesApplied = 0;
+    let reasoning = '';
+    let issues: VisionIssue[] = [];
+    let healingMethod: VisionLoopResult['healingMethod'] = 'none';
+
+    // ── Pass 1: Initial Vision Score ──
+    onProgress('Reviewing layout quality...');
+    let review: VisionReviewResult | null;
+    try {
+        review = await callVisionReview(engine, canvasW, canvasH, signal);
+    } catch (err) {
+        console.warn('[VisionLoop] Initial review failed:', err);
+        return { finalScore: 0, passes: 1, fixesApplied: 0, suggestions: [], reasoning: 'Vision API error', healingMethod: 'none' };
+    }
+    if (!review) {
+        return { finalScore: 0, passes: 1, fixesApplied: 0, suggestions: [], reasoning: 'No elements on canvas', healingMethod: 'none' };
+    }
+
+    bestScore = review.score;
+    bestSnapshot = saveCanvasState(engine);
+    reasoning = review.reasoning;
+    issues = review.issues;
+    console.log(`[VisionLoop] Pass 1: score=${bestScore}, issues=${issues.length}, reasoning="${reasoning}"`);
+
+    // ★ If score is good enough, approve immediately
+    if (bestScore >= PASS_SCORE) {
+        onProgress(`Score ${bestScore}/100 — Layout approved.`);
+        return { finalScore: bestScore, passes: 1, fixesApplied: 0, suggestions: [], reasoning, healingMethod: 'none' };
+    }
+
+    // ── Pass 2: Quick Patch (low-level coordinate fixes) ──
+    if (review.fixes.length > 0) {
+        onProgress(`Score ${bestScore}/100 — Applying quick fixes...`);
+        const preFixSnapshot = saveCanvasState(engine);
+        let fixCount = 0;
+        for (const fix of review.fixes) {
+            if (applyFix(engine, fix, canvasW, canvasH)) fixCount++;
+        }
+        totalFixesApplied += fixCount;
+        console.log(`[VisionLoop] Applied ${fixCount} quick fix(es)`);
+
+        // Re-score after patches
+        try {
+            const recheck = await callVisionReview(engine, canvasW, canvasH, signal);
+            if (recheck) {
+                console.log(`[VisionLoop] Pass 2 (post-patch): score=${recheck.score}`);
+                if (recheck.score > bestScore) {
+                    bestScore = recheck.score;
+                    bestSnapshot = saveCanvasState(engine);
+                    reasoning = recheck.reasoning;
+                    issues = recheck.issues;
+                    healingMethod = 'patch';
+                } else {
+                    // Patches made it worse → rollback
+                    if (preFixSnapshot) restoreCanvasState(engine, preFixSnapshot);
+                }
+
+                if (bestScore >= PASS_SCORE) {
+                    onProgress(`Score ${bestScore}/100 — Quick fix approved.`);
+                    return { finalScore: bestScore, passes: 2, fixesApplied: totalFixesApplied, suggestions: [], reasoning, healingMethod };
+                }
+            }
+        } catch {
+            // Re-score failed — keep patch results
+        }
+    }
+
+    // ── Pass 3: Agent Healing (AI uses atomic tools) ──
+    if (signal.aborted || !healerFn) {
+        if (!healerFn) console.log('[VisionLoop] No healerFn provided — skipping Agent healing');
+        return { finalScore: bestScore, passes: 2, fixesApplied: totalFixesApplied, suggestions: [], reasoning, healingMethod };
+    }
+    onProgress(`Score ${bestScore}/100 — AI Agent healing...`);
+    const preHealSnapshot = saveCanvasState(engine);
+
+    try {
+        await healerFn(engine, issues, bestScore, canvasW, canvasH);
+
+        // Re-score after Agent healing
+        const healReview = await callVisionReview(engine, canvasW, canvasH, signal);
+        if (healReview) {
+            console.log(`[VisionLoop] Pass 3 (post-heal): score=${healReview.score}`);
+            if (healReview.score > bestScore) {
+                bestScore = healReview.score;
+                bestSnapshot = saveCanvasState(engine);
+                reasoning = healReview.reasoning;
+                issues = healReview.issues;
+                healingMethod = 'agent';
+                totalFixesApplied += 1; // Count agent healing as 1 fix
+            } else {
+                // Agent made it worse → rollback to best snapshot
+                console.log(`[VisionLoop] Agent healing did not improve (${healReview.score} vs ${bestScore}). Rolling back.`);
+                if (preHealSnapshot) restoreCanvasState(engine, preHealSnapshot);
+            }
+        }
+    } catch (err) {
+        console.warn('[VisionLoop] Agent healing failed:', err);
+        // Rollback to pre-heal state
+        if (preHealSnapshot) restoreCanvasState(engine, preHealSnapshot);
+    }
+
+    const fixNote = totalFixesApplied > 0 ? ` · ${totalFixesApplied} fix(es)` : '';
+    if (bestScore >= PASS_SCORE) {
+        onProgress(`Score ${bestScore}/100${fixNote} — Healed and approved.`);
+    } else {
+        onProgress(`Score ${bestScore}/100${fixNote} — Best result delivered.`);
+    }
+
+    return {
+        finalScore: bestScore,
+        passes: 3,
+        fixesApplied: totalFixesApplied,
+        suggestions: [],
+        reasoning,
+        healingMethod,
+    };
+}
+
+// ═══════════════════════════════════════════════════
+// LEGACY: runVisionLoop — kept for backward compat
+// ═══════════════════════════════════════════════════
+
+const MAX_PASSES_LEGACY = 3;
 
 export async function runVisionLoop(
     engine: Engine,
@@ -186,92 +433,40 @@ export async function runVisionLoop(
     let suggestions: VisionFix[] = [];
     let reasoning = '';
 
-    for (let pass = 1; pass <= MAX_PASSES; pass++) {
+    for (let pass = 1; pass <= MAX_PASSES_LEGACY; pass++) {
         if (signal.aborted) break;
         onProgress(pass === 1 ? 'Reviewing layout quality...' : `Improving design (pass ${pass})...`);
 
-        // ── 1. Screenshot ──
-        let screenshot: string;
         try {
-            screenshot = engine.get_screenshot() as string;
-        } catch (err) {
-            console.warn('[VisionLoop] get_screenshot failed:', err);
-            return { finalScore: 0, passes: pass, fixesApplied: totalFixesApplied, suggestions: [], reasoning: 'Screenshot failed' };
-        }
+            const review = await callVisionReview(engine, canvasW, canvasH, signal);
+            if (!review) {
+                return { finalScore: 0, passes: pass, fixesApplied: totalFixesApplied, suggestions: [], reasoning: 'No elements', healingMethod: 'patch' };
+            }
 
-        // ── 2. Get element names ──
-        let elementNames: string[] = [];
-        try {
-            const nodes = JSON.parse(engine.get_all_nodes() as string) as Array<{ name?: string }>;
-            elementNames = nodes.map((n) => n.name ?? '').filter(Boolean);
-        } catch { /* ok */ }
+            lastScore = review.score;
+            suggestions = review.fixes;
+            reasoning = review.reasoning;
 
-        if (elementNames.length === 0) {
-            return { finalScore: 0, passes: pass, fixesApplied: totalFixesApplied, suggestions: [], reasoning: 'No elements on canvas' };
-        }
+            console.log(`[VisionLoop] Pass ${pass}: score=${lastScore}, fixes=${suggestions.length}`);
 
-        // ── 3. Call Claude Vision ──
-        const pureBase64 = screenshot.startsWith('data:')
-            ? screenshot.split(',')[1] ?? screenshot
-            : screenshot;
-
-        const prompt = buildReviewPrompt(canvasW, canvasH, elementNames);
-        const body = {
-            model: DEFAULT_CLAUDE_MODEL,
-            max_tokens: 1024,
-            messages: [{
-                role: 'user',
-                content: [
-                    { type: 'image', source: { type: 'base64', media_type: 'image/png', data: pureBase64 } },
-                    { type: 'text', text: prompt },
-                ],
-            }],
-        };
-
-        try {
-            const data = await callAnthropicApi(body, signal) as {
-                content: Array<{ type: string; text?: string }>;
-            };
-            const rawText = data.content.find((c) => c.type === 'text')?.text ?? '';
-            const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-            if (!jsonMatch) throw new Error('No JSON in vision response');
-
-            const reviewResult = JSON.parse(jsonMatch[0]) as {
-                score: number; fixes: VisionFix[]; reasoning: string;
-            };
-
-            lastScore = reviewResult.score ?? 0;
-            suggestions = reviewResult.fixes ?? [];
-            reasoning = reviewResult.reasoning ?? '';
-
-            console.log(`[VisionLoop] Pass ${pass}: score=${lastScore}, fixes=${suggestions.length}, reasoning="${reasoning}"`);
-
-            // ── 4. Score check: if >= PASS_SCORE, approve and stop ──
             if (lastScore >= PASS_SCORE) {
                 onProgress(`Score ${lastScore}/100 — Layout approved.`);
                 break;
             }
 
-            // ── 5. Apply fixes (if below threshold and not last pass) ──
-            if (suggestions.length > 0 && pass < MAX_PASSES) {
+            if (suggestions.length > 0 && pass < MAX_PASSES_LEGACY) {
                 let fixCount = 0;
                 for (const fix of suggestions) {
-                    if (applyFix(engine, fix, canvasW, canvasH)) {
-                        fixCount++;
-                    }
+                    if (applyFix(engine, fix, canvasW, canvasH)) fixCount++;
                 }
                 totalFixesApplied += fixCount;
                 onProgress(`Score ${lastScore}/100 — Applied ${fixCount} fix(es), re-checking...`);
-                console.log(`[VisionLoop] Applied ${fixCount} fix(es) on pass ${pass}`);
-            } else {
-                onProgress(`Score ${lastScore}/100 — ${suggestions.length} issue(s) found.`);
             }
-
         } catch (err) {
             console.warn('[VisionLoop] Vision call failed:', err);
-            return { finalScore: 0, passes: pass, fixesApplied: totalFixesApplied, suggestions: [], reasoning: 'Vision API error' };
+            return { finalScore: 0, passes: pass, fixesApplied: totalFixesApplied, suggestions: [], reasoning: 'Vision API error', healingMethod: 'patch' };
         }
     }
 
-    return { finalScore: lastScore, passes: MAX_PASSES, fixesApplied: totalFixesApplied, suggestions, reasoning };
+    return { finalScore: lastScore, passes: MAX_PASSES_LEGACY, fixesApplied: totalFixesApplied, suggestions, reasoning, healingMethod: 'patch' };
 }
