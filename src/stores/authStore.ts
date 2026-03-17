@@ -17,13 +17,14 @@ import {
     fetchUserRole,
     type UserRole,
 } from '@/services/supabaseClient';
+import type { PlanTier } from '@/schema/planTypes';
 
 export interface User {
     id: string;
     email: string;
     displayName: string;
     avatarUrl?: string;
-    plan: 'free' | 'pro' | 'team';
+    plan: PlanTier;
     createdAt: string;
 }
 
@@ -151,9 +152,21 @@ export const useAuthStore = create<AuthState>()(
                         supaUser.user_metadata?.name ??
                         supaUser.email?.split('@')[0] ?? 'User',
                     avatarUrl: supaUser.user_metadata?.avatar_url,
-                    plan: 'free',
+                    plan: 'starter', // default, will be updated below
                     createdAt: supaUser.created_at,
                 };
+
+                // ★ Load plan from subscriptions table
+                let userPlan: PlanTier = 'starter';
+                try {
+                    const { data: sub } = await sb.from('subscriptions')
+                        .select('plan')
+                        .eq('user_id', supaUser.id)
+                        .eq('status', 'active')
+                        .single();
+                    if (sub?.plan) userPlan = sub.plan as PlanTier;
+                } catch { /* no subscription = starter */ }
+                user.plan = userPlan;
 
                 console.log('[syncSession] Fetching role for:', supaUser.id);
                 const role = await fetchUserRole(supaUser.id);

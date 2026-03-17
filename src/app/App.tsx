@@ -19,6 +19,7 @@ import AnimationTestPage from './AnimationTestPage';
 import EffectsTestPage from './EffectsTestPage';
 import ExportTestPage from './ExportTestPage';
 import AiTestPage from './AiTestPage';
+import PricingPage from './PricingPage';
 
 // Components
 import { TemplateGallery } from '../components/editor/TemplateGallery';
@@ -37,6 +38,7 @@ export default function App() {
                     <Route path="/login" element={<LoginPage />} />
                     <Route path="/auth/callback" element={<AuthCallback />} />
                     <Route path="/pending" element={<PendingPage />} />
+                    <Route path="/pricing" element={<PricingPage />} />
                     <Route path="/onboarding" element={
                         <ProtectedRoute>
                             <OnboardingPage />
