@@ -151,3 +151,60 @@ export async function updateUserRole(
 
     return { error: error?.message ?? null };
 }
+
+// ── Onboarding Status ───────────────────────────
+
+export interface OnboardingStatus {
+    hasCompletedOnboarding: boolean;
+    preferredLanguage: string;
+}
+
+/**
+ * Fetch onboarding status from Supabase.
+ * Returns null if Supabase is unavailable or column doesn't exist yet.
+ */
+export async function fetchOnboardingStatus(userId: string): Promise<OnboardingStatus | null> {
+    const sb = getSupabase();
+    if (!sb) return null;
+
+    try {
+        const { data, error } = await sb
+            .from('user_roles')
+            .select('has_completed_onboarding, preferred_language')
+            .eq('user_id', userId)
+            .maybeSingle();
+
+        if (error || !data) return null;
+        return {
+            hasCompletedOnboarding: data.has_completed_onboarding ?? false,
+            preferredLanguage: data.preferred_language ?? 'English',
+        };
+    } catch {
+        // Column may not exist yet (migration not run)
+        return null;
+    }
+}
+
+/**
+ * Mark onboarding as completed in Supabase.
+ * Fire-and-forget safe — failures fall back to localStorage.
+ */
+export async function markOnboardingComplete(
+    userId: string,
+    preferredLanguage: string,
+): Promise<void> {
+    const sb = getSupabase();
+    if (!sb) return;
+
+    try {
+        await sb
+            .from('user_roles')
+            .update({
+                has_completed_onboarding: true,
+                preferred_language: preferredLanguage,
+            })
+            .eq('user_id', userId);
+    } catch (e) {
+        console.warn('[markOnboardingComplete] Supabase update failed:', e);
+    }
+}

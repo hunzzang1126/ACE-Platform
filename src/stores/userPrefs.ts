@@ -5,7 +5,9 @@
 // personalize outputs based on past behavior.
 // Persisted to localStorage.
 
-const STORAGE_KEY = 'ace-user-prefs';
+const STORAGE_KEY_PREFIX = 'glid-prefs-';
+/** Legacy key for migration — will be read-once then deleted */
+const LEGACY_KEY = 'ace-user-prefs';
 
 // ── Supported Languages ──
 
@@ -26,22 +28,22 @@ export interface UserPrefs {
     preferredLanguage: SupportedLanguage;
     /** Whether the user has completed onboarding */
     hasCompletedOnboarding: boolean;
-    /** Preferred brand colors (auto-learned from user's designs) */
+    /** User's learned brand colors */
     brandColors: {
         primary: string;
         secondary: string;
         background: string;
         text: string;
     };
-    /** Preferred font families */
+    /** Preferred fonts */
     fonts: {
         heading: string;
         body: string;
     };
-    /** Layout style preferences */
+    /** Layout style preference */
     layoutStyle: 'minimal' | 'balanced' | 'dense';
-    /** Preferred animation style */
-    animationStyle: 'subtle' | 'moderate' | 'dramatic';
+    /** Animation intensity preference */
+    animationStyle: 'none' | 'subtle' | 'moderate' | 'dynamic';
     /** Common text patterns (headlines, CTAs the user frequently uses) */
     frequentTexts: { text: string; role: string; count: number }[];
     /** User's design history stats */
@@ -75,11 +77,35 @@ const DEFAULT_PREFS: UserPrefs = {
     },
 };
 
+// ── Per-user storage key ──
+
+function storageKey(userId?: string): string {
+    if (userId) return `${STORAGE_KEY_PREFIX}${userId}`;
+    // Fallback: try to get userId from authStore (avoid circular import)
+    return LEGACY_KEY;
+}
+
 // ── Load / Save ──
 
-export function loadUserPrefs(): UserPrefs {
+/**
+ * Load prefs for a specific user. Migrates from legacy key if needed.
+ */
+export function loadUserPrefs(userId?: string): UserPrefs {
     try {
-        const raw = localStorage.getItem(STORAGE_KEY);
+        const key = storageKey(userId);
+        let raw = localStorage.getItem(key);
+
+        // Migration: if per-user key is empty, check legacy global key
+        if (!raw && userId) {
+            const legacy = localStorage.getItem(LEGACY_KEY);
+            if (legacy) {
+                // Migrate to per-user key and delete legacy
+                localStorage.setItem(key, legacy);
+                localStorage.removeItem(LEGACY_KEY);
+                raw = legacy;
+            }
+        }
+
         if (!raw) return { ...DEFAULT_PREFS };
         return { ...DEFAULT_PREFS, ...JSON.parse(raw) };
     } catch {
@@ -87,26 +113,49 @@ export function loadUserPrefs(): UserPrefs {
     }
 }
 
-export function saveUserPrefs(prefs: UserPrefs): void {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
+export function saveUserPrefs(prefs: UserPrefs, userId?: string): void {
+    localStorage.setItem(storageKey(userId), JSON.stringify(prefs));
 }
 
 /**
  * Set the user's preferred language for AI copy generation.
  */
-export function setPreferredLanguage(lang: SupportedLanguage): void {
-    const prefs = loadUserPrefs();
+export function setPreferredLanguage(lang: SupportedLanguage, userId?: string): void {
+    const prefs = loadUserPrefs(userId);
     prefs.preferredLanguage = lang;
-    saveUserPrefs(prefs);
+    saveUserPrefs(prefs, userId);
 }
 
 /**
- * Mark onboarding as completed.
+ * Mark onboarding as completed (localStorage only — sync version).
  */
-export function completeOnboarding(): void {
-    const prefs = loadUserPrefs();
+export function completeOnboarding(userId?: string): void {
+    const prefs = loadUserPrefs(userId);
     prefs.hasCompletedOnboarding = true;
-    saveUserPrefs(prefs);
+    saveUserPrefs(prefs, userId);
+}
+
+/**
+ * Mark onboarding as completed — writes to both localStorage AND Supabase.
+ * Use this from OnboardingPage for full cross-device persistence.
+ */
+export async function completeOnboardingAsync(
+    userId: string,
+    preferredLanguage: SupportedLanguage,
+): Promise<void> {
+    // 1. Write to localStorage (immediate, always works)
+    const prefs = loadUserPrefs(userId);
+    prefs.hasCompletedOnboarding = true;
+    prefs.preferredLanguage = preferredLanguage;
+    saveUserPrefs(prefs, userId);
+
+    // 2. Write to Supabase (async, fire-and-forget safe)
+    try {
+        const { markOnboardingComplete } = await import('@/services/supabaseClient');
+        await markOnboardingComplete(userId, preferredLanguage);
+    } catch (e) {
+        console.warn('[completeOnboardingAsync] Supabase sync failed:', e);
+    }
 }
 
 // ── Learning Functions ──

@@ -14,14 +14,34 @@ export function AuthCallback() {
         const handleCallback = async () => {
             await syncSession();
 
-            const { isAuthenticated, isApproved } = useAuthStore.getState();
+            const { isAuthenticated, isApproved, user } = useAuthStore.getState();
             if (isAuthenticated()) {
                 if (!isApproved()) {
                     navigate('/pending', { replace: true });
                 } else {
-                    const { loadUserPrefs } = await import('@/stores/userPrefs');
-                    const prefs = loadUserPrefs();
-                    navigate(prefs.hasCompletedOnboarding ? '/dashboard' : '/onboarding', { replace: true });
+                    // Check Supabase first (cross-device), fallback to localStorage
+                    const { fetchOnboardingStatus } = await import('@/services/supabaseClient');
+                    const { loadUserPrefs, saveUserPrefs } = await import('@/stores/userPrefs');
+                    const userId = user?.id;
+
+                    let hasOnboarded = false;
+                    if (userId) {
+                        const sbStatus = await fetchOnboardingStatus(userId);
+                        if (sbStatus) {
+                            hasOnboarded = sbStatus.hasCompletedOnboarding;
+                            // Sync Supabase prefs to localStorage
+                            if (hasOnboarded) {
+                                const prefs = loadUserPrefs(userId);
+                                prefs.hasCompletedOnboarding = true;
+                                prefs.preferredLanguage = sbStatus.preferredLanguage as typeof prefs.preferredLanguage;
+                                saveUserPrefs(prefs, userId);
+                            }
+                        } else {
+                            // Supabase unavailable — check localStorage
+                            hasOnboarded = loadUserPrefs(userId).hasCompletedOnboarding;
+                        }
+                    }
+                    navigate(hasOnboarded ? '/dashboard' : '/onboarding', { replace: true });
                 }
             } else {
                 navigate('/login', { replace: true });

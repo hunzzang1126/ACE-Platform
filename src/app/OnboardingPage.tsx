@@ -12,7 +12,7 @@ import {
     SUPPORTED_LANGUAGES,
     type SupportedLanguage,
     setPreferredLanguage,
-    completeOnboarding,
+    completeOnboardingAsync,
 } from '@/stores/userPrefs';
 import './landing.css';
 
@@ -80,6 +80,7 @@ type Step = 'welcome' | 'language' | 'done';
 export function OnboardingPage() {
     const navigate = useNavigate();
     const user = useAuthStore(s => s.user);
+    const userId = user?.id;
     const displayName = user?.displayName ?? 'there';
 
     const [step, setStep] = useState<Step>('welcome');
@@ -94,11 +95,18 @@ export function OnboardingPage() {
         }, 300);
     }, []);
 
-    const handleFinish = useCallback(() => {
-        setPreferredLanguage(selected);
-        completeOnboarding();
+    const handleFinish = useCallback(async () => {
+        // Save to both localStorage + Supabase (cross-device persist)
+        if (userId) {
+            await completeOnboardingAsync(userId, selected);
+        } else {
+            // Fallback: no userId available, save to localStorage only
+            setPreferredLanguage(selected);
+            const { completeOnboarding } = await import('@/stores/userPrefs');
+            completeOnboarding();
+        }
         navigate('/dashboard', { replace: true });
-    }, [selected, navigate]);
+    }, [selected, navigate, userId]);
 
     return (
         <div className="landing-page" style={{

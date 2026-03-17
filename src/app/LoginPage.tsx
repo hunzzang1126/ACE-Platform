@@ -27,14 +27,14 @@ export function LoginPage() {
             await signUpWithEmail(email, password, name);
         }
         // Navigation handled by AuthCallback or syncSession
-        const { isAuthenticated, isApproved } = useAuthStore.getState();
+        const { isAuthenticated, isApproved, user: authUser } = useAuthStore.getState();
         if (isAuthenticated()) {
             if (!isApproved()) {
                 navigate('/pending', { replace: true });
             } else {
-                // Check if user has completed onboarding
+                // Check if user has completed onboarding (per-user)
                 const { loadUserPrefs } = await import('@/stores/userPrefs');
-                const prefs = loadUserPrefs();
+                const prefs = loadUserPrefs(authUser?.id);
                 navigate(prefs.hasCompletedOnboarding ? '/dashboard' : '/onboarding', { replace: true });
             }
         }
