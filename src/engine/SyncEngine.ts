@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────
-// SyncEngine – Master-Slave Synchronization Core
+// SyncEngine – Plug-based Synchronization Core
 // ─────────────────────────────────────────────────
-// 마스터 배너의 변경 사항을 슬레이브 배너에 "즉시" 전파.
+// 오리진 요소 변경 → 플러그된 타겟에만 전파.
 // 제약 조건(constraints)을 기반으로 다른 크기의 배너에 맞게 좌표를 재계산.
 // role이 있는 요소는 Smart Layout 엔진으로 비율별 최적 위치 계산.
 
@@ -33,20 +33,37 @@ export class SyncEngine {
     /**
      * 마스터 요소 변경 → 슬레이브 전파 좌표 계산
      *
-     * 핵심 로직:
-     * 1. 마스터 요소의 constraints를 기반으로
-     * 2. 각 슬레이브 배너의 크기(preset)에 맞는 좌표를 재계算
-     * 3. 오버라이드된 요소는 건너뜀
+     * ★ Plug-aware propagation:
+     * Only propagates to variants that are plugged into the source variant.
+     * Falls back to legacy master→all if no plugConnections exist.
      */
     static propagateChange(
         masterElement: DesignElement,
         creativeSet: CreativeSet,
+        /** Which variant this element belongs to (for plug graph lookup) */
+        sourceVariantId?: string,
     ): SyncResult {
         const result: SyncResult = { deltas: [], skipped: [] };
+        const plugs = creativeSet.plugConnections ?? {};
+        const originId = sourceVariantId ?? creativeSet.masterVariantId;
+
+        // Find targets plugged into this origin
+        const pluggedTargetIds = Object.entries(plugs)
+            .filter(([, oId]) => oId === originId)
+            .map(([targetId]) => targetId);
+        const hasPlugConnections = Object.keys(plugs).length > 0;
 
         for (const variant of creativeSet.variants) {
-            // 마스터 자신은 건너뜀
-            if (variant.id === creativeSet.masterVariantId) continue;
+            // Skip the source variant itself
+            if (variant.id === originId) continue;
+
+            // ★ Only propagate to plugged targets
+            // If plug connections exist, only targets connected to this origin
+            // If no plug connections (legacy), propagate to all non-origin variants
+            if (hasPlugConnections && !pluggedTargetIds.includes(variant.id)) {
+                result.skipped.push({ variantId: variant.id, reason: 'not-plugged' });
+                continue;
+            }
 
             // 동기화 잠김
             if (variant.syncLocked) {
