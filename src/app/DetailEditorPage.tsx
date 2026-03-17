@@ -22,6 +22,8 @@ import { AuthModal } from '@/components/editor/AuthModal';
 import { useFabricCanvas } from '@/hooks/useFabricCanvas';
 import { useOverlayElements } from '@/hooks/useOverlayElements';
 import { useCanvasSync } from '@/hooks/useCanvasSync';
+import { exportToHtml5, exportToImage, downloadExport } from '@/engine/html5Exporter';
+import type { EngineNode } from '@/hooks/canvasTypes';
 
 export function DetailEditorPage() {
     const { variantId } = useParams<{ variantId: string }>();
@@ -116,6 +118,45 @@ export function DetailEditorPage() {
         setTimeout(() => { isSavingRef.current = false; }, 200);
         setTimeout(() => setSaveStatus('idle'), 2000);
     }, [saveToStore, engineRef, overlay.overlayElements]);
+
+    // ── Export handlers ──────────────────────────────
+    const handleExportPNG = useCallback((quality: number) => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const result = exportToImage(canvas, 'png', quality);
+        downloadExport(result);
+    }, [canvasRef]);
+
+    const handleExportJPG = useCallback((quality: number) => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const result = exportToImage(canvas, 'jpeg', quality);
+        downloadExport(result);
+    }, [canvasRef]);
+
+    const handleExportHTML5 = useCallback(() => {
+        const engine = engineRef.current;
+        if (!engine) return;
+        try {
+            const raw = engine.get_all_nodes();
+            const nodes: EngineNode[] = JSON.parse(raw);
+            const result = exportToHtml5(nodes, {
+                width,
+                height,
+                backgroundColor: variant?.backgroundColor ?? '#ffffff',
+                title: `${creativeSet?.name ?? 'Banner'}_${width}x${height}`,
+            });
+            downloadExport(result);
+        } catch (err) {
+            console.error('[Export] HTML5 export failed:', err);
+        }
+    }, [engineRef, width, height, variant?.backgroundColor, creativeSet?.name]);
+
+    const handleExportGIF = useCallback(() => {
+        // GIF export requires gif.js library — not yet integrated
+        console.log('[Export] GIF export is not yet available');
+        alert('GIF export coming soon');
+    }, []);
 
     // Bridge engine to global AI panel when ready + restore saved elements
     useEffect(() => {
@@ -374,6 +415,10 @@ export function DetailEditorPage() {
                         nodes={state.nodes}
                         canvasWidth={width}
                         canvasHeight={height}
+                        onExportHTML5={handleExportHTML5}
+                        onExportPNG={handleExportPNG}
+                        onExportJPG={handleExportJPG}
+                        onExportGIF={() => handleExportGIF()}
                         onClose={toggleExportPanel}
                     />
                 )}
