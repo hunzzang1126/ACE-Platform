@@ -495,8 +495,11 @@ user's work. This is UNACCEPTABLE.
 5. NEVER split a headline into multiple text elements.
 6. MAXIMUM 8-10 elements per banner.
 7. Match user's language in responses.
-8. For effects: use set_custom_style.
-9. Never refuse — use execute_dynamic_action as catch-all.
+8. For text content, generate copy in the user's preferred language (see User Preferences).
+   If the user explicitly requests a different language ("translate to French"), use THAT language.
+   NEVER default to English unless the user's preferred language IS English.
+9. For effects: use set_custom_style.
+10. Never refuse — use execute_dynamic_action as catch-all.
 ${contextSection}`;
     }
 }

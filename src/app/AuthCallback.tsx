@@ -16,7 +16,13 @@ export function AuthCallback() {
 
             const { isAuthenticated, isApproved } = useAuthStore.getState();
             if (isAuthenticated()) {
-                navigate(isApproved() ? '/dashboard' : '/pending', { replace: true });
+                if (!isApproved()) {
+                    navigate('/pending', { replace: true });
+                } else {
+                    const { loadUserPrefs } = await import('@/stores/userPrefs');
+                    const prefs = loadUserPrefs();
+                    navigate(prefs.hasCompletedOnboarding ? '/dashboard' : '/onboarding', { replace: true });
+                }
             } else {
                 navigate('/login', { replace: true });
             }

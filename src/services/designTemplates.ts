@@ -762,7 +762,7 @@ export function selectTemplate(canvasW: number, canvasH: number): DesignTemplate
 /**
  * Build the content-only prompt for the AI.
  */
-export function buildContentPrompt(userPrompt: string, canvasW: number, canvasH: number, templateName: string): string {
+export function buildContentPrompt(userPrompt: string, canvasW: number, canvasH: number, templateName: string, language: string = 'English'): string {
     const isWide = canvasW > canvasH * 2;
     const isTall = canvasH > canvasW * 2;
     const isSmall = canvasW < 200 || canvasH < 200;
@@ -788,7 +788,8 @@ Rules:
 - Headline should be the star — punchy, memorable
 - CTA must be a clear call to action  
 - Tag is a tiny category marker, always uppercase
-- All text must be in English
+- Write all text in ${language}
+- If the user's prompt is in a different language, use THAT language instead
 - IMPORTANT: If the headline already conveys the full message (e.g. "SUMMER SALE 40% OFF"), the subheadline is OPTIONAL — set it to "" (empty string) to keep the layout clean
 - ${isSmall ? 'This canvas is very SMALL — subheadline should be empty "" to avoid crowding' : 'Only include subheadline if it adds genuine value'}
 - Return ONLY the JSON object, no explanation`;

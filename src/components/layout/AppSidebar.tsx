@@ -1,9 +1,11 @@
 // ─────────────────────────────────────────────────
 // AppSidebar — Wide sidebar with text labels (Figma-inspired)
 // ─────────────────────────────────────────────────
-import { type ReactNode } from 'react';
+import { type ReactNode, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { IcLayout, IcBolt, IcFolder } from '@/components/ui/Icons';
+import { IcLayout, IcBolt } from '@/components/ui/Icons';
+import { useAuthStore } from '@/stores/authStore';
+import { SettingsPanel } from '@/components/panels/SettingsPanel';
 
 const NAV_ITEMS: { icon: ReactNode; label: string; path: string }[] = [
     {
@@ -56,42 +58,70 @@ const NAV_ITEMS: { icon: ReactNode; label: string; path: string }[] = [
 export function AppSidebar() {
     const location = useLocation();
     const navigate = useNavigate();
+    const user = useAuthStore(s => s.user);
+    const role = useAuthStore(s => s.role);
+    const [settingsOpen, setSettingsOpen] = useState(false);
+
+    const displayName = user?.displayName ?? 'User';
+    const initials = displayName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
     return (
-        <aside className="sidebar">
-            {/* Gradient Logo */}
-            <div className="sidebar-logo" onClick={() => navigate('/dashboard')}>
-                <span className="sidebar-logo-text">ACE</span>
-            </div>
+        <>
+            <aside className="sidebar">
+                {/* Gradient Logo */}
+                <div className="sidebar-logo" onClick={() => navigate('/dashboard')}>
+                    <span className="sidebar-logo-text">ACE</span>
+                </div>
 
-            {/* Navigation */}
-            <nav className="sidebar-nav">
-                {NAV_ITEMS.map((item) => {
-                    const isActive = location.pathname === item.path ||
-                        (item.path === '/' && location.pathname === '/');
-                    return (
+                {/* Navigation */}
+                <nav className="sidebar-nav">
+                    {NAV_ITEMS.map((item) => {
+                        const isActive = location.pathname === item.path ||
+                            (item.path === '/' && location.pathname === '/');
+                        return (
+                            <button
+                                key={item.path}
+                                onClick={() => navigate(item.path)}
+                                className={`sidebar-nav-item ${isActive ? 'active' : ''}`}
+                            >
+                                <span className="sidebar-icon">{item.icon}</span>
+                                <span className="sidebar-label">{item.label}</span>
+                            </button>
+                        );
+                    })}
+                </nav>
+
+                {/* User + Settings */}
+                <div className="sidebar-footer">
+                    <div className="sidebar-user">
+                        <div className="sidebar-avatar">{initials}</div>
+                        <div className="sidebar-user-info">
+                            <span className="sidebar-user-name">{displayName}</span>
+                            <span className="sidebar-user-role">{role === 'admin' ? 'Admin' : 'User'}</span>
+                        </div>
                         <button
-                            key={item.path}
-                            onClick={() => navigate(item.path)}
-                            className={`sidebar-nav-item ${isActive ? 'active' : ''}`}
+                            onClick={() => setSettingsOpen(true)}
+                            title="Settings"
+                            style={{
+                                background: 'none', border: 'none', color: '#86868b',
+                                cursor: 'pointer', padding: 4, marginLeft: 'auto',
+                                borderRadius: 6, display: 'flex', alignItems: 'center',
+                                transition: 'color 0.2s',
+                            }}
+                            onMouseEnter={e => (e.currentTarget.style.color = '#f5f5f7')}
+                            onMouseLeave={e => (e.currentTarget.style.color = '#86868b')}
                         >
-                            <span className="sidebar-icon">{item.icon}</span>
-                            <span className="sidebar-label">{item.label}</span>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                <circle cx="12" cy="12" r="3" />
+                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.32 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                            </svg>
                         </button>
-                    );
-                })}
-            </nav>
-
-            {/* User */}
-            <div className="sidebar-footer">
-                <div className="sidebar-user">
-                    <div className="sidebar-avatar">YA</div>
-                    <div className="sidebar-user-info">
-                        <span className="sidebar-user-name">Young An</span>
-                        <span className="sidebar-user-role">Admin</span>
                     </div>
                 </div>
-            </div>
-        </aside>
+            </aside>
+
+            {/* Settings slide-out */}
+            <SettingsPanel isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
+        </>
     );
 }

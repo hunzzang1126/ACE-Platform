@@ -7,9 +7,25 @@
 
 const STORAGE_KEY = 'ace-user-prefs';
 
+// ── Supported Languages ──
+
+export const SUPPORTED_LANGUAGES = [
+    'English', 'Korean', 'Japanese',
+    'Chinese (Simplified)', 'Chinese (Traditional)',
+    'French', 'Spanish', 'German', 'Portuguese', 'Italian',
+    'Dutch', 'Russian', 'Arabic', 'Hindi', 'Thai',
+    'Vietnamese', 'Indonesian', 'Turkish', 'Polish', 'Swedish',
+] as const;
+
+export type SupportedLanguage = typeof SUPPORTED_LANGUAGES[number];
+
 // ── Types ──
 
 export interface UserPrefs {
+    /** Preferred language for AI-generated copy */
+    preferredLanguage: SupportedLanguage;
+    /** Whether the user has completed onboarding */
+    hasCompletedOnboarding: boolean;
     /** Preferred brand colors (auto-learned from user's designs) */
     brandColors: {
         primary: string;
@@ -37,6 +53,8 @@ export interface UserPrefs {
 }
 
 const DEFAULT_PREFS: UserPrefs = {
+    preferredLanguage: 'English',
+    hasCompletedOnboarding: false,
     brandColors: {
         primary: '#c9a84c',
         secondary: '#1a1f2e',
@@ -71,6 +89,24 @@ export function loadUserPrefs(): UserPrefs {
 
 export function saveUserPrefs(prefs: UserPrefs): void {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
+}
+
+/**
+ * Set the user's preferred language for AI copy generation.
+ */
+export function setPreferredLanguage(lang: SupportedLanguage): void {
+    const prefs = loadUserPrefs();
+    prefs.preferredLanguage = lang;
+    saveUserPrefs(prefs);
+}
+
+/**
+ * Mark onboarding as completed.
+ */
+export function completeOnboarding(): void {
+    const prefs = loadUserPrefs();
+    prefs.hasCompletedOnboarding = true;
+    saveUserPrefs(prefs);
 }
 
 // ── Learning Functions ──
@@ -157,6 +193,8 @@ export function trackSizeUsage(width: number, height: number): void {
 export function prefsToPromptSection(prefs: UserPrefs): string {
     const lines: string[] = [];
     lines.push(`### User Preferences (learned from past designs)`);
+    lines.push(`- **Content Language: ${prefs.preferredLanguage}** — Write ALL generated copy in this language`);
+    lines.push(`- If the user writes in a different language, use THAT language instead`);
     lines.push(`- Brand: bg=${prefs.brandColors.background}, primary=${prefs.brandColors.primary}, text=${prefs.brandColors.text}`);
     lines.push(`- Fonts: heading="${prefs.fonts.heading}", body="${prefs.fonts.body}"`);
     lines.push(`- Style: ${prefs.layoutStyle} layout, ${prefs.animationStyle} animations`);

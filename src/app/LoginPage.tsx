@@ -28,7 +28,14 @@ export function LoginPage() {
         // Navigation handled by AuthCallback or syncSession
         const { isAuthenticated, isApproved } = useAuthStore.getState();
         if (isAuthenticated()) {
-            navigate(isApproved() ? '/dashboard' : '/pending', { replace: true });
+            if (!isApproved()) {
+                navigate('/pending', { replace: true });
+            } else {
+                // Check if user has completed onboarding
+                const { loadUserPrefs } = await import('@/stores/userPrefs');
+                const prefs = loadUserPrefs();
+                navigate(prefs.hasCompletedOnboarding ? '/dashboard' : '/onboarding', { replace: true });
+            }
         }
     };
 

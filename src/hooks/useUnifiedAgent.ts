@@ -187,7 +187,9 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
 
         const abort = new AbortController();
         const { callTemplateContent } = await import('@/services/autoDesignService');
-        const content = await callTemplateContent(prompt, canvasW, canvasH, 'AI Pipeline', abort.signal);
+        const { loadUserPrefs } = await import('@/stores/userPrefs');
+        const preferredLang = loadUserPrefs().preferredLanguage;
+        const content = await callTemplateContent(prompt, canvasW, canvasH, 'AI Pipeline', abort.signal, preferredLang);
 
         const copyDetail = [
             `Headline: "${content.headline}" (${content.headline.length} chars)`,

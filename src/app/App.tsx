@@ -8,6 +8,7 @@ import { LandingPage } from './LandingPage';
 import { LoginPage } from './LoginPage';
 import { AuthCallback } from './AuthCallback';
 import { PendingPage } from './PendingPage';
+import { OnboardingPage } from './OnboardingPage';
 import { AdminPage } from './AdminPage';
 import { DashboardPage } from './DashboardPage';
 import { TrashPage } from './TrashPage';
@@ -36,6 +37,11 @@ export default function App() {
                     <Route path="/login" element={<LoginPage />} />
                     <Route path="/auth/callback" element={<AuthCallback />} />
                     <Route path="/pending" element={<PendingPage />} />
+                    <Route path="/onboarding" element={
+                        <ProtectedRoute>
+                            <OnboardingPage />
+                        </ProtectedRoute>
+                    } />
 
                     {/* ── Protected Routes (auth + approved role required) ── */}
                     <Route path="/dashboard" element={

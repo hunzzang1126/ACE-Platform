@@ -319,6 +319,7 @@ ABSOLUTE RULES — NEVER VIOLATE:
 
 User prompt: "${userPrompt}"
 Write SHORT, impactful ad copy. No lorem ipsum. Real creative content.
+Write all copy in the user's preferred language. If their prompt is in a specific language, use THAT language.
 
 Return ONLY the render_banner tool call. No explanation.`;
 }
@@ -533,8 +534,9 @@ export async function callTemplateContent(
     canvasH: number,
     templateName: string,
     signal: AbortSignal,
+    language: string = 'English',
 ): Promise<GeneratedContent> {
-    const contentPrompt = buildContentPrompt(userPrompt, canvasW, canvasH, templateName);
+    const contentPrompt = buildContentPrompt(userPrompt, canvasW, canvasH, templateName, language);
 
     const body = {
         model: DEFAULT_CLAUDE_MODEL,
