@@ -284,26 +284,20 @@ export const useDesignStore = create<DesignState>()(
                     set((state) => {
                         const cs = getActiveCS(state);
                         if (!cs) return;
-                        const master = cs.variants.find(
-                            (v) => v.id === cs.masterVariantId,
-                        );
-                        if (!master) return;
 
-                        // Origin의 요소를 복제하여 신규 변형 생성
+                        // Create blank variant — user connects plugs manually
                         const newVariantId = uuid();
                         const newVariant: BannerVariant = {
                             id: newVariantId,
                             preset,
-                            elements: JSON.parse(JSON.stringify(master.elements)),
-                            backgroundColor: master.backgroundColor,
+                            elements: [],
+                            backgroundColor: '#ffffff',
                             overriddenElementIds: [],
                             syncLocked: false,
                         };
 
                         cs.variants.push(newVariant);
-                        // ★ Auto-plug: new variant plugs into the master/origin
                         if (!cs.plugConnections) cs.plugConnections = {};
-                        cs.plugConnections[newVariantId] = cs.masterVariantId;
                         cs.updatedAt = new Date().toISOString();
                         state.creativeSet = cs;
                     });
@@ -398,27 +392,18 @@ export const useDesignStore = create<DesignState>()(
 
                         // ★ Plug-aware propagation: propagate to variants plugged INTO this one
                         const plugs = cs.plugConnections ?? {};
-                        // Find all targets that plug into this variant
                         const pluggedTargetIds = Object.entries(plugs)
                             .filter(([, originId]) => originId === variantId)
                             .map(([targetId]) => targetId);
 
-                        // Also: backward compat — if this is masterVariantId, propagate to un-plugged targets too
-                        const isLegacyMaster = variantId === cs.masterVariantId;
-
-                        if (pluggedTargetIds.length > 0 || isLegacyMaster) {
+                        if (pluggedTargetIds.length > 0) {
                             const originW = variant.preset.width;
                             const originH = variant.preset.height;
 
                             for (const target of cs.variants) {
                                 if (target.id === variantId) continue;
                                 if (target.syncLocked) continue;
-
-                                // Only propagate to plugged targets
-                                // (or all non-master if legacy mode and no plug connections exist)
-                                const isPluggedToThis = pluggedTargetIds.includes(target.id);
-                                const isLegacyTarget = isLegacyMaster && Object.keys(plugs).length === 0;
-                                if (!isPluggedToThis && !isLegacyTarget) continue;
+                                if (!pluggedTargetIds.includes(target.id)) continue;
 
                                 const targetW = target.preset.width;
                                 const targetH = target.preset.height;

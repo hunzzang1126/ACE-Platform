@@ -123,39 +123,27 @@ describe('designStore — Element Operations', () => {
         expect(stored.fill).toBe('#FF5733');
     });
 
-    it('removeElementFromMaster removes from all variants', () => {
+    it('removeElementFromMaster removes from master only (non-plugged variants unaffected)', () => {
         useDesignStore.getState().createCreativeSet('Remove Test', MASTER_PRESET);
 
         const rect = makeTestRect('remove-me', '#000');
         useDesignStore.getState().addElementToMaster(rect);
-        useDesignStore.getState().addVariant({
-            id: 'test-728x90',
-            name: '728x90',
-            width: 728,
-            height: 90,
-            category: 'display',
-        });
 
         const before = useDesignStore.getState().creativeSet!;
-        expect(before.variants).toHaveLength(2);
+        expect(before.variants).toHaveLength(1);
         expect(before.variants[0]!.elements).toHaveLength(1);
-        expect(before.variants[1]!.elements).toHaveLength(1);
 
         useDesignStore.getState().removeElementFromMaster('remove-me');
 
         const after = useDesignStore.getState().creativeSet!;
         expect(after.variants[0]!.elements).toHaveLength(0);
-        expect(after.variants[1]!.elements).toHaveLength(0);
     });
 });
 
 describe('designStore — Variant Management', () => {
 
-    it('addVariant creates new variant with smart-sized elements', () => {
+    it('addVariant creates new blank variant', () => {
         useDesignStore.getState().createCreativeSet('Variant Test', MASTER_PRESET);
-
-        const rect = makeTestRect('sized-el', '#00F');
-        useDesignStore.getState().addElementToMaster(rect);
 
         useDesignStore.getState().addVariant({
             id: 'test-728x90',
@@ -167,7 +155,8 @@ describe('designStore — Variant Management', () => {
 
         const cs = useDesignStore.getState().creativeSet!;
         expect(cs.variants).toHaveLength(2);
-        expect(cs.variants[1]!.elements.length).toBeGreaterThanOrEqual(1);
+        // New variant starts blank — user connects plugs manually
+        expect(cs.variants[1]!.elements).toHaveLength(0);
     });
 
     it('removeVariant cannot delete the last remaining variant', () => {
@@ -213,16 +202,15 @@ describe('designStore — Plug Connections', () => {
         expect(Object.keys(cs.plugConnections)).toHaveLength(0);
     });
 
-    it('addVariant auto-plugs new variant to master', () => {
-        useDesignStore.getState().createCreativeSet('Auto Plug', MASTER_PRESET);
-        const masterId = useDesignStore.getState().creativeSet!.masterVariantId;
+    it('addVariant does NOT auto-plug (user connects manually)', () => {
+        useDesignStore.getState().createCreativeSet('No Auto Plug', MASTER_PRESET);
 
         useDesignStore.getState().addVariant(VARIANT_PRESET_A);
         const cs = useDesignStore.getState().creativeSet!;
-        const newVariant = cs.variants.find(v => v.id !== masterId)!;
+        const newVariant = cs.variants.find(v => v.id !== cs.masterVariantId)!;
 
-        // New variant should be plugged into master
-        expect(cs.plugConnections[newVariant.id]).toBe(masterId);
+        // New variant should NOT be auto-plugged
+        expect(cs.plugConnections[newVariant.id]).toBeUndefined();
     });
 
     it('connectPlug creates origin → target connection', () => {
@@ -247,10 +235,12 @@ describe('designStore — Plug Connections', () => {
         useDesignStore.getState().addVariant(VARIANT_PRESET_A);
 
         const cs = useDesignStore.getState().creativeSet!;
+        const masterId = cs.masterVariantId;
         const targetId = cs.variants[1]!.id;
 
-        // Should be connected after addVariant
-        expect(cs.plugConnections[targetId]).toBeDefined();
+        // Manually connect, then disconnect
+        useDesignStore.getState().connectPlug(masterId, targetId);
+        expect(useDesignStore.getState().creativeSet!.plugConnections[targetId]).toBe(masterId);
 
         useDesignStore.getState().disconnectPlug(targetId);
 
@@ -276,6 +266,9 @@ describe('designStore — Plug Connections', () => {
         const masterId = cs.masterVariantId;
         const targetId = cs.variants[1]!.id;
 
+        // Manually connect
+        useDesignStore.getState().connectPlug(masterId, targetId);
+
         const origin = useDesignStore.getState().getOriginForVariant(targetId);
         expect(origin).toBe(masterId);
     });
@@ -297,8 +290,15 @@ describe('designStore — Plug Connections', () => {
         useDesignStore.getState().addVariant(VARIANT_PRESET_B);
 
         const masterId = useDesignStore.getState().creativeSet!.masterVariantId;
-        const targets = useDesignStore.getState().getPluggedTargets(masterId);
+        const cs = useDesignStore.getState().creativeSet!;
+        const targetA = cs.variants[1]!.id;
+        const targetB = cs.variants[2]!.id;
 
+        // Manually connect both
+        useDesignStore.getState().connectPlug(masterId, targetA);
+        useDesignStore.getState().connectPlug(masterId, targetB);
+
+        const targets = useDesignStore.getState().getPluggedTargets(masterId);
         expect(targets).toHaveLength(2);
     });
 
@@ -307,10 +307,12 @@ describe('designStore — Plug Connections', () => {
         useDesignStore.getState().addVariant(VARIANT_PRESET_A);
 
         const cs = useDesignStore.getState().creativeSet!;
+        const masterId = cs.masterVariantId;
         const targetId = cs.variants[1]!.id;
 
-        // Variant is plugged
-        expect(cs.plugConnections[targetId]).toBeDefined();
+        // Manually plug, then remove
+        useDesignStore.getState().connectPlug(masterId, targetId);
+        expect(useDesignStore.getState().creativeSet!.plugConnections[targetId]).toBe(masterId);
 
         useDesignStore.getState().removeVariant(targetId);
 
