@@ -70,6 +70,8 @@ export interface CreativeSet {
     createdBy?: string;
     /** Cosmetic label only — marks one variant as "Master" for organization. No functional difference. */
     masterLabel?: string;
+    /** Persisted card positions in size dashboard (variantId → {x,y}) */
+    cardPositions?: Record<string, { x: number; y: number }>;
 }
 
 /** 대시보드용 크리에이티브 셋 요약 (가벼운 리스트 아이템) */

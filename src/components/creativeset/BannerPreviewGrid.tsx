@@ -90,8 +90,13 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
     const plugConnections = useDesignStore(s => s.creativeSet?.plugConnections ?? {});
     const masterLabel = useDesignStore(s => s.creativeSet?.masterLabel);
 
-    // ── Free-form card positions (variant.id → {x, y}) ──
-    const [cardPositions, setCardPositions] = useState<Record<string, { x: number; y: number }>>({});
+    // ── Free-form card positions (variant.id → {x, y}) — persisted in store ──
+    const storedPositions = useDesignStore(s => s.creativeSet?.cardPositions ?? {});
+    const [cardPositions, setCardPositions] = useState<Record<string, { x: number; y: number }>>(storedPositions);
+    // Sync from store → local when store changes (e.g. different creative set loaded)
+    useEffect(() => {
+        setCardPositions(storedPositions);
+    }, [storedPositions]);
     const draggingRef = useRef<{
         variantId: string;
         startMouse: { x: number; y: number };
@@ -151,6 +156,17 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                 // 300ms cooldown: suppress click/doubleclick after drag
                 dragCooldownRef.current = true;
                 setTimeout(() => { dragCooldownRef.current = false; }, 300);
+                // ★ Persist card positions to store so they survive navigation
+                setCardPositions(current => {
+                    const cs = useDesignStore.getState().creativeSet;
+                    if (cs) {
+                        useDesignStore.setState(state => ({
+                            ...state,
+                            creativeSet: state.creativeSet ? { ...state.creativeSet, cardPositions: current } : state.creativeSet,
+                        }));
+                    }
+                    return current;
+                });
             }
         };
         window.addEventListener('mousemove', onMove);
