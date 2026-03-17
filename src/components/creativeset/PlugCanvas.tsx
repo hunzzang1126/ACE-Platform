@@ -180,14 +180,14 @@ export function PlugCanvas({ variants, cardRefs, containerRef }: PlugCanvasProps
                         <stop offset="100%" stopColor="#c084fc" />
                     </linearGradient>
                     <filter id="plug-glow">
-                        <feGaussianBlur stdDeviation="4" result="blur" />
+                        <feGaussianBlur stdDeviation="6" result="blur" />
                         <feMerge>
                             <feMergeNode in="blur" />
                             <feMergeNode in="SourceGraphic" />
                         </feMerge>
                     </filter>
                     <filter id="plug-shadow">
-                        <feDropShadow dx="0" dy="1" stdDeviation="2" floodColor="#000" floodOpacity="0.3" />
+                        <feDropShadow dx="0" dy="2" stdDeviation="4" floodColor="#000" floodOpacity="0.5" />
                     </filter>
                 </defs>
 
@@ -199,8 +199,8 @@ export function PlugCanvas({ variants, cardRefs, containerRef }: PlugCanvasProps
                             d={bezierPath(conn.from, conn.to)}
                             fill="none"
                             stroke="url(#plug-cable-grad)"
-                            strokeWidth={6}
-                            opacity={0.15}
+                            strokeWidth={10}
+                            opacity={0.12}
                             filter="url(#plug-glow)"
                         />
                         {/* Cable body */}
@@ -208,7 +208,7 @@ export function PlugCanvas({ variants, cardRefs, containerRef }: PlugCanvasProps
                             d={bezierPath(conn.from, conn.to)}
                             fill="none"
                             stroke="url(#plug-cable-grad)"
-                            strokeWidth={2.5}
+                            strokeWidth={4}
                             opacity={0.9}
                             strokeLinecap="round"
                         />
@@ -225,11 +225,11 @@ export function PlugCanvas({ variants, cardRefs, containerRef }: PlugCanvasProps
                                         recalcPositions();
                                     }}
                                 >
-                                    <circle cx={mx} cy={my} r={8} fill="#1e2231" stroke="#ff6b6b" strokeWidth={1.5} opacity={0} className="plug-disconnect-btn" />
-                                    <line x1={mx - 3} y1={my - 3} x2={mx + 3} y2={my + 3} stroke="#ff6b6b" strokeWidth={1.5} opacity={0} className="plug-disconnect-x" />
-                                    <line x1={mx + 3} y1={my - 3} x2={mx - 3} y2={my + 3} stroke="#ff6b6b" strokeWidth={1.5} opacity={0} className="plug-disconnect-x" />
+                                    <circle cx={mx} cy={my} r={12} fill="#1e2231" stroke="#ff6b6b" strokeWidth={2} opacity={0} className="plug-disconnect-btn" />
+                                    <line x1={mx - 4} y1={my - 4} x2={mx + 4} y2={my + 4} stroke="#ff6b6b" strokeWidth={2} opacity={0} className="plug-disconnect-x" />
+                                    <line x1={mx + 4} y1={my - 4} x2={mx - 4} y2={my + 4} stroke="#ff6b6b" strokeWidth={2} opacity={0} className="plug-disconnect-x" />
                                     {/* Invisible hit area */}
-                                    <circle cx={mx} cy={my} r={12} fill="transparent" />
+                                    <circle cx={mx} cy={my} r={18} fill="transparent" />
                                 </g>
                             );
                         })()}
@@ -242,8 +242,8 @@ export function PlugCanvas({ variants, cardRefs, containerRef }: PlugCanvasProps
                         d={bezierPath(dragging.from, { x: dragging.mouse.x, y: dragging.mouse.y })}
                         fill="none"
                         stroke="url(#plug-cable-active)"
-                        strokeWidth={2.5}
-                        strokeDasharray="8 4"
+                        strokeWidth={4}
+                        strokeDasharray="10 5"
                         opacity={0.7}
                         filter="url(#plug-glow)"
                     />
@@ -265,14 +265,16 @@ export function PlugCanvas({ variants, cardRefs, containerRef }: PlugCanvasProps
                                         style={{ cursor: 'grab', pointerEvents: 'auto' }}
                                         onMouseDown={(e) => handlePortMouseDown(e as unknown as React.MouseEvent, v.id)}
                                     >
-                                        {/* Glow ring */}
-                                        <circle cx={oPort.x} cy={oPort.y} r={10} fill="none" stroke="#4a9eff" strokeWidth={1} opacity={0.3} />
-                                        {/* Outer ring */}
-                                        <circle cx={oPort.x} cy={oPort.y} r={7} fill="#1a1f2e" stroke="#4a9eff" strokeWidth={2} filter="url(#plug-shadow)" />
-                                        {/* Inner dot */}
-                                        <circle cx={oPort.x} cy={oPort.y} r={3} fill="#4a9eff" />
-                                        {/* Invisible hit area */}
-                                        <circle cx={oPort.x} cy={oPort.y} r={14} fill="transparent" />
+                                        {/* Outer glow pulse */}
+                                        <circle cx={oPort.x} cy={oPort.y} r={20} fill="none" stroke="#4a9eff" strokeWidth={1.5} opacity={0.2} />
+                                        {/* Port body */}
+                                        <circle cx={oPort.x} cy={oPort.y} r={14} fill="#0d1520" stroke="#4a9eff" strokeWidth={3} filter="url(#plug-shadow)" />
+                                        {/* Inner glow */}
+                                        <circle cx={oPort.x} cy={oPort.y} r={7} fill="#4a9eff" opacity={0.9} />
+                                        {/* Highlight dot */}
+                                        <circle cx={oPort.x - 2} cy={oPort.y - 2} r={2.5} fill="#fff" opacity={0.6} />
+                                        {/* Hit area */}
+                                        <circle cx={oPort.x} cy={oPort.y} r={22} fill="transparent" />
                                     </g>
                                 );
                             })()}
@@ -285,18 +287,19 @@ export function PlugCanvas({ variants, cardRefs, containerRef }: PlugCanvasProps
                                 if (isPlugged) {
                                     return (
                                         <g style={{ pointerEvents: 'auto' }}>
-                                            {/* Connected: purple filled */}
-                                            <circle cx={tPort.x} cy={tPort.y} r={10} fill="none" stroke="#a855f7" strokeWidth={1} opacity={0.3} />
-                                            <circle cx={tPort.x} cy={tPort.y} r={7} fill="#1a1f2e" stroke="#a855f7" strokeWidth={2} filter="url(#plug-shadow)" />
-                                            <circle cx={tPort.x} cy={tPort.y} r={3} fill="#a855f7" />
+                                            {/* Connected: purple socket */}
+                                            <circle cx={tPort.x} cy={tPort.y} r={20} fill="none" stroke="#a855f7" strokeWidth={1.5} opacity={0.2} />
+                                            <circle cx={tPort.x} cy={tPort.y} r={14} fill="#0d1520" stroke="#a855f7" strokeWidth={3} filter="url(#plug-shadow)" />
+                                            <circle cx={tPort.x} cy={tPort.y} r={7} fill="#a855f7" opacity={0.9} />
+                                            <circle cx={tPort.x - 2} cy={tPort.y - 2} r={2.5} fill="#fff" opacity={0.4} />
                                         </g>
                                     );
                                 }
                                 return (
                                     <g style={{ pointerEvents: 'auto' }}>
-                                        {/* Unconnected: dashed ring */}
-                                        <circle cx={tPort.x} cy={tPort.y} r={7} fill="#1a1f2e" stroke="#484f58" strokeWidth={1.5} strokeDasharray="3 2" filter="url(#plug-shadow)" />
-                                        <circle cx={tPort.x} cy={tPort.y} r={2} fill="#484f58" opacity={0.5} />
+                                        {/* Unconnected: dashed dark socket */}
+                                        <circle cx={tPort.x} cy={tPort.y} r={14} fill="#0d1520" stroke="#484f58" strokeWidth={2.5} strokeDasharray="5 3" filter="url(#plug-shadow)" />
+                                        <circle cx={tPort.x} cy={tPort.y} r={4} fill="#484f58" opacity={0.4} />
                                     </g>
                                 );
                             })()}
