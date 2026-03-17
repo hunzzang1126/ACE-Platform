@@ -49,7 +49,7 @@ export function PlugCanvas({ variants, cardRefs, containerRef }: PlugCanvasProps
     const plugConnections = useDesignStore(s => s.creativeSet?.plugConnections ?? {});
     const connectPlug = useDesignStore(s => s.connectPlug);
     const disconnectPlug = useDesignStore(s => s.disconnectPlug);
-    const masterVariantId = useDesignStore(s => s.creativeSet?.masterVariantId ?? '');
+    // masterVariantId no longer used — all cards get both ports
 
     const [positions, setPositions] = useState<{
         origins: Record<string, PortPos>;
@@ -142,12 +142,12 @@ export function PlugCanvas({ variants, cardRefs, containerRef }: PlugCanvasProps
         }
     }
 
-    // Origins: master + any variant that has targets plugged into it
+    // All cards can be origins (output) — not just master
+    // originIds = any variant that has at least one target plugged into it
     const originIds = new Set<string>();
     for (const [, originId] of Object.entries(plugConnections)) {
         originIds.add(originId);
     }
-    originIds.add(masterVariantId);
 
     const container = containerRef.current;
     const svgW = container ? container.scrollWidth : 0;
@@ -251,14 +251,13 @@ export function PlugCanvas({ variants, cardRefs, containerRef }: PlugCanvasProps
 
                 {/* Port circles rendered in SVG for perfect alignment */}
                 {variants.map(v => {
-                    const isOrigin = originIds.has(v.id);
                     const isPlugged = v.id in plugConnections;
 
                     return (
                         <g key={`ports-${v.id}`}>
-                            {/* Origin output port (right side) — blue glowing circle */}
+                            {/* Output port (right side) — always shown on every card */}
                             {(() => {
-                                const oPort = isOrigin ? positions.origins[v.id] : undefined;
+                                const oPort = positions.origins[v.id];
                                 if (!oPort) return null;
                                 return (
                                     <g
@@ -279,9 +278,8 @@ export function PlugCanvas({ variants, cardRefs, containerRef }: PlugCanvasProps
                                 );
                             })()}
 
-                            {/* Target input socket (left side) — dashed or purple */}
+                            {/* Input socket (left side) — always shown on every card */}
                             {(() => {
-                                if (isOrigin) return null;
                                 const tPort = positions.targets[v.id];
                                 if (!tPort) return null;
                                 if (isPlugged) {

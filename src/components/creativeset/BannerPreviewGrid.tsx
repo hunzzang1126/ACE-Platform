@@ -88,6 +88,7 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
     const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
     const gridContainerRef = useRef<HTMLDivElement>(null);
     const plugConnections = useDesignStore(s => s.creativeSet?.plugConnections ?? {});
+    const masterLabel = useDesignStore(s => s.creativeSet?.masterLabel);
 
     // ── Free-form card positions (variant.id → {x, y}) ──
     const [cardPositions, setCardPositions] = useState<Record<string, { x: number; y: number }>>({});
@@ -400,7 +401,7 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                     const previewW = Math.round(width * scale);
                     const previewH = Math.round(height * scale);
                     const zoom = Math.round(scale * 100);
-                    const isMaster = variant.id === masterVariantId;
+                    const hasLabel = variant.id === masterLabel;
 
                     // ★ Auto-layout: calculate grid position if not yet positioned
                     const pos = cardPositions[variant.id] ?? autoGridPos(idx, previewW);
@@ -431,8 +432,8 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                             >
                                 <span className="banner-card-dims">
                                     {width} x {height}
-                                    {isMaster && <span className="banner-card-origin">  ORIGIN</span>}
-                                    {!isMaster && (variant.id in plugConnections) && <span className="banner-card-plugged">  PLUGGED</span>}
+                                    {hasLabel && <span className="banner-card-origin">  MASTER</span>}
+                                    {(variant.id in plugConnections) && <span className="banner-card-plugged">  PLUGGED</span>}
                                 </span>
                                 {selectedIds.has(variant.id) && (
                                     <span style={{
@@ -732,7 +733,7 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                     )}
 
                     {/* Delete variant */}
-                    {ctxMenu.variantId !== masterVariantId && (
+                    {visibleVariants.length > 1 && (
                         <>
                             <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', margin: '4px 0' }} />
                             <button
@@ -748,6 +749,30 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                                 Delete Size
                             </button>
                         </>
+                    )}
+
+                    {/* Label as Master (cosmetic) */}
+                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', margin: '4px 0' }} />
+                    {ctxMenu.variantId === masterLabel ? (
+                        <button
+                            className="banner-ctx-item"
+                            onClick={() => {
+                                useDesignStore.getState().clearMasterLabel();
+                                setCtxMenu(null);
+                            }}
+                        >
+                            Remove Master Label
+                        </button>
+                    ) : (
+                        <button
+                            className="banner-ctx-item"
+                            onClick={() => {
+                                useDesignStore.getState().setMasterLabel(ctxMenu.variantId);
+                                setCtxMenu(null);
+                            }}
+                        >
+                            Label as Master
+                        </button>
                     )}
                 </div>
             )}

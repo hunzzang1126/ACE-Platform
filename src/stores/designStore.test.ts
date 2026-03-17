@@ -170,14 +170,26 @@ describe('designStore — Variant Management', () => {
         expect(cs.variants[1]!.elements.length).toBeGreaterThanOrEqual(1);
     });
 
-    it('removeVariant cannot delete the master variant', () => {
-        useDesignStore.getState().createCreativeSet('Cannot Remove Master', MASTER_PRESET);
-        const masterId = useDesignStore.getState().creativeSet!.masterVariantId;
+    it('removeVariant cannot delete the last remaining variant', () => {
+        useDesignStore.getState().createCreativeSet('Cannot Remove Last', MASTER_PRESET);
+        const lastId = useDesignStore.getState().creativeSet!.variants[0]!.id;
 
-        useDesignStore.getState().removeVariant(masterId);
+        useDesignStore.getState().removeVariant(lastId);
 
         expect(useDesignStore.getState().creativeSet!.variants).toHaveLength(1);
-        expect(useDesignStore.getState().creativeSet!.variants[0]!.id).toBe(masterId);
+        expect(useDesignStore.getState().creativeSet!.variants[0]!.id).toBe(lastId);
+    });
+
+    it('removeVariant CAN delete any variant when more than one exists', () => {
+        useDesignStore.getState().createCreativeSet('Can Remove Any', MASTER_PRESET);
+        const masterId = useDesignStore.getState().creativeSet!.masterVariantId;
+
+        useDesignStore.getState().addVariant(VARIANT_PRESET_A);
+        expect(useDesignStore.getState().creativeSet!.variants).toHaveLength(2);
+
+        // Delete the master variant (previously forbidden)
+        useDesignStore.getState().removeVariant(masterId);
+        expect(useDesignStore.getState().creativeSet!.variants).toHaveLength(1);
     });
 });
 
@@ -326,5 +338,46 @@ describe('designStore — Plug Connections', () => {
 
         const updated = useDesignStore.getState().creativeSet!;
         expect(updated.plugConnections[variantB.id]).toBeUndefined();
+    });
+});
+
+// ─────────────────────────────────────────────────
+// Master Label Tests (cosmetic only)
+// ─────────────────────────────────────────────────
+
+describe('designStore — Master Label (cosmetic)', () => {
+
+    it('setMasterLabel assigns the label to a variant', () => {
+        useDesignStore.getState().createCreativeSet('Label Test', MASTER_PRESET);
+        const variantId = useDesignStore.getState().creativeSet!.variants[0]!.id;
+
+        useDesignStore.getState().setMasterLabel(variantId);
+
+        expect(useDesignStore.getState().creativeSet!.masterLabel).toBe(variantId);
+    });
+
+    it('clearMasterLabel removes the label', () => {
+        useDesignStore.getState().createCreativeSet('Clear Label', MASTER_PRESET);
+        const variantId = useDesignStore.getState().creativeSet!.variants[0]!.id;
+
+        useDesignStore.getState().setMasterLabel(variantId);
+        expect(useDesignStore.getState().creativeSet!.masterLabel).toBe(variantId);
+
+        useDesignStore.getState().clearMasterLabel();
+        expect(useDesignStore.getState().creativeSet!.masterLabel).toBeUndefined();
+    });
+
+    it('deleting a labeled variant clears the master label', () => {
+        useDesignStore.getState().createCreativeSet('Delete Label', MASTER_PRESET);
+        useDesignStore.getState().addVariant(VARIANT_PRESET_A);
+
+        const cs = useDesignStore.getState().creativeSet!;
+        const target = cs.variants[1]!;
+
+        useDesignStore.getState().setMasterLabel(target.id);
+        expect(useDesignStore.getState().creativeSet!.masterLabel).toBe(target.id);
+
+        useDesignStore.getState().removeVariant(target.id);
+        expect(useDesignStore.getState().creativeSet!.masterLabel).toBeUndefined();
     });
 });

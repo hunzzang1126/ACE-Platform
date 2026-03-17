@@ -88,6 +88,12 @@ interface DesignState {
     getOriginForVariant: (variantId: string) => string | undefined;
     /** Get all targets plugged into a given origin */
     getPluggedTargets: (originId: string) => string[];
+
+    // ── Master Label (cosmetic only — no functional difference) ──
+    /** Set the "Master" cosmetic label on a variant */
+    setMasterLabel: (variantId: string) => void;
+    /** Remove the "Master" cosmetic label */
+    clearMasterLabel: () => void;
 }
 
 // Helper: get the active creative set from state
@@ -307,8 +313,8 @@ export const useDesignStore = create<DesignState>()(
                     set((state) => {
                         const cs = getActiveCS(state);
                         if (!cs) return;
-                        // Origin(마스터)는 삭제 불가
-                        if (variantId === cs.masterVariantId) return;
+                        // Cannot delete the last remaining variant
+                        if (cs.variants.length <= 1) return;
                         cs.variants = cs.variants.filter(
                             (v) => v.id !== variantId,
                         );
@@ -321,6 +327,10 @@ export const useDesignStore = create<DesignState>()(
                                     delete cs.plugConnections[target];
                                 }
                             }
+                        }
+                        // Clear master label if deleted variant had it
+                        if (cs.masterLabel === variantId) {
+                            cs.masterLabel = undefined;
                         }
                         cs.updatedAt = new Date().toISOString();
                         state.creativeSet = cs;
@@ -501,6 +511,28 @@ export const useDesignStore = create<DesignState>()(
                     return Object.entries(cs.plugConnections)
                         .filter(([, oId]) => oId === originId)
                         .map(([targetId]) => targetId);
+                },
+
+                // ── Master Label (cosmetic only) ──
+
+                setMasterLabel: (variantId) => {
+                    set((state) => {
+                        const cs = getActiveCS(state);
+                        if (!cs) return;
+                        cs.masterLabel = variantId;
+                        cs.updatedAt = new Date().toISOString();
+                        state.creativeSet = cs;
+                    });
+                },
+
+                clearMasterLabel: () => {
+                    set((state) => {
+                        const cs = getActiveCS(state);
+                        if (!cs) return;
+                        cs.masterLabel = undefined;
+                        cs.updatedAt = new Date().toISOString();
+                        state.creativeSet = cs;
+                    });
                 },
 
             })),

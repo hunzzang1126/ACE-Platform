@@ -68,6 +68,8 @@ export interface CreativeSet {
     updatedAt: string;
     /** 생성자 */
     createdBy?: string;
+    /** Cosmetic label only — marks one variant as "Master" for organization. No functional difference. */
+    masterLabel?: string;
 }
 
 /** 대시보드용 크리에이티브 셋 요약 (가벼운 리스트 아이템) */
