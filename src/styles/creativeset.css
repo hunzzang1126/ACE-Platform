@@ -1009,7 +1009,9 @@
     white-space: nowrap;
 }
 
-/* ── Plug Connection Ports ── */
+/* ── Plug Connection System ── */
+
+/* Plug port base (deprecated — ports now in SVG) */
 .plug-port {
     width: 14px;
     height: 14px;
@@ -1018,43 +1020,16 @@
     transition: transform 0.15s, box-shadow 0.2s, background 0.2s;
 }
 
-.plug-port:active {
-    cursor: grabbing;
-    transform: scale(1.3);
+.plug-port:active { cursor: grabbing; transform: scale(1.3); }
+
+/* Disconnect button appears on cable hover */
+.plug-disconnect-btn,
+.plug-disconnect-x {
+    transition: opacity 0.2s ease;
 }
 
-/* Origin output port — glowing blue circle */
-.plug-port--origin {
-    background: radial-gradient(circle, #4a9eff 40%, #2563eb 100%);
-    box-shadow: 0 0 6px rgba(74, 158, 255, 0.5), 0 0 12px rgba(74, 158, 255, 0.2);
-    border: 2px solid rgba(255, 255, 255, 0.3);
-}
-
-.plug-port--origin:hover {
-    transform: scale(1.25);
-    box-shadow: 0 0 10px rgba(74, 158, 255, 0.7), 0 0 20px rgba(74, 158, 255, 0.3);
-}
-
-/* Target input socket — dark circle */
-.plug-port--target {
-    background: var(--bg-surface);
-    border: 2px dashed var(--border);
-    box-shadow: inset 0 0 3px rgba(0, 0, 0, 0.3);
-    cursor: default;
-}
-
-/* Connected target — purple glow */
-.plug-port--target.plug-port--connected {
-    background: radial-gradient(circle, #a855f7 40%, #7c3aed 100%);
-    border: 2px solid rgba(255, 255, 255, 0.2);
-    box-shadow: 0 0 6px rgba(168, 85, 247, 0.5), 0 0 12px rgba(168, 85, 247, 0.2);
-    cursor: context-menu;
-}
-
-.plug-port--target.plug-port--connected:hover {
-    transform: scale(1.2);
-    box-shadow: 0 0 10px rgba(168, 85, 247, 0.7), 0 0 20px rgba(168, 85, 247, 0.3);
-}
+g:hover > .plug-disconnect-btn { opacity: 1 !important; }
+g:hover > .plug-disconnect-x { opacity: 1 !important; }
 
 /* Origin badge on card header */
 .banner-card-origin {
@@ -1070,3 +1045,4 @@
     font-size: 10px;
     letter-spacing: 0.3px;
 }
+

@@ -91,12 +91,13 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
 
     // ── Free-form card positions (variant.id → {x, y}) ──
     const [cardPositions, setCardPositions] = useState<Record<string, { x: number; y: number }>>({});
-    const [draggingCard, setDraggingCard] = useState<{
+    const draggingRef = useRef<{
         variantId: string;
         startMouse: { x: number; y: number };
         startPos: { x: number; y: number };
+        hasMoved: boolean;
     } | null>(null);
-
+    const [draggingId, setDraggingId] = useState<string | null>(null);
     // ── Auto-layout helper: calculate grid position for card ──
     const GRID_GAP = 32;
     const GRID_COLS = 3;
@@ -109,41 +110,48 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
 
 
 
-    // ── Drag handlers ──
+    // ── Drag handlers (ref-based for performance) ──
     const handleCardDragStart = useCallback((e: React.MouseEvent, variantId: string, currentPos: { x: number; y: number }) => {
-        // Only drag from left-click on header, not right-click or port interaction
         if (e.button !== 0) return;
         e.stopPropagation();
-        e.preventDefault();
-        setDraggingCard({
+        draggingRef.current = {
             variantId,
             startMouse: { x: e.clientX, y: e.clientY },
             startPos: currentPos,
-        });
+            hasMoved: false,
+        };
+        setDraggingId(variantId);
     }, []);
 
-    // Drag move/up effect
+    // Drag move/up at document level
     useEffect(() => {
-        if (!draggingCard) return;
         const onMove = (e: MouseEvent) => {
-            const dx = e.clientX - draggingCard.startMouse.x;
-            const dy = e.clientY - draggingCard.startMouse.y;
+            const drag = draggingRef.current;
+            if (!drag) return;
+            const dx = e.clientX - drag.startMouse.x;
+            const dy = e.clientY - drag.startMouse.y;
+            // 3px threshold to distinguish click from drag
+            if (!drag.hasMoved && Math.abs(dx) + Math.abs(dy) < 3) return;
+            drag.hasMoved = true;
             setCardPositions(prev => ({
                 ...prev,
-                [draggingCard.variantId]: {
-                    x: Math.max(0, draggingCard.startPos.x + dx),
-                    y: Math.max(0, draggingCard.startPos.y + dy),
+                [drag.variantId]: {
+                    x: Math.max(0, drag.startPos.x + dx),
+                    y: Math.max(0, drag.startPos.y + dy),
                 },
             }));
         };
-        const onUp = () => setDraggingCard(null);
+        const onUp = () => {
+            draggingRef.current = null;
+            setDraggingId(null);
+        };
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
         return () => {
             window.removeEventListener('mousemove', onMove);
             window.removeEventListener('mouseup', onUp);
         };
-    }, [draggingCard]);
+    }, []);
 
     // ── Context menu state ──
     const [ctxMenu, setCtxMenu] = useState<ContextMenuState | null>(null);
@@ -395,8 +403,9 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                             key={variant.id}
                             ref={(el) => { cardRefs.current[variant.id] = el; }}
                             data-variant-id={variant.id}
-                            className={`banner-card ${isPlaying ? 'banner-card--playing' : ''} ${selectedIds.has(variant.id) ? 'banner-card--selected' : ''} ${draggingCard?.variantId === variant.id ? 'banner-card--dragging' : ''}`}
-                            onClick={(e) => toggleSelection(variant.id, e)}
+                            className={`banner-card ${isPlaying ? 'banner-card--playing' : ''} ${selectedIds.has(variant.id) ? 'banner-card--selected' : ''} ${draggingId === variant.id ? 'banner-card--dragging' : ''}`}
+                            onMouseDown={(e) => handleCardDragStart(e, variant.id, pos)}
+                            onClick={(e) => { if (!draggingRef.current?.hasMoved) toggleSelection(variant.id, e); }}
                             onDoubleClick={() => handleDoubleClick(variant.id)}
                             onContextMenu={(e) => handleContextMenu(e, variant.id)}
                             style={{
@@ -411,8 +420,7 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                         >
                             <div
                                 className="banner-card-header"
-                                onMouseDown={(e) => handleCardDragStart(e, variant.id, pos)}
-                                style={{ cursor: 'grab' }}
+                                style={{ cursor: draggingId ? 'grabbing' : 'grab' }}
                             >
                                 <span className="banner-card-dims">
                                     {width} x {height}
@@ -699,6 +707,38 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                     <button className="banner-ctx-item" onClick={() => { setCtxMenu(null); handleDoubleClick(ctxMenu.variantId); }}>
                         Open in Editor
                     </button>
+
+                    {/* Disconnect plug */}
+                    {(ctxMenu.variantId in plugConnections) && (
+                        <button
+                            className="banner-ctx-item"
+                            onClick={() => {
+                                useDesignStore.getState().disconnectPlug(ctxMenu.variantId);
+                                setCtxMenu(null);
+                            }}
+                        >
+                            Disconnect Plug
+                        </button>
+                    )}
+
+                    {/* Delete variant */}
+                    {ctxMenu.variantId !== masterVariantId && (
+                        <>
+                            <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', margin: '4px 0' }} />
+                            <button
+                                className="banner-ctx-item banner-ctx-item--danger"
+                                onClick={() => {
+                                    const confirmed = window.confirm('Are you sure you want to permanently delete this size variant? This cannot be undone.');
+                                    if (confirmed) {
+                                        useDesignStore.getState().removeVariant(ctxMenu.variantId);
+                                        setCtxMenu(null);
+                                    }
+                                }}
+                            >
+                                Delete Size
+                            </button>
+                        </>
+                    )}
                 </div>
             )}
         </div>

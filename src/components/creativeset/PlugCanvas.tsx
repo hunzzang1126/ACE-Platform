@@ -1,9 +1,8 @@
 // ─────────────────────────────────────────────────
-// PlugCanvas – SVG overlay for visual plug connections
+// PlugCanvas – Premium SVG plug connectors
 // ─────────────────────────────────────────────────
-// Renders bezier cables between connected card ports.
-// Drag from an origin port to a target socket to create connections.
-// Pure presentation component — uses designStore for data.
+// Figma-style bezier cables between origin → target cards.
+// Tactile plug aesthetic: glowing output ports, socket receivers.
 
 import { useCallback, useEffect, useState } from 'react';
 import { useDesignStore } from '@/stores/designStore';
@@ -11,22 +10,12 @@ import type { BannerVariant } from '@/schema/design.types';
 
 interface PlugCanvasProps {
     variants: BannerVariant[];
-    /** Map of variant.id → DOM element ref for each card */
     cardRefs: React.MutableRefObject<Record<string, HTMLDivElement | null>>;
-    /** The scrollable container the grid lives within */
     containerRef: React.RefObject<HTMLDivElement | null>;
 }
 
-interface PortPos {
-    /** Absolute px position of the port center (relative to svg) */
-    x: number;
-    y: number;
-}
+interface PortPos { x: number; y: number; }
 
-/**
- * Calculate port positions based on card DOM rects.
- * Origin port = right edge center, Target socket = left edge center.
- */
 function getPortPositions(
     cardRefs: Record<string, HTMLDivElement | null>,
     container: HTMLDivElement | null,
@@ -39,12 +28,10 @@ function getPortPositions(
     for (const [id, el] of Object.entries(cardRefs)) {
         if (!el) continue;
         const r = el.getBoundingClientRect();
-        // Origin port: right edge, vertically centered
         origins[id] = {
             x: r.right - cRect.left + container.scrollLeft,
             y: r.top + r.height / 2 - cRect.top + container.scrollTop,
         };
-        // Target socket: left edge, vertically centered
         targets[id] = {
             x: r.left - cRect.left + container.scrollLeft,
             y: r.top + r.height / 2 - cRect.top + container.scrollTop,
@@ -53,7 +40,6 @@ function getPortPositions(
     return { origins, targets };
 }
 
-/** Generate SVG cubic bezier path between two points */
 function bezierPath(from: PortPos, to: PortPos): string {
     const dx = Math.abs(to.x - from.x) * 0.5;
     return `M ${from.x} ${from.y} C ${from.x + dx} ${from.y}, ${to.x - dx} ${to.y}, ${to.x} ${to.y}`;
@@ -65,42 +51,38 @@ export function PlugCanvas({ variants, cardRefs, containerRef }: PlugCanvasProps
     const disconnectPlug = useDesignStore(s => s.disconnectPlug);
     const masterVariantId = useDesignStore(s => s.creativeSet?.masterVariantId ?? '');
 
-    // Positions re-calculated on layout changes
     const [positions, setPositions] = useState<{
         origins: Record<string, PortPos>;
         targets: Record<string, PortPos>;
     }>({ origins: {}, targets: {} });
 
-    // Drag state for creating new connections
     const [dragging, setDragging] = useState<{
         originId: string;
         from: PortPos;
         mouse: { x: number; y: number };
     } | null>(null);
 
-    // Recalculate positions
     const recalcPositions = useCallback(() => {
         setPositions(getPortPositions(cardRefs.current, containerRef.current));
     }, [cardRefs, containerRef]);
 
-    // Update positions on mount, resize, scroll, and variant changes
+    // Recalculate on mount, resize, scroll, variant changes, and frequently
     useEffect(() => {
         recalcPositions();
         const onResize = () => recalcPositions();
         const container = containerRef.current;
         window.addEventListener('resize', onResize);
         container?.addEventListener('scroll', onResize);
-        // MutationObserver for DOM changes
-        const observer = new MutationObserver(onResize);
-        if (container) observer.observe(container, { childList: true, subtree: true });
+        // Frequent recalc for drag movements
+        const interval = setInterval(recalcPositions, 100);
         return () => {
             window.removeEventListener('resize', onResize);
             container?.removeEventListener('scroll', onResize);
-            observer.disconnect();
+            clearInterval(interval);
         };
     }, [variants.length, recalcPositions, containerRef]);
 
-    // Handle drag start from origin port
+    // Handle plug port drag
     const handlePortMouseDown = useCallback((e: React.MouseEvent, variantId: string) => {
         e.stopPropagation();
         e.preventDefault();
@@ -119,7 +101,6 @@ export function PlugCanvas({ variants, cardRefs, containerRef }: PlugCanvasProps
         });
     }, [positions.origins, containerRef]);
 
-    // Handle drag move
     useEffect(() => {
         if (!dragging) return;
         const container = containerRef.current;
@@ -135,7 +116,6 @@ export function PlugCanvas({ variants, cardRefs, containerRef }: PlugCanvasProps
             } : null);
         };
         const onUp = (e: MouseEvent) => {
-            // Find which card the mouse is over
             const target = document.elementFromPoint(e.clientX, e.clientY);
             const card = target?.closest('[data-variant-id]') as HTMLElement | null;
             if (card && card.dataset.variantId && card.dataset.variantId !== dragging.originId) {
@@ -152,15 +132,7 @@ export function PlugCanvas({ variants, cardRefs, containerRef }: PlugCanvasProps
         };
     }, [dragging, connectPlug, containerRef, recalcPositions]);
 
-    // Determine which variants are origins (have targets plugged into them)
-    const originIds = new Set<string>();
-    for (const [, originId] of Object.entries(plugConnections)) {
-        originIds.add(originId);
-    }
-    // Master is always an origin
-    originIds.add(masterVariantId);
-
-    // Build connections for rendering
+    // Build connections
     const connections: { id: string; from: PortPos; to: PortPos; targetId: string }[] = [];
     for (const [targetId, originId] of Object.entries(plugConnections)) {
         const from = positions.origins[originId];
@@ -170,14 +142,20 @@ export function PlugCanvas({ variants, cardRefs, containerRef }: PlugCanvasProps
         }
     }
 
-    // SVG dimensions match container scroll area
+    // Origins: master + any variant that has targets plugged into it
+    const originIds = new Set<string>();
+    for (const [, originId] of Object.entries(plugConnections)) {
+        originIds.add(originId);
+    }
+    originIds.add(masterVariantId);
+
     const container = containerRef.current;
     const svgW = container ? container.scrollWidth : 0;
     const svgH = container ? container.scrollHeight : 0;
 
     return (
         <>
-            {/* SVG cable overlay */}
+            {/* SVG cables */}
             <svg
                 className="plug-canvas-svg"
                 width={svgW}
@@ -194,110 +172,138 @@ export function PlugCanvas({ variants, cardRefs, containerRef }: PlugCanvasProps
                 <defs>
                     <linearGradient id="plug-cable-grad" x1="0%" y1="0%" x2="100%" y2="0%">
                         <stop offset="0%" stopColor="#4a9eff" />
+                        <stop offset="50%" stopColor="#6c63ff" />
                         <stop offset="100%" stopColor="#a855f7" />
                     </linearGradient>
+                    <linearGradient id="plug-cable-active" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="#60b4ff" />
+                        <stop offset="100%" stopColor="#c084fc" />
+                    </linearGradient>
                     <filter id="plug-glow">
-                        <feGaussianBlur stdDeviation="3" result="blur" />
+                        <feGaussianBlur stdDeviation="4" result="blur" />
                         <feMerge>
                             <feMergeNode in="blur" />
                             <feMergeNode in="SourceGraphic" />
                         </feMerge>
                     </filter>
+                    <filter id="plug-shadow">
+                        <feDropShadow dx="0" dy="1" stdDeviation="2" floodColor="#000" floodOpacity="0.3" />
+                    </filter>
                 </defs>
 
-                {/* Established connections */}
+                {/* Cables */}
                 {connections.map(conn => (
                     <g key={conn.id}>
-                        {/* Glow background */}
+                        {/* Outer glow */}
                         <path
                             d={bezierPath(conn.from, conn.to)}
                             fill="none"
                             stroke="url(#plug-cable-grad)"
-                            strokeWidth={4}
-                            opacity={0.2}
+                            strokeWidth={6}
+                            opacity={0.15}
                             filter="url(#plug-glow)"
                         />
-                        {/* Main cable */}
+                        {/* Cable body */}
                         <path
                             d={bezierPath(conn.from, conn.to)}
                             fill="none"
                             stroke="url(#plug-cable-grad)"
-                            strokeWidth={2}
-                            opacity={0.8}
+                            strokeWidth={2.5}
+                            opacity={0.9}
                             strokeLinecap="round"
                         />
+                        {/* Disconnect button at midpoint */}
+                        {(() => {
+                            const mx = (conn.from.x + conn.to.x) / 2;
+                            const my = (conn.from.y + conn.to.y) / 2;
+                            return (
+                                <g
+                                    style={{ cursor: 'pointer', pointerEvents: 'auto' }}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        disconnectPlug(conn.targetId);
+                                        recalcPositions();
+                                    }}
+                                >
+                                    <circle cx={mx} cy={my} r={8} fill="#1e2231" stroke="#ff6b6b" strokeWidth={1.5} opacity={0} className="plug-disconnect-btn" />
+                                    <line x1={mx - 3} y1={my - 3} x2={mx + 3} y2={my + 3} stroke="#ff6b6b" strokeWidth={1.5} opacity={0} className="plug-disconnect-x" />
+                                    <line x1={mx + 3} y1={my - 3} x2={mx - 3} y2={my + 3} stroke="#ff6b6b" strokeWidth={1.5} opacity={0} className="plug-disconnect-x" />
+                                    {/* Invisible hit area */}
+                                    <circle cx={mx} cy={my} r={12} fill="transparent" />
+                                </g>
+                            );
+                        })()}
                     </g>
                 ))}
 
-                {/* Dragging cable preview */}
+                {/* Drag preview cable */}
                 {dragging && (
                     <path
                         d={bezierPath(dragging.from, { x: dragging.mouse.x, y: dragging.mouse.y })}
                         fill="none"
-                        stroke="#4a9eff"
-                        strokeWidth={2}
-                        strokeDasharray="6 4"
-                        opacity={0.6}
+                        stroke="url(#plug-cable-active)"
+                        strokeWidth={2.5}
+                        strokeDasharray="8 4"
+                        opacity={0.7}
+                        filter="url(#plug-glow)"
                     />
                 )}
+
+                {/* Port circles rendered in SVG for perfect alignment */}
+                {variants.map(v => {
+                    const isOrigin = originIds.has(v.id);
+                    const isPlugged = v.id in plugConnections;
+
+                    return (
+                        <g key={`ports-${v.id}`}>
+                            {/* Origin output port (right side) — blue glowing circle */}
+                            {(() => {
+                                const oPort = isOrigin ? positions.origins[v.id] : undefined;
+                                if (!oPort) return null;
+                                return (
+                                    <g
+                                        style={{ cursor: 'grab', pointerEvents: 'auto' }}
+                                        onMouseDown={(e) => handlePortMouseDown(e as unknown as React.MouseEvent, v.id)}
+                                    >
+                                        {/* Glow ring */}
+                                        <circle cx={oPort.x} cy={oPort.y} r={10} fill="none" stroke="#4a9eff" strokeWidth={1} opacity={0.3} />
+                                        {/* Outer ring */}
+                                        <circle cx={oPort.x} cy={oPort.y} r={7} fill="#1a1f2e" stroke="#4a9eff" strokeWidth={2} filter="url(#plug-shadow)" />
+                                        {/* Inner dot */}
+                                        <circle cx={oPort.x} cy={oPort.y} r={3} fill="#4a9eff" />
+                                        {/* Invisible hit area */}
+                                        <circle cx={oPort.x} cy={oPort.y} r={14} fill="transparent" />
+                                    </g>
+                                );
+                            })()}
+
+                            {/* Target input socket (left side) — dashed or purple */}
+                            {(() => {
+                                if (isOrigin) return null;
+                                const tPort = positions.targets[v.id];
+                                if (!tPort) return null;
+                                if (isPlugged) {
+                                    return (
+                                        <g style={{ pointerEvents: 'auto' }}>
+                                            {/* Connected: purple filled */}
+                                            <circle cx={tPort.x} cy={tPort.y} r={10} fill="none" stroke="#a855f7" strokeWidth={1} opacity={0.3} />
+                                            <circle cx={tPort.x} cy={tPort.y} r={7} fill="#1a1f2e" stroke="#a855f7" strokeWidth={2} filter="url(#plug-shadow)" />
+                                            <circle cx={tPort.x} cy={tPort.y} r={3} fill="#a855f7" />
+                                        </g>
+                                    );
+                                }
+                                return (
+                                    <g style={{ pointerEvents: 'auto' }}>
+                                        {/* Unconnected: dashed ring */}
+                                        <circle cx={tPort.x} cy={tPort.y} r={7} fill="#1a1f2e" stroke="#484f58" strokeWidth={1.5} strokeDasharray="3 2" filter="url(#plug-shadow)" />
+                                        <circle cx={tPort.x} cy={tPort.y} r={2} fill="#484f58" opacity={0.5} />
+                                    </g>
+                                );
+                            })()}
+                        </g>
+                    );
+                })}
             </svg>
-
-            {/* Port overlays on each card */}
-            {variants.map(v => {
-                const isOrigin = originIds.has(v.id);
-                const isPlugged = v.id in plugConnections;
-
-                return (
-                    <div key={`port-${v.id}`}>
-                        {/* Origin output port (right side) */}
-                        {(() => {
-                            const oPort = isOrigin ? positions.origins[v.id] : undefined;
-                            if (!oPort) return null;
-                            return (
-                                <div
-                                    className="plug-port plug-port--origin"
-                                    style={{
-                                        position: 'absolute',
-                                        left: oPort.x - 7,
-                                        top: oPort.y - 7,
-                                        zIndex: 10,
-                                        pointerEvents: 'auto',
-                                    }}
-                                    onMouseDown={(e) => handlePortMouseDown(e, v.id)}
-                                    title="Drag to connect"
-                                />
-                            );
-                        })()}
-
-                        {/* Target input socket (left side) */}
-                        {(() => {
-                            if (isOrigin) return null;
-                            const tPort = positions.targets[v.id];
-                            if (!tPort) return null;
-                            return (
-                                <div
-                                    className={`plug-port plug-port--target ${isPlugged ? 'plug-port--connected' : ''}`}
-                                    style={{
-                                        position: 'absolute',
-                                        left: tPort.x - 7,
-                                        top: tPort.y - 7,
-                                        zIndex: 10,
-                                        pointerEvents: 'auto',
-                                    }}
-                                    title={isPlugged ? 'Connected — right-click to disconnect' : 'Drop here to connect'}
-                                    onContextMenu={(e) => {
-                                        if (isPlugged) {
-                                            e.preventDefault();
-                                            disconnectPlug(v.id);
-                                            recalcPositions();
-                                        }
-                                    }}
-                                />
-                            );
-                        })()}
-                    </div>
-                );
-            })}
         </>
     );
 }
