@@ -9,6 +9,8 @@ import { resolveConstraints } from '@/schema/constraints.types';
 import { computeAnimStyle, type AnimPresetType } from '@/hooks/useAnimationPresets';
 import { loadVideoBlob } from '@/stores/videoStorage';
 import type { SmartCheckStatus } from '@/hooks/useSmartCheck';
+import { PlugCanvas } from './PlugCanvas';
+import { useDesignStore } from '@/stores/designStore';
 
 interface ContextMenuState {
     x: number;
@@ -84,6 +86,8 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
     const rafRef = useRef<number>(0);
     const startTimeRef = useRef<number>(0);
     const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
+    const gridContainerRef = useRef<HTMLDivElement>(null);
+    const plugConnections = useDesignStore(s => s.creativeSet?.plugConnections ?? {});
 
     // ── Context menu state ──
     const [ctxMenu, setCtxMenu] = useState<ContextMenuState | null>(null);
@@ -294,7 +298,12 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                 )}
             </div>
 
-            <div className="banner-grid">
+            <div className="banner-grid" ref={gridContainerRef} style={{ position: 'relative' }}>
+                <PlugCanvas
+                    variants={visibleVariants}
+                    cardRefs={cardRefs}
+                    containerRef={gridContainerRef}
+                />
                 {visibleVariants.map((variant) => {
                     const { width, height } = variant.preset;
                     const scale = getPreviewScale(width, height);
@@ -307,6 +316,7 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                         <div
                             key={variant.id}
                             ref={(el) => { cardRefs.current[variant.id] = el; }}
+                            data-variant-id={variant.id}
                             className={`banner-card ${isPlaying ? 'banner-card--playing' : ''} ${selectedIds.has(variant.id) ? 'banner-card--selected' : ''}`}
                             onClick={(e) => toggleSelection(variant.id, e)}
                             onDoubleClick={() => handleDoubleClick(variant.id)}
@@ -321,7 +331,8 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                             <div className="banner-card-header">
                                 <span className="banner-card-dims">
                                     {width} x {height}
-                                    {isMaster && <span className="banner-card-master">  M</span>}
+                                    {isMaster && <span className="banner-card-origin">  ORIGIN</span>}
+                                    {!isMaster && (variant.id in plugConnections) && <span className="banner-card-plugged">  PLUGGED</span>}
                                 </span>
                                 {selectedIds.has(variant.id) && (
                                     <span style={{
