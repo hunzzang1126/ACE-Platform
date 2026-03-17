@@ -485,19 +485,17 @@
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.2s;
-    cursor: pointer;
     z-index: 10;
 }
 
 .banner-card:hover .banner-card-play-overlay {
     opacity: 1;
-    pointer-events: auto;
+    /* overlay stays pointer-events:none — only btn is clickable */
 }
 
-/* Disable overlay during drag */
-.banner-card--dragging .banner-card-play-overlay {
-    opacity: 0 !important;
-    pointer-events: none !important;
+/* Only the play button itself is clickable, not the full overlay */
+.banner-card:hover .banner-card-play-btn {
+    pointer-events: auto;
 }
 
 .banner-card-play-btn {

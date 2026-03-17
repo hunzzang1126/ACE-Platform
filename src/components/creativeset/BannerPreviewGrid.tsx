@@ -413,6 +413,7 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                             className={`banner-card ${isPlaying ? 'banner-card--playing' : ''} ${selectedIds.has(variant.id) ? 'banner-card--selected' : ''} ${draggingId === variant.id ? 'banner-card--dragging' : ''}`}
                             onMouseDown={(e) => handleCardDragStart(e, variant.id, pos)}
                             onClick={(e) => { if (!dragCooldownRef.current) toggleSelection(variant.id, e); }}
+                            onDoubleClick={() => { if (!dragCooldownRef.current) handleDoubleClick(variant.id); }}
                             onContextMenu={(e) => handleContextMenu(e, variant.id)}
                             style={{
                                 position: 'absolute',
@@ -592,15 +593,18 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
 
                             {/* Play button overlay — appears on hover */}
                             {!isPlaying && (
-                                <div
-                                    className="banner-card-play-overlay"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDoubleClick(variant.id);
-                                    }}
-                                    title="Open editor to preview animation"
-                                >
-                                    <div className="banner-card-play-btn">▶</div>
+                                <div className="banner-card-play-overlay">
+                                    <div
+                                        className="banner-card-play-btn"
+                                        onMouseDown={(e) => e.stopPropagation()}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDoubleClick(variant.id);
+                                        }}
+                                        title="Open in Editor"
+                                    >
+                                        ▶
+                                    </div>
                                 </div>
                             )}
 
