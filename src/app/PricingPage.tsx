@@ -9,6 +9,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import { PLANS, type PlanTier } from '@/schema/planTypes';
+import { redirectToCheckout, isStripeConfigured } from '@/services/stripeService';
 
 const CHECK = '\u2713';
 const DASH = '\u2014';
@@ -18,11 +19,11 @@ export default function PricingPage() {
     const user = useAuthStore(s => s.user);
     const currentPlan = (user?.plan as PlanTier) ?? 'starter';
     const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly');
+    const [loading, setLoading] = useState(false);
 
-    const handleSelectPlan = (tier: PlanTier) => {
+    const handleSelectPlan = async (tier: PlanTier) => {
         if (tier === currentPlan) return;
         if (tier === 'starter') {
-            // Downgrade — would need confirmation
             alert('To downgrade, please contact support.');
             return;
         }
@@ -30,8 +31,24 @@ export default function PricingPage() {
             window.open('mailto:sales@glid.ai?subject=Enterprise Plan Inquiry', '_blank');
             return;
         }
-        // Pro upgrade — will integrate Stripe checkout
-        alert('Stripe checkout coming soon. Your plan will be upgraded to Pro.');
+
+        // ★ Pro upgrade — Stripe Checkout
+        if (!isStripeConfigured()) {
+            alert('Payment system is being set up. Please try again shortly.');
+            return;
+        }
+        if (!user) {
+            navigate('/login');
+            return;
+        }
+
+        setLoading(true);
+        const { error } = await redirectToCheckout(tier, user.id, user.email ?? '');
+        setLoading(false);
+
+        if (error) {
+            alert(error);
+        }
     };
 
     return (
