@@ -180,3 +180,151 @@ describe('designStore — Variant Management', () => {
         expect(useDesignStore.getState().creativeSet!.variants[0]!.id).toBe(masterId);
     });
 });
+
+// ─────────────────────────────────────────────────
+// Plug Architecture Tests
+// ─────────────────────────────────────────────────
+
+const VARIANT_PRESET_A: BannerPreset = {
+    id: 'test-728x90', name: '728x90', width: 728, height: 90, category: 'display',
+};
+const VARIANT_PRESET_B: BannerPreset = {
+    id: 'test-160x600', name: '160x600', width: 160, height: 600, category: 'display',
+};
+
+describe('designStore — Plug Connections', () => {
+
+    it('createCreativeSet initializes empty plugConnections', () => {
+        useDesignStore.getState().createCreativeSet('Plug Init', MASTER_PRESET);
+        const cs = useDesignStore.getState().creativeSet!;
+        expect(cs.plugConnections).toBeDefined();
+        expect(Object.keys(cs.plugConnections)).toHaveLength(0);
+    });
+
+    it('addVariant auto-plugs new variant to master', () => {
+        useDesignStore.getState().createCreativeSet('Auto Plug', MASTER_PRESET);
+        const masterId = useDesignStore.getState().creativeSet!.masterVariantId;
+
+        useDesignStore.getState().addVariant(VARIANT_PRESET_A);
+        const cs = useDesignStore.getState().creativeSet!;
+        const newVariant = cs.variants.find(v => v.id !== masterId)!;
+
+        // New variant should be plugged into master
+        expect(cs.plugConnections[newVariant.id]).toBe(masterId);
+    });
+
+    it('connectPlug creates origin → target connection', () => {
+        useDesignStore.getState().createCreativeSet('Connect Test', MASTER_PRESET);
+        useDesignStore.getState().addVariant(VARIANT_PRESET_A);
+        useDesignStore.getState().addVariant(VARIANT_PRESET_B);
+
+        const cs = useDesignStore.getState().creativeSet!;
+        const variantA = cs.variants[1]!;
+        const variantB = cs.variants[2]!;
+
+        // Disconnect B from master, connect B → A
+        useDesignStore.getState().disconnectPlug(variantB.id);
+        useDesignStore.getState().connectPlug(variantA.id, variantB.id);
+
+        const updated = useDesignStore.getState().creativeSet!;
+        expect(updated.plugConnections[variantB.id]).toBe(variantA.id);
+    });
+
+    it('disconnectPlug removes the connection', () => {
+        useDesignStore.getState().createCreativeSet('Disconnect Test', MASTER_PRESET);
+        useDesignStore.getState().addVariant(VARIANT_PRESET_A);
+
+        const cs = useDesignStore.getState().creativeSet!;
+        const targetId = cs.variants[1]!.id;
+
+        // Should be connected after addVariant
+        expect(cs.plugConnections[targetId]).toBeDefined();
+
+        useDesignStore.getState().disconnectPlug(targetId);
+
+        const updated = useDesignStore.getState().creativeSet!;
+        expect(updated.plugConnections[targetId]).toBeUndefined();
+    });
+
+    it('connectPlug prevents self-connection', () => {
+        useDesignStore.getState().createCreativeSet('Self Connect', MASTER_PRESET);
+        const masterId = useDesignStore.getState().creativeSet!.masterVariantId;
+
+        useDesignStore.getState().connectPlug(masterId, masterId);
+
+        const cs = useDesignStore.getState().creativeSet!;
+        expect(cs.plugConnections[masterId]).toBeUndefined();
+    });
+
+    it('getOriginForVariant returns the origin of a plugged variant', () => {
+        useDesignStore.getState().createCreativeSet('Get Origin', MASTER_PRESET);
+        useDesignStore.getState().addVariant(VARIANT_PRESET_A);
+
+        const cs = useDesignStore.getState().creativeSet!;
+        const masterId = cs.masterVariantId;
+        const targetId = cs.variants[1]!.id;
+
+        const origin = useDesignStore.getState().getOriginForVariant(targetId);
+        expect(origin).toBe(masterId);
+    });
+
+    it('getOriginForVariant returns undefined for unconnected variants', () => {
+        useDesignStore.getState().createCreativeSet('No Origin', MASTER_PRESET);
+        useDesignStore.getState().addVariant(VARIANT_PRESET_A);
+
+        const targetId = useDesignStore.getState().creativeSet!.variants[1]!.id;
+        useDesignStore.getState().disconnectPlug(targetId);
+
+        const origin = useDesignStore.getState().getOriginForVariant(targetId);
+        expect(origin).toBeUndefined();
+    });
+
+    it('getPluggedTargets returns all targets connected to an origin', () => {
+        useDesignStore.getState().createCreativeSet('Get Targets', MASTER_PRESET);
+        useDesignStore.getState().addVariant(VARIANT_PRESET_A);
+        useDesignStore.getState().addVariant(VARIANT_PRESET_B);
+
+        const masterId = useDesignStore.getState().creativeSet!.masterVariantId;
+        const targets = useDesignStore.getState().getPluggedTargets(masterId);
+
+        expect(targets).toHaveLength(2);
+    });
+
+    it('removeVariant cleans up plug connections', () => {
+        useDesignStore.getState().createCreativeSet('Remove Cleanup', MASTER_PRESET);
+        useDesignStore.getState().addVariant(VARIANT_PRESET_A);
+
+        const cs = useDesignStore.getState().creativeSet!;
+        const targetId = cs.variants[1]!.id;
+
+        // Variant is plugged
+        expect(cs.plugConnections[targetId]).toBeDefined();
+
+        useDesignStore.getState().removeVariant(targetId);
+
+        const updated = useDesignStore.getState().creativeSet!;
+        // Plug connection should be removed
+        expect(updated.plugConnections[targetId]).toBeUndefined();
+        expect(updated.variants).toHaveLength(1);
+    });
+
+    it('removeVariant cleans up connections where removed variant was origin', () => {
+        useDesignStore.getState().createCreativeSet('Origin Cleanup', MASTER_PRESET);
+        useDesignStore.getState().addVariant(VARIANT_PRESET_A);
+        useDesignStore.getState().addVariant(VARIANT_PRESET_B);
+
+        const cs = useDesignStore.getState().creativeSet!;
+        const variantA = cs.variants[1]!;
+        const variantB = cs.variants[2]!;
+
+        // Make A the origin for B
+        useDesignStore.getState().disconnectPlug(variantB.id);
+        useDesignStore.getState().connectPlug(variantA.id, variantB.id);
+
+        // Now remove A — B should lose its connection
+        useDesignStore.getState().removeVariant(variantA.id);
+
+        const updated = useDesignStore.getState().creativeSet!;
+        expect(updated.plugConnections[variantB.id]).toBeUndefined();
+    });
+});
