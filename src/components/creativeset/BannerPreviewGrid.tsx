@@ -87,16 +87,20 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
     const startTimeRef = useRef<number>(0);
     const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
     const gridContainerRef = useRef<HTMLDivElement>(null);
-    const plugConnections = useDesignStore(s => s.creativeSet?.plugConnections ?? {});
+    const plugConnections = useDesignStore(s => s.creativeSet?.plugConnections) ?? {};
     const masterLabel = useDesignStore(s => s.creativeSet?.masterLabel);
 
     // ── Free-form card positions (variant.id → {x, y}) — persisted in store ──
-    const storedPositions = useDesignStore(s => s.creativeSet?.cardPositions ?? {});
-    const [cardPositions, setCardPositions] = useState<Record<string, { x: number; y: number }>>(storedPositions);
-    // Sync from store → local when store changes (e.g. different creative set loaded)
+    const storedPositionsRaw = useDesignStore(s => s.creativeSet?.cardPositions);
+    const [cardPositions, setCardPositions] = useState<Record<string, { x: number; y: number }>>(storedPositionsRaw ?? {});
+    // Sync from store → local ONLY when store content actually changes
+    const prevStoredRef = useRef(storedPositionsRaw);
     useEffect(() => {
-        setCardPositions(storedPositions);
-    }, [storedPositions]);
+        if (storedPositionsRaw !== prevStoredRef.current) {
+            prevStoredRef.current = storedPositionsRaw;
+            setCardPositions(storedPositionsRaw ?? {});
+        }
+    }, [storedPositionsRaw]);
     const draggingRef = useRef<{
         variantId: string;
         startMouse: { x: number; y: number };
