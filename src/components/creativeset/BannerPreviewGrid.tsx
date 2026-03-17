@@ -89,6 +89,62 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
     const gridContainerRef = useRef<HTMLDivElement>(null);
     const plugConnections = useDesignStore(s => s.creativeSet?.plugConnections ?? {});
 
+    // ── Free-form card positions (variant.id → {x, y}) ──
+    const [cardPositions, setCardPositions] = useState<Record<string, { x: number; y: number }>>({});
+    const [draggingCard, setDraggingCard] = useState<{
+        variantId: string;
+        startMouse: { x: number; y: number };
+        startPos: { x: number; y: number };
+    } | null>(null);
+
+    // ── Auto-layout helper: calculate grid position for card ──
+    const GRID_GAP = 32;
+    const GRID_COLS = 3;
+    const autoGridPos = useCallback((idx: number, cardW: number): { x: number; y: number } => {
+        const col = idx % GRID_COLS;
+        const row = Math.floor(idx / GRID_COLS);
+        const colWidth = MAX_PREVIEW_WIDTH + GRID_GAP + 40; // card padding + gap
+        return { x: col * colWidth, y: row * (MAX_PREVIEW_HEIGHT + 100 + GRID_GAP) };
+    }, []);
+
+
+
+    // ── Drag handlers ──
+    const handleCardDragStart = useCallback((e: React.MouseEvent, variantId: string, currentPos: { x: number; y: number }) => {
+        // Only drag from left-click on header, not right-click or port interaction
+        if (e.button !== 0) return;
+        e.stopPropagation();
+        e.preventDefault();
+        setDraggingCard({
+            variantId,
+            startMouse: { x: e.clientX, y: e.clientY },
+            startPos: currentPos,
+        });
+    }, []);
+
+    // Drag move/up effect
+    useEffect(() => {
+        if (!draggingCard) return;
+        const onMove = (e: MouseEvent) => {
+            const dx = e.clientX - draggingCard.startMouse.x;
+            const dy = e.clientY - draggingCard.startMouse.y;
+            setCardPositions(prev => ({
+                ...prev,
+                [draggingCard.variantId]: {
+                    x: Math.max(0, draggingCard.startPos.x + dx),
+                    y: Math.max(0, draggingCard.startPos.y + dy),
+                },
+            }));
+        };
+        const onUp = () => setDraggingCard(null);
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+        return () => {
+            window.removeEventListener('mousemove', onMove);
+            window.removeEventListener('mouseup', onUp);
+        };
+    }, [draggingCard]);
+
     // ── Context menu state ──
     const [ctxMenu, setCtxMenu] = useState<ContextMenuState | null>(null);
 
@@ -111,6 +167,17 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
         () => variants.filter((v) => visibleIds.has(v.id)),
         [variants, visibleIds],
     );
+
+    // Compute canvas min-height for free-form layout
+    const canvasHeight = useMemo(() => {
+        let maxY = 0;
+        visibleVariants.forEach((v, idx) => {
+            const pos = cardPositions[v.id] ?? autoGridPos(idx, 0);
+            const h = Math.round(v.preset.height * getPreviewScale(v.preset.width, v.preset.height));
+            maxY = Math.max(maxY, pos.y + h + 100);
+        });
+        return maxY;
+    }, [visibleVariants, cardPositions, autoGridPos]);
 
     // ── Restore video blob URLs from IndexedDB ──
     useEffect(() => {
@@ -298,13 +365,21 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                 )}
             </div>
 
-            <div className="banner-grid" ref={gridContainerRef} style={{ position: 'relative' }}>
+            <div
+                className="banner-grid"
+                ref={gridContainerRef}
+                style={{
+                    position: 'relative',
+                    minHeight: Math.max(600, canvasHeight + 40),
+                    overflow: 'visible',
+                }}
+            >
                 <PlugCanvas
                     variants={visibleVariants}
                     cardRefs={cardRefs}
                     containerRef={gridContainerRef}
                 />
-                {visibleVariants.map((variant) => {
+                {visibleVariants.map((variant, idx) => {
                     const { width, height } = variant.preset;
                     const scale = getPreviewScale(width, height);
                     const previewW = Math.round(width * scale);
@@ -312,23 +387,33 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                     const zoom = Math.round(scale * 100);
                     const isMaster = variant.id === masterVariantId;
 
+                    // ★ Auto-layout: calculate grid position if not yet positioned
+                    const pos = cardPositions[variant.id] ?? autoGridPos(idx, previewW);
+
                     return (
                         <div
                             key={variant.id}
                             ref={(el) => { cardRefs.current[variant.id] = el; }}
                             data-variant-id={variant.id}
-                            className={`banner-card ${isPlaying ? 'banner-card--playing' : ''} ${selectedIds.has(variant.id) ? 'banner-card--selected' : ''}`}
+                            className={`banner-card ${isPlaying ? 'banner-card--playing' : ''} ${selectedIds.has(variant.id) ? 'banner-card--selected' : ''} ${draggingCard?.variantId === variant.id ? 'banner-card--dragging' : ''}`}
                             onClick={(e) => toggleSelection(variant.id, e)}
                             onDoubleClick={() => handleDoubleClick(variant.id)}
                             onContextMenu={(e) => handleContextMenu(e, variant.id)}
                             style={{
+                                position: 'absolute',
+                                left: pos.x,
+                                top: pos.y,
                                 outline: selectedIds.has(variant.id) ? '2px solid #4a9eff' : '2px solid transparent',
                                 outlineOffset: -2,
                                 transition: 'outline-color 0.15s ease, background 0.15s ease',
                                 background: selectedIds.has(variant.id) ? 'rgba(74,158,255,0.06)' : undefined,
                             }}
                         >
-                            <div className="banner-card-header">
+                            <div
+                                className="banner-card-header"
+                                onMouseDown={(e) => handleCardDragStart(e, variant.id, pos)}
+                                style={{ cursor: 'grab' }}
+                            >
                                 <span className="banner-card-dims">
                                     {width} x {height}
                                     {isMaster && <span className="banner-card-origin">  ORIGIN</span>}
