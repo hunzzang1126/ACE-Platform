@@ -441,40 +441,18 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         }
         hideCursor();
 
-        // ── Phase 7: Vision QA (Patch + Agent Healing + Rollback) ──
+        // ── Phase 7: Vision QA (Quick Patch + 15s timeout) ──
         narrate(`Reviewing and optimizing design quality...`);
         addCard('vision', 'Optimizing layout', 'running');
         try {
             const { runVisionHealingLoop } = await import('@/services/autoDesignLoop');
-            const { AiService } = await import('@/ai/aiService');
-
-            // Create a healer callback — uses a dedicated AiService instance
-            const healerFn = async (eng: unknown, issues: Array<{ type: string; severity: string; element?: string; description: string; suggestion?: string }>, score: number, cw: number, ch: number) => {
-                const healer = new AiService([]);
-                const silentProgress = {
-                    onThinking: () => {},
-                    onCanvasScan: () => {},
-                    onPlan: () => {},
-                    onStepStart: () => {},
-                    onStepComplete: () => {},
-                    onReflection: () => {},
-                    onToken: () => {},
-                    onComplete: () => {},
-                    onToolCalls: () => {},
-                    onToolResult: () => {},
-                    onNarration: () => {},
-                    onError: (msg: string) => console.warn('[VisionHealer]', msg),
-                };
-                await healer.healDesign(eng, issues, score, cw, ch, silentProgress);
-            };
 
             const loopResult = await runVisionHealingLoop(engine, canvasW, canvasH, abort.signal, (msg: string) => {
                 updateCard('vision', 'running', msg);
-            }, healerFn);
+            });
 
             const fixNote = loopResult.fixesApplied > 0 ? ` · ${loopResult.fixesApplied} fix(es)` : '';
-            const methodNote = loopResult.healingMethod === 'agent' ? ' (AI healed)' :
-                               loopResult.healingMethod === 'patch' ? ' (auto-patched)' : '';
+            const methodNote = loopResult.healingMethod === 'patch' ? ' (auto-patched)' : '';
 
             // ★ Always show score — user wants transparency
             if (loopResult.finalScore >= 80) {

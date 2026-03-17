@@ -284,8 +284,14 @@ function restoreCanvasState(engine: Engine, snapshot: string): void {
 }
 
 // ═══════════════════════════════════════════════════
-// NEW: runVisionHealingLoop — Patch → Agent Healing → Rollback
+// runVisionHealingLoop — Score → Quick Patch → Done
 // ═══════════════════════════════════════════════════
+// Agent Healing (Pass 3) DISABLED — too slow/destructive.
+// Only fast coordinate patches (Pass 2) are applied.
+// 15-second timeout protects against slow Vision API.
+// ═══════════════════════════════════════════════════
+
+const VISION_TIMEOUT_MS = 15_000; // 15 seconds max for entire loop
 
 export async function runVisionHealingLoop(
     engine: Engine,
@@ -293,14 +299,35 @@ export async function runVisionHealingLoop(
     canvasH: number,
     signal: AbortSignal,
     onProgress: (msg: string) => void,
-    healerFn?: HealerFn,
+    _healerFn?: HealerFn, // kept for API compat but UNUSED
+): Promise<VisionLoopResult> {
+    // Wrap with timeout
+    const timeoutCtrl = new AbortController();
+    const timeout = setTimeout(() => timeoutCtrl.abort(), VISION_TIMEOUT_MS);
+    const combinedSignal = signal.aborted ? signal : timeoutCtrl.signal;
+
+    // Also abort our timer if caller aborts
+    const onCallerAbort = () => timeoutCtrl.abort();
+    signal.addEventListener('abort', onCallerAbort, { once: true });
+
+    try {
+        return await _runVisionLoop(engine, canvasW, canvasH, combinedSignal, onProgress);
+    } finally {
+        clearTimeout(timeout);
+        signal.removeEventListener('abort', onCallerAbort);
+    }
+}
+
+async function _runVisionLoop(
+    engine: Engine,
+    canvasW: number,
+    canvasH: number,
+    signal: AbortSignal,
+    onProgress: (msg: string) => void,
 ): Promise<VisionLoopResult> {
     let bestScore = 0;
-    let bestSnapshot: string | null = null;
     let totalFixesApplied = 0;
     let reasoning = '';
-    let issues: VisionIssue[] = [];
-    let healingMethod: VisionLoopResult['healingMethod'] = 'none';
 
     // ── Pass 1: Initial Vision Score ──
     onProgress('Reviewing layout quality...');
@@ -308,6 +335,11 @@ export async function runVisionHealingLoop(
     try {
         review = await callVisionReview(engine, canvasW, canvasH, signal);
     } catch (err) {
+        if (signal.aborted) {
+            console.warn('[VisionLoop] Timed out during initial review');
+            onProgress('Vision review timed out — delivering design as-is.');
+            return { finalScore: 0, passes: 1, fixesApplied: 0, suggestions: [], reasoning: 'Timed out', healingMethod: 'none' };
+        }
         console.warn('[VisionLoop] Initial review failed:', err);
         return { finalScore: 0, passes: 1, fixesApplied: 0, suggestions: [], reasoning: 'Vision API error', healingMethod: 'none' };
     }
@@ -316,10 +348,8 @@ export async function runVisionHealingLoop(
     }
 
     bestScore = review.score;
-    bestSnapshot = saveCanvasState(engine);
     reasoning = review.reasoning;
-    issues = review.issues;
-    console.log(`[VisionLoop] Pass 1: score=${bestScore}, issues=${issues.length}, reasoning="${reasoning}"`);
+    console.log(`[VisionLoop] Pass 1: score=${bestScore}, fixes=${review.fixes.length}, reasoning="${reasoning}"`);
 
     // ★ If score is good enough, approve immediately
     if (bestScore >= PASS_SCORE) {
@@ -328,8 +358,8 @@ export async function runVisionHealingLoop(
     }
 
     // ── Pass 2: Quick Patch (low-level coordinate fixes) ──
-    if (review.fixes.length > 0) {
-        onProgress(`Score ${bestScore}/100 — Applying quick fixes...`);
+    if (review.fixes.length > 0 && !signal.aborted) {
+        onProgress(`Score ${bestScore}/100 · ${review.fixes.length} fix(es) (auto-patched)`);
         const preFixSnapshot = saveCanvasState(engine);
         let fixCount = 0;
         for (const fix of review.fixes) {
@@ -338,80 +368,46 @@ export async function runVisionHealingLoop(
         totalFixesApplied += fixCount;
         console.log(`[VisionLoop] Applied ${fixCount} quick fix(es)`);
 
-        // Re-score after patches
-        try {
-            const recheck = await callVisionReview(engine, canvasW, canvasH, signal);
-            if (recheck) {
-                console.log(`[VisionLoop] Pass 2 (post-patch): score=${recheck.score}`);
-                if (recheck.score > bestScore) {
-                    bestScore = recheck.score;
-                    bestSnapshot = saveCanvasState(engine);
-                    reasoning = recheck.reasoning;
-                    issues = recheck.issues;
-                    healingMethod = 'patch';
-                } else {
-                    // Patches made it worse → rollback
-                    if (preFixSnapshot) restoreCanvasState(engine, preFixSnapshot);
+        // Re-score after patches (only if time allows)
+        if (!signal.aborted) {
+            try {
+                const recheck = await callVisionReview(engine, canvasW, canvasH, signal);
+                if (recheck) {
+                    console.log(`[VisionLoop] Pass 2 (post-patch): score=${recheck.score}`);
+                    if (recheck.score > bestScore) {
+                        bestScore = recheck.score;
+                        reasoning = recheck.reasoning;
+                    } else if (recheck.score < bestScore) {
+                        // Patches made it worse → rollback
+                        console.log(`[VisionLoop] Patches worsened score (${recheck.score} vs ${bestScore}). Rolling back.`);
+                        if (preFixSnapshot) restoreCanvasState(engine, preFixSnapshot);
+                        totalFixesApplied -= fixCount;
+                    }
                 }
-
-                if (bestScore >= PASS_SCORE) {
-                    onProgress(`Score ${bestScore}/100 — Quick fix approved.`);
-                    return { finalScore: bestScore, passes: 2, fixesApplied: totalFixesApplied, suggestions: [], reasoning, healingMethod };
+            } catch {
+                // Re-score failed (timeout) — keep patches, report original score
+                if (signal.aborted) {
+                    onProgress(`Score ${bestScore}/100 · ${totalFixesApplied} fix(es) (auto-patched) — Best result`);
                 }
             }
-        } catch {
-            // Re-score failed — keep patch results
         }
     }
 
-    // ── Pass 3: Agent Healing (AI uses atomic tools) ──
-    if (signal.aborted || !healerFn) {
-        if (!healerFn) console.log('[VisionLoop] No healerFn provided — skipping Agent healing');
-        return { finalScore: bestScore, passes: 2, fixesApplied: totalFixesApplied, suggestions: [], reasoning, healingMethod };
-    }
-    onProgress(`Score ${bestScore}/100 — AI Agent healing...`);
-    const preHealSnapshot = saveCanvasState(engine);
-
-    try {
-        await healerFn(engine, issues, bestScore, canvasW, canvasH);
-
-        // Re-score after Agent healing
-        const healReview = await callVisionReview(engine, canvasW, canvasH, signal);
-        if (healReview) {
-            console.log(`[VisionLoop] Pass 3 (post-heal): score=${healReview.score}`);
-            if (healReview.score > bestScore) {
-                bestScore = healReview.score;
-                bestSnapshot = saveCanvasState(engine);
-                reasoning = healReview.reasoning;
-                issues = healReview.issues;
-                healingMethod = 'agent';
-                totalFixesApplied += 1; // Count agent healing as 1 fix
-            } else {
-                // Agent made it worse → rollback to best snapshot
-                console.log(`[VisionLoop] Agent healing did not improve (${healReview.score} vs ${bestScore}). Rolling back.`);
-                if (preHealSnapshot) restoreCanvasState(engine, preHealSnapshot);
-            }
-        }
-    } catch (err) {
-        console.warn('[VisionLoop] Agent healing failed:', err);
-        // Rollback to pre-heal state
-        if (preHealSnapshot) restoreCanvasState(engine, preHealSnapshot);
-    }
-
-    const fixNote = totalFixesApplied > 0 ? ` · ${totalFixesApplied} fix(es)` : '';
+    // ── Done — no Agent Healing (too slow/destructive) ──
+    const fixNote = totalFixesApplied > 0 ? ` · ${totalFixesApplied} fix(es) (auto-patched)` : '';
     if (bestScore >= PASS_SCORE) {
-        onProgress(`Score ${bestScore}/100${fixNote} — Healed and approved.`);
+        onProgress(`Score ${bestScore}/100${fixNote} — Approved.`);
     } else {
-        onProgress(`Score ${bestScore}/100${fixNote} — Best result delivered.`);
+        onProgress(`Score ${bestScore}/100${fixNote} — Best result`);
     }
 
     return {
         finalScore: bestScore,
-        passes: 3,
+        passes: 2,
         fixesApplied: totalFixesApplied,
         suggestions: [],
         reasoning,
-        healingMethod,
+        healingMethod: totalFixesApplied > 0 ? 'patch' : 'none',
     };
 }
 
