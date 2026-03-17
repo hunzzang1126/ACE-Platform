@@ -2,7 +2,7 @@
 // HowItWorks — Immersive Apple-style workflow section
 // ─────────────────────────────────────────────────
 // Professional, scroll-animated "How It Works" section
-// that demonstrates ACE's workflow and time savings.
+// that demonstrates Glid's workflow and time savings.
 
 import { useEffect, useRef, useState } from 'react';
 
@@ -316,7 +316,7 @@ function TimeSavingsCounter() {
                     <span className="hiw-comparison-time">8+ hours</span>
                 </div>
                 <div className="hiw-comparison-row">
-                    <span className="hiw-comparison-label">With ACE</span>
+                    <span className="hiw-comparison-label">With Glid</span>
                     <div className="hiw-comparison-bar hiw-comparison-bar--new">
                         <div className="hiw-comparison-fill hiw-comparison-fill--new" />
                     </div>
@@ -342,7 +342,7 @@ export function HowItWorks({ addRef }: { addRef: (el: HTMLDivElement | null) => 
                 </h2>
                 <p className="landing-section-sub">
                     From blank canvas to deployed campaign in minutes.
-                    Here is exactly how ACE transforms your creative production.
+                    Here is exactly how Glid transforms your creative production.
                 </p>
             </div>
 
@@ -380,7 +380,7 @@ export function HowItWorks({ addRef }: { addRef: (el: HTMLDivElement | null) => 
                                         </svg>
                                     </div>
                                     <div className="hiw-step-time-new">
-                                        <span className="hiw-step-time-label">With ACE</span>
+                                        <span className="hiw-step-time-label">With Glid</span>
                                         <span className="hiw-step-time-value">{step.timeNew}</span>
                                     </div>
                                 </div>

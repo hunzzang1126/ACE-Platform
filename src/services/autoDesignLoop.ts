@@ -20,7 +20,7 @@ type Engine = any;
 // ── Types ──────────────────────────────────────────
 
 export interface VisionFix {
-    /** Exact layer __aceName */
+    /** Exact layer __glidName */
     elementName: string;
     x?: number;
     y?: number;

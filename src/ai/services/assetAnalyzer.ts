@@ -4,7 +4,7 @@
 // When a user uploads an image, this service calls the Vision API
 // to automatically extract metadata: type, colors, suggested role,
 // description, tags, transparency, aspect ratio, quality.
-// This makes ACE's asset library "smart" -- upload only, no manual tagging.
+// This makes Glid's asset library "smart" -- upload only, no manual tagging.
 
 import { getAnthropicKey } from '@/config/apiKeys';
 

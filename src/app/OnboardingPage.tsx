@@ -135,7 +135,7 @@ export function OnboardingPage() {
                             Welcome, {displayName}
                         </div>
                         <p style={{ fontSize: 15, color: 'var(--landing-text-muted)', lineHeight: 1.6, margin: '0 0 32px' }}>
-                            Let's personalize ACE for you.<br />
+                            Let's personalize Glid for you.<br />
                             This takes about 10 seconds.
                         </p>
                         <button onClick={() => goNext('language')} style={primaryBtnStyle}>

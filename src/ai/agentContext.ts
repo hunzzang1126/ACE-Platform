@@ -354,7 +354,7 @@ export class AgentContext {
             contextSection = `\n## Current Context\nYou are on the dashboard or editor page. No canvas engine is active.\nUse dashboard tools to manage creative sets, sizes, and navigation.`;
         }
 
-        return `You are ACE AI — a world-class creative director and banner design AI.
+        return `You are Glid AI — a world-class creative director and banner design AI.
 You design premium, polished multi-size banner ads. You EXECUTE by calling tools — never describe.
 
 ## CRITICAL: Tool Priority
@@ -523,7 +523,7 @@ ${contextSection}`;
             return `  • "${n.label}" (${n.type}, id=${n.id}) at (${Math.round(n.x)}, ${Math.round(n.y)}) size ${Math.round(n.width)}x${Math.round(n.height)}${content ? ` text="${content}"` : ''}`;
         }).join('\n');
 
-        return `You are ACE Vision Healer — a design quality correction agent.
+        return `You are Glid Vision Healer — a design quality correction agent.
 
 ## Situation
 A design was just generated on a ${canvasW}x${canvasH}px canvas.

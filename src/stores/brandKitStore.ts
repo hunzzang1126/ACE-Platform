@@ -350,6 +350,6 @@ export const useBrandKitStore = create<BrandKitState>()(
                 });
             },
         })),
-        { name: 'ace-brand-kits', storage: createJSONStorage(() => idbStorage) },
+        { name: 'glid-brand-kits', storage: createJSONStorage(() => idbStorage) },
     ),
 );

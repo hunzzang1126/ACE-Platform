@@ -12,7 +12,7 @@ import {
 } from 'fabric';
 import { useAnimPresetStore } from './useAnimationPresets';
 import {
-    nextId, rgbToHex, isArtboard, fabricToEngineNode, patchAceProps, ACE_CUSTOM_PROPS,
+    nextId, rgbToHex, isArtboard, fabricToEngineNode, patchAceProps, GLID_CUSTOM_PROPS,
 } from './fabricHelpers';
 
 /**
@@ -26,7 +26,7 @@ export function createEngineShim(
     artboardW: number,
     artboardH: number,
 ) {
-    const findById = (id: number) => fc.getObjects().find((o) => (o as any).__aceId === id);
+    const findById = (id: number) => fc.getObjects().find((o) => (o as any).__glidId === id);
     const userObjects = () => fc.getObjects().filter(o => !isArtboard(o));
 
     return {
@@ -37,10 +37,10 @@ export function createEngineShim(
         },
 
         // ★ SINGLE SOURCE OF TRUTH: Fabric-native serialization.
-        // Returns fc.toObject() with all ACE custom props included.
+        // Returns fc.toObject() with all Glid custom props included.
         // This JSON is the canonical representation — no lossy conversion.
         getCanvasJSON: (): string => {
-            return JSON.stringify(fc.toObject(ACE_CUSTOM_PROPS));
+            return JSON.stringify(fc.toObject(GLID_CUSTOM_PROPS));
         },
 
         // ★ SINGLE SOURCE OF TRUTH: Fabric-native deserialization.
@@ -54,7 +54,7 @@ export function createEngineShim(
         node_count: () => userObjects().length,
         get_selection: () => {
             const active = fc.getActiveObjects();
-            return JSON.stringify(active.map((o) => (o as any).__aceId ?? 0));
+            return JSON.stringify(active.map((o) => (o as any).__glidId ?? 0));
         },
         selection_bounds: () => {
             const active = fc.getActiveObject();
@@ -74,9 +74,9 @@ export function createEngineShim(
                 fill: rgbToHex(r, g, b),
                 opacity: a,
             });
-            (rect as any).__aceId = id;
-            (rect as any).__aceName = name || `Rectangle #${id}`;
-            (rect as any).__aceZIndex = userObjects().length;
+            (rect as any).__glidId = id;
+            (rect as any).__glidName = name || `Rectangle #${id}`;
+            (rect as any).__glidZIndex = userObjects().length;
             patchAceProps(rect);
             fc.add(rect);
             fc.renderAll();
@@ -92,9 +92,9 @@ export function createEngineShim(
                 opacity: a,
                 rx: radius, ry: radius,
             });
-            (rect as any).__aceId = id;
-            (rect as any).__aceName = name || `Rounded Rect #${id}`;
-            (rect as any).__aceZIndex = userObjects().length;
+            (rect as any).__glidId = id;
+            (rect as any).__glidName = name || `Rounded Rect #${id}`;
+            (rect as any).__glidZIndex = userObjects().length;
             patchAceProps(rect);
             fc.add(rect);
             fc.renderAll();
@@ -129,12 +129,12 @@ export function createEngineShim(
                 fill: gradient,
                 rx: radius, ry: radius,
             });
-            (rect as any).__aceId = id;
-            (rect as any).__aceName = name || `Gradient Rect #${id}`;
-            (rect as any).__aceZIndex = userObjects().length;
-            (rect as any).__aceGradientStart = hex1;
-            (rect as any).__aceGradientEnd = hex2;
-            (rect as any).__aceGradientAngle = angleDeg;
+            (rect as any).__glidId = id;
+            (rect as any).__glidName = name || `Gradient Rect #${id}`;
+            (rect as any).__glidZIndex = userObjects().length;
+            (rect as any).__glidGradientStart = hex1;
+            (rect as any).__glidGradientEnd = hex2;
+            (rect as any).__glidGradientAngle = angleDeg;
             patchAceProps(rect);
             fc.add(rect);
             fc.renderAll();
@@ -150,8 +150,8 @@ export function createEngineShim(
                 fill: rgbToHex(r, g, b),
                 opacity: a,
             });
-            (el as any).__aceId = id;
-            (el as any).__aceZIndex = userObjects().length;
+            (el as any).__glidId = id;
+            (el as any).__glidZIndex = userObjects().length;
             patchAceProps(el);
             fc.add(el);
             fc.renderAll();
@@ -182,9 +182,9 @@ export function createEngineShim(
                 charSpacing: (letterSpacing ?? 0) * 10,
                 editable: true,
             });
-            (tb as any).__aceId = id;
-            (tb as any).__aceName = name || `Text #${id}`;
-            (tb as any).__aceZIndex = userObjects().length;
+            (tb as any).__glidId = id;
+            (tb as any).__glidName = name || `Text #${id}`;
+            (tb as any).__glidZIndex = userObjects().length;
             patchAceProps(tb);
             fc.add(tb);
             fc.renderAll();
@@ -194,11 +194,11 @@ export function createEngineShim(
 
         // ── Create: image (async) ────────────────────────
         // ★ REGRESSION GUARD: fc.add() ALWAYS places objects at the TOP of the
-        // Fabric stack — regardless of __aceZIndex. When images load async
+        // Fabric stack — regardless of __glidZIndex. When images load async
         // (FabricImage.fromURL), all sync elements (shapes, text) are already
         // added, so the image lands on top of everything after load.
         // Fix: after fc.add(), immediately call fc.moveObjectTo(img, rank+1)
-        // where rank is this image's position in the __aceZIndex-sorted list.
+        // where rank is this image's position in the __glidZIndex-sorted list.
         // ★ REGRESSION GUARD: storedNatW/storedNatH preserve the SVG natural dimensions
         // captured at first load time. SVGs without explicit width/height attributes may
         // report naturalWidth/naturalHeight=0 on second load (browser varies).
@@ -270,19 +270,19 @@ export function createEngineShim(
                 }
 
                 img.set({ left: x, top: y, scaleX, scaleY });
-                (img as any).__aceId = id;
-                (img as any).__aceName = name || `Image #${id}`;
+                (img as any).__glidId = id;
+                (img as any).__glidName = name || `Image #${id}`;
                 const targetZIndex = zIndex ?? userObjects().length;
-                (img as any).__aceZIndex = targetZIndex;
+                (img as any).__glidZIndex = targetZIndex;
                 patchAceProps(img);
                 fc.add(img);
 
                 // ★ Move to correct stack position IMMEDIATELY after fc.add().
                 // Artboard is always at Fabric index 0. User objects start at index 1.
-                // Sort all current user objects by __aceZIndex, find this image's rank,
+                // Sort all current user objects by __glidZIndex, find this image's rank,
                 // then move it to rank+1 (skipping artboard at 0).
                 const sortedByZ = userObjects().sort(
-                    (a, b) => ((a as any).__aceZIndex ?? 0) - ((b as any).__aceZIndex ?? 0)
+                    (a, b) => ((a as any).__glidZIndex ?? 0) - ((b as any).__glidZIndex ?? 0)
                 );
                 const rank = sortedByZ.indexOf(img);
                 if (rank >= 0) {
@@ -302,11 +302,11 @@ export function createEngineShim(
             return id;
         },
 
-        // Utility: re-sort all Fabric objects by __aceZIndex.
+        // Utility: re-sort all Fabric objects by __glidZIndex.
         // Call after all async image loads to fix any ordering issues.
         reorder_by_z_index: () => {
             const objs = userObjects().sort(
-                (a, b) => ((a as any).__aceZIndex ?? 0) - ((b as any).__aceZIndex ?? 0)
+                (a, b) => ((a as any).__glidZIndex ?? 0) - ((b as any).__glidZIndex ?? 0)
             );
             objs.forEach((o, i) => fc.moveObjectTo(o, i + 1)); // +1: artboard at 0
             fc.renderAll();
@@ -320,9 +320,9 @@ export function createEngineShim(
             const gid = nextId();
             const group = new Group(objects);
             objects.forEach(o => fc.remove(o));
-            (group as any).__aceId = gid;
-            (group as any).__aceName = name || `Group #${gid}`;
-            (group as any).__aceZIndex = userObjects().length;
+            (group as any).__glidId = gid;
+            (group as any).__glidName = name || `Group #${gid}`;
+            (group as any).__glidZIndex = userObjects().length;
             patchAceProps(group);
             fc.add(group);
             fc.setActiveObject(group);
@@ -337,8 +337,8 @@ export function createEngineShim(
             const items = (obj as Group).getObjects();
             fc.remove(obj);
             items.forEach((item, i) => {
-                (item as any).__aceId = nextId();
-                (item as any).__aceZIndex = userObjects().length + i;
+                (item as any).__glidId = nextId();
+                (item as any).__glidZIndex = userObjects().length + i;
                 patchAceProps(item);
                 fc.add(item);
             });
@@ -396,13 +396,13 @@ export function createEngineShim(
 
         // ── Lookup ───────────────────────────────────────
         find_by_name: (name: string): number | null => {
-            const obj = userObjects().find((o) => (o as any).__aceName === name);
-            return obj ? ((obj as any).__aceId as number) : null;
+            const obj = userObjects().find((o) => (o as any).__glidName === name);
+            return obj ? ((obj as any).__glidId as number) : null;
         },
         find_all_by_type: (type: string): number[] => {
             return userObjects()
                 .filter((o) => fabricToEngineNode(o).type === type)
-                .map((o) => (o as any).__aceId as number);
+                .map((o) => (o as any).__glidId as number);
         },
         get_element_bounds: (id: number): { x: number; y: number; w: number; h: number } | null => {
             const obj = findById(id);
@@ -421,7 +421,7 @@ export function createEngineShim(
             const obj = findById(id);
             if (obj) {
                 fc.bringObjectToFront(obj);
-                (obj as any).__aceZIndex = userObjects().length - 1;
+                (obj as any).__glidZIndex = userObjects().length - 1;
                 fc.renderAll();
                 syncState();
             }
@@ -471,8 +471,8 @@ export function createEngineShim(
         set_z_index: (id: number, z: number) => {
             const obj = findById(id);
             if (!obj) return;
-            (obj as any).__aceZIndex = z;
-            const objs = userObjects().sort((a, b) => ((a as any).__aceZIndex ?? 0) - ((b as any).__aceZIndex ?? 0));
+            (obj as any).__glidZIndex = z;
+            const objs = userObjects().sort((a, b) => ((a as any).__glidZIndex ?? 0) - ((b as any).__glidZIndex ?? 0));
             objs.forEach((o, i) => { fc.moveObjectTo(o, i + 1); });
             fc.renderAll();
             syncState();
@@ -562,7 +562,7 @@ export function createEngineShim(
             let needsRender = false;
 
             for (const obj of objs) {
-                const aceId = (obj as any).__aceId;
+                const aceId = (obj as any).__glidId;
                 if (!aceId) continue;
                 const config = presets[String(aceId)];
                 if (!config || config.anim === 'none') continue;

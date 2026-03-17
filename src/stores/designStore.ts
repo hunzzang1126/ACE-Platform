@@ -522,7 +522,7 @@ export const useDesignStore = create<DesignState>()(
 
             })),
             {
-                name: 'ace-design-store',
+                name: 'glid-design-store',
                 // ★ IndexedDB storage — no 5MB limit, async I/O
                 storage: createJSONStorage(() => idbStorage),
                 partialize: (state) => ({
@@ -578,7 +578,7 @@ function _applyDesignSync(raw: string) {
 
 function _broadcastDesignSync() {
     try {
-        const raw = localStorage.getItem('ace-design-store');
+        const raw = localStorage.getItem('glid-design-store');
         if (raw && _designChannel) _designChannel.postMessage(raw);
     } catch { /* ok */ }
 }
@@ -588,13 +588,13 @@ let _designChannel: BroadcastChannel | null = null;
 if (typeof window !== 'undefined') {
     // 1. StorageEvent (fires in OTHER tabs only)
     window.addEventListener('storage', (e) => {
-        if (e.key !== 'ace-design-store' || !e.newValue) return;
+        if (e.key !== 'glid-design-store' || !e.newValue) return;
         _applyDesignSync(e.newValue);
     });
 
     // 2. BroadcastChannel (fires in ALL other same-origin tabs instantly)
     try {
-        _designChannel = new BroadcastChannel('ace-design-sync');
+        _designChannel = new BroadcastChannel('glid-design-sync');
         _designChannel.onmessage = (e) => {
             if (typeof e.data === 'string') {
                 _applyDesignSync(e.data);

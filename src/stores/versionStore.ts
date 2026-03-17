@@ -142,6 +142,6 @@ export const useVersionStore = create<VersionState>()(
                 return { diff, percentage };
             },
         })),
-        { name: 'ace-versions', storage: createJSONStorage(() => idbStorage) },
+        { name: 'glid-versions', storage: createJSONStorage(() => idbStorage) },
     ),
 );

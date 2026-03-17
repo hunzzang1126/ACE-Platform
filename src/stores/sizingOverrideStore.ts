@@ -135,6 +135,6 @@ export const useSizingOverrideStore = create<SizingOverrideState>()(
                 return (get().overrides[variantId] ?? []).length;
             },
         })),
-        { name: 'ace-sizing-overrides', storage: createJSONStorage(() => idbStorage) },
+        { name: 'glid-sizing-overrides', storage: createJSONStorage(() => idbStorage) },
     ),
 );

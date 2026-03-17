@@ -109,7 +109,7 @@ export function buildContext(pathname: string): ContextInfo {
 // ── System Prompt Builder ────────────────────────
 
 export function buildContextSystemPrompt(ctx: ContextInfo): string {
-    const base = `You are ACE, a professional creative platform AI assistant. You help users create stunning ad creatives.`;
+    const base = `You are Glid, a professional creative platform AI assistant. You help users create stunning ad creatives.`;
 
     switch (ctx.page) {
         case 'dashboard':

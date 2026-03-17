@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────
 // Smart Layout Engine — Aspect-Ratio-Aware Element Positioning
 // ─────────────────────────────────────────────────
-// The core differentiator of ACE: given an element's semantic role
+// The core differentiator of Glid: given an element's semantic role
 // and a target canvas size, compute the optimal constraints.
 //
 // Layout patterns:
@@ -139,7 +139,7 @@ const RULES_BY_CATEGORY: Record<AspectCategory, Partial<Record<LayoutRole, Posit
  * Compute optimal constraints for an element based on its semantic role
  * and the target canvas size.
  *
- * This is the core of ACE Smart Sizing — it knows that:
+ * This is the core of Glid Smart Sizing — it knows that:
  * - Ultra-wide: logo LEFT, headline CENTER, CTA RIGHT
  * - Portrait:   logo TOP, headline MULTI-LINE CENTER, CTA BOTTOM
  * - Landscape:  standard vertical stack

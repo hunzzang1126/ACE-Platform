@@ -57,7 +57,7 @@ export function exportToHtml5(
         clickTagUrl = '',
         duration = 5,
         loop = false,
-        title = 'ACE Banner',
+        title = 'Glid Banner',
     } = options;
 
     // Get animation presets from store

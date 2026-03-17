@@ -2,7 +2,7 @@
 // Design Tokens — Centralized design system values
 // ─────────────────────────────────────────────────
 // All colors, spacing, typography, and animation tokens.
-// Single source of truth for the entire ACE UI.
+// Single source of truth for the entire Glid UI.
 // ─────────────────────────────────────────────────
 
 /**

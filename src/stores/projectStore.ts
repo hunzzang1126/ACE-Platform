@@ -267,7 +267,7 @@ export const useProjectStore = create<ProjectState>()(
             },
         })),
         {
-            name: 'ace-project-store',
+            name: 'glid-project-store',
             // ★ IndexedDB storage — no 5MB limit, async I/O
             storage: createJSONStorage(() => idbStorage),
             // Only persist data, not UI state like selection/search/page
@@ -306,7 +306,7 @@ function _applyExternalSync(raw: string) {
 // Helper: broadcast current state to other tabs
 function _broadcastSync() {
     try {
-        const raw = localStorage.getItem('ace-project-store');
+        const raw = localStorage.getItem('glid-project-store');
         if (raw && _channel) _channel.postMessage(raw);
     } catch { /* ok */ }
 }
@@ -316,7 +316,7 @@ let _channel: BroadcastChannel | null = null;
 if (typeof window !== 'undefined') {
     // 1. StorageEvent (fires in OTHER tabs)
     window.addEventListener('storage', (e) => {
-        if (e.key !== 'ace-project-store') return;
+        if (e.key !== 'glid-project-store') return;
         if (!e.newValue) {
             useProjectStore.setState({ creativeSets: [], folders: [], trash: [] });
             return;
@@ -326,7 +326,7 @@ if (typeof window !== 'undefined') {
 
     // 2. BroadcastChannel (fires in ALL other same-origin tabs, instantly)
     try {
-        _channel = new BroadcastChannel('ace-project-sync');
+        _channel = new BroadcastChannel('glid-project-sync');
         _channel.onmessage = (e) => {
             if (typeof e.data === 'string') {
                 _applyExternalSync(e.data);

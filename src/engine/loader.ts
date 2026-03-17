@@ -8,7 +8,7 @@ let cachedModule: any = null;
 let loadingPromise: Promise<unknown> | null = null;
 
 /**
- * Loads and initializes the ace-engine WASM module.
+ * Loads and initializes the glid-engine WASM module.
  * Returns the module with WasmEngine class.
  *
  * - Caches the result so it's only loaded once.
@@ -25,7 +25,7 @@ export async function loadAceEngine(): Promise<any> {
 
     loadingPromise = (async () => {
         try {
-            console.log('[loader] Loading ace-engine WASM module...');
+            console.log('[loader] Loading glid-engine WASM module...');
             // @ts-expect-error — WASM glue file has no TS declarations
             const mod = await import('./wasm/ace_engine.js');
             if (typeof mod.default === 'function') {

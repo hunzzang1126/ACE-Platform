@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────
-// aceDB — Central IndexedDB database for ACE platform
+// aceDB — Central IndexedDB database for Glid platform
 // ─────────────────────────────────────────────────
 // Replaces localStorage as the persistence layer for all stores.
 // Uses Dexie.js for clean IndexedDB API with versioning support.
@@ -10,7 +10,7 @@ import Dexie, { type EntityTable } from 'dexie';
 
 // ── Key-value store for Zustand persist adapter ──
 export interface KVEntry {
-    key: string;       // store name (e.g. 'ace-design-store')
+    key: string;       // store name (e.g. 'glid-design-store')
     value: string;     // JSON string of store state
     updatedAt: number; // timestamp
 }

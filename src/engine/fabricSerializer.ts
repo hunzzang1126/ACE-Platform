@@ -19,7 +19,7 @@ import type {
 } from '@/schema/elements.types';
 import { absoluteToConstraints } from './elementConverters';
 import { resolveFontWeight, getAnimationForElement } from './elementConverters';
-import { ACE_CUSTOM_PROPS } from '@/hooks/fabricHelpers';
+import { GLID_CUSTOM_PROPS } from '@/hooks/fabricHelpers';
 
 // ── Fabric JSON types (subset we need) ──
 
@@ -45,14 +45,14 @@ interface FabricObjectJSON {
     charSpacing?: number;
     // Image-specific
     src?: string;
-    // ACE custom props
-    __aceId?: number;
-    __aceZIndex?: number;
-    __aceArtboard?: boolean;
-    __aceName?: string;
-    __aceGradientStart?: string;
-    __aceGradientEnd?: string;
-    __aceGradientAngle?: number;
+    // Glid custom props
+    __glidId?: number;
+    __glidZIndex?: number;
+    __glidArtboard?: boolean;
+    __glidName?: string;
+    __glidGradientStart?: string;
+    __glidGradientEnd?: string;
+    __glidGradientAngle?: number;
     __aceGuide?: boolean;
     // Misc
     visible?: boolean;
@@ -86,11 +86,11 @@ export function fabricJsonToElements(
 
     for (const obj of parsed.objects) {
         // Skip artboard and guide objects
-        if (obj.__aceArtboard || obj.__aceGuide) continue;
+        if (obj.__glidArtboard || obj.__aceGuide) continue;
 
-        const aceId = obj.__aceId ?? 0;
-        const zIndex = obj.__aceZIndex ?? 0;
-        const name = obj.__aceName || `Element #${aceId}`;
+        const aceId = obj.__glidId ?? 0;
+        const zIndex = obj.__glidZIndex ?? 0;
+        const name = obj.__glidName || `Element #${aceId}`;
         const opacity = obj.opacity ?? 1;
 
         // Compute absolute bounds from Fabric properties
@@ -166,11 +166,11 @@ export function fabricJsonToElements(
                 }
             }
 
-            // ACE custom gradient props (set by add_gradient_rect)
-            if (obj.__aceGradientStart) {
-                gradientStart = obj.__aceGradientStart;
-                gradientEnd = obj.__aceGradientEnd;
-                gradientAngle = obj.__aceGradientAngle;
+            // Glid custom gradient props (set by add_gradient_rect)
+            if (obj.__glidGradientStart) {
+                gradientStart = obj.__glidGradientStart;
+                gradientEnd = obj.__glidGradientEnd;
+                gradientAngle = obj.__glidGradientAngle;
                 fill = gradientStart ?? fill;
             }
 
@@ -202,7 +202,7 @@ export function fabricJsonToElements(
 }
 
 /**
- * List of custom ACE properties to include in Fabric's toObject() serialization.
+ * List of custom Glid properties to include in Fabric's toObject() serialization.
  * Re-exported from fabricHelpers for convenience.
  */
-export { ACE_CUSTOM_PROPS };
+export { GLID_CUSTOM_PROPS };

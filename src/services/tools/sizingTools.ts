@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────
 // sizingTools.ts — Smart Sizing Operations
 // ─────────────────────────────────────────────────
-// ACE's proprietary Smart Sizing tools — what
+// Glid's proprietary Smart Sizing tools — what
 // competitors CAN'T replicate.
 // ─────────────────────────────────────────────────
 

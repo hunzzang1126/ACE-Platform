@@ -86,7 +86,7 @@ export default function AiTestPage() {
                 <div style={toolbarStyle}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <span style={{ fontSize: 20 }}></span>
-                        <span style={{ fontWeight: 700, fontSize: 16, letterSpacing: -0.5 }}>ACE AI Agent</span>
+                        <span style={{ fontWeight: 700, fontSize: 16, letterSpacing: -0.5 }}>Glid AI Agent</span>
                     </div>
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                         <ToolBtn label="Undo" onClick={handleUndo} title="Undo (Cmd+Z)" />

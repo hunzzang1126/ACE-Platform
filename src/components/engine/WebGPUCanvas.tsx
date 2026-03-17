@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────
-// WebGPUCanvas — Renders ace-engine via WASM + WebGPU
+// WebGPUCanvas — Renders glid-engine via WASM + WebGPU
 // ─────────────────────────────────────────────────
 
 import { useEffect, useRef, useState } from 'react';
@@ -125,7 +125,7 @@ export function WebGPUCanvas({ width, height, rects }: Props) {
                     background: 'rgba(22,25,31,0.9)',
                 }}>
                     <div style={{ fontSize: 24, marginBottom: 8 }}>Loading...</div>
-                    <strong>Loading ACE Engine...</strong>
+                    <strong>Loading Glid Engine...</strong>
                 </div>
             )}
         </div>

@@ -138,7 +138,7 @@ export function useCanvasEngine(
         const tryInit = async (attempt: number): Promise<void> => {
             if (cancelled) return;
 
-            const attemptLabel = `[ACE] Init attempt ${attempt + 1}/${MAX_RETRIES}`;
+            const attemptLabel = `[Glid] Init attempt ${attempt + 1}/${MAX_RETRIES}`;
             console.log(`${attemptLabel}: starting...`);
 
             if (attempt > 0) {
@@ -248,7 +248,7 @@ export function useCanvasEngine(
             attemptTimeouts.forEach(clearTimeout);
             cancelAnimationFrame(rafRef.current);
             if (engineRef.current) {
-                console.log('[ACE] Cleanup: freeing engine');
+                console.log('[Glid] Cleanup: freeing engine');
                 try { engineRef.current.free(); } catch { /* ignore */ }
                 engineRef.current = null;
             }
@@ -545,7 +545,7 @@ export function useCanvasEngine(
 
     // ── Manual retry function ──
     const retryInit = useCallback(() => {
-        console.log('[ACE] Manual retry triggered');
+        console.log('[Glid] Manual retry triggered');
         // Clear any existing engine
         if (engineRef.current) {
             try { engineRef.current.free(); } catch { /* ignore */ }

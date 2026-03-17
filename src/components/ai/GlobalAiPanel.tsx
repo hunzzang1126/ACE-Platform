@@ -153,7 +153,7 @@ export function GlobalAiPanel() {
                     <div style={headerStyle}>
                         <IcAi size={18} color="#c9d1d9" />
                         <div style={{ flex: 1 }}>
-                            <div style={{ fontWeight: 600, fontSize: 13, color: '#e6edf3', letterSpacing: -0.3 }}>ACE AI</div>
+                            <div style={{ fontWeight: 600, fontSize: 13, color: '#e6edf3', letterSpacing: -0.3 }}>Glid AI</div>
                             <div style={{ fontSize: 10, color: '#6e7681', marginTop: 1 }}>{contextLabel}</div>
                         </div>
                         <button onClick={() => agent.clearChat()} style={headerBtnStyle} title="New conversation">

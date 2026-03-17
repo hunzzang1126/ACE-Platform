@@ -106,7 +106,7 @@ export default function AiChatPanel({ aiService, engine, trackedNodes, onSendMes
             <div style={headerStyle}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: 16 }}></span>
-                    <span style={{ fontWeight: 600, fontSize: 14, letterSpacing: -0.3 }}>ACE AI Agent</span>
+                    <span style={{ fontWeight: 600, fontSize: 14, letterSpacing: -0.3 }}>Glid AI Agent</span>
                 </div>
                 <button onClick={() => setShowSettings(!showSettings)} style={iconBtnStyle}>Settings</button>
             </div>

@@ -6,7 +6,7 @@
 //
 // Usage:
 //   persist(stateCreator, {
-//     name: 'ace-design-store',
+//     name: 'glid-design-store',
 //     storage: idbStorage,  // ← replaces default localStorage
 //   })
 // ─────────────────────────────────────────────────

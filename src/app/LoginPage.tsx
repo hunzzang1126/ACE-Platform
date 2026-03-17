@@ -69,7 +69,7 @@ export function LoginPage() {
                         }}
                         onClick={() => navigate('/')}
                     >
-                        ACE
+                        Glid
                     </div>
                     <div style={{ fontSize: 15, color: 'var(--landing-text-muted)' }}>
                         {mode === 'signin' ? 'Welcome back' : 'Create your account'}

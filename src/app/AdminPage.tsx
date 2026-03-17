@@ -62,7 +62,7 @@ export function AdminPage() {
                         WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
                         cursor: 'pointer',
                     }} onClick={() => navigate('/dashboard')}>
-                        ACE
+                        Glid
                     </div>
                     <span style={{ color: 'rgba(255,255,255,0.2)' }}>/</span>
                     <span style={{ fontSize: 14, color: '#86868b', fontWeight: 500 }}>Admin</span>

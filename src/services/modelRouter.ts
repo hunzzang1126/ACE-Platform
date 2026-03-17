@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────
 // modelRouter.ts — Model Selection & Routing
 // ─────────────────────────────────────────────────
-// Maps ACE use cases to optimal OpenRouter models.
+// Maps Glid use cases to optimal OpenRouter models.
 // Single config point for all model decisions.
 //
 // Model lineup (exposed in selector):

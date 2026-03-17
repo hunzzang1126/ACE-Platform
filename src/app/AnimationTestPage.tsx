@@ -166,7 +166,7 @@ export default function AnimationTestPage() {
             background: '#0d1117', fontFamily: 'Inter, system-ui, sans-serif', color: '#e6edf3',
         }}>
             <h1 style={{ fontSize: 22, fontWeight: 600, marginBottom: 12, letterSpacing: -0.5 }}>
-                ACE Engine — Animation
+                Glid Engine — Animation
             </h1>
 
             {/* Transport Controls */}
@@ -244,7 +244,7 @@ export default function AnimationTestPage() {
                                 alignItems: 'center', justifyContent: 'center',
                                 background: 'rgba(22,25,31,0.9)', color: '#adb5bd', fontSize: 14,
                             }}>
-                                Loading ACE Engine...
+                                Loading Glid Engine...
                             </div>
                         )}
                     </div>

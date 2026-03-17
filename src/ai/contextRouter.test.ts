@@ -99,7 +99,7 @@ describe('contextRouter', () => {
         it('returns dashboard-specific prompt for dashboard page', () => {
             const ctx = buildContext('/');
             const prompt = buildContextSystemPrompt(ctx);
-            expect(prompt).toContain('ACE');
+            expect(prompt).toContain('Glid');
             expect(prompt).toContain('Main Dashboard');
             expect(prompt).toContain('FULL AUTONOMY');
         });

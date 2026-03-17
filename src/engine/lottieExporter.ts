@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────
-// Lottie Exporter — Convert ACE animations to Lottie JSON
+// Lottie Exporter — Convert Glid animations to Lottie JSON
 // ─────────────────────────────────────────────────
 // Outputs a Bodymovin-compatible JSON that can be played
 // by lottie-web, lottie-ios, lottie-android, etc.
@@ -36,7 +36,7 @@ interface LottieKeyframe {
 }
 
 /**
- * Export ACE engine state + animation data to Lottie JSON.
+ * Export Glid engine state + animation data to Lottie JSON.
  */
 export function exportToLottie(
     shapes: LottieShape[],
@@ -44,7 +44,7 @@ export function exportToLottie(
     duration: number,
     options: LottieExportOptions,
 ): object {
-    const { width, height, fps, name = 'ACE Export' } = options;
+    const { width, height, fps, name = 'Glid Export' } = options;
     const totalFrames = Math.ceil(duration * fps);
 
     // Build layers (reverse order — Lottie renders first layer on top)

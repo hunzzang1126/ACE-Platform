@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────
 // apiKeys.ts — Centralized API Key Provider
 // ─────────────────────────────────────────────────
-// ACE supplies keys to all users (company-managed).
+// Glid supplies keys to all users (company-managed).
 // All API calls route through OpenRouter.
 // Future: token system via login/auth.
 // ─────────────────────────────────────────────────

@@ -17,7 +17,7 @@ import { useHistoryStore } from '@/stores/historyStore';
 import type { EngineNode, CanvasEngineState, CanvasEngineActions, UseCanvasEngineResult } from './canvasTypes';
 import {
     nextId, nextColor, rgbToHex, hexToRgb01,
-    isArtboard, fabricToEngineNode, patchAceProps, ACE_CUSTOM_PROPS,
+    isArtboard, fabricToEngineNode, patchAceProps, GLID_CUSTOM_PROPS,
 } from './fabricHelpers';
 import { createEngineShim } from './fabricEngineShim';
 import { snapToGuides, type GuideLine } from './useFabricGuides';
@@ -81,7 +81,7 @@ export function useFabricCanvas(
         const fc = fabricRef.current;
         if (fc) {
             const active = fc.getActiveObjects();
-            const selectedIds = active.map((o) => (o as any).__aceId ?? 0).filter((id: number) => id > 0);
+            const selectedIds = active.map((o) => (o as any).__glidId ?? 0).filter((id: number) => id > 0);
             const selJson = JSON.stringify(selectedIds);
             if (selJson !== prevSelJson.current) {
                 prevSelJson.current = selJson;
@@ -105,7 +105,7 @@ export function useFabricCanvas(
     const pushUndo = useCallback((label = 'Edit') => {
         const fc = fabricRef.current;
         if (!fc || skipHistory.current) return;
-        useHistoryStore.getState().pushState(label, JSON.stringify(fc.toObject(ACE_CUSTOM_PROPS)));
+        useHistoryStore.getState().pushState(label, JSON.stringify(fc.toObject(GLID_CUSTOM_PROPS)));
         setCanUndo(true);
         setCanRedo(false);
     }, []);
@@ -113,12 +113,12 @@ export function useFabricCanvas(
     // ── Z-index resync (hook-level, accessible to all useCallbacks) ──
     // ★ REGRESSION GUARD: This MUST be a hook-level function, NOT scoped inside useEffect.
     // All z-order mutations (bringToFront, sendToBack, etc.) call this after Fabric stack changes.
-    // fabricToEngineNode reads __aceZIndex during save — if stale, saved z_index is wrong.
+    // fabricToEngineNode reads __glidZIndex during save — if stale, saved z_index is wrong.
     const resyncZIndices = useCallback(() => {
         const fc = fabricRef.current;
         if (!fc) return;
         const userObjs = fc.getObjects().filter(o => !isArtboard(o) && !(o as any).__aceGuide);
-        userObjs.forEach((o, i) => { (o as any).__aceZIndex = i; });
+        userObjs.forEach((o, i) => { (o as any).__glidZIndex = i; });
     }, []);
 
     // ── Smart guide rendering helpers ──
@@ -197,7 +197,7 @@ export function useFabricCanvas(
                 hoverCursor: 'default',
                 shadow: new Shadow({ color: 'rgba(0,0,0,0.35)', blur: 24, offsetX: 0, offsetY: 6 }),
             });
-            (artboard as any).__aceArtboard = true;
+            (artboard as any).__glidArtboard = true;
             patchAceProps(artboard);
             fc.add(artboard);
 
@@ -214,8 +214,8 @@ export function useFabricCanvas(
             fc.on('selection:cleared', () => syncState());
 
             // ★ REGRESSION GUARD: After any transform (move/resize/rotate), recompute
-            // __aceZIndex for ALL objects based on actual Fabric stack position.
-            // Previously, __aceZIndex was set only at add-time and never updated,
+            // __glidZIndex for ALL objects based on actual Fabric stack position.
+            // Previously, __glidZIndex was set only at add-time and never updated,
             // causing z-index corruption when objects were reordered.
             // Use hook-level resyncZIndices (accessible from all useCallback hooks).
             fc.on('object:modified', () => {
@@ -226,9 +226,9 @@ export function useFabricCanvas(
             });
             fc.on('object:added', (opt) => {
                 const obj = opt.target;
-                if (obj && !(obj as any).__aceId && !isArtboard(obj) && !(obj as any).__aceGuide) {
-                    (obj as any).__aceId = nextId();
-                    (obj as any).__aceZIndex = fc.getObjects().filter(o => !isArtboard(o) && !(o as any).__aceGuide).length;
+                if (obj && !(obj as any).__glidId && !isArtboard(obj) && !(obj as any).__aceGuide) {
+                    (obj as any).__glidId = nextId();
+                    (obj as any).__glidZIndex = fc.getObjects().filter(o => !isArtboard(o) && !(o as any).__aceGuide).length;
                     patchAceProps(obj);
                 }
                 if (!skipHistory.current && !(obj as any)?.__aceGuide) pushUndo('Add element');
@@ -345,9 +345,9 @@ export function useFabricCanvas(
         return () => ro.disconnect();
     }, [status]);
 
-    // ── Helper: find by ACE id ──
+    // ── Helper: find by Glid id ──
     const findById = useCallback((id: number): FabricObject | undefined => {
-        return fabricRef.current?.getObjects().find((o) => (o as any).__aceId === id);
+        return fabricRef.current?.getObjects().find((o) => (o as any).__glidId === id);
     }, []);
 
     // ── Shape creation ──
@@ -359,8 +359,8 @@ export function useFabricCanvas(
             left: x ?? (width / 2 - 60), top: y ?? (height / 2 - 40),
             width: 120, height: 80, fill: nextColor(), opacity: 0.9,
         });
-        (rect as any).__aceId = id;
-        (rect as any).__aceZIndex = getUserObjects().length;
+        (rect as any).__glidId = id;
+        (rect as any).__glidZIndex = getUserObjects().length;
         patchAceProps(rect);
         fc.add(rect); fc.setActiveObject(rect); fc.renderAll(); syncState();
         return id;
@@ -374,8 +374,8 @@ export function useFabricCanvas(
             left: x ?? (width / 2 - 60), top: y ?? (height / 2 - 40),
             width: 120, height: 80, fill: nextColor(), opacity: 0.9, rx: 12, ry: 12,
         });
-        (rect as any).__aceId = id;
-        (rect as any).__aceZIndex = getUserObjects().length;
+        (rect as any).__glidId = id;
+        (rect as any).__glidZIndex = getUserObjects().length;
         patchAceProps(rect);
         fc.add(rect); fc.setActiveObject(rect); fc.renderAll(); syncState();
         return id;
@@ -389,8 +389,8 @@ export function useFabricCanvas(
             left: x ?? (width / 2 - 60), top: y ?? (height / 2 - 40),
             rx: 60, ry: 50, fill: nextColor(), opacity: 0.9,
         });
-        (el as any).__aceId = id;
-        (el as any).__aceZIndex = getUserObjects().length;
+        (el as any).__glidId = id;
+        (el as any).__glidZIndex = getUserObjects().length;
         patchAceProps(el);
         fc.add(el); fc.setActiveObject(el); fc.renderAll(); syncState();
         return id;
@@ -414,9 +414,9 @@ export function useFabricCanvas(
             lineHeight: opts?.lineHeight ?? 1.4,
             editable: true, splitByGrapheme: false,
         });
-        (tb as any).__aceId = id;
-        (tb as any).__aceName = `Text #${id}`;
-        (tb as any).__aceZIndex = getUserObjects().length;
+        (tb as any).__glidId = id;
+        (tb as any).__glidName = `Text #${id}`;
+        (tb as any).__glidZIndex = getUserObjects().length;
         patchAceProps(tb);
         fc.add(tb); fc.setActiveObject(tb); fc.renderAll(); syncState();
         return id;
@@ -460,9 +460,9 @@ export function useFabricCanvas(
             const scale = targetW / natW;
             const targetH = h ?? (natH * scale);
             img.set({ left: x, top: y, scaleX: targetW / natW, scaleY: targetH / natH });
-            (img as any).__aceId = id;
-            (img as any).__aceName = `Image #${id}`;
-            (img as any).__aceZIndex = getUserObjects().length;
+            (img as any).__glidId = id;
+            (img as any).__glidName = `Image #${id}`;
+            (img as any).__glidZIndex = getUserObjects().length;
             patchAceProps(img);
             fc.add(img); fc.setActiveObject(img); fc.renderAll(); syncState();
             return id;
@@ -520,9 +520,9 @@ export function useFabricCanvas(
 
     // ── Z-index ──
     // ★ REGRESSION GUARD: After every Fabric stack reorder call (bringObjectToFront etc.),
-    // resyncZIndices() MUST be called to update __aceZIndex on ALL objects.
-    // fabricToEngineNode reads __aceZIndex to determine z_index during save.
-    // If __aceZIndex is stale, the saved z_index is wrong and layer order reverts on re-enter.
+    // resyncZIndices() MUST be called to update __glidZIndex on ALL objects.
+    // fabricToEngineNode reads __glidZIndex to determine z_index during save.
+    // If __glidZIndex is stale, the saved z_index is wrong and layer order reverts on re-enter.
     const bringToFront = useCallback((id: number) => {
         const fc = fabricRef.current; const obj = findById(id);
         if (!fc || !obj) return;
@@ -583,14 +583,14 @@ export function useFabricCanvas(
     // ── Undo / Redo ──
     const restoreArtboardFlags = useCallback((fc: Canvas) => {
         fc.getObjects().forEach((obj) => {
-            if ((obj as any).__aceArtboard) {
+            if ((obj as any).__glidArtboard) {
                 obj.set({
                     selectable: false, evented: false, hasControls: false, hasBorders: false,
                     lockMovementX: true, lockMovementY: true, hoverCursor: 'default',
                 });
-            } else if (!(obj as any).__aceId) {
-                (obj as any).__aceId = nextId();
-                (obj as any).__aceZIndex = 0;
+            } else if (!(obj as any).__glidId) {
+                (obj as any).__glidId = nextId();
+                (obj as any).__glidZIndex = 0;
             }
             patchAceProps(obj);
         });
@@ -601,7 +601,7 @@ export function useFabricCanvas(
         const hs = useHistoryStore.getState();
         if (!fc || !hs.canUndo) return;
         // Save current state for redo
-        hs.pushState('redo-save', JSON.stringify(fc.toObject(ACE_CUSTOM_PROPS)));
+        hs.pushState('redo-save', JSON.stringify(fc.toObject(GLID_CUSTOM_PROPS)));
         const entry = hs.undo();
         if (!entry?.canvasState) return;
         skipHistory.current = true;
@@ -631,7 +631,7 @@ export function useFabricCanvas(
         const id = nextId();
         active.clone().then((cloned: FabricObject) => {
             cloned.set({ left: (cloned.left ?? 0) + 20, top: (cloned.top ?? 0) + 20 });
-            (cloned as any).__aceId = id;
+            (cloned as any).__glidId = id;
             fc.add(cloned); fc.setActiveObject(cloned); fc.renderAll(); syncState();
         });
         return id;
@@ -744,7 +744,7 @@ export function useFabricCanvas(
         groupSelected: (name?: string) => {
             const fc = fabricRef.current;
             if (!fc) return null;
-            const ids = fc.getActiveObjects().map(o => (o as any).__aceId as number).filter(id => id > 0);
+            const ids = fc.getActiveObjects().map(o => (o as any).__glidId as number).filter(id => id > 0);
             if (ids.length < 2) return null;
             return engineRef.current?.group_elements(ids, name) ?? null;
         },
@@ -753,7 +753,7 @@ export function useFabricCanvas(
             if (!fc) return;
             const active = fc.getActiveObject();
             if (!active) return;
-            const id = (active as any).__aceId;
+            const id = (active as any).__glidId;
             if (id) engineRef.current?.ungroup(id);
         },
         undo, redo, alignToCanvas,

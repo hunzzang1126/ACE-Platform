@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────
 // Video Exporter — WebCodecs H.264 + mp4-muxer
 // ─────────────────────────────────────────────────
-// Captures frames from the ACE engine by stepping the timeline,
+// Captures frames from the Glid engine by stepping the timeline,
 // encodes to H.264 via WebCodecs, muxes into MP4 with mp4-muxer.
 
 import { Muxer, ArrayBufferTarget } from 'mp4-muxer';
@@ -32,7 +32,7 @@ export type ProgressCallback = (progress: ExportProgress) => void;
 /**
  * Export animation to MP4 video.
  *
- * @param engine - ACE WasmEngine instance
+ * @param engine - Glid WasmEngine instance
  * @param canvas - The WebGPU canvas element
  * @param duration - Animation duration in seconds
  * @param options - Export configuration
@@ -81,7 +81,7 @@ export async function exportToMp4(
             encodedFrames++;
         },
         error: (e) => {
-            console.error('[ACE Export] Encode error:', e);
+            console.error('[Glid Export] Encode error:', e);
             onProgress?.({
                 phase: 'error',
                 currentFrame: encodedFrames,

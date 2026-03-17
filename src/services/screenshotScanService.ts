@@ -2,13 +2,13 @@
 // screenshotScanService.ts — Vision-to-Design
 // ─────────────────────────────────────────────────────────
 // Takes a design screenshot → Claude Vision API analyzes it
-// → Returns a JSON layout of editable ACE elements
+// → Returns a JSON layout of editable Glid elements
 // ─────────────────────────────────────────────────────────
 
 import { callAnthropicApi, DEFAULT_CLAUDE_MODEL } from '@/services/anthropicClient';
 import type { RenderElement } from '@/services/autoDesignService';
 
-// ── Font style classification → closest ACE font mapping ──
+// ── Font style classification → closest Glid font mapping ──
 const FONT_STYLE_MAP: Record<string, string> = {
     // Display/Impact → bold headline fonts
     display: 'Anton',

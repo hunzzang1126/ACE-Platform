@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────
-// LandingPage — Apple-style marketing page for ACE
+// LandingPage — Apple-style marketing page for Glid
 // ─────────────────────────────────────────────────
 
 import { useEffect, useRef } from 'react';
@@ -103,7 +103,7 @@ export function LandingPage() {
         <div className="landing-page">
             {/* ── Navigation ── */}
             <nav className="landing-nav">
-                <div className="landing-nav-logo">ACE</div>
+                <div className="landing-nav-logo">Glid</div>
                 <div className="landing-nav-links">
                     <button className="landing-nav-link" onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}>Features</button>
                     <button className="landing-nav-link" onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}>How It Works</button>
@@ -128,7 +128,7 @@ export function LandingPage() {
                 </h1>
 
                 <p className="landing-hero-sub">
-                    ACE is the AI-native creative platform for performance marketing.
+                    Glid is the AI-native creative platform for performance marketing.
                     Design, animate, and deploy ad creatives across every channel
                     — powered by WebGPU and an intelligent design agent.
                 </p>
@@ -191,7 +191,7 @@ export function LandingPage() {
                 <div className="landing-section-label">Platform</div>
                 <h2 className="landing-section-title">Built for Scale</h2>
                 <p className="landing-section-sub">
-                    From solo designers to enterprise teams. ACE adapts to your workflow
+                    From solo designers to enterprise teams. Glid adapts to your workflow
                     with cloud sync, version history, and role-based access.
                 </p>
 
@@ -202,7 +202,7 @@ export function LandingPage() {
                         <div className="landing-showcase-dot" />
                     </div>
                     <div className="landing-showcase-content">
-                        <span className="landing-showcase-label">ACE Creative Workspace</span>
+                        <span className="landing-showcase-label">Glid Creative Workspace</span>
                     </div>
                 </div>
             </section>
@@ -219,7 +219,7 @@ export function LandingPage() {
 
             {/* ── Footer ── */}
             <footer className="landing-footer">
-                <span className="landing-footer-text">ACE — Autonomous Creative Engine</span>
+                <span className="landing-footer-text">Glid — Global Intelligence Design</span>
                 <span className="landing-footer-text">&copy; {new Date().getFullYear()} All rights reserved.</span>
             </footer>
         </div>

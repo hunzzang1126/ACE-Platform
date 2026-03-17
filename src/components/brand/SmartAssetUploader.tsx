@@ -2,7 +2,7 @@
 // SmartAssetUploader — Drag & drop + AI auto-analysis
 // ─────────────────────────────────────────────────
 // Upload images → Vision API → auto-tags, colors, description.
-// Shows analysis results inline. Thin component per ACE rules.
+// Shows analysis results inline. Thin component per Glid rules.
 
 import React, { useState, useCallback, useRef } from 'react';
 import {

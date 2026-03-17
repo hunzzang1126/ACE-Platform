@@ -43,7 +43,7 @@ export function EngineStatusBadge() {
                     background: loading ? '#ffc107' : dotColor,
                     boxShadow: loading ? '0 0 6px #ffc107' : `0 0 6px ${dotColor}`,
                 }} />
-                <strong style={{ color: '#e9ecef', fontSize: 13 }}>ACE Engine</strong>
+                <strong style={{ color: '#e9ecef', fontSize: 13 }}>Glid Engine</strong>
                 <span style={{ marginLeft: 'auto', fontSize: 11, opacity: 0.6 }}>{runtime}</span>
             </div>
             <div style={{ fontSize: 11, lineHeight: 1.6 }}>

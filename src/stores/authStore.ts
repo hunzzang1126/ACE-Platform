@@ -218,7 +218,7 @@ export const useAuthStore = create<AuthState>()(
             },
         }),
         {
-            name: 'ace-auth',
+            name: 'glid-auth',
             storage: createJSONStorage(() => idbStorage),
             // Don't persist transient state — always starts fresh
             partialize: (state) => ({

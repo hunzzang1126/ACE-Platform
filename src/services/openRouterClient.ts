@@ -32,7 +32,7 @@ export function getOpenRouterHeaders(): Record<string, string> {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${getOpenRouterKey()}`,
         'HTTP-Referer': 'https://ace.design',
-        'X-Title': 'ACE Design Engine',
+        'X-Title': 'Glid Design Engine',
     };
 }
 

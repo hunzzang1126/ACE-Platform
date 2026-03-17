@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 // visionService.ts — AI Vision: Capture · Analyze · Compare
 // ─────────────────────────────────────────────────────────────
-// The "eyes" of ACE's AI — enables the AI to SEE the canvas,
+// The "eyes" of Glid's AI — enables the AI to SEE the canvas,
 // analyze design quality, compare to references, and self-correct.
 //
 // Six capabilities:
@@ -9,7 +9,7 @@
 //   2. captureElement()      — screenshot an arbitrary HTML element's canvas
 //   3. analyzeDesign()       — send screenshot to Vision → structured analysis
 //   4. analyzeReference()    — analyze a reference image for Scan Design
-//   5. compareToReference()  — compare ACE output vs reference → similarity
+//   5. compareToReference()  — compare Glid output vs reference → similarity
 //   6. batchQA()             — run Vision QA on multiple size variants
 //
 // Also re-exports the legacy callVisionCheck() for backward compat.
@@ -29,7 +29,7 @@ import { callAnthropicApi, DEFAULT_CLAUDE_MODEL } from '@/services/anthropicClie
 // SECTION 1: ZOD SCHEMAS — Typed, runtime-validated AI responses
 // ═══════════════════════════════════════════════════════════════
 
-// ── Semantic roles matching ACE's Smart Sizing role system ──
+// ── Semantic roles matching Glid's Smart Sizing role system ──
 
 export const VISION_ROLES = [
     'headline', 'subline', 'cta', 'logo', 'hero',
@@ -46,7 +46,7 @@ export const ELEMENT_TYPES = [
 export const DetectedElementSchema = z.object({
     /** Human-readable label (e.g. "Main Headline", "CTA Button") */
     name: z.string(),
-    /** Semantic role — maps 1:1 to ACE's Smart Sizing roles */
+    /** Semantic role — maps 1:1 to Glid's Smart Sizing roles */
     role: z.enum(VISION_ROLES),
     /** Visual type as perceived by the AI */
     type: z.enum(ELEMENT_TYPES),
@@ -267,7 +267,7 @@ export function fileToBase64(file: File | Blob): Promise<string> {
  * on exactly what to detect and how to format the JSON response.
  */
 function buildAnalysisPrompt(canvasW: number, canvasH: number): string {
-    return `You are ACE Vision — a world-class design quality analysis system.
+    return `You are Glid Vision — a world-class design quality analysis system.
 You analyze banner ad screenshots with pixel-perfect precision.
 
 Canvas: ${canvasW}x${canvasH}px
@@ -393,7 +393,7 @@ export async function analyzeDesign(
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Analyze ONLY a reference image (before ACE has built anything).
+ * Analyze ONLY a reference image (before Glid has built anything).
  * First step of Scan Design — extracts structure from the reference
  * so the AI planner knows what tools to call.
  */
@@ -446,13 +446,13 @@ EXTRA FOR REFERENCE ANALYSIS:
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Compare ACE output against a reference image.
+ * Compare Glid output against a reference image.
  * Sends BOTH images to Vision API for side-by-side analysis.
  *
  * Returns:
  *   - Similarity score (0-100)
  *   - What matches and what differs
- *   - Feasibility: what ACE tools handle vs what needs Flux/Imagen
+ *   - Feasibility: what Glid tools handle vs what needs Flux/Imagen
  */
 export async function compareToReference(
     referenceBase64: string,
@@ -478,7 +478,7 @@ export async function compareToReference(
                         type: 'text',
                         text: `Compare these two ${canvasW}x${canvasH}px banner designs.
 IMAGE 1 = REFERENCE (target to replicate)
-IMAGE 2 = CURRENT ACE OUTPUT (what we built)
+IMAGE 2 = CURRENT Glid OUTPUT (what we built)
 
 Return JSON ONLY:
 {
@@ -493,7 +493,7 @@ Return JSON ONLY:
 }
 
 COMPARE: layout, colors, typography, spacing, elements, overall feel.
-For feasibility: which ACE tools can handle each element vs what needs Flux/Imagen image generation.`,
+For feasibility: which Glid tools can handle each element vs what needs Flux/Imagen image generation.`,
                     },
                 ],
             }],

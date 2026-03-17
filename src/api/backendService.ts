@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────
-// ACE Backend API Service
+// Glid Backend API Service
 // ─────────────────────────────────────────────────
 const API_BASE = 'http://localhost:8000';
 

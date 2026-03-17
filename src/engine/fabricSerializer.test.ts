@@ -31,7 +31,7 @@ describe('fabricJsonToElements', () => {
 
     it('should skip artboard objects', () => {
         const json = makeFabricJSON([
-            { type: 'rect', left: 0, top: 0, width: 300, height: 250, scaleX: 1, scaleY: 1, opacity: 1, fill: '#ffffff', __aceArtboard: true },
+            { type: 'rect', left: 0, top: 0, width: 300, height: 250, scaleX: 1, scaleY: 1, opacity: 1, fill: '#ffffff', __glidArtboard: true },
         ]);
         const result = fabricJsonToElements(json, 300, 250);
         expect(result).toEqual([]);
@@ -49,7 +49,7 @@ describe('fabricJsonToElements', () => {
 
     it('should convert rect to ShapeElement with correct fill', () => {
         const json = makeFabricJSON([
-            { type: 'rect', left: 10, top: 20, width: 100, height: 80, scaleX: 1, scaleY: 1, opacity: 0.8, fill: '#FF5733', __aceId: 1, __aceZIndex: 0, __aceName: 'Red Box' },
+            { type: 'rect', left: 10, top: 20, width: 100, height: 80, scaleX: 1, scaleY: 1, opacity: 0.8, fill: '#FF5733', __glidId: 1, __glidZIndex: 0, __glidName: 'Red Box' },
         ]);
         const result = fabricJsonToElements(json, 300, 250);
         expect(result).toHaveLength(1);
@@ -66,7 +66,7 @@ describe('fabricJsonToElements', () => {
 
     it('should convert ellipse to ShapeElement with ellipse type', () => {
         const json = makeFabricJSON([
-            { type: 'ellipse', left: 50, top: 50, width: 120, height: 80, scaleX: 1, scaleY: 1, opacity: 1, fill: '#00FF00', __aceId: 2, __aceZIndex: 1, __aceName: 'Green Ellipse' },
+            { type: 'ellipse', left: 50, top: 50, width: 120, height: 80, scaleX: 1, scaleY: 1, opacity: 1, fill: '#00FF00', __glidId: 2, __glidZIndex: 1, __glidName: 'Green Ellipse' },
         ]);
         const result = fabricJsonToElements(json, 300, 250);
         expect(result).toHaveLength(1);
@@ -75,12 +75,12 @@ describe('fabricJsonToElements', () => {
         }
     });
 
-    it('should preserve gradient data from ACE custom props', () => {
+    it('should preserve gradient data from Glid custom props', () => {
         const json = makeFabricJSON([
             {
                 type: 'rect', left: 0, top: 0, width: 300, height: 250, scaleX: 1, scaleY: 1, opacity: 1,
-                fill: '#000000', __aceId: 3, __aceZIndex: 0, __aceName: 'Gradient BG',
-                __aceGradientStart: '#FF0000', __aceGradientEnd: '#0000FF', __aceGradientAngle: 45,
+                fill: '#000000', __glidId: 3, __glidZIndex: 0, __glidName: 'Gradient BG',
+                __glidGradientStart: '#FF0000', __glidGradientEnd: '#0000FF', __glidGradientAngle: 45,
             },
         ]);
         const result = fabricJsonToElements(json, 300, 250);
@@ -94,7 +94,7 @@ describe('fabricJsonToElements', () => {
 
     it('should preserve border radius', () => {
         const json = makeFabricJSON([
-            { type: 'rect', left: 10, top: 10, width: 100, height: 50, scaleX: 1, scaleY: 1, opacity: 1, fill: '#333', __aceId: 4, __aceZIndex: 0, rx: 12 },
+            { type: 'rect', left: 10, top: 10, width: 100, height: 50, scaleX: 1, scaleY: 1, opacity: 1, fill: '#333', __glidId: 4, __glidZIndex: 0, rx: 12 },
         ]);
         const result = fabricJsonToElements(json, 300, 250);
         if (result[0].type === 'shape') {
@@ -110,7 +110,7 @@ describe('fabricJsonToElements', () => {
                 type: 'textbox', left: 20, top: 30, width: 200, height: 40, scaleX: 1, scaleY: 1, opacity: 1,
                 fill: '#FFFFFF', text: 'Hello World', fontSize: 24, fontFamily: 'Roboto',
                 fontWeight: '700', fontStyle: 'italic', textAlign: 'center', lineHeight: 1.2,
-                charSpacing: 50, __aceId: 5, __aceZIndex: 2, __aceName: 'Title',
+                charSpacing: 50, __glidId: 5, __glidZIndex: 2, __glidName: 'Title',
             },
         ]);
         const result = fabricJsonToElements(json, 300, 250);
@@ -132,7 +132,7 @@ describe('fabricJsonToElements', () => {
         const json = makeFabricJSON([
             {
                 type: 'textbox', left: 0, top: 0, width: 100, height: 30, scaleX: 1, scaleY: 1, opacity: 1,
-                fill: '#000', text: 'Bold', fontWeight: 'bold', __aceId: 6, __aceZIndex: 0,
+                fill: '#000', text: 'Bold', fontWeight: 'bold', __glidId: 6, __glidZIndex: 0,
             },
         ]);
         const result = fabricJsonToElements(json, 300, 250);
@@ -147,7 +147,7 @@ describe('fabricJsonToElements', () => {
         const json = makeFabricJSON([
             {
                 type: 'image', left: 10, top: 10, width: 400, height: 300, scaleX: 0.5, scaleY: 0.5, opacity: 1,
-                src: 'data:image/png;base64,abc123', __aceId: 7, __aceZIndex: 3, __aceName: 'Product Photo',
+                src: 'data:image/png;base64,abc123', __glidId: 7, __glidZIndex: 3, __glidName: 'Product Photo',
             },
         ]);
         const result = fabricJsonToElements(json, 300, 250);
@@ -164,9 +164,9 @@ describe('fabricJsonToElements', () => {
 
     it('should sort elements by zIndex', () => {
         const json = makeFabricJSON([
-            { type: 'rect', left: 0, top: 0, width: 50, height: 50, scaleX: 1, scaleY: 1, opacity: 1, fill: '#f00', __aceId: 1, __aceZIndex: 2, __aceName: 'Top' },
-            { type: 'rect', left: 0, top: 0, width: 50, height: 50, scaleX: 1, scaleY: 1, opacity: 1, fill: '#0f0', __aceId: 2, __aceZIndex: 0, __aceName: 'Bottom' },
-            { type: 'rect', left: 0, top: 0, width: 50, height: 50, scaleX: 1, scaleY: 1, opacity: 1, fill: '#00f', __aceId: 3, __aceZIndex: 1, __aceName: 'Middle' },
+            { type: 'rect', left: 0, top: 0, width: 50, height: 50, scaleX: 1, scaleY: 1, opacity: 1, fill: '#f00', __glidId: 1, __glidZIndex: 2, __glidName: 'Top' },
+            { type: 'rect', left: 0, top: 0, width: 50, height: 50, scaleX: 1, scaleY: 1, opacity: 1, fill: '#0f0', __glidId: 2, __glidZIndex: 0, __glidName: 'Bottom' },
+            { type: 'rect', left: 0, top: 0, width: 50, height: 50, scaleX: 1, scaleY: 1, opacity: 1, fill: '#00f', __glidId: 3, __glidZIndex: 1, __glidName: 'Middle' },
         ]);
         const result = fabricJsonToElements(json, 300, 250);
         expect(result.map(e => e.name)).toEqual(['Bottom', 'Middle', 'Top']);
@@ -176,7 +176,7 @@ describe('fabricJsonToElements', () => {
 
     it('should apply scaleX/scaleY to element dimensions for constraints', () => {
         const json = makeFabricJSON([
-            { type: 'rect', left: 0, top: 0, width: 100, height: 100, scaleX: 2, scaleY: 3, opacity: 1, fill: '#abc', __aceId: 8, __aceZIndex: 0 },
+            { type: 'rect', left: 0, top: 0, width: 100, height: 100, scaleX: 2, scaleY: 3, opacity: 1, fill: '#abc', __glidId: 8, __glidZIndex: 0 },
         ]);
         const result = fabricJsonToElements(json, 300, 250);
         // The constraints should be computed from scaled dimensions (200x300)
@@ -194,7 +194,7 @@ describe('fabricJsonToElements', () => {
 
     it('should respect visible property', () => {
         const json = makeFabricJSON([
-            { type: 'rect', left: 0, top: 0, width: 50, height: 50, scaleX: 1, scaleY: 1, opacity: 1, fill: '#f00', __aceId: 1, __aceZIndex: 0, visible: false },
+            { type: 'rect', left: 0, top: 0, width: 50, height: 50, scaleX: 1, scaleY: 1, opacity: 1, fill: '#f00', __glidId: 1, __glidZIndex: 0, visible: false },
         ]);
         const result = fabricJsonToElements(json, 300, 250);
         expect(result[0].visible).toBe(false);
@@ -204,7 +204,7 @@ describe('fabricJsonToElements', () => {
 
     it('should use sensible defaults for missing properties', () => {
         const json = makeFabricJSON([
-            { type: 'textbox', __aceId: 1, __aceZIndex: 0 },
+            { type: 'textbox', __glidId: 1, __glidZIndex: 0 },
         ]);
         const result = fabricJsonToElements(json, 300, 250);
         expect(result).toHaveLength(1);

@@ -192,7 +192,7 @@ function renderVariantToCanvas(variant: BannerVariant): string | null {
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
 
-    // Default background (dark, matching ACE editor)
+    // Default background (dark, matching Glid editor)
     ctx.fillStyle = '#1a1f2e';
     ctx.fillRect(0, 0, w, h);
 

@@ -533,7 +533,7 @@ export class AiService {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${apiKey}`,
                     'HTTP-Referer': 'https://ace.design',
-                    'X-Title': 'ACE Design Engine',
+                    'X-Title': 'Glid Design Engine',
                 },
                 body: JSON.stringify(body),
             });

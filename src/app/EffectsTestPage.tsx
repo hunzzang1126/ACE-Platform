@@ -131,7 +131,7 @@ export default function EffectsTestPage() {
             background: '#0d1117', fontFamily: 'Inter, system-ui, sans-serif', color: '#e6edf3',
         }}>
             <h1 style={{ fontSize: 22, fontWeight: 600, marginBottom: 12, letterSpacing: -0.5 }}>
-                 ACE Engine — Pro Effects
+                 Glid Engine — Pro Effects
             </h1>
 
             <div style={{ display: 'flex', gap: 20, marginBottom: 12 }}>

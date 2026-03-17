@@ -207,7 +207,7 @@ export default function ExportTestPage() {
         }));
 
         const lottie = exportToLottie(lottieShapes, keyframes, DURATION, {
-            width: WIDTH, height: HEIGHT, fps: FPS, name: 'ACE Animation',
+            width: WIDTH, height: HEIGHT, fps: FPS, name: 'Glid Animation',
         });
 
         downloadLottie(lottie, `ace-animation-${Date.now()}.json`);
@@ -227,7 +227,7 @@ export default function ExportTestPage() {
             background: '#0d1117', fontFamily: 'Inter, system-ui, sans-serif', color: '#e6edf3',
         }}>
             <h1 style={{ fontSize: 22, fontWeight: 600, marginBottom: 12, letterSpacing: -0.5 }}>
-                ACE Engine — Video & Export
+                Glid Engine — Video & Export
             </h1>
 
             {/* Canvas */}

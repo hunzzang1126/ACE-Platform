@@ -4,7 +4,7 @@
 // Video files are too large for localStorage. We store them in IndexedDB
 // as ArrayBuffer and regenerate blob URLs on demand.
 
-const DB_NAME = 'ace-video-store';
+const DB_NAME = 'glid-video-store';
 const DB_VERSION = 1;
 const STORE_NAME = 'videos';
 

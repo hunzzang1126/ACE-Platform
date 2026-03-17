@@ -53,12 +53,12 @@ export function rgbToHex(r: number, g: number, b: number): string {
 
 // ── Check if object is the artboard background ──
 export function isArtboard(obj: FabricObject): boolean {
-    return (obj as any).__aceArtboard === true;
+    return (obj as any).__glidArtboard === true;
 }
 
 // ── Extract EngineNode from Fabric object ──
 export function fabricToEngineNode(obj: FabricObject): EngineNode {
-    const id = (obj as any).__aceId ?? 0;
+    const id = (obj as any).__glidId ?? 0;
     const objType = obj.type;
     const br = (obj as any).rx ?? 0;
 
@@ -81,10 +81,10 @@ export function fabricToEngineNode(obj: FabricObject): EngineNode {
     }
 
     // Read custom gradient props set by shim's add_gradient_rect
-    if ((obj as any).__aceGradientStart) {
-        gradientStart = (obj as any).__aceGradientStart;
-        gradientEnd = (obj as any).__aceGradientEnd;
-        gradientAngle = (obj as any).__aceGradientAngle;
+    if ((obj as any).__glidGradientStart) {
+        gradientStart = (obj as any).__glidGradientStart;
+        gradientEnd = (obj as any).__glidGradientEnd;
+        gradientAngle = (obj as any).__glidGradientAngle;
         fill = gradientStart ?? fill;
     }
 
@@ -97,10 +97,10 @@ export function fabricToEngineNode(obj: FabricObject): EngineNode {
         name = `Ellipse #${id}`;
     } else if (objType === 'textbox' || objType === 'i-text') {
         aceType = 'text';
-        name = (obj as any).__aceName || `Text #${id}`;
+        name = (obj as any).__glidName || `Text #${id}`;
     } else if (objType === 'image') {
         aceType = 'image';
-        name = (obj as any).__aceName || `Image #${id}`;
+        name = (obj as any).__glidName || `Image #${id}`;
     } else if (objType === 'path') {
         aceType = 'path';
         name = `Path #${id}`;
@@ -110,8 +110,8 @@ export function fabricToEngineNode(obj: FabricObject): EngineNode {
     }
 
     // Prefer custom name if set
-    if ((obj as any).__aceName) {
-        name = (obj as any).__aceName;
+    if ((obj as any).__glidName) {
+        name = (obj as any).__glidName;
     }
 
     const node: EngineNode = {
@@ -122,7 +122,7 @@ export function fabricToEngineNode(obj: FabricObject): EngineNode {
         w: (obj.width ?? 0) * (obj.scaleX ?? 1),
         h: (obj.height ?? 0) * (obj.scaleY ?? 1),
         opacity: obj.opacity ?? 1,
-        z_index: (obj as any).__aceZIndex ?? 0,
+        z_index: (obj as any).__glidZIndex ?? 0,
         fill_r: r,
         fill_g: g,
         fill_b: b,
@@ -192,20 +192,20 @@ export function fabricToEngineNode(obj: FabricObject): EngineNode {
 }
 
 // ── Custom properties to include in serialization ──
-export const ACE_CUSTOM_PROPS = ['__aceId', '__aceZIndex', '__aceArtboard', '__aceName', '__aceGradientStart', '__aceGradientEnd', '__aceGradientAngle'];
+export const GLID_CUSTOM_PROPS = ['__glidId', '__glidZIndex', '__glidArtboard', '__glidName', '__glidGradientStart', '__glidGradientEnd', '__glidGradientAngle'];
 
-// Patch a Fabric object to include ACE custom props in toObject()
+// Patch a Fabric object to include Glid custom props in toObject()
 export function patchAceProps(obj: FabricObject): void {
     const original = obj.toObject.bind(obj);
     obj.toObject = function (additionalProps?: string[]) {
         const data = original(additionalProps);
-        data.__aceId = (this as any).__aceId;
-        data.__aceZIndex = (this as any).__aceZIndex;
-        if ((this as any).__aceArtboard) data.__aceArtboard = true;
-        if ((this as any).__aceName) data.__aceName = (this as any).__aceName;
-        if ((this as any).__aceGradientStart) data.__aceGradientStart = (this as any).__aceGradientStart;
-        if ((this as any).__aceGradientEnd) data.__aceGradientEnd = (this as any).__aceGradientEnd;
-        if ((this as any).__aceGradientAngle != null) data.__aceGradientAngle = (this as any).__aceGradientAngle;
+        data.__glidId = (this as any).__glidId;
+        data.__glidZIndex = (this as any).__glidZIndex;
+        if ((this as any).__glidArtboard) data.__glidArtboard = true;
+        if ((this as any).__glidName) data.__glidName = (this as any).__glidName;
+        if ((this as any).__glidGradientStart) data.__glidGradientStart = (this as any).__glidGradientStart;
+        if ((this as any).__glidGradientEnd) data.__glidGradientEnd = (this as any).__glidGradientEnd;
+        if ((this as any).__glidGradientAngle != null) data.__glidGradientAngle = (this as any).__glidGradientAngle;
         return data;
     };
 }
