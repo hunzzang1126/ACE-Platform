@@ -87,6 +87,39 @@ export function useCanvasSync(
         // Sort by zIndex
         elements.sort((a, b) => a.zIndex - b.zIndex);
 
+        // ★★ CRITICAL: Restore idb:// refs for image elements.
+        // The engine holds runtime blob: URLs (created by resolveAsset during restore).
+        // blob: URLs are SESSION-SCOPED — they become ERR_FILE_NOT_FOUND on page reload.
+        // Map them back to the original idb:// refs from the current store state.
+        const variant = cs.variants.find(v => v.id === variantId);
+        if (variant) {
+            // Build lookup: element name → original src (idb:// or data:)
+            const storedSrcByName = new Map<string, string>();
+            const storedSrcById = new Map<string, string>();
+            for (const el of variant.elements) {
+                if (el.type === 'image' && (el as ImageElement).src) {
+                    const src = (el as ImageElement).src!;
+                    // Only preserve idb:// or data: URLs — NOT blob: URLs
+                    if (src.startsWith('idb://') || src.startsWith('data:')) {
+                        if (el.name) storedSrcByName.set(el.name, src);
+                        storedSrcById.set(el.id, src);
+                    }
+                }
+            }
+            // Restore idb:// refs for images that currently have blob: URLs
+            for (const el of elements) {
+                if (el.type !== 'image') continue;
+                const img = el as ImageElement;
+                if (!img.src || !img.src.startsWith('blob:')) continue;
+                // Try matching by name first, then by id
+                const original = (img.name ? storedSrcByName.get(img.name) : undefined)
+                    || storedSrcById.get(img.id);
+                if (original) {
+                    img.src = original;
+                }
+            }
+        }
+
         // ★ Phase 2: Extract base64 images → idb:// refs (async, non-blocking)
         // Save immediately with raw data, then async-extract in background
         replaceVariantElements(variantId, elements);
@@ -147,6 +180,33 @@ export function useCanvasSync(
 
         // 3. Sort by zIndex
         elements.sort((a, b) => a.zIndex - b.zIndex);
+
+        // ★★ CRITICAL: Restore idb:// refs for images (same as saveToStore).
+        // blob: URLs are session-scoped — must map back to idb:// before persisting.
+        const variant = cs.variants.find(v => v.id === variantId);
+        if (variant) {
+            const storedSrcByName = new Map<string, string>();
+            const storedSrcById = new Map<string, string>();
+            for (const el of variant.elements) {
+                if (el.type === 'image' && (el as ImageElement).src) {
+                    const src = (el as ImageElement).src!;
+                    if (src.startsWith('idb://') || src.startsWith('data:')) {
+                        if (el.name) storedSrcByName.set(el.name, src);
+                        storedSrcById.set(el.id, src);
+                    }
+                }
+            }
+            for (const el of elements) {
+                if (el.type !== 'image') continue;
+                const img = el as ImageElement;
+                if (!img.src || !img.src.startsWith('blob:')) continue;
+                const original = (img.name ? storedSrcByName.get(img.name) : undefined)
+                    || storedSrcById.get(img.id);
+                if (original) {
+                    img.src = original;
+                }
+            }
+        }
 
         // 4. Write to store
         replaceVariantElements(variantId, elements);
