@@ -6,6 +6,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { IcLayout, IcBolt } from '@/components/ui/Icons';
 import { useAuthStore } from '@/stores/authStore';
 import { SettingsPanel } from '@/components/panels/SettingsPanel';
+import { GlidLogo } from '@/components/brand/GlidLogo';
 
 const NAV_ITEMS: { icon: ReactNode; label: string; path: string }[] = [
     {
@@ -70,7 +71,7 @@ export function AppSidebar() {
             <aside className="sidebar">
                 {/* Gradient Logo */}
                 <div className="sidebar-logo" onClick={() => navigate('/dashboard')}>
-                    <span className="sidebar-logo-text">Glid</span>
+                    <GlidLogo size={22} />
                 </div>
 
                 {/* Navigation */}

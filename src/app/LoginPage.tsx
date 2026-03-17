@@ -2,9 +2,10 @@
 // LoginPage — Sign In / Sign Up with OAuth + Email
 // ─────────────────────────────────────────────────
 
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
+import { GlidLogo } from '@/components/brand/GlidLogo';
 import './landing.css';
 
 type Mode = 'signin' | 'signup';
@@ -56,21 +57,7 @@ export function LoginPage() {
             }}>
                 {/* Logo */}
                 <div style={{ textAlign: 'center', marginBottom: 32 }}>
-                    <div
-                        style={{
-                            fontSize: 28,
-                            fontWeight: 700,
-                            letterSpacing: -1,
-                            background: 'linear-gradient(135deg, var(--landing-gradient-1), var(--landing-gradient-2))',
-                            WebkitBackgroundClip: 'text',
-                            WebkitTextFillColor: 'transparent',
-                            marginBottom: 8,
-                            cursor: 'pointer',
-                        }}
-                        onClick={() => navigate('/')}
-                    >
-                        Glid
-                    </div>
+                    <GlidLogo size={32} onClick={() => navigate('/')} />
                     <div style={{ fontSize: 15, color: 'var(--landing-text-muted)' }}>
                         {mode === 'signin' ? 'Welcome back' : 'Create your account'}
                     </div>

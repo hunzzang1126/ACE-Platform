@@ -5,6 +5,7 @@
 import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
+import { GlidLogo } from '@/components/brand/GlidLogo';
 import { HowItWorks } from './HowItWorks';
 import './landing.css';
 
@@ -103,7 +104,7 @@ export function LandingPage() {
         <div className="landing-page">
             {/* ── Navigation ── */}
             <nav className="landing-nav">
-                <div className="landing-nav-logo">Glid</div>
+                <GlidLogo size={24} variant="white" className="landing-nav-logo" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} />
                 <div className="landing-nav-links">
                     <button className="landing-nav-link" onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}>Features</button>
                     <button className="landing-nav-link" onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}>How It Works</button>

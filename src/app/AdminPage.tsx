@@ -6,6 +6,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import { fetchAllUsers, updateUserRole, type UserRecord, type UserRole } from '@/services/supabaseClient';
+import { GlidLogo } from '@/components/brand/GlidLogo';
 import './landing.css';
 
 export function AdminPage() {
@@ -56,14 +57,7 @@ export function AdminPage() {
                 backdropFilter: 'blur(20px)',
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                    <div style={{
-                        fontSize: 20, fontWeight: 700, letterSpacing: -0.5,
-                        background: 'linear-gradient(135deg, #6c5ce7, #00cec9)',
-                        WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-                        cursor: 'pointer',
-                    }} onClick={() => navigate('/dashboard')}>
-                        Glid
-                    </div>
+                    <GlidLogo size={20} onClick={() => navigate('/dashboard')} />
                     <span style={{ color: 'rgba(255,255,255,0.2)' }}>/</span>
                     <span style={{ fontSize: 14, color: '#86868b', fontWeight: 500 }}>Admin</span>
                 </div>
