@@ -98,6 +98,7 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
         hasMoved: boolean;
     } | null>(null);
     const [draggingId, setDraggingId] = useState<string | null>(null);
+    const dragCooldownRef = useRef(false);
     // ── Auto-layout helper: calculate grid position for card ──
     const GRID_GAP = 32;
     const GRID_COLS = 3;
@@ -142,8 +143,14 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
             }));
         };
         const onUp = () => {
+            const wasDrag = draggingRef.current?.hasMoved ?? false;
             draggingRef.current = null;
             setDraggingId(null);
+            if (wasDrag) {
+                // 300ms cooldown: suppress click/doubleclick after drag
+                dragCooldownRef.current = true;
+                setTimeout(() => { dragCooldownRef.current = false; }, 300);
+            }
         };
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
@@ -405,8 +412,8 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                             data-variant-id={variant.id}
                             className={`banner-card ${isPlaying ? 'banner-card--playing' : ''} ${selectedIds.has(variant.id) ? 'banner-card--selected' : ''} ${draggingId === variant.id ? 'banner-card--dragging' : ''}`}
                             onMouseDown={(e) => handleCardDragStart(e, variant.id, pos)}
-                            onClick={(e) => { if (!draggingRef.current?.hasMoved) toggleSelection(variant.id, e); }}
-                            onDoubleClick={() => handleDoubleClick(variant.id)}
+                            onClick={(e) => { if (!dragCooldownRef.current) toggleSelection(variant.id, e); }}
+                            onDoubleClick={() => { if (!dragCooldownRef.current) handleDoubleClick(variant.id); }}
                             onContextMenu={(e) => handleContextMenu(e, variant.id)}
                             style={{
                                 position: 'absolute',
