@@ -111,17 +111,58 @@ export class AgentContext {
 
     /**
      * Extract all scene nodes from the engine into structured data.
+     * Parses the JSON from engine.get_all_nodes() (Fabric shim or WASM).
      */
     static extractSceneNodes(engine: Engine): SceneNodeInfo[] {
         const nodes: SceneNodeInfo[] = [];
         try {
-            const count = engine.node_count() as number;
-            // The engine doesn't expose individual node getters directly,
-            // so we use the selection/hit-test info plus known state.
-            // For now, we track created nodes via the agent's own records.
-            // This is a simplified version — full implementation would add
-            // a `get_scene_json()` WASM method.
-            void count;
+            const raw = engine.get_all_nodes?.() as string | undefined;
+            if (!raw) return nodes;
+            const parsed = JSON.parse(raw) as Array<Record<string, unknown>>;
+
+            for (const n of parsed) {
+                const id = Number(n.id ?? 0);
+                const rawType = String(n.type ?? 'rect');
+                const type = (['rect', 'rounded_rect', 'ellipse', 'text', 'image'].includes(rawType)
+                    ? rawType : 'unknown') as SceneNodeInfo['type'];
+
+                const fillR = Number(n.fill_r ?? 0.5);
+                const fillG = Number(n.fill_g ?? 0.5);
+                const fillB = Number(n.fill_b ?? 0.5);
+                const toHex = (v: number) => Math.round(v * 255).toString(16).padStart(2, '0');
+                const colorHex = `#${toHex(fillR)}${toHex(fillG)}${toHex(fillB)}`;
+
+                const name = String(n.name ?? '');
+                const content = n.content ? String(n.content) : undefined;
+                const label = name || (content ? `"${content.slice(0, 30)}" (${type})` : `${type} #${id}`);
+
+                nodes.push({
+                    id,
+                    type,
+                    x: Number(n.x ?? 0),
+                    y: Number(n.y ?? 0),
+                    width: Number(n.w ?? 0),
+                    height: Number(n.h ?? 0),
+                    color: n.color ? String(n.color) : colorHex,
+                    opacity: Number(n.opacity ?? 1),
+                    zIndex: Number(n.z_index ?? 0),
+                    label,
+                    effects: {
+                        hasShadow: false,
+                        brightness: 1,
+                        contrast: 1,
+                        saturation: 1,
+                        hueRotate: 0,
+                        blendMode: 'normal',
+                    },
+                    animations: [],
+                    // Extra fields for AI context (not in SceneNodeInfo type,
+                    // but available via the JSON and used in prompt building)
+                    ...(content ? { _content: content } : {}),
+                    ...(n.fontSize ? { _fontSize: Number(n.fontSize) } : {}),
+                    ...(n.fontFamily ? { _fontFamily: String(n.fontFamily) } : {}),
+                } as SceneNodeInfo);
+            }
         } catch {
             // Engine might not support full introspection yet
         }
@@ -397,24 +438,45 @@ EVERY element must have CLEAR VERTICAL SPACE. Never stack without gaps.
 - **Tech/Modern**: Background #0f172a, Accent #3b82f6 (blue), Text white
 - **Bold/Energetic**: Background #1a0a0a, Accent #ef4444 (red), Text white
 
-## ★★★ DESIGN GENERATION RULES (CRITICAL) ★★★
+## ★★★ INTENT CLASSIFICATION — CHECK THIS FIRST (CRITICAL) ★★★
 
-### For CREATING NEW DESIGNS (banners, ads, creatives):
-→ ALWAYS use the \`generate_full_design\` tool. NEVER try to build a design element-by-element.
-→ generate_full_design uses professionally-curated layout templates, AI-driven color palettes,
-   and structured content generation to produce clean, premium results.
-→ Pass the user's full request as the \`prompt\` parameter.
-→ Example: User says "create a Nike summer sale banner" → call generate_full_design(prompt="Nike summer sale banner")
+Before EVERY action, classify the user's intent:
 
-### For MODIFYING EXISTING ELEMENTS on canvas:
-→ Use atomic tools: add_text, add_shape, add_button, set_color, move_node, etc.
-→ These are for targeted changes: "change the headline color", "move the CTA button down",
-   "add a small logo", "make the text bigger"
+### CASE 1: Canvas is EMPTY → User wants a NEW design
+→ Use \`generate_full_design\` tool. Pass the full prompt.
+→ Example: "create a Nike summer sale banner" → generate_full_design(prompt="...")
 
-### Decision Rule:
-- "create/generate/make/design a [something]" → generate_full_design
-- "change/modify/move/resize/recolor [something]" → atomic tools
-- "add a [single element]" → atomic tools (add_text, add_shape, add_button)
+### CASE 2: Canvas has elements → User wants to MODIFY existing design
+→ NEVER use \`generate_full_design\`. It wipes the canvas and recreates everything.
+→ Use atomic tools: add_text, add_shape, set_color, move_node, set_font_size, etc.
+→ Find the target element by name from the "Elements on Canvas" section above.
+
+### CASE 3: User explicitly says "start over" / "redesign" / "new design" / "from scratch"
+→ ONLY THEN use \`generate_full_design\` even if canvas has elements.
+→ This is the ONLY exception to Case 2.
+
+### Examples — CORRECT routing:
+| User says | Canvas state | Action |
+|---|---|---|
+| "Create a Nike summer sale banner" | Empty | generate_full_design |
+| "Change the headline to French" | Has elements | Find headline → update text content |
+| "Make the CTA button red" | Has elements | Find CTA → set_fill_hex |
+| "Move the logo up" | Has elements | Find logo → set_position |
+| "Make it bigger" | Has elements | Find last-touched element → resize |
+| "Add a disclaimer text" | Has elements | add_text (single new element) |
+| "Start over with a dark theme" | Has elements | generate_full_design (explicit restart) |
+| "Redesign this completely" | Has elements | generate_full_design (explicit restart) |
+
+### ★★★ ABSOLUTE RULE ★★★
+If the user asks to translate, recolor, resize, reposition, or edit ANY existing element,
+you MUST use atomic tools. Using generate_full_design for these requests DESTROYS the
+user's work. This is UNACCEPTABLE.
+
+## ★★★ ELEMENT RESOLUTION — HOW TO FIND ELEMENTS ★★★
+1. Check "Elements on Canvas" in context — match by name, role, or content
+2. Check "Recently Modified Elements" — for pronouns like "it", "that", "the last one"
+3. Use the element's \`id\` number when calling tools that need \`node_id\`
+4. If ambiguous, ask the user which element they mean
 
 ## Animation Rules
 - ALWAYS use set_animation with element_name and preset

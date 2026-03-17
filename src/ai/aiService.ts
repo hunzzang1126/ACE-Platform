@@ -12,7 +12,7 @@ import { ALL_TOOLS } from './agentTools';
 import { toClaudeTools } from './aceToolDef';
 import { executeToolCall, type ExecutionResult } from './commandExecutor';
 import { DASHBOARD_TOOL_NAMES } from './dashboardTools';
-import { buildSmartContext, pushAction, type SmartContext } from './smartContextBuilder';
+import { buildSmartContext, pushAction, pushLastTouched, type SmartContext } from './smartContextBuilder';
 import { getOpenRouterKey } from '@/config/apiKeys';
 import type { CreativeSet } from '@/schema/design.types';
 
@@ -164,12 +164,15 @@ export class AiService {
         };
         this.context.addMessage(userMsg);
 
-        // Phase 0: Canvas scan
+        // Phase 0: Canvas scan — extract REAL scene nodes from engine
+        if (engine) {
+            this.trackedNodes = AgentContext.extractSceneNodes(engine);
+        }
         let canvasSummary = 'No canvas engine connected (dashboard mode).';
         if (engine) {
-            const nodeCount = engine.node_count?.() ?? 0;
+            const nodeCount = this.trackedNodes.length;
             const animPlaying = engine.anim_playing?.() ? 'yes' : 'no';
-            const trackedSummary = this.trackedNodes.length > 0
+            const trackedSummary = nodeCount > 0
                 ? this.trackedNodes.map(n => `• ${n.label} (${n.type}, id ${n.id})`).join('\n')
                 : 'Empty canvas';
             canvasSummary = `Canvas: ${nodeCount} element${nodeCount !== 1 ? 's' : ''} · Animation: ${animPlaying}\n${trackedSummary}`;
@@ -205,12 +208,13 @@ export class AiService {
      */
     private async agenticLoop(
         engine: Engine,
-        systemPrompt: string,
+        initialSystemPrompt: string,
         progress: LiveProgress,
         executorOverride?: ToolExecutorOverride,
     ): Promise<void> {
         const messages = this.buildClaudeMessages();
         const tools = toClaudeTools(ALL_TOOLS);
+        let systemPrompt = initialSystemPrompt;
 
         let rounds = 0;
         let finished = false;
@@ -285,6 +289,16 @@ export class AiService {
                     progress.onStepComplete(i, result);
                     await sleep(300);
 
+                    // ★ Part 4: Track last-touched element for pronoun resolution
+                    if (result.success) {
+                        const nodeId = result.nodeId ?? Number(params.node_id ?? params.id ?? -1);
+                        if (nodeId >= 0) {
+                            const nodeName = this.trackedNodes.find(nd => nd.id === nodeId)?.label
+                                ?? String(params.name ?? `element #${nodeId}`);
+                            pushLastTouched(nodeName, nodeId, tc.name!);
+                        }
+                    }
+
                     toolResults.push({
                         type: 'tool_result',
                         tool_use_id: tc.id!,
@@ -305,6 +319,18 @@ export class AiService {
                     role: 'user',
                     content: toolResults,
                 });
+
+                // ★ LIVE SCENE REFRESH: Re-scan canvas after tool execution
+                // so the next LLM round sees the result of its own actions.
+                if (engine) {
+                    this.trackedNodes = AgentContext.extractSceneNodes(engine);
+                    const smartCtx = buildSmartContext(
+                        'editor',
+                        this.designContext?.creativeSet,
+                        this.designContext?.activeVariantId,
+                    );
+                    systemPrompt = AgentContext.buildSystemPrompt(engine, this.trackedNodes, smartCtx);
+                }
 
                 // Store text from this round if any
                 const roundText = textBlocks.map(b => b.text).filter(Boolean).join('\n');
@@ -345,7 +371,7 @@ export class AiService {
      */
     private buildClaudeMessages(): ClaudeMessage[] {
         const messages: ClaudeMessage[] = [];
-        const recent = this.context.getRecentMessages(4);
+        const recent = this.context.getRecentMessages(20);
         for (const msg of recent) {
             messages.push({
                 role: msg.role as 'user' | 'assistant',

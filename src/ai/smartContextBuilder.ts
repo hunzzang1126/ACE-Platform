@@ -92,6 +92,28 @@ export function clearActionHistory(): void {
     actionHistory = [];
 }
 
+// ── Last Touched Elements (for pronoun resolution: "it", "that", "the last one") ──
+
+const LAST_TOUCHED_MAX = 5;
+let lastTouched: { name: string; id: number; action: string; timestamp: number }[] = [];
+
+export function pushLastTouched(name: string, id: number, action: string): void {
+    // Deduplicate: if same element+action exists, update timestamp
+    lastTouched = lastTouched.filter(t => !(t.id === id && t.action === action));
+    lastTouched.push({ name, id, action, timestamp: Date.now() });
+    if (lastTouched.length > LAST_TOUCHED_MAX) {
+        lastTouched = lastTouched.slice(-LAST_TOUCHED_MAX);
+    }
+}
+
+export function getLastTouched() {
+    return [...lastTouched];
+}
+
+export function clearLastTouched(): void {
+    lastTouched = [];
+}
+
 // ── Main Builder ──
 
 /**
@@ -205,6 +227,16 @@ export function contextToPromptSection(ctx: SmartContext): string {
         lines.push(`\n### Recent User Actions`);
         for (const action of ctx.recentActions.slice(-5)) {
             lines.push(`- ${action}`);
+        }
+    }
+
+    // ── Last Touched Elements (pronoun resolution) ──
+    const touched = getLastTouched();
+    if (touched.length > 0) {
+        lines.push(`\n### Recently Modified Elements`);
+        lines.push(`*(When the user says "it", "that", "the last one", they mean the most recent item below)*`);
+        for (const t of touched) {
+            lines.push(`- "${t.name}" (id=${t.id}): ${t.action}`);
         }
     }
 

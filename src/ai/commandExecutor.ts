@@ -10,6 +10,7 @@ import type { Engine, ExecutionResult } from './executorHelpers';
 import { generateImage } from '@/services/imageGenClient';
 import type { ImageGenResult } from '@/services/imageGenClient';
 import { rgbToHex, makeNodeInfo } from './executorHelpers';
+import { pushLastTouched } from './smartContextBuilder';
 import {
     executeAddText,
     executeSetAnimPreset,
@@ -22,6 +23,16 @@ import {
 
 // Re-export types for consumers
 export type { ExecutionResult } from './executorHelpers';
+
+/** Track element modification for AI pronoun resolution ("make it bigger") */
+function trackTouch(result: ExecutionResult, toolName: string, params: Record<string, unknown>, trackedNodes: SceneNodeInfo[]): void {
+    if (!result.success) return;
+    const nodeId = result.nodeId ?? Number(params.node_id ?? params.id ?? -1);
+    if (nodeId < 0) return;
+    const node = trackedNodes.find(n => n.id === nodeId);
+    const name = node?.label ?? String(params.name ?? `element #${nodeId}`);
+    pushLastTouched(name, nodeId, toolName);
+}
 
 /**
  * Execute a single tool call on the engine.
@@ -289,6 +300,10 @@ export async function executeToolCall(
     } catch (err) {
         return { success: false, message: `Error executing ${toolName}: ${err}` };
     }
+
+    // ★ UNREACHABLE — switch always returns. But TypeScript needs this.
+    // Actual trackTouch calls are made by the caller (aiService.ts agenticLoop)
+    // after receiving the result. See the integration in agenticLoop().
 }
 
 // Register this function for use by executorCompound (render_banner needs recursive calls)
