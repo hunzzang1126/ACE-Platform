@@ -61,49 +61,66 @@ export type HealerFn = (
 
 const PASS_SCORE = 80;
 
-// ── Vision review prompt ──────────────────────────
+// ── Element data for Vision review ────────────────
 
-function buildReviewPrompt(canvasW: number, canvasH: number, elementNames: string[]): string {
-    const nameList = elementNames.map(n => `  - "${n}"`).join('\n');
-    return `You are a professional creative designer doing a strict quality review.
+interface ElementInfo {
+    name: string;
+    type: string;
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+}
 
-Canvas: ${canvasW}x${canvasH}px
-Elements present:
-${nameList}
+function buildElementList(elements: ElementInfo[]): string {
+    return elements.map(e =>
+        `  - "${e.name}" (${e.type}) at (${e.x}, ${e.y}) size ${e.w}x${e.h}`
+    ).join('\n');
+}
 
-Check for these issues and DEDUCT points accordingly:
-1. TEXT READABILITY — ALL text must be clearly readable against its background.
-   Text on a busy image without contrast overlay = -25 points (CRITICAL)
-2. OVERLAP — ANY text overlapping another text element = -30 points per instance (CRITICAL)
-   Look VERY carefully: if ANY part of one text element's characters touch or overlap
-   with characters from another text element, this is overlap. Even partial overlap counts.
-   If headline text and subheadline text share the same vertical space, that IS overlap.
-   A design with ANY text-on-text overlap can NEVER score above 45.
-3. TEXT CLIPPED — text going outside canvas bounds = -15 points
-4. HIERARCHY — headline must be largest/most prominent. If not = -10 points
-5. CTA — CTA button must be clearly visible with strong contrast = -10 if weak
-6. ALIGNMENT — if elements should be centered but aren't = -15 points
-7. FONT SIZE — any text smaller than 12px on banners = -10 points
-8. SPACING — elements crowded with < 8px gap = -10 points
+function buildReviewPrompt(canvasW: number, canvasH: number, elements: ElementInfo[]): string {
+    const elementList = buildElementList(elements);
+    const area = canvasW * canvasH;
 
-Scoring rules:
-- Start at 100, subtract for each issue found
-- ANY text overlap = AUTOMATIC cap at 45 (no exceptions)
-- Score above 80 ONLY if ALL text is clearly readable AND no overlaps exist
-- Score above 90 ONLY if ALL elements are properly aligned and spaced
-- Be EXTREMELY STRICT about overlap — look at every text element pair carefully
+    // Dynamic spacing threshold based on canvas size
+    const minGap = area < 100_000 ? 4 : area < 200_000 ? 6 : 8;
+    const minFontSize = area < 100_000 ? 10 : 12;
 
-IMPORTANT: For each fix, provide the EXACT pixel coordinates that would resolve the issue.
-Keep all values within canvas bounds: x 0-${canvasW}, y 0-${canvasH}.
+    return `You are a professional creative designer doing a quality review of a banner ad.
+
+Canvas: ${canvasW}x${canvasH}px (${area < 100_000 ? 'SMALL banner — tight spacing is acceptable' : area < 200_000 ? 'medium banner' : 'large banner'})
+
+Elements with EXACT positions and sizes:
+${elementList}
+
+Look at the screenshot AND the element data above. Check for these issues:
+
+1. TEXT READABILITY — Text must be readable against its background. Text on a busy image without a contrast overlay = -15 points.
+2. TEXT OVERLAP — If any text element overlaps another, deduct -20 per instance. Use the element positions/sizes above to check precisely.
+3. TEXT CLIPPED — Text going outside canvas bounds (check: x + w > ${canvasW} or y + h > ${canvasH}) = -10 points.
+4. CTA ALIGNMENT — CTA label text should be visually centered in its button. If off-center = -10 points. Use the positions above to verify.
+5. FONT SIZE — Any text smaller than ${minFontSize}px = -5 points.
+6. SPACING — Elements with less than ${minGap}px gap between them = -5 points (use element positions to check mathematically).
+7. HIERARCHY — Headline should be the most prominent text. If not = -5 points.
+
+Scoring:
+- Start at 100, subtract for each real issue
+- Be fair: on a ${canvasW}x${canvasH} canvas, elements WILL be close together. That's normal.
+- Only deduct if something is genuinely wrong visually
+- A clean design with readable text and no overlaps should score 85+
+
+IMPORTANT: For each fix, you KNOW the exact element positions. Calculate precise new coordinates.
+For CTA centering: cta_label should be at x = cta_button.x + (cta_button.w - cta_label.w) / 2, y = cta_button.y + (cta_button.h - cta_label.h) / 2.
+For overlap: separate elements by adjusting y positions with ${minGap}px gaps.
 
 Return JSON only:
 {
   "score": <0-100>,
   "issues": [
     {
-      "type": "<overlap|text_overflow|contrast|hierarchy|spacing|alignment|clipping|readability|crowding>",
+      "type": "<overlap|clipping|contrast|alignment|spacing|readability|hierarchy>",
       "severity": "<error|warning|suggestion>",
-      "element": "<element name or omit>",
+      "element": "<element name>",
       "description": "<what's wrong>",
       "suggestion": "<how to fix>"
     }
@@ -123,17 +140,11 @@ Return JSON only:
 }
 
 Rules for fixes:
-- Keep all positions within canvas bounds (0 to ${canvasW} wide, 0 to ${canvasH} tall)
-- Only include elementName if element exists in the list above
-- Only provide fixes for actual problems found
+- ONLY fix actual visible problems — do NOT rearrange a working layout
+- Use the element positions above to calculate exact fix coordinates
+- Keep all positions within canvas bounds (0 to ${canvasW}, 0 to ${canvasH})
 - If score >= ${PASS_SCORE}, return empty fixes array
-
-CRITICAL FIX STRATEGY for OVERLAPPING TEXT:
-- If two text elements overlap: REDUCE fontSize of both (not just reposition)
-- Headline wrapping to too many lines? Reduce headline fontSize so it wraps to fewer lines
-- Subheadline too long? Reduce subheadline fontSize so it takes fewer lines
-- After reducing font sizes, adjust Y positions so elements stack cleanly with 8-12px gaps
-- NEVER just nudge Y position without also checking if font size should shrink
+- Prefer minimal changes — move the least number of elements possible
 
 Return ONLY the JSON object.`;
 }
@@ -214,16 +225,28 @@ async function callVisionReview(
         return null;
     }
 
-    // 2. Get element names
-    let elementNames: string[] = [];
+    // 2. Get full element data (name, type, x, y, w, h)
+    let elements: ElementInfo[] = [];
     try {
-        const nodes = JSON.parse(engine.get_all_nodes() as string) as Array<{ name?: string }>;
-        elementNames = nodes.map((n) => n.name ?? '').filter(Boolean);
+        const nodes = JSON.parse(engine.get_all_nodes() as string) as Array<{
+            name?: string; type?: string;
+            x?: number; y?: number; w?: number; h?: number;
+        }>;
+        elements = nodes
+            .filter(n => n.name)
+            .map(n => ({
+                name: n.name!,
+                type: n.type ?? 'unknown',
+                x: Math.round(n.x ?? 0),
+                y: Math.round(n.y ?? 0),
+                w: Math.round(n.w ?? 0),
+                h: Math.round(n.h ?? 0),
+            }));
     } catch { /* ok */ }
 
-    if (elementNames.length === 0) return null;
+    if (elements.length === 0) return null;
 
-    // 3. Call Claude Vision
+    // 3. Call Claude Vision with screenshot + element data
     const pureBase64 = screenshot.startsWith('data:')
         ? screenshot.split(',')[1] ?? screenshot
         : screenshot;
@@ -235,7 +258,7 @@ async function callVisionReview(
             role: 'user',
             content: [
                 { type: 'image', source: { type: 'base64', media_type: 'image/png', data: pureBase64 } },
-                { type: 'text', text: buildReviewPrompt(canvasW, canvasH, elementNames) },
+                { type: 'text', text: buildReviewPrompt(canvasW, canvasH, elements) },
             ],
         }],
     };
