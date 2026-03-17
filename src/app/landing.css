@@ -24,7 +24,15 @@
     font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Segoe UI', sans-serif;
     min-height: 100vh;
     overflow-x: hidden;
+    overflow-y: auto;
     -webkit-font-smoothing: antialiased;
+}
+
+/* Override html/body overflow:hidden when landing page is active */
+html:has(.landing-page),
+html:has(.landing-page) body {
+    overflow: auto;
+    height: auto;
 }
 
 /* ── Navigation ── */
