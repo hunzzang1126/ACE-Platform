@@ -5,6 +5,7 @@
 import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
+import { HowItWorks } from './HowItWorks';
 import './landing.css';
 
 // SVG icons as inline components (no emoji, no external deps)
@@ -105,6 +106,7 @@ export function LandingPage() {
                 <div className="landing-nav-logo">ACE</div>
                 <div className="landing-nav-links">
                     <button className="landing-nav-link" onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}>Features</button>
+                    <button className="landing-nav-link" onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}>How It Works</button>
                     <button className="landing-nav-link" onClick={() => document.getElementById('showcase')?.scrollIntoView({ behavior: 'smooth' })}>Platform</button>
                     <button className="landing-nav-cta" onClick={() => navigate('/login')}>Sign In</button>
                 </div>
@@ -180,6 +182,9 @@ export function LandingPage() {
                     ))}
                 </div>
             </section>
+
+            {/* ── How It Works ── */}
+            <HowItWorks addRef={addRef} />
 
             {/* ── Showcase ── */}
             <section id="showcase" className="landing-showcase fade-in-section" ref={addRef}>
