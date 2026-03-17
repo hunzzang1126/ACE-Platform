@@ -211,15 +211,50 @@ export function smartSizeElements(
     const scaleY = targetH / originH;
     // Use the smaller scale for fonts so text doesn't overflow
     const fontScale = Math.min(scaleX, scaleY);
+    // Uniform scale for elements that need aspect ratio preservation
+    const uniformScale = Math.min(scaleX, scaleY);
 
     return originElements.map((el) => {
         const resolved = resolveConstraints(el.constraints, originW, originH);
+        const role = detectElementRole(el, originW, originH);
 
-        // Proportional position and size
-        const newX = Math.round(resolved.x * scaleX);
-        const newY = Math.round(resolved.y * scaleY);
-        const newW = Math.max(4, Math.round(resolved.width * scaleX));
-        const newH = Math.max(4, Math.round(resolved.height * scaleY));
+        let newX: number, newY: number, newW: number, newH: number;
+
+        if (role === 'background') {
+            // ★ BUG 1 FIX: Backgrounds always cover the full target canvas
+            newX = 0;
+            newY = 0;
+            newW = targetW;
+            newH = targetH;
+        } else if (role === 'image' || role === 'logo') {
+            // ★ BUG 1 FIX: Use uniform scale to preserve aspect ratio
+            newW = Math.max(4, Math.round(resolved.width * uniformScale));
+            newH = Math.max(4, Math.round(resolved.height * uniformScale));
+            // Center-align the scaled element relative to its proportional position
+            const relCenterX = (resolved.x + resolved.width / 2) / originW;
+            const relCenterY = (resolved.y + resolved.height / 2) / originH;
+            newX = Math.round(relCenterX * targetW - newW / 2);
+            newY = Math.round(relCenterY * targetH - newH / 2);
+        } else if (role === 'cta') {
+            // ★ BUG 2 FIX: CTA preserves width/height ratio
+            newW = Math.max(4, Math.round(resolved.width * uniformScale));
+            newH = Math.max(4, Math.round(resolved.height * uniformScale));
+            // Position proportionally
+            const relCenterX = (resolved.x + resolved.width / 2) / originW;
+            const relCenterY = (resolved.y + resolved.height / 2) / originH;
+            newX = Math.round(relCenterX * targetW - newW / 2);
+            newY = Math.round(relCenterY * targetH - newH / 2);
+        } else {
+            // Text, decoration, etc. — proportional scaling (original behavior)
+            newX = Math.round(resolved.x * scaleX);
+            newY = Math.round(resolved.y * scaleY);
+            newW = Math.max(4, Math.round(resolved.width * scaleX));
+            newH = Math.max(4, Math.round(resolved.height * scaleY));
+        }
+
+        // Clamp to canvas bounds
+        newX = Math.max(0, Math.min(newX, targetW - Math.min(newW, targetW)));
+        newY = Math.max(0, Math.min(newY, targetH - Math.min(newH, targetH)));
 
         const newConstraints: ElementConstraints = {
             horizontal: { anchor: 'left' as const, offset: newX },

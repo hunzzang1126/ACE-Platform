@@ -96,6 +96,50 @@ interface DesignState {
     clearMasterLabel: () => void;
 }
 
+// ★ BUG 3/6 FIX: Merge visual properties from origin → target WITHOUT touching layout.
+// Only syncs: fill, color, opacity, content, fontWeight, fontFamily, fontSize, src, gradients.
+// Preserves: constraints (position/size), overridden elements, zIndex.
+function mergePropertyChanges(
+    targetElements: DesignElement[],
+    originElements: DesignElement[],
+): DesignElement[] {
+    // Build lookup by name (primary) and id (fallback)
+    const originByName = new Map<string, DesignElement>();
+    const originById = new Map<string, DesignElement>();
+    for (const el of originElements) {
+        if (el.name) originByName.set(el.name, el);
+        originById.set(el.id, el);
+    }
+
+    return targetElements.map(targetEl => {
+        // Match by name first (more reliable across sizes), then by id
+        const originEl = (targetEl.name ? originByName.get(targetEl.name) : undefined)
+            || originById.get(targetEl.id);
+        if (!originEl) return targetEl; // No match found — keep as-is
+
+        // Deep clone target to avoid mutating
+        const merged = JSON.parse(JSON.stringify(targetEl)) as DesignElement;
+
+        // Sync non-layout properties
+        if ('fill' in originEl) (merged as any).fill = (originEl as any).fill;
+        if ('color' in originEl) (merged as any).color = (originEl as any).color;
+        if ('opacity' in originEl) merged.opacity = originEl.opacity;
+        if ('content' in originEl) (merged as any).content = (originEl as any).content;
+        if ('fontWeight' in originEl) (merged as any).fontWeight = (originEl as any).fontWeight;
+        if ('fontFamily' in originEl) (merged as any).fontFamily = (originEl as any).fontFamily;
+        if ('src' in originEl) (merged as any).src = (originEl as any).src;
+        if ('gradientStart' in originEl) (merged as any).gradientStart = (originEl as any).gradientStart;
+        if ('gradientEnd' in originEl) (merged as any).gradientEnd = (originEl as any).gradientEnd;
+        if ('gradientAngle' in originEl) (merged as any).gradientAngle = (originEl as any).gradientAngle;
+        if ('textAlign' in originEl) (merged as any).textAlign = (originEl as any).textAlign;
+        if ('lineHeight' in originEl) (merged as any).lineHeight = (originEl as any).lineHeight;
+        if ('letterSpacing' in originEl) (merged as any).letterSpacing = (originEl as any).letterSpacing;
+
+        // ★ Do NOT touch: constraints, zIndex, name, id, type
+        return merged;
+    });
+}
+
 // Helper: get the active creative set from state
 function getActiveCS(state: DesignState): CreativeSet | undefined {
     if (!state.activeCreativeSetId) return undefined;
@@ -376,6 +420,16 @@ export const useDesignStore = create<DesignState>()(
                 },
 
                 replaceVariantElements: (variantId, elements, fabricJSON) => {
+                    // ★ BUG 4 FIX: Enforce z-index=0 for background elements before saving
+                    for (const el of elements) {
+                        if (el.name?.match(/background|ai_bg/i)) {
+                            el.zIndex = 0;
+                        }
+                    }
+
+                    // ★ BUG 5 FIX: Collect refresh events OUTSIDE set() to avoid Immer proxy revocation
+                    const pendingRefreshes: Array<{ variantId: string; fixCount: number }> = [];
+
                     set((state) => {
                         const cs = getActiveCS(state);
                         if (!cs) return;
@@ -384,8 +438,6 @@ export const useDesignStore = create<DesignState>()(
 
                         // 해당 변형의 요소 교체
                         variant.elements = elements;
-                        // ★ SINGLE SOURCE OF TRUTH: Store raw Fabric JSON when provided.
-                        // On restore, loadFromJSON() will be used instead of element-by-element reconstruction.
                         if (fabricJSON) {
                             variant.fabricJSON = fabricJSON;
                         }
@@ -408,29 +460,40 @@ export const useDesignStore = create<DesignState>()(
                                 const targetW = target.preset.width;
                                 const targetH = target.preset.height;
 
-                                // Smart Sizing: adapt origin elements → target size
-                                const adapted = smartSizeElements(
-                                    elements,
-                                    originW, originH,
-                                    targetW, targetH,
-                                );
+                                // ★ BUG 3/6 FIX: If target already has elements,
+                                // only sync property changes (color, fill, opacity, content, src).
+                                // Do NOT re-run layout — that destroys manual arrangement.
+                                const targetHasExisting = target.elements.length > 0;
 
-                                // ── Auto-QA sweep ──
-                                const targetWithAdapted: BannerVariant = { ...target, elements: adapted };
-                                const qaIssues = runSmartSizingQA([targetWithAdapted]);
-                                let finalElements = adapted;
-                                if (qaIssues.length > 0) {
-                                    const fixes = generateFixes(qaIssues, [targetWithAdapted]);
-                                    if (fixes.length > 0) {
-                                        finalElements = adapted.map((el) => {
-                                            const fix = fixes.find(f => f.elementId === el.id);
-                                            return fix ? { ...el, ...fix.patch } as DesignElement : el;
-                                        });
-                                        setTimeout(() => {
-                                            window.dispatchEvent(new CustomEvent('ace:canvas-refresh', {
-                                                detail: { variantId: target.id, fixCount: fixes.length },
-                                            }));
-                                        }, 50);
+                                let finalElements: DesignElement[];
+
+                                if (targetHasExisting) {
+                                    // ── Property-only merge: preserve layout, sync appearances ──
+                                    finalElements = mergePropertyChanges(target.elements, elements);
+                                } else {
+                                    // ── First time: full smart sizing ──
+                                    const adapted = smartSizeElements(
+                                        elements,
+                                        originW, originH,
+                                        targetW, targetH,
+                                    );
+                                    // Auto-QA sweep
+                                    const targetWithAdapted: BannerVariant = { ...target, elements: adapted };
+                                    const qaIssues = runSmartSizingQA([targetWithAdapted]);
+                                    finalElements = adapted;
+                                    if (qaIssues.length > 0) {
+                                        const fixes = generateFixes(qaIssues, [targetWithAdapted]);
+                                        if (fixes.length > 0) {
+                                            finalElements = adapted.map((el) => {
+                                                const fix = fixes.find(f => f.elementId === el.id);
+                                                return fix ? { ...el, ...fix.patch } as DesignElement : el;
+                                            });
+                                            // ★ BUG 5: Capture plain values, NOT Immer proxies
+                                            pendingRefreshes.push({
+                                                variantId: target.id,
+                                                fixCount: fixes.length,
+                                            });
+                                        }
                                     }
                                 }
 
@@ -449,6 +512,15 @@ export const useDesignStore = create<DesignState>()(
                         cs.updatedAt = new Date().toISOString();
                         state.creativeSet = cs;
                     });
+
+                    // ★ BUG 5 FIX: Dispatch refresh events AFTER set() completes (proxy is dead)
+                    for (const refresh of pendingRefreshes) {
+                        queueMicrotask(() => {
+                            window.dispatchEvent(new CustomEvent('ace:canvas-refresh', {
+                                detail: refresh,
+                            }));
+                        });
+                    }
                 },
 
                 getAllCreativeSets: () => {
