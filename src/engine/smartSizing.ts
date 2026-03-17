@@ -180,276 +180,70 @@ export const LAYOUT_ZONES: Record<SizeCategory, LayoutMap> = {
     },
 };
 
-// ── Smart Reposition ────────────────────────────
+// ── Proportional Scaling ────────────────────────
+// The plug system provides explicit connections between sizes.
+// When origin saves, propagate to targets using EXACT proportional scaling:
+//   same relative position, same relative size.
+// This replaces the old zone-based repositioning system.
+
+const MIN_FONT = 8; // minimum font size in px
 
 /**
- * Smart-reposition a single element from master to a target size.
- * Returns new constraints adapted for the target canvas.
- */
-export function smartReposition(
-    element: DesignElement,
-    masterW: number,
-    masterH: number,
-    targetW: number,
-    targetH: number,
-): ElementConstraints {
-    const role = detectElementRole(element, masterW, masterH);
-    const category = classifyRatio(targetW, targetH);
-    const zone = LAYOUT_ZONES[category][role];
-
-    // Background always stretches to fill
-    if (role === 'background') {
-        return {
-            horizontal: { anchor: 'stretch', offset: 0, marginLeft: 0, marginRight: 0 },
-            vertical: { anchor: 'stretch', offset: 0, marginTop: 0, marginBottom: 0 },
-            size: { widthMode: 'relative', heightMode: 'relative', width: 1, height: 1 },
-            rotation: element.constraints.rotation,
-        };
-    }
-
-    // Convert zone (relative) → absolute constraints
-    const absX = Math.round(zone.x * targetW);
-    const absY = Math.round(zone.y * targetH);
-    const absW = Math.round(zone.w * targetW);
-    const absH = Math.round(zone.h * targetH);
-
-    // For text elements, scale font size
-    const masterResolved = resolveConstraints(element.constraints, masterW, masterH);
-    const scaleX = absW / masterResolved.width;
-    const scaleY = absH / masterResolved.height;
-    const uniformScale = Math.min(scaleX, scaleY, zone.maxFontScale);
-
-    // Determine best anchor based on zone position
-    let horizontal: ElementConstraints['horizontal'];
-    const zoneCenterX = zone.x + zone.w / 2;
-    if (zoneCenterX > 0.4 && zoneCenterX < 0.6) {
-        horizontal = { anchor: 'center', offset: 0 };
-    } else if (zoneCenterX <= 0.4) {
-        horizontal = { anchor: 'left', offset: absX };
-    } else {
-        horizontal = { anchor: 'right', offset: Math.round(targetW - absX - absW) };
-    }
-
-    let vertical: ElementConstraints['vertical'];
-    const zoneCenterY = zone.y + zone.h / 2;
-    if (zoneCenterY > 0.4 && zoneCenterY < 0.6) {
-        vertical = { anchor: 'center', offset: 0 };
-    } else if (zoneCenterY <= 0.4) {
-        vertical = { anchor: 'top', offset: absY };
-    } else {
-        vertical = { anchor: 'bottom', offset: Math.round(targetH - absY - absH) };
-    }
-
-    // For CTA buttons, keep reasonable fixed size
-    // Min: 40×20px (always tappable), Max: 50% canvas width
-    if (role === 'cta') {
-        const ctaW = Math.min(absW, Math.max(40, Math.round(targetW * 0.5)));
-        const ctaH = Math.min(absH, Math.max(20, Math.round(targetH * 0.12)));
-        return {
-            horizontal,
-            vertical,
-            size: { widthMode: 'fixed', heightMode: 'fixed', width: ctaW, height: ctaH },
-            rotation: element.constraints.rotation,
-        };
-    }
-
-    // For text, use proportional sizing
-    if (element.type === 'text') {
-        return {
-            horizontal,
-            vertical,
-            size: {
-                widthMode: 'fixed',
-                heightMode: 'auto',
-                width: absW,
-                height: Math.round(masterResolved.height * uniformScale),
-            },
-            rotation: element.constraints.rotation,
-        };
-    }
-
-    // For images, maintain aspect ratio within zone
-    if (element.type === 'image') {
-        const origAR = masterResolved.width / masterResolved.height;
-        let imgW = absW;
-        let imgH = Math.round(imgW / origAR);
-        if (imgH > absH) {
-            imgH = absH;
-            imgW = Math.round(imgH * origAR);
-        }
-        return {
-            horizontal,
-            vertical,
-            size: { widthMode: 'fixed', heightMode: 'fixed', width: imgW, height: imgH },
-            rotation: element.constraints.rotation,
-        };
-    }
-
-    // Default: scale proportionally
-    return {
-        horizontal,
-        vertical,
-        size: { widthMode: 'fixed', heightMode: 'fixed', width: absW, height: absH },
-        rotation: element.constraints.rotation,
-    };
-}
-
-/**
- * Role-based minimum font sizes (px).
- * Mirrors Yoga's minWidth/minHeight concept — no element should
- * shrink below usability thresholds.
- */
-const MIN_FONT_BY_ROLE: Partial<Record<ElementRole, number>> = {
-    background: 10,
-    logo: 8,
-    headline: 10,
-    subtext: 9,
-    cta: 10,
-    decoration: 10,  // raised from 7 — was effectively dead since decoration is rarely assigned
-    image: 10,
-};
-
-/**
- * Scale font-related properties for a text element
- */
-export function scaleFontSize(
-    element: DesignElement,
-    masterW: number,
-    masterH: number,
-    targetW: number,
-    targetH: number,
-): Partial<DesignElement> {
-    if (element.type !== 'text' && element.type !== 'button') return {};
-
-    const role = detectElementRole(element, masterW, masterH);
-    const category = classifyRatio(targetW, targetH);
-    const zone = LAYOUT_ZONES[category][role];
-
-    // Scale based on the smaller dimension ratio
-    const scaleW = targetW / masterW;
-    const scaleH = targetH / masterH;
-    const fontScale = Math.min(scaleW, scaleH, zone.maxFontScale);
-
-    // Use role-based floor (Yoga-inspired minWidth/minHeight concept)
-    const minFont = MIN_FONT_BY_ROLE[role] ?? 8;
-
-    if (element.type === 'text') {
-        return {
-            fontSize: Math.max(minFont, Math.round(element.fontSize * fontScale)),
-        };
-    }
-    if (element.type === 'button') {
-        return {
-            fontSize: Math.max(minFont, Math.round(element.fontSize * fontScale)),
-        };
-    }
-    return {};
-}
-
-// ── Propagation Entry Point ─────────────────────
-
-/**
- * Apply smart sizing from master elements → target variant.
+ * Apply proportional scaling from origin elements → target variant.
  * Returns new array of elements adapted for the target size.
+ *
+ * Strategy: Scale all positions and sizes proportionally.
+ * If origin has a rect at (30%, 20%) → target gets it at (30%, 20%).
  */
 export function smartSizeElements(
-    masterElements: DesignElement[],
-    masterW: number,
-    masterH: number,
+    originElements: DesignElement[],
+    originW: number,
+    originH: number,
     targetW: number,
     targetH: number,
 ): DesignElement[] {
     // If same size, just deep-clone
-    if (masterW === targetW && masterH === targetH) {
-        return JSON.parse(JSON.stringify(masterElements));
+    if (originW === targetW && originH === targetH) {
+        return JSON.parse(JSON.stringify(originElements));
     }
 
-    return masterElements.map((el) => {
-        const newConstraints = smartReposition(el, masterW, masterH, targetW, targetH);
-        const fontPatch = scaleFontSize(el, masterW, masterH, targetW, targetH);
+    const scaleX = targetW / originW;
+    const scaleY = targetH / originH;
+    // Use the smaller scale for fonts so text doesn't overflow
+    const fontScale = Math.min(scaleX, scaleY);
 
-        const adapted: DesignElement = {
+    return originElements.map((el) => {
+        const resolved = resolveConstraints(el.constraints, originW, originH);
+
+        // Proportional position and size
+        const newX = Math.round(resolved.x * scaleX);
+        const newY = Math.round(resolved.y * scaleY);
+        const newW = Math.max(4, Math.round(resolved.width * scaleX));
+        const newH = Math.max(4, Math.round(resolved.height * scaleY));
+
+        const newConstraints: ElementConstraints = {
+            horizontal: { anchor: 'left' as const, offset: newX },
+            vertical: { anchor: 'top' as const, offset: newY },
+            size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width: newW, height: newH },
+            rotation: el.constraints.rotation,
+        };
+
+        // Scale font proportionally with a floor
+        let fontPatch: Partial<DesignElement> = {};
+        if ((el.type === 'text' || el.type === 'button') && (el as any).fontSize) {
+            fontPatch = {
+                fontSize: Math.max(MIN_FONT, Math.round((el as any).fontSize * fontScale)),
+            };
+        }
+
+        return {
             ...JSON.parse(JSON.stringify(el)),
             constraints: newConstraints,
             ...fontPatch,
-        };
-
-        // ── Overflow prevention ──
-        return clampToCanvas(adapted, targetW, targetH);
+        } as DesignElement;
     });
 }
 
-/**
- * Clamp element to stay within canvas bounds.
- * If element extends beyond canvas:
- * 1. Shift position to fit
- * 2. If still too large, shrink to fit
- * 3. For text, reduce fontSize until it fits
- */
-export function clampToCanvas(
-    element: DesignElement,
-    canvasW: number,
-    canvasH: number,
-    padding = 4,
-): DesignElement {
-    const resolved = resolveConstraints(element.constraints, canvasW, canvasH);
-    let { x, y, width: elW, height: elH } = resolved;
-
-    const role = detectElementRole(element, canvasW, canvasH);
-    // Background is allowed to fill entire canvas
-    if (role === 'background') return element;
-
-    let modified = false;
-
-    // 1. Shift to fit (prefer moving over shrinking)
-    if (x < padding) { x = padding; modified = true; }
-    if (y < padding) { y = padding; modified = true; }
-    if (x + elW > canvasW - padding) {
-        x = Math.max(padding, canvasW - padding - elW);
-        modified = true;
-    }
-    if (y + elH > canvasH - padding) {
-        y = Math.max(padding, canvasH - padding - elH);
-        modified = true;
-    }
-
-    // 2. If still overflowing, shrink to fit
-    if (x + elW > canvasW - padding) {
-        elW = canvasW - padding - x;
-        modified = true;
-    }
-    if (y + elH > canvasH - padding) {
-        elH = canvasH - padding - y;
-        modified = true;
-    }
-
-    // Minimum visible area enforcement
-    const MIN_SIZE = 10;
-    elW = Math.max(MIN_SIZE, elW);
-    elH = Math.max(MIN_SIZE, elH);
-
-    if (!modified) return element;
-
-    // 3. For text, auto-shrink fontSize if element was shrunk significantly
-    const scaleFactor = Math.min(elW / resolved.width, elH / resolved.height);
-    const elFontSize = (element as any).fontSize as number | undefined;
-    let newFontSize = elFontSize;
-    if ((element.type === 'text' || element.type === 'button') && elFontSize && scaleFactor < 0.9) {
-        const MIN_FONT = 8;
-        newFontSize = Math.max(MIN_FONT, Math.round(elFontSize * scaleFactor));
-    }
-
-    return {
-        ...element,
-        constraints: {
-            ...element.constraints,
-            horizontal: { anchor: 'left' as const, offset: Math.round(x) },
-            vertical: { anchor: 'top' as const, offset: Math.round(y) },
-            size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width: Math.round(elW), height: Math.round(elH) },
-        },
-        ...(newFontSize !== elFontSize ? { fontSize: newFontSize } : {}),
-    };
-}
 
 // ── Multi-Master Architecture (P3) ──────────────────────
 //
