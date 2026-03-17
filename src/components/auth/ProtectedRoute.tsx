@@ -16,7 +16,9 @@ export function ProtectedRoute({ children, adminOnly = false }: ProtectedRoutePr
     const user = useAuthStore((s) => s.user);
     const role = useAuthStore((s) => s.role);
     const isLoading = useAuthStore((s) => s.isLoading);
+    const isSessionValid = useAuthStore((s) => s.isSessionValid);
     const syncSession = useAuthStore((s) => s.syncSessionFromSupabase);
+    const signOut = useAuthStore((s) => s.signOut);
 
     // Auto-sync session on mount if user exists but role is missing
     useEffect(() => {
@@ -24,6 +26,14 @@ export function ProtectedRoute({ children, adminOnly = false }: ProtectedRoutePr
             syncSession();
         }
     }, [user, role, syncSession]);
+
+    // Check 24h TTL on mount — force re-auth if stale
+    useEffect(() => {
+        if (user && !isSessionValid()) {
+            console.log('[ProtectedRoute] Session expired (24h TTL) — signing out');
+            signOut();
+        }
+    }, [user, isSessionValid, signOut]);
 
     // Show loading while session is being resolved
     if (isLoading || (user && !role)) {

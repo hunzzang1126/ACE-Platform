@@ -30,8 +30,13 @@ export interface User {
 export interface Session {
     accessToken: string;
     refreshToken: string;
-    expiresAt: number; // Unix timestamp
+    expiresAt: number; // Unix timestamp (Supabase token expiry)
+    /** When the user last performed an actual sign-in (OAuth, email, etc.) */
+    lastAuthenticatedAt: number; // Unix timestamp
 }
+
+/** Hard limit: users must re-authenticate after 24 hours */
+const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 interface AuthState {
     user: User | null;
@@ -160,6 +165,7 @@ export const useAuthStore = create<AuthState>()(
                         accessToken: session.access_token,
                         refreshToken: session.refresh_token,
                         expiresAt: Date.now() + (session.expires_in ?? 3600) * 1000,
+                        lastAuthenticatedAt: Date.now(),
                     },
                     role,
                     isLoading: false,
@@ -170,6 +176,14 @@ export const useAuthStore = create<AuthState>()(
             refreshSession: async () => {
                 const sb = getSupabase();
                 if (!sb) return;
+
+                // ★ 24h TTL: Do NOT refresh if session is older than 24 hours
+                const { session: currentSession } = get();
+                if (currentSession && (Date.now() - currentSession.lastAuthenticatedAt > SESSION_TTL_MS)) {
+                    console.log('[refreshSession] 24h TTL exceeded — forcing sign out');
+                    get().signOut();
+                    return;
+                }
 
                 const { data: { session } } = await sb.auth.refreshSession();
                 if (!session) {
@@ -182,6 +196,8 @@ export const useAuthStore = create<AuthState>()(
                         accessToken: session.access_token,
                         refreshToken: session.refresh_token,
                         expiresAt: Date.now() + (session.expires_in ?? 3600) * 1000,
+                        // Keep original lastAuthenticatedAt — NOT refreshed
+                        lastAuthenticatedAt: currentSession?.lastAuthenticatedAt ?? Date.now(),
                     },
                 });
             },
@@ -190,7 +206,10 @@ export const useAuthStore = create<AuthState>()(
             isSessionValid: () => {
                 const { session } = get();
                 if (!session) return false;
-                return session.expiresAt > Date.now();
+                // Check both: Supabase token AND 24h hard TTL
+                const tokenValid = session.expiresAt > Date.now();
+                const withinTTL = (Date.now() - session.lastAuthenticatedAt) < SESSION_TTL_MS;
+                return tokenValid && withinTTL;
             },
             isAdmin: () => get().role === 'admin',
             isApproved: () => {
