@@ -108,6 +108,7 @@ export function LandingPage() {
                 <div className="landing-nav-links">
                     <button className="landing-nav-link" onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}>Features</button>
                     <button className="landing-nav-link" onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}>How It Works</button>
+                    <button className="landing-nav-link" onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}>Pricing</button>
                     <button className="landing-nav-link" onClick={() => document.getElementById('showcase')?.scrollIntoView({ behavior: 'smooth' })}>Platform</button>
                     <button className="landing-nav-cta" onClick={() => navigate('/login')}>Sign In</button>
                 </div>
@@ -204,6 +205,93 @@ export function LandingPage() {
                     </div>
                     <div className="landing-showcase-content">
                         <span className="landing-showcase-label">Glid Creative Workspace</span>
+                    </div>
+                </div>
+            </section>
+
+            {/* ── Pricing ── */}
+            <section id="pricing" className="fade-in-section" ref={addRef} style={{
+                padding: '100px 20px 60px', maxWidth: 1100, margin: '0 auto',
+            }}>
+                <div className="landing-section-label">Pricing</div>
+                <h2 className="landing-section-title">Simple, Transparent Pricing</h2>
+                <p className="landing-section-sub">Start free. Upgrade when you need more power.</p>
+
+                <div style={{
+                    display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: 24, marginTop: 48,
+                }}>
+                    {/* Starter */}
+                    <div style={{
+                        background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+                        borderRadius: 16, padding: 32,
+                    }}>
+                        <h3 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 6px', color: '#e2e8f0' }}>Starter</h3>
+                        <p style={{ color: '#94a3b8', fontSize: 13, margin: '0 0 20px' }}>Perfect for trying out Glid</p>
+                        <div style={{ fontSize: 42, fontWeight: 800, color: '#f1f5f9', marginBottom: 24 }}>Free</div>
+                        <button onClick={() => navigate('/login')} style={{
+                            width: '100%', padding: '12px 0', borderRadius: 10,
+                            background: 'rgba(255,255,255,0.08)', border: 'none',
+                            color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                        }}>Get Started</button>
+                        <ul style={{ marginTop: 24, padding: 0, listStyle: 'none', fontSize: 13, color: '#94a3b8' }}>
+                            <li style={{ padding: '6px 0' }}>3 Creative Sets</li>
+                            <li style={{ padding: '6px 0' }}>10 AI Generations / month</li>
+                            <li style={{ padding: '6px 0' }}>PNG Export</li>
+                        </ul>
+                    </div>
+
+                    {/* Pro */}
+                    <div style={{
+                        background: 'linear-gradient(135deg, rgba(129,140,248,0.12), rgba(192,132,252,0.08))',
+                        border: '1px solid rgba(129,140,248,0.3)', borderRadius: 16, padding: 32,
+                        position: 'relative',
+                    }}>
+                        <div style={{
+                            position: 'absolute', top: 16, right: 16,
+                            background: 'linear-gradient(135deg, #818cf8, #c084fc)',
+                            color: '#fff', fontSize: 11, fontWeight: 700,
+                            padding: '4px 10px', borderRadius: 20,
+                            letterSpacing: '0.5px', textTransform: 'uppercase',
+                        }}>Most Popular</div>
+                        <h3 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 6px', color: '#e2e8f0' }}>Pro</h3>
+                        <p style={{ color: '#94a3b8', fontSize: 13, margin: '0 0 20px' }}>For professional creators and teams</p>
+                        <div style={{ marginBottom: 24 }}>
+                            <span style={{ fontSize: 42, fontWeight: 800, color: '#f1f5f9' }}>$49</span>
+                            <span style={{ color: '#64748b', fontSize: 14, marginLeft: 4 }}>/month</span>
+                        </div>
+                        <button onClick={() => navigate('/login')} style={{
+                            width: '100%', padding: '12px 0', borderRadius: 10,
+                            background: 'linear-gradient(135deg, #818cf8, #6366f1)', border: 'none',
+                            color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                        }}>Get Started</button>
+                        <ul style={{ marginTop: 24, padding: 0, listStyle: 'none', fontSize: 13, color: '#94a3b8' }}>
+                            <li style={{ padding: '6px 0' }}>Unlimited Creative Sets</li>
+                            <li style={{ padding: '6px 0' }}>1,000 AI Generations / month</li>
+                            <li style={{ padding: '6px 0' }}>PNG, JPG, HTML5 Export</li>
+                            <li style={{ padding: '6px 0' }}>AI Vision QA</li>
+                        </ul>
+                    </div>
+
+                    {/* Enterprise */}
+                    <div style={{
+                        background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+                        borderRadius: 16, padding: 32,
+                    }}>
+                        <h3 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 6px', color: '#e2e8f0' }}>Enterprise</h3>
+                        <p style={{ color: '#94a3b8', fontSize: 13, margin: '0 0 20px' }}>Brand Cloud + unlimited team seats</p>
+                        <div style={{ fontSize: 42, fontWeight: 800, color: '#f1f5f9', marginBottom: 24 }}>Custom</div>
+                        <button onClick={() => window.open('mailto:sales@glid.ai?subject=Enterprise Plan Inquiry', '_blank')} style={{
+                            width: '100%', padding: '12px 0', borderRadius: 10,
+                            background: 'rgba(255,255,255,0.08)', border: 'none',
+                            color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                        }}>Contact Sales</button>
+                        <ul style={{ marginTop: 24, padding: 0, listStyle: 'none', fontSize: 13, color: '#94a3b8' }}>
+                            <li style={{ padding: '6px 0' }}>5,000 AI Generations / month</li>
+                            <li style={{ padding: '6px 0' }}>All export formats</li>
+                            <li style={{ padding: '6px 0' }}>Brand Cloud integration</li>
+                            <li style={{ padding: '6px 0' }}>Unlimited team seats</li>
+                        </ul>
                     </div>
                 </div>
             </section>
