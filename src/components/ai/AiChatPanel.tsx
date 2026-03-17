@@ -9,6 +9,7 @@ import type { AiService, AiConfig } from '../../ai/aiService';
 import { generateSuggestions } from '../../ai/suggestions';
 import { MessageBubble, SuggestionCard } from './MessageBubble';
 import { LiveProgressPanel, type LiveState } from './LiveProgressPanel';
+import { usePlanLimits } from '@/hooks/usePlanLimits';
 import {
     panelStyle, headerStyle, iconBtnStyle, settingsStyle,
     labelStyle, settingsInputStyle, saveBtnStyle,
@@ -37,6 +38,9 @@ export default function AiChatPanel({ aiService, engine, trackedNodes, onSendMes
 
     const suggestions = generateSuggestions(trackedNodes);
 
+    // ★ Plan enforcement: AI token limits
+    const { canUseAI, recordAIUsage, remainingAI } = usePlanLimits();
+
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages, live]);
@@ -44,6 +48,17 @@ export default function AiChatPanel({ aiService, engine, trackedNodes, onSendMes
     const handleSend = useCallback(async (text?: string) => {
         const msg = text ?? input.trim();
         if (!msg) return;
+
+        // ★ Plan enforcement: check AI token limit
+        if (!canUseAI()) {
+            const limitMsg: AgentMessage = {
+                role: 'assistant',
+                content: 'You have reached your monthly AI generation limit. Please upgrade your plan for more AI generations.',
+                timestamp: Date.now(),
+            };
+            setMessages(prev => [...prev, { role: 'user', content: msg, timestamp: Date.now() }, limitMsg]);
+            return;
+        }
 
         setInput('');
         onSendMessage?.(msg);
@@ -75,10 +90,12 @@ export default function AiChatPanel({ aiService, engine, trackedNodes, onSendMes
             onComplete: (assistantMsg) => {
                 setMessages(prev => [...prev, assistantMsg]);
                 setLive(prev => ({ ...prev, phase: 'done' }));
+                // ★ Record AI usage on successful completion
+                recordAIUsage(1);
             },
             onError: (e) => setLive(prev => ({ ...prev, phase: 'error', error: e })),
         });
-    }, [input, aiService, engine, onSendMessage]);
+    }, [input, aiService, engine, onSendMessage, canUseAI, recordAIUsage]);
 
     // Expose for browser automation / testing (fire-and-forget)
     useEffect(() => {
@@ -191,7 +208,7 @@ export default function AiChatPanel({ aiService, engine, trackedNodes, onSendMes
                     value={input}
                     onChange={e => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder={aiService.isConfigured() ? "Ask anything... (Cmd+K)" : "Set API key in Settings first"}
+                    placeholder={!aiService.isConfigured() ? "Set API key in Settings first" : `Ask anything... (${remainingAI} AI tokens left)`}
                     disabled={live.phase !== 'idle' && live.phase !== 'done' && live.phase !== 'error'}
                     style={inputFieldStyle}
                 />

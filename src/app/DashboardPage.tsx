@@ -11,6 +11,8 @@ import { AppSidebar } from '@/components/layout/AppSidebar';
 import { ProjectCard } from '@/components/dashboard/ProjectCard';
 import { IcFolder } from '@/components/ui/Icons';
 import { APP_VERSION } from '@/version';
+import { usePlanLimits } from '@/hooks/usePlanLimits';
+import { UpgradeModal, type UpgradeReason } from '@/components/billing/UpgradeModal';
 
 function getGreeting(): string {
     const h = new Date().getHours();
@@ -38,22 +40,23 @@ export function DashboardPage() {
     const createCreativeSet = useDesignStore((s) => s.createCreativeSet);
     const openCreativeSet = useDesignStore((s) => s.openCreativeSet);
 
+    // ★ Plan enforcement
+    const { canCreateSet, remainingSets, planName, remainingAI, limits, isStarter } = usePlanLimits();
+    const [upgradeModal, setUpgradeModal] = useState<{ open: boolean; reason: UpgradeReason }>({
+        open: false, reason: 'creative_set_limit',
+    });
+
     // ── Sync: add NEW creative sets from designStore that projectStore doesn't know about ──
     // ★ REGRESSION GUARD: projectStore is AUTHORITATIVE for names, trash, and deletions.
     // NEVER overwrite names or remove items — only ADD missing entries.
     // ★★ CRITICAL: Must wait for IDB hydration to complete BEFORE syncing.
-    //    IDB is async — stores start with defaults ([]) and hydrate later.
-    //    If we sync before hydration, we add entries with stale names from designStore.
     useEffect(() => {
         let cancelled = false;
 
-        // Wait for BOTH stores to finish IDB hydration
         const waitForHydration = async () => {
-            // Zustand persist exposes onFinishHydration via the persist API
             const projectPersist = (useProjectStore as any).persist;
             const designPersist = (useDesignStore as any).persist;
 
-            // If not yet hydrated, wait for hydration
             if (projectPersist?.hasHydrated && !projectPersist.hasHydrated()) {
                 await new Promise<void>(resolve => {
                     const unsub = projectPersist.onFinishHydration(() => { unsub(); resolve(); });
@@ -67,22 +70,18 @@ export function DashboardPage() {
 
             if (cancelled) return;
 
-            // NOW safe to sync — both stores have their persisted data
             const allCS = useDesignStore.getState().getAllCreativeSets();
             const trash = useProjectStore.getState().trash;
             const trashIds = new Set(trash.map(t => t.item.id));
             useProjectStore.setState((state) => {
                 const existingIds = new Set(state.creativeSets.map(s => s.id));
                 for (const cs of allCS) {
-                    // Skip if already in projectStore or in trash
                     if (existingIds.has(cs.id) || trashIds.has(cs.id)) continue;
-                    // Only ADD new entries — don't overwrite existing ones
                     state.creativeSets.push({
                         id: cs.id, name: cs.name, variantCount: cs.variants.length,
                         createdAt: cs.createdAt, updatedAt: cs.updatedAt, createdBy: displayName || 'User',
                     });
                 }
-                // Update variant counts only (not names!) for existing sets
                 for (const cs of allCS) {
                     const existing = state.creativeSets.find(s => s.id === cs.id);
                     if (existing) {
@@ -116,6 +115,11 @@ export function DashboardPage() {
 
     // ── Handlers ──
     const handleNewCreativeSet = useCallback(() => {
+        // ★ Plan enforcement: check creative set limit
+        if (!canCreateSet()) {
+            setUpgradeModal({ open: true, reason: 'creative_set_limit' });
+            return;
+        }
         const defaultPreset = BANNER_PRESETS[0]!;
         const csId = createCreativeSet('Untitled Creative Set', defaultPreset);
         createCreativeSetProject('Untitled Creative Set');
@@ -127,7 +131,7 @@ export function DashboardPage() {
             }
         });
         navigate('/editor');
-    }, [createCreativeSetProject, createCreativeSet, navigate]);
+    }, [createCreativeSetProject, createCreativeSet, navigate, canCreateSet]);
 
     const handleOpenSet = useCallback((id: string) => {
         const opened = openCreativeSet(id);
@@ -176,6 +180,34 @@ export function DashboardPage() {
                     <div className="dashboard-hero__orb dashboard-hero__orb--2" />
                 </section>
 
+                {/* ★ Plan usage indicator */}
+                <div style={{
+                    display: 'flex', gap: 16, padding: '0 24px', marginBottom: 8,
+                    fontSize: 12, color: '#64748b', alignItems: 'center',
+                }}>
+                    <span style={{
+                        padding: '4px 10px', borderRadius: 6,
+                        background: isStarter ? 'rgba(255,255,255,0.04)' : 'rgba(129,140,248,0.1)',
+                        color: isStarter ? '#64748b' : '#818cf8',
+                        fontWeight: 600,
+                    }}>
+                        {planName}
+                    </span>
+                    <span>AI: {remainingAI} / {limits.aiGenerationsPerMonth} remaining</span>
+                    {remainingSets >= 0 && (
+                        <span>Sets: {remainingSets} / {limits.maxCreativeSets} remaining</span>
+                    )}
+                    <button
+                        onClick={() => navigate('/pricing')}
+                        style={{
+                            background: 'none', border: 'none', color: '#818cf8',
+                            fontSize: 12, cursor: 'pointer', padding: 0, marginLeft: 'auto',
+                        }}
+                    >
+                        {isStarter ? 'Upgrade Plan' : 'Manage Plan'}
+                    </button>
+                </div>
+
                 {/* Search */}
                 <div className="dashboard-search-bar">
                     <svg className="dashboard-search-bar__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -191,7 +223,6 @@ export function DashboardPage() {
 
                 {/* Content */}
                 <div className="dashboard-content">
-                    {/* Folders */}
                     {displayFolders.length > 0 && (
                         <div className="dashboard-section">
                             <h2 className="dashboard-section__title">Folders</h2>
@@ -206,7 +237,6 @@ export function DashboardPage() {
                         </div>
                     )}
 
-                    {/* Projects */}
                     <div className="dashboard-section">
                         <h2 className="dashboard-section__title">
                             {currentFolderId ? 'Projects' : 'All Projects'}
@@ -248,6 +278,15 @@ export function DashboardPage() {
                     <span className="dashboard-footer__version">{APP_VERSION}</span>
                 </footer>
             </main>
+
+            {/* ★ Upgrade Modal */}
+            <UpgradeModal
+                isOpen={upgradeModal.open}
+                onClose={() => setUpgradeModal(prev => ({ ...prev, open: false }))}
+                reason={upgradeModal.reason}
+                currentUsage={upgradeModal.reason === 'creative_set_limit' ? creativeSets.length : undefined}
+                limit={upgradeModal.reason === 'creative_set_limit' ? limits.maxCreativeSets : undefined}
+            />
         </div>
     );
 }
