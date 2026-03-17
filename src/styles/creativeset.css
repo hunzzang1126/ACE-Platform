@@ -483,6 +483,7 @@
     align-items: center;
     justify-content: center;
     opacity: 0;
+    pointer-events: none;
     transition: opacity 0.2s;
     cursor: pointer;
     z-index: 10;
@@ -490,6 +491,13 @@
 
 .banner-card:hover .banner-card-play-overlay {
     opacity: 1;
+    pointer-events: auto;
+}
+
+/* Disable overlay during drag */
+.banner-card--dragging .banner-card-play-overlay {
+    opacity: 0 !important;
+    pointer-events: none !important;
 }
 
 .banner-card-play-btn {
