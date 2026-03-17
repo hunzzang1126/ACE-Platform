@@ -18,33 +18,159 @@ interface ContextMenuState {
     variantId: string;
 }
 
-/** Capture a banner card DOM element to a PNG data URL */
-async function captureBannerCard(cardEl: HTMLElement, w: number, h: number): Promise<string> {
+/**
+ * Render a BannerVariant's elements directly to a Canvas (CORS-safe).
+ * Avoids "tainted canvas" error by fetching images as blobs first.
+ */
+async function renderVariantToCanvas(variant: BannerVariant): Promise<string> {
+    const { width: w, height: h } = variant.preset;
     const canvas = document.createElement('canvas');
     canvas.width = w;
     canvas.height = h;
     const ctx = canvas.getContext('2d')!;
-    // Use html serialization + foreignObject as fallback
-    const data = new XMLSerializer().serializeToString(cardEl);
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><foreignObject width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml">${data}</div></foreignObject></svg>`;
-    const img = new Image();
-    const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+
+    // Background
+    ctx.fillStyle = variant.backgroundColor || '#ffffff';
+    ctx.fillRect(0, 0, w, h);
+
+    // Sort by zIndex
+    const sorted = [...variant.elements].sort((a, b) => a.zIndex - b.zIndex);
+
+    for (const el of sorted) {
+        const resolved = resolveConstraints(el.constraints, w, h);
+        const { x, y, width: ew, height: eh } = resolved;
+
+        ctx.save();
+        ctx.globalAlpha = el.opacity ?? 1;
+
+        if (el.type === 'image' && el.src) {
+            // ★ Fetch image as blob to avoid CORS tainting
+            try {
+                let imgSrc = el.src;
+                // Resolve idb:// references
+                if (imgSrc.startsWith('idb://')) {
+                    const { resolveAsset } = await import('@/services/assetService');
+                    imgSrc = await resolveAsset(imgSrc);
+                }
+                const img = await loadImageCORS(imgSrc);
+                ctx.drawImage(img, x, y, ew, eh);
+            } catch { /* skip failed images */ }
+        } else if (el.type === 'shape') {
+            const shapeEl = el as import('@/schema/elements.types').ShapeElement;
+            if (shapeEl.gradientStart && shapeEl.gradientEnd) {
+                const angle = (shapeEl.gradientAngle ?? 135) * Math.PI / 180;
+                const cx = x + ew / 2, cy = y + eh / 2;
+                const len = Math.max(ew, eh);
+                const grad = ctx.createLinearGradient(
+                    cx - Math.cos(angle) * len / 2, cy - Math.sin(angle) * len / 2,
+                    cx + Math.cos(angle) * len / 2, cy + Math.sin(angle) * len / 2,
+                );
+                grad.addColorStop(0, shapeEl.gradientStart);
+                grad.addColorStop(1, shapeEl.gradientEnd);
+                ctx.fillStyle = grad;
+            } else {
+                ctx.fillStyle = shapeEl.fill || '#cccccc';
+            }
+            const r = shapeEl.borderRadius ?? 0;
+            if (r > 0) {
+                roundRect(ctx, x, y, ew, eh, r);
+                ctx.fill();
+            } else {
+                ctx.fillRect(x, y, ew, eh);
+            }
+        } else if (el.type === 'text' && el.content) {
+            ctx.fillStyle = el.color || '#000000';
+            const fontSize = el.fontSize ?? 16;
+            const fontFamily = el.fontFamily || 'Inter, system-ui, sans-serif';
+            const fontWeight = el.fontWeight || '400';
+            ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+            ctx.textBaseline = 'top';
+            // Simple text wrapping
+            const words = el.content.split(' ');
+            let line = '';
+            let lineY = y;
+            const lineHeight = fontSize * (el.lineHeight ?? 1.2);
+            for (const word of words) {
+                const test = line + (line ? ' ' : '') + word;
+                if (ctx.measureText(test).width > ew && line) {
+                    const drawX = el.textAlign === 'center' ? x + ew / 2 - ctx.measureText(line).width / 2
+                        : el.textAlign === 'right' ? x + ew - ctx.measureText(line).width : x;
+                    ctx.fillText(line, drawX, lineY);
+                    line = word;
+                    lineY += lineHeight;
+                } else {
+                    line = test;
+                }
+            }
+            if (line) {
+                const drawX = el.textAlign === 'center' ? x + ew / 2 - ctx.measureText(line).width / 2
+                    : el.textAlign === 'right' ? x + ew - ctx.measureText(line).width : x;
+                ctx.fillText(line, drawX, lineY);
+            }
+        } else if (el.type === 'button') {
+            // Button background
+            ctx.fillStyle = el.backgroundColor || '#2563eb';
+            const r = el.borderRadius ?? 6;
+            if (r > 0) {
+                roundRect(ctx, x, y, ew, eh, r);
+                ctx.fill();
+            } else {
+                ctx.fillRect(x, y, ew, eh);
+            }
+            // Button label
+            if (el.label) {
+                ctx.fillStyle = el.color || '#ffffff';
+                const fontSize = el.fontSize ?? 14;
+                ctx.font = `${el.fontWeight || '600'} ${fontSize}px ${el.fontFamily || 'Inter, system-ui, sans-serif'}`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(el.label, x + ew / 2, y + eh / 2);
+                ctx.textAlign = 'start'; // reset
+            }
+        }
+
+        ctx.restore();
+    }
+
+    return canvas.toDataURL('image/png');
+}
+
+/** Load image with CORS-safe blob fetching */
+async function loadImageCORS(src: string): Promise<HTMLImageElement> {
+    // If it's already a blob/data URL, load directly
+    if (src.startsWith('blob:') || src.startsWith('data:')) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.onerror = reject;
+            img.src = src;
+        });
+    }
+    // Fetch as blob to bypass CORS tainting
+    const resp = await fetch(src, { mode: 'cors' });
+    const blob = await resp.blob();
     const url = URL.createObjectURL(blob);
-    return new Promise((resolve) => {
-        img.onload = () => {
-            ctx.drawImage(img, 0, 0);
-            URL.revokeObjectURL(url);
-            resolve(canvas.toDataURL('image/png'));
-        };
-        img.onerror = () => {
-            URL.revokeObjectURL(url);
-            // Fallback: draw background + simple rendering
-            ctx.fillStyle = '#1a1f2e';
-            ctx.fillRect(0, 0, w, h);
-            resolve(canvas.toDataURL('image/png'));
-        };
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Image load failed')); };
         img.src = url;
     });
+}
+
+/** Canvas rounded rectangle helper */
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
 }
 
 /** Download a data URL as a file */
@@ -326,10 +452,8 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
         setCtxMenu(null);
         const variant = variants.find((v) => v.id === variantId);
         if (!variant) return;
-        const cardEl = cardRefs.current[variantId]?.querySelector('.banner-card-canvas') as HTMLElement;
-        if (!cardEl) return;
         try {
-            const dataURL = await captureBannerCard(cardEl, variant.preset.width, variant.preset.height);
+            const dataURL = await renderVariantToCanvas(variant);
             downloadDataURL(dataURL, `banner_${variant.preset.width}x${variant.preset.height}.png`);
         } catch {
             alert('Export failed. Try again.');
@@ -340,10 +464,8 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
     const handleExportAll = useCallback(async () => {
         setCtxMenu(null);
         for (const variant of visibleVariants) {
-            const cardEl = cardRefs.current[variant.id]?.querySelector('.banner-card-canvas') as HTMLElement;
-            if (!cardEl) continue;
             try {
-                const dataURL = await captureBannerCard(cardEl, variant.preset.width, variant.preset.height);
+                const dataURL = await renderVariantToCanvas(variant);
                 downloadDataURL(dataURL, `banner_${variant.preset.width}x${variant.preset.height}.png`);
                 await new Promise((r) => setTimeout(r, 300)); // stagger downloads
             } catch { /* skip */ }
@@ -355,10 +477,8 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
         setCtxMenu(null);
         const toExport = variants.filter(v => selectedIds.has(v.id));
         for (const variant of toExport) {
-            const cardEl = cardRefs.current[variant.id]?.querySelector('.banner-card-canvas') as HTMLElement;
-            if (!cardEl) continue;
             try {
-                const dataURL = await captureBannerCard(cardEl, variant.preset.width, variant.preset.height);
+                const dataURL = await renderVariantToCanvas(variant);
                 downloadDataURL(dataURL, `banner_${variant.preset.width}x${variant.preset.height}.png`);
                 await new Promise((r) => setTimeout(r, 300));
             } catch { /* skip */ }
@@ -708,15 +828,12 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                         >
                             <button className="banner-ctx-item" onClick={async () => {
                                 setCtxMenu(null);
-                                // Export all selected sizes (including the right-clicked one)
                                 const idsToExport = selectedIds.size > 0 ? Array.from(selectedIds) : [ctxMenu.variantId];
                                 for (const vid of idsToExport) {
                                     const v = variants.find(v => v.id === vid);
                                     if (!v) continue;
-                                    const cardEl = cardRefs.current[vid]?.querySelector('.banner-card-canvas') as HTMLElement;
-                                    if (!cardEl) continue;
                                     try {
-                                        const dataURL = await captureBannerCard(cardEl, v.preset.width, v.preset.height);
+                                        const dataURL = await renderVariantToCanvas(v);
                                         downloadDataURL(dataURL, `banner_${v.preset.width}x${v.preset.height}.png`);
                                         if (idsToExport.length > 1) await new Promise(r => setTimeout(r, 300));
                                     } catch { /* skip */ }
