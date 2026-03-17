@@ -288,11 +288,19 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                 setTimeout(() => { dragCooldownRef.current = false; }, 300);
                 // ★ Persist card positions to store so they survive navigation
                 setCardPositions(current => {
-                    const cs = useDesignStore.getState().creativeSet;
-                    if (cs) {
+                    const store = useDesignStore.getState();
+                    const activeId = store.activeCreativeSetId;
+                    if (store.creativeSet && activeId) {
+                        // ★ Must update BOTH creativeSet AND allCreativeSets to survive navigation
                         useDesignStore.setState(state => ({
                             ...state,
                             creativeSet: state.creativeSet ? { ...state.creativeSet, cardPositions: current } : state.creativeSet,
+                            allCreativeSets: {
+                                ...state.allCreativeSets,
+                                [activeId]: state.allCreativeSets[activeId]
+                                    ? { ...state.allCreativeSets[activeId], cardPositions: current }
+                                    : state.allCreativeSets[activeId],
+                            },
                         }));
                     }
                     return current;
