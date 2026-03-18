@@ -8,6 +8,7 @@
 type Engine = any;
 
 import { buildSmartContext, contextToPromptSection, type SmartContext } from './smartContextBuilder';
+import { ALL_TOOLS } from './agentTools';
 
 /**
  * Chat message with tool execution history.
@@ -359,7 +360,6 @@ export class AgentContext {
         }
 
         // ── Auto-discover tool catalog from registry ──
-        const { ALL_TOOLS } = require('./agentTools');
         const toolsByCategory: Record<string, string[]> = {};
         for (const tool of ALL_TOOLS) {
             const cat = tool.category ?? 'other';
