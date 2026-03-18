@@ -14,9 +14,9 @@ import { APP_VERSION } from '@/version';
 import { usePlanLimits } from '@/hooks/usePlanLimits';
 import { UpgradeModal, type UpgradeReason } from '@/components/billing/UpgradeModal';
 import { DashboardTemplateGallery } from '@/components/dashboard/DashboardTemplateGallery';
-import { BrandCloudSection } from '@/components/dashboard/BrandCloudSection';
 
-type DashboardTab = 'projects' | 'templates' | 'brand-cloud';
+
+type DashboardTab = 'projects' | 'templates';
 
 function getGreeting(): string {
     const h = new Date().getHours();
@@ -258,7 +258,7 @@ export function DashboardPage() {
                 <div style={{
                     display: 'flex', gap: 4, padding: '0 24px', marginBottom: 16,
                 }}>
-                    {(['projects', 'templates', 'brand-cloud'] as DashboardTab[]).map(tab => (
+                    {(['projects', 'templates'] as DashboardTab[]).map(tab => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
@@ -269,33 +269,14 @@ export function DashboardPage() {
                                 color: activeTab === tab ? '#818cf8' : '#64748b',
                             }}
                         >
-                            {tab === 'projects' ? 'Projects' : tab === 'templates' ? 'Templates' : 'Brand Cloud'}
+                            {tab === 'projects' ? 'Projects' : 'Templates'}
                         </button>
                     ))}
                 </div>
 
                 {/* ── Tab Content ── */}
                 {activeTab === 'templates' && <DashboardTemplateGallery />}
-                {activeTab === 'brand-cloud' && (
-                    limits.brandCloudEnabled || isAdmin ? (
-                        <BrandCloudSection />
-                    ) : (
-                        <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-                            <p style={{ color: '#94a3b8', fontSize: 14, marginBottom: 16 }}>
-                                Brand Cloud is available on Pro and Enterprise plans
-                            </p>
-                            <button
-                                onClick={() => navigate('/pricing')}
-                                style={{
-                                    padding: '8px 24px', borderRadius: 8, border: 'none', fontSize: 13, fontWeight: 600,
-                                    cursor: 'pointer', background: 'linear-gradient(135deg, #818cf8, #6366f1)', color: '#fff',
-                                }}
-                            >
-                                Upgrade to Pro
-                            </button>
-                        </div>
-                    )
-                )}
+
                 {activeTab === 'projects' && (
                     <>
                 {/* Search */}
