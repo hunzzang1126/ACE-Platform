@@ -99,10 +99,7 @@ const t1Elements: DesignElement[] = [
         content: 'Experience the next generation\nof creative tools.',
         fontSize: 13, fontWeight: 400, color: '#94a3b8', zIndex: 2, role: 'body',
     }),
-    btnEl('t1-cta', 'CTA', 20, 170, 130, 38, {
-        label: 'Learn More', fontSize: 14, color: '#ffffff',
-        backgroundColor: '#8b5cf6', borderRadius: 8, zIndex: 3, role: 'cta',
-    }),
+
 ];
 
 // ═══════════════════════════════════════════════════
@@ -121,10 +118,7 @@ const t2Elements: DesignElement[] = [
         content: 'Up to 50% off · Limited time only', fontSize: 14, fontWeight: 500,
         color: 'rgba(255,255,255,0.85)', zIndex: 2, role: 'body',
     }),
-    btnEl('t2-cta', 'CTA', 590, 22, 115, 46, {
-        label: 'Shop Now', fontSize: 15, color: '#ff6b35',
-        backgroundColor: '#ffffff', borderRadius: 20, zIndex: 3, role: 'cta',
-    }),
+
 ];
 
 // ═══════════════════════════════════════════════════
@@ -145,10 +139,7 @@ const t3Elements: DesignElement[] = [
         content: 'Automate repetitive tasks\nand focus on what matters.',
         fontSize: 12, fontWeight: 400, color: '#64748b', zIndex: 2, role: 'body',
     }),
-    btnEl('t3-cta', 'CTA', 24, 155, 130, 36, {
-        label: 'Start Free Trial', fontSize: 13, color: '#ffffff',
-        backgroundColor: '#2563eb', borderRadius: 6, zIndex: 3, role: 'cta',
-    }),
+
     textEl('t3-badge', 'Badge', 165, 163, 110, 20, {
         content: 'No credit card required', fontSize: 10, fontWeight: 500,
         color: '#94a3b8', zIndex: 2,
@@ -176,10 +167,7 @@ const t4Elements: DesignElement[] = [
         content: 'Premium wealth\nmanagement for investors.', 
         fontSize: 13, fontWeight: 400, color: '#888888', textAlign: 'center', zIndex: 2, role: 'body',
     }),
-    btnEl('t4-cta', 'CTA', 30, 500, 100, 36, {
-        label: 'Inquire', fontSize: 14, color: '#0c0c0c',
-        backgroundColor: '#c9a84c', borderRadius: 2, zIndex: 3, role: 'cta',
-    }),
+
 ];
 
 // ═══════════════════════════════════════════════════
@@ -212,10 +200,7 @@ const t5Elements: DesignElement[] = [
         content: 'San Francisco · Moscone Center', fontSize: 20, fontWeight: 500,
         color: '#94a3b8', zIndex: 3,
     }),
-    btnEl('t5-cta', 'CTA', 80, 880, 300, 70, {
-        label: 'Get Tickets', fontSize: 28, color: '#ffffff',
-        backgroundColor: '#7c3aed', borderRadius: 14, zIndex: 4, role: 'cta',
-    }),
+
 ];
 
 // ── Build Template Objects ──

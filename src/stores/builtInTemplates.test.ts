@@ -85,13 +85,13 @@ describe('BUILT_IN_TEMPLATES', () => {
         }
     });
 
-    it('all templates have at least one CTA', () => {
+    it('templates have no CTA elements (CTA is a separate feature)', () => {
         for (const t of BUILT_IN_TEMPLATES) {
             const variant = JSON.parse(t.variantSnapshot);
             const ctas = variant.elements.filter(
                 (el: any) => el.role === 'cta',
             );
-            expect(ctas.length).toBeGreaterThanOrEqual(1);
+            expect(ctas.length).toBe(0);
         }
     });
 
@@ -153,7 +153,7 @@ describe('BUILT_IN_TEMPLATES', () => {
         expect(t.width).toBe(300);
         expect(t.height).toBe(250);
         const variant = JSON.parse(t.variantSnapshot);
-        expect(variant.elements.length).toBe(5); // bg, accent, headline, body, cta
+        expect(variant.elements.length).toBe(4); // bg, accent, headline, body
     });
 
     it('T2 Warm Gradient: 728x90 leaderboard', () => {
@@ -161,7 +161,7 @@ describe('BUILT_IN_TEMPLATES', () => {
         expect(t.width).toBe(728);
         expect(t.height).toBe(90);
         const variant = JSON.parse(t.variantSnapshot);
-        expect(variant.elements.length).toBe(4); // bg, headline, subline, cta
+        expect(variant.elements.length).toBe(3); // bg, headline, subline
     });
 
     it('T3 Clean Minimal: 300x250 SaaS', () => {
@@ -169,7 +169,7 @@ describe('BUILT_IN_TEMPLATES', () => {
         expect(t.width).toBe(300);
         expect(t.height).toBe(250);
         const variant = JSON.parse(t.variantSnapshot);
-        expect(variant.elements.length).toBe(6); // bg, top-bar, headline, body, cta, badge
+        expect(variant.elements.length).toBe(5); // bg, top-bar, headline, body, badge
     });
 
     it('T4 Luxury Gold: 160x600 skyscraper', () => {
@@ -177,7 +177,7 @@ describe('BUILT_IN_TEMPLATES', () => {
         expect(t.width).toBe(160);
         expect(t.height).toBe(600);
         const variant = JSON.parse(t.variantSnapshot);
-        expect(variant.elements.length).toBe(6); // bg, gold-line, headline, divider, body, cta
+        expect(variant.elements.length).toBe(5); // bg, gold-line, headline, divider, body
     });
 
     it('T5 Vibrant Event: 1080x1080 social', () => {
@@ -186,7 +186,7 @@ describe('BUILT_IN_TEMPLATES', () => {
         expect(t.height).toBe(1080);
         expect(t.category).toBe('social');
         const variant = JSON.parse(t.variantSnapshot);
-        expect(variant.elements.length).toBe(8); // bg, glow, date, headline, subline, line, location, cta
+        expect(variant.elements.length).toBe(7); // bg, glow, date, headline, subline, line, location
     });
 
     it('T5 headline and subline do not overlap', () => {

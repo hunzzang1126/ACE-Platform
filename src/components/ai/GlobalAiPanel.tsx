@@ -142,8 +142,8 @@ export function GlobalAiPanel() {
                 title={open ? 'Close AI (Cmd+K)' : 'Open AI (Cmd+K)'}
             >
                 {open
-                    ? <IcChevronRight size={14} color="#8b949e" />
-                    : <IcAi size={16} color="#c9d1d9" />}
+                    ? <IcChevronRight size={14} color="#64748b" />
+                    : <IcAi size={16} color="#475569" />}
             </button>
 
             {/* Panel content */}
@@ -151,16 +151,16 @@ export function GlobalAiPanel() {
                 <div style={panelInnerStyle}>
                     {/* ── Header ────────────────────── */}
                     <div style={headerStyle}>
-                        <IcAi size={18} color="#c9d1d9" />
+                        <IcAi size={18} color="#7c3aed" />
                         <div style={{ flex: 1 }}>
-                            <div style={{ fontWeight: 600, fontSize: 13, color: '#e6edf3', letterSpacing: -0.3 }}>Glid AI</div>
-                            <div style={{ fontSize: 10, color: '#6e7681', marginTop: 1 }}>{contextLabel}</div>
+                            <div style={{ fontWeight: 600, fontSize: 13, color: '#1e293b', letterSpacing: -0.3 }}>ACE AI</div>
+                            <div style={{ fontSize: 10, color: '#64748b', marginTop: 1 }}>{contextLabel}</div>
                         </div>
                         <button onClick={() => agent.clearChat()} style={headerBtnStyle} title="New conversation">
-                            <span style={{ fontSize: 12, color: '#6e7681' }}>+</span>
+                            <span style={{ fontSize: 12, color: '#64748b' }}>+</span>
                         </button>
                         <button onClick={() => setOpen(false)} style={headerBtnStyle} title="Close (Esc)">
-                            <IcClose size={14} color="#6e7681" />
+                            <IcClose size={14} color="#64748b" />
                         </button>
                     </div>
 
@@ -174,11 +174,11 @@ export function GlobalAiPanel() {
                         {/* Empty state */}
                         {agent.messages.length === 0 && agent.state.phase === 'idle' && (
                             <div style={emptyStyle}>
-                                <IcAi size={36} color="#e2e8f0" />
-                                <div style={{ marginTop: 16, fontSize: 14, fontWeight: 500, color: '#c9d1d9' }}>
+                                <IcAi size={36} color="#7c3aed" />
+                                <div style={{ marginTop: 16, fontSize: 14, fontWeight: 500, color: '#1e293b' }}>
                                     What would you like to create?
                                 </div>
-                                <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 6, lineHeight: 1.5 }}>
+                                <div style={{ fontSize: 12, color: '#64748b', marginTop: 6, lineHeight: 1.5 }}>
                                     Design social creatives, ads, landing pages, or any visual format.
                                     Drop a screenshot to reverse-engineer an existing design.
                                 </div>
@@ -191,8 +191,8 @@ export function GlobalAiPanel() {
                                             onClick={() => handleQuickAction(action.id)}
                                             style={quickActionBtnStyle}
                                         >
-                                            <span style={{ fontSize: 12, fontWeight: 500, color: '#c9d1d9' }}>{action.label}</span>
-                                            <span style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>{action.hint}</span>
+                                            <span style={{ fontSize: 12, fontWeight: 500, color: '#1e293b' }}>{action.label}</span>
+                                            <span style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>{action.hint}</span>
                                         </button>
                                     ))}
                                 </div>
@@ -202,10 +202,10 @@ export function GlobalAiPanel() {
                         {/* Image drop overlay */}
                         {showDropZone && (
                             <div style={dropOverlayStyle}>
-                                <div style={{ fontSize: 14, fontWeight: 500, color: '#58a6ff' }}>
+                                <div style={{ fontSize: 14, fontWeight: 500, color: '#7c3aed' }}>
                                     Drop screenshot to scan
                                 </div>
-                                <div style={{ fontSize: 11, color: '#6e7681', marginTop: 4 }}>
+                                <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
                                     AI will extract all elements as editable layers
                                 </div>
                             </div>
@@ -243,22 +243,22 @@ export function GlobalAiPanel() {
                     </div>
 
                     {/* ── Bottom Bar ────────────────── */}
-                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
                         {/* Model selector */}
                         <div style={modelBarStyle}>
                             <button
                                 onClick={() => setShowModelDropdown(!showModelDropdown)}
                                 style={modelSelectorBtnStyle}
                             >
-                                <span style={{ fontSize: 11, color: '#c9d1d9', fontWeight: 500 }}>{activeModel.name}</span>
-                                <IcChevronRight size={10} color="#6e7681" />
+                                <span style={{ fontSize: 11, color: '#1e293b', fontWeight: 500 }}>{activeModel.name}</span>
+                                <IcChevronRight size={10} color="#94a3b8" />
                             </button>
                             <button
                                 onClick={() => fileInputRef.current?.click()}
                                 style={{ ...headerBtnStyle, marginLeft: 'auto' }}
                                 title="Scan a screenshot"
                             >
-                                <span style={{ fontSize: 11, color: '#6e7681' }}>Scan</span>
+                                <span style={{ fontSize: 11, color: '#64748b' }}>Scan</span>
                             </button>
                             <input
                                 ref={fileInputRef}
@@ -329,19 +329,19 @@ function ActionCardInline({ card }: { card: ActionCardData }) {
     const [expanded, setExpanded] = useState(false);
     const hasExpandable = !!card.expandedDetail;
 
-    const icon = card.status === 'running' ? <IcLoader size={12} color="#58a6ff" />
-        : card.status === 'done' ? <IcCheck size={12} color="#3fb950" />
-            : card.status === 'error' ? <IcError size={12} color="#f85149" />
+    const icon = card.status === 'running' ? <IcLoader size={12} color="#7c3aed" />
+        : card.status === 'done' ? <IcCheck size={12} color="#16a34a" />
+            : card.status === 'error' ? <IcError size={12} color="#dc2626" />
                 : <span style={{ width: 12, display: 'inline-block', textAlign: 'center', color: '#94a3b8' }}>·</span>;
 
     return (
         <div style={{
             ...actionCardStyle,
-            borderColor: card.status === 'done' ? 'rgba(63,185,80,0.15)'
-                : card.status === 'error' ? 'rgba(248,81,73,0.2)'
-                    : card.status === 'running' ? 'rgba(88,166,255,0.15)'
-                        : 'rgba(255,255,255,0.04)',
-            boxShadow: card.status === 'done' ? '0 0 8px rgba(63,185,80,0.08)' : 'none',
+            borderColor: card.status === 'done' ? 'rgba(22,163,106,0.2)'
+                : card.status === 'error' ? 'rgba(220,38,38,0.2)'
+                    : card.status === 'running' ? 'rgba(124,58,237,0.2)'
+                        : 'rgba(0,0,0,0.06)',
+            boxShadow: card.status === 'done' ? '0 0 8px rgba(22,163,106,0.08)' : 'none',
         }}>
             {/* Main row */}
             <div
@@ -353,16 +353,16 @@ function ActionCardInline({ card }: { card: ActionCardData }) {
             >
                 {icon}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 11, color: card.status === 'error' ? '#f85149' : '#c9d1d9', fontWeight: 500 }}>
+                    <div style={{ fontSize: 11, color: card.status === 'error' ? '#dc2626' : '#1e293b', fontWeight: 500 }}>
                         {card.label}
                     </div>
                     {card.reasoning && (
-                        <div style={{ fontSize: 10, color: '#8b949e', marginTop: 2, fontStyle: 'italic', lineHeight: 1.4 }}>
+                        <div style={{ fontSize: 10, color: '#64748b', marginTop: 2, fontStyle: 'italic', lineHeight: 1.4 }}>
                             {card.reasoning}
                         </div>
                     )}
                     {card.detail && !expanded && (
-                        <div style={{ fontSize: 10, color: '#6e7681', marginTop: 1 }}>{card.detail}</div>
+                        <div style={{ fontSize: 10, color: '#64748b', marginTop: 1 }}>{card.detail}</div>
                     )}
                 </div>
                 {hasExpandable && (
@@ -382,11 +382,11 @@ function ActionCardInline({ card }: { card: ActionCardData }) {
                 <div style={{
                     marginTop: 6, marginLeft: 20,
                     padding: '6px 8px',
-                    background: 'rgba(255,255,255,0.02)',
-                    border: '1px solid rgba(255,255,255,0.04)',
+                    background: 'rgba(0,0,0,0.03)',
+                    border: '1px solid rgba(0,0,0,0.06)',
                     borderRadius: 6,
                     fontSize: 10, lineHeight: 1.6,
-                    color: '#8b949e',
+                    color: '#475569',
                     fontFamily: 'JetBrains Mono, Menlo, monospace',
                     whiteSpace: 'pre-wrap',
                     maxHeight: 200,
@@ -423,14 +423,14 @@ function ModelDropdown({ selectedRole, onSelect }: { selectedRole: AceModelRole;
                         }}
                     >
                         <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                            <span style={{ fontSize: 12, color: active ? '#e6edf3' : '#c9d1d9' }}>{opt.label}</span>
+                            <span style={{ fontSize: 12, color: active ? '#1e293b' : '#334155' }}>{opt.label}</span>
                             {m.costPer1MInput > 0 && (
-                                <span style={{ fontSize: 10, color: '#94a3b8' }}>
+                                <span style={{ fontSize: 10, color: '#64748b' }}>
                                     ${m.costPer1MInput}/{m.costPer1MOutput}
                                 </span>
                             )}
                         </div>
-                        <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>{m.id}</div>
+                        <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>{m.id}</div>
                     </button>
                 );
             })}
@@ -448,22 +448,22 @@ const wrapperStyle: CSSProperties = {
 
 const toggleBtnStyle: CSSProperties = {
     width: 32, flexShrink: 0, height: '100%',
-    background: 'rgba(22, 27, 38, 0.95)', border: 'none',
-    borderLeft: '1px solid rgba(255,255,255,0.06)',
-    color: '#8b949e', cursor: 'pointer',
+    background: '#f0f2f5', border: 'none',
+    borderLeft: '1px solid rgba(0,0,0,0.06)',
+    color: '#475569', cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
 };
 
 const panelInnerStyle: CSSProperties = {
     width: PANEL_WIDTH - 32, flexShrink: 0, height: '100%',
-    background: '#f0f2f5', borderLeft: '1px solid rgba(255,255,255,0.06)',
+    background: '#f0f2f5', borderLeft: '1px solid rgba(0,0,0,0.06)',
     display: 'flex', flexDirection: 'column',
-    fontFamily: 'Inter, system-ui, sans-serif', color: '#e6edf3',
+    fontFamily: 'Inter, system-ui, sans-serif', color: '#1e293b',
 };
 
 const headerStyle: CSSProperties = {
     display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px',
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
+    borderBottom: '1px solid rgba(0,0,0,0.06)',
 };
 
 const headerBtnStyle: CSSProperties = {
@@ -478,7 +478,7 @@ const msgAreaStyle: CSSProperties = {
 
 const emptyStyle: CSSProperties = {
     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-    color: '#e2e8f0', padding: '40px 20px', textAlign: 'center',
+    color: '#1e293b', padding: '40px 20px', textAlign: 'center',
 };
 
 const quickActionsStyle: CSSProperties = {
@@ -487,7 +487,7 @@ const quickActionsStyle: CSSProperties = {
 
 const quickActionBtnStyle: CSSProperties = {
     display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
-    background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)',
+    background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(0,0,0,0.06)',
     borderRadius: 8, padding: '10px 14px', cursor: 'pointer',
     transition: 'all 0.15s ease', textAlign: 'left', width: '100%',
 };
@@ -495,27 +495,27 @@ const quickActionBtnStyle: CSSProperties = {
 const dropOverlayStyle: CSSProperties = {
     position: 'absolute', inset: 0, zIndex: 10,
     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-    background: 'rgba(13,17,23,0.92)',
-    border: '2px dashed #388bfd', borderRadius: 8,
+    background: 'rgba(255,255,255,0.92)',
+    border: '2px dashed #7c3aed', borderRadius: 8,
     margin: 8,
 };
 
 const userBubbleStyle: CSSProperties = {
     padding: '8px 14px', margin: '4px 14px', alignSelf: 'flex-end',
-    background: 'rgba(56,139,253,0.1)', borderRadius: '12px 12px 4px 12px',
-    maxWidth: '85%', fontSize: 13, lineHeight: '1.6', color: '#c9d1d9',
+    background: 'linear-gradient(135deg, #7c3aed, #6d28d9)', borderRadius: '12px 12px 4px 12px',
+    maxWidth: '85%', fontSize: 13, lineHeight: '1.6', color: '#ffffff',
 };
 
 const assistantStyle: CSSProperties = {
     padding: '8px 14px', margin: '4px 14px', fontSize: 13, lineHeight: '1.7',
-    color: '#e6edf3', whiteSpace: 'pre-wrap',
+    color: '#334155', whiteSpace: 'pre-wrap',
 };
 
 const actionCardStyle: CSSProperties = {
     margin: '3px 10px',
     padding: '6px 10px',
-    background: 'rgba(255,255,255,0.015)',
-    border: '1px solid rgba(255,255,255,0.04)',
+    background: 'rgba(255,255,255,0.6)',
+    border: '1px solid rgba(0,0,0,0.06)',
     borderRadius: 8,
     display: 'flex', flexDirection: 'column', gap: 4,
     transition: 'border-color 0.3s ease, box-shadow 0.3s ease',
@@ -524,14 +524,14 @@ const actionCardStyle: CSSProperties = {
 const errorStyle: CSSProperties = {
     display: 'flex', alignItems: 'center', gap: 6,
     margin: '4px 14px', padding: '8px 12px',
-    background: 'rgba(248,81,73,0.08)', border: '1px solid rgba(248,81,73,0.2)',
-    borderRadius: 8, fontSize: 12, color: '#f85149',
+    background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.15)',
+    borderRadius: 8, fontSize: 12, color: '#dc2626',
 };
 
 const modelBarStyle: CSSProperties = {
     display: 'flex', alignItems: 'center', gap: 6,
     padding: '6px 12px',
-    borderBottom: '1px solid rgba(255,255,255,0.04)',
+    borderBottom: '1px solid rgba(0,0,0,0.04)',
 };
 
 const modelSelectorBtnStyle: CSSProperties = {
@@ -541,12 +541,12 @@ const modelSelectorBtnStyle: CSSProperties = {
 };
 
 const modelDropdownStyle: CSSProperties = {
-    background: '#fafbfc',
-    border: '1px solid rgba(255,255,255,0.08)',
+    background: '#ffffff',
+    border: '1px solid rgba(0,0,0,0.08)',
     borderRadius: 8,
     margin: '0 8px 4px',
     padding: '6px 0',
-    boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+    boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
     maxHeight: 280,
     overflowY: 'auto',
 };
@@ -561,17 +561,17 @@ const modelOptionStyle: CSSProperties = {
 
 const inputAreaStyle: CSSProperties = {
     display: 'flex', gap: 6, padding: '10px 12px',
-    borderTop: '1px solid rgba(255,255,255,0.06)', alignItems: 'center',
+    borderTop: '1px solid rgba(0,0,0,0.06)', alignItems: 'center',
 };
 
 const inputFieldStyle: CSSProperties = {
-    flex: 1, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 8, padding: '9px 12px', color: '#e6edf3', fontSize: 13, outline: 'none',
+    flex: 1, background: '#ffffff', border: '1px solid rgba(0,0,0,0.1)',
+    borderRadius: 8, padding: '9px 12px', color: '#1e293b', fontSize: 13, outline: 'none',
 };
 
 const sendBtnStyle: CSSProperties = {
     width: 34, height: 34, borderRadius: 8,
-    background: '#238636', border: 'none', cursor: 'pointer',
+    background: 'linear-gradient(135deg, #7c3aed, #6d28d9)', border: 'none', cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     transition: 'opacity 0.15s ease',
 };
