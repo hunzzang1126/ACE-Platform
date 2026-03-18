@@ -25,14 +25,14 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/88</span>
+                <span class='fraction'>0/86</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/45</span>
+                <span class='fraction'>0/39</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/80</span>
+                <span class='fraction'>0/79</span>
             </div>
         
             
@@ -277,13 +277,7 @@
 <a name='L212'></a><a href='#L212'>212</a>
 <a name='L213'></a><a href='#L213'>213</a>
 <a name='L214'></a><a href='#L214'>214</a>
-<a name='L215'></a><a href='#L215'>215</a>
-<a name='L216'></a><a href='#L216'>216</a>
-<a name='L217'></a><a href='#L217'>217</a>
-<a name='L218'></a><a href='#L218'>218</a>
-<a name='L219'></a><a href='#L219'>219</a>
-<a name='L220'></a><a href='#L220'>220</a>
-<a name='L221'></a><a href='#L221'>221</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L215'></a><a href='#L215'>215</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -342,7 +336,6 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -441,11 +434,6 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -558,21 +546,20 @@ export async function <span class="fstat-no" title="function not covered" >pushT
 &nbsp;
 <span class="cstat-no" title="statement not covered" >    try {</span>
         // Get current local state
-        const { projects } = <span class="cstat-no" title="statement not covered" >useProjectStore.getState();</span>
+        const { creativeSets } = <span class="cstat-no" title="statement not covered" >useProjectStore.getState();</span>
         const { creativeSet } = <span class="cstat-no" title="statement not covered" >useDesignStore.getState();</span>
 &nbsp;
-        // Push all projects
-<span class="cstat-no" title="statement not covered" >        for (const proj of projects) {</span>
-<span class="cstat-no" title="statement not covered" >            if (proj.deletedAt) <span class="cstat-no" title="statement not covered" >continue; // skip trashed items for now</span></span>
+        // Push all creative sets as projects
+<span class="cstat-no" title="statement not covered" >        for (const cs of creativeSets) {</span>
 &nbsp;
             const { error: projErr } = <span class="cstat-no" title="statement not covered" >await sb</span>
                 .from('projects')
                 .upsert({
-                    id: proj.id,
+                    id: cs.id,
                     user_id: userId,
-                    name: proj.name,
-                    folder_id: proj.folderId ?? null,
-                    variant_count: proj.variantCount ?? 1,
+                    name: cs.name,
+                    folder_id: cs.folderId ?? null,
+                    variant_count: cs.variantCount ?? 1,
                     updated_at: new Date().toISOString(),
                 }, { onConflict: 'id' });
 &nbsp;
@@ -654,18 +641,13 @@ export async function <span class="fstat-no" title="function not covered" >pullF
 &nbsp;
         // Merge into local stores (cloud data wins for now — last-write-wins)
 <span class="cstat-no" title="statement not covered" >        if (cloudProjects &amp;&amp; cloudProjects.length &gt; 0) {</span>
-            const localProjects = <span class="cstat-no" title="statement not covered" >useProjectStore.getState().projects;</span>
-            const localIds = <span class="cstat-no" title="statement not covered" >new Set(localProjects.map(<span class="fstat-no" title="function not covered" >p =&gt; <span class="cstat-no" title="statement not covered" >p</span>.id)</span>);</span>
+            const localSets = <span class="cstat-no" title="statement not covered" >useProjectStore.getState().creativeSets;</span>
+            const localIds = <span class="cstat-no" title="statement not covered" >new Set(localSets.map(<span class="fstat-no" title="function not covered" >(s</span>: { id: string }) =&gt; <span class="cstat-no" title="statement not covered" >s.id)</span>);</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >            for (const cp of cloudProjects) {</span>
 <span class="cstat-no" title="statement not covered" >                if (!localIds.has(cp.id)) {</span>
-                    // New from cloud — add locally
-<span class="cstat-no" title="statement not covered" >                    useProjectStore.getState().addProject({</span>
-                        id: cp.id,
-                        name: cp.name,
-                        folderId: cp.folder_id ?? undefined,
-                        variantCount: cp.variant_count ?? 1,
-                    });
+                    // New from cloud — create locally
+<span class="cstat-no" title="statement not covered" >                    useProjectStore.getState().createCreativeSet(cp.name);</span>
                 }
             }
 <span class="cstat-no" title="statement not covered" >            console.log(`[cloudSync] Pulled ${cloudProjects.length} projects`);</span>
@@ -730,7 +712,7 @@ export function <span class="fstat-no" title="function not covered" >startAutoSy
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-03-12T14:04:49.400Z
+                at 2026-03-18T16:07:41.605Z
             </div>
         <script src="../prettify.js"></script>
         <script>

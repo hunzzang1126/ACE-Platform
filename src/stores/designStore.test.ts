@@ -383,3 +383,70 @@ describe('designStore — Master Label (cosmetic)', () => {
         expect(useDesignStore.getState().creativeSet!.masterLabel).toBeUndefined();
     });
 });
+
+// ─────────────────────────────────────────────────
+// replaceVariantElements Tests
+// ─────────────────────────────────────────────────
+// ★ Regression guard for template instantiation:
+// createCreativeSet makes empty CS, replaceVariantElements
+// injects template elements. Must work reliably.
+
+describe('designStore — replaceVariantElements', () => {
+
+    it('replaces all elements in a variant', () => {
+        useDesignStore.getState().createCreativeSet('Replace Test', MASTER_PRESET);
+        const cs = useDesignStore.getState().creativeSet!;
+        const masterId = cs.masterVariantId;
+
+        // Start with one element
+        useDesignStore.getState().addElementToMaster(makeTestRect('old-el', '#000'));
+        expect(useDesignStore.getState().creativeSet!.variants[0]!.elements).toHaveLength(1);
+
+        // Replace with two new elements
+        const newElements = [
+            makeTestRect('new-1', '#FF0000'),
+            makeTestRect('new-2', '#00FF00'),
+        ];
+        useDesignStore.getState().replaceVariantElements(masterId, newElements);
+
+        const updated = useDesignStore.getState().creativeSet!;
+        const master = updated.variants.find(v => v.id === masterId)!;
+        expect(master.elements).toHaveLength(2);
+        expect(master.elements[0]!.id).toBe('new-1');
+        expect(master.elements[1]!.id).toBe('new-2');
+    });
+
+    it('replaces elements on an initially empty variant', () => {
+        useDesignStore.getState().createCreativeSet('Empty Replace', MASTER_PRESET);
+        const masterId = useDesignStore.getState().creativeSet!.masterVariantId;
+
+        // Master starts empty
+        expect(useDesignStore.getState().creativeSet!.variants[0]!.elements).toHaveLength(0);
+
+        const newElements = [makeTestRect('injected', '#ABCDEF')];
+        useDesignStore.getState().replaceVariantElements(masterId, newElements);
+
+        const master = useDesignStore.getState().creativeSet!.variants[0]!;
+        expect(master.elements).toHaveLength(1);
+        expect((master.elements[0] as ShapeElement).fill).toBe('#ABCDEF');
+    });
+
+    it('does not crash when replacing elements on non-existent variant', () => {
+        useDesignStore.getState().createCreativeSet('Safe Replace', MASTER_PRESET);
+        expect(() => {
+            useDesignStore.getState().replaceVariantElements('non-existent-id', [makeTestRect('x', '#000')]);
+        }).not.toThrow();
+    });
+
+    it('preserves variant metadata after element replacement', () => {
+        useDesignStore.getState().createCreativeSet('Preserve Meta', MASTER_PRESET);
+        const masterId = useDesignStore.getState().creativeSet!.masterVariantId;
+        const originalPreset = useDesignStore.getState().creativeSet!.variants[0]!.preset;
+
+        useDesignStore.getState().replaceVariantElements(masterId, [makeTestRect('el', '#000')]);
+
+        const updated = useDesignStore.getState().creativeSet!.variants[0]!;
+        expect(updated.preset).toEqual(originalPreset);
+        expect(updated.id).toBe(masterId);
+    });
+});

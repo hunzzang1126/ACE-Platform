@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">55.97% </span>
+                <span class="strong">57.14% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>75/134</span>
+                <span class='fraction'>80/140</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">31.03% </span>
+                <span class="strong">32.25% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>18/58</span>
+                <span class='fraction'>20/62</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">62% </span>
+                <span class="strong">63.2% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>62/100</span>
+                <span class='fraction'>67/106</span>
             </div>
         
             
@@ -388,7 +388,18 @@
 <a name='L323'></a><a href='#L323'>323</a>
 <a name='L324'></a><a href='#L324'>324</a>
 <a name='L325'></a><a href='#L325'>325</a>
-<a name='L326'></a><a href='#L326'>326</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L326'></a><a href='#L326'>326</a>
+<a name='L327'></a><a href='#L327'>327</a>
+<a name='L328'></a><a href='#L328'>328</a>
+<a name='L329'></a><a href='#L329'>329</a>
+<a name='L330'></a><a href='#L330'>330</a>
+<a name='L331'></a><a href='#L331'>331</a>
+<a name='L332'></a><a href='#L332'>332</a>
+<a name='L333'></a><a href='#L333'>333</a>
+<a name='L334'></a><a href='#L334'>334</a>
+<a name='L335'></a><a href='#L335'>335</a>
+<a name='L336'></a><a href='#L336'>336</a>
+<a name='L337'></a><a href='#L337'>337</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -533,6 +544,17 @@
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -859,6 +881,17 @@ export const useProjectStore = create&lt;ProjectState&gt;()(
                     const s = state.creativeSets.find((s) =&gt; s.id === id);
                     <span class="missing-if-branch" title="else path not taken" >E</span>if (s) { s.name = name; s.updatedAt = new Date().toISOString(); }
                 });
+                // ★ Cross-store sync: also update designStore so name persists on reload.
+                // Called AFTER set() to avoid Zustand deadlock (REGRESSION GUARD).
+                // Guard: only sync if name actually differs (prevents infinite loop).
+                try {
+                    const { useDesignStore } = require('@/stores/designStore');
+                    const ds = useDesignStore.getState();
+                    const designCS = ds.allCreativeSets[id];
+                    <span class="missing-if-branch" title="if path not taken" >I</span>if (designCS &amp;&amp; <span class="branch-1 cbranch-no" title="branch not covered" >designCS.name !== name) {</span>
+<span class="cstat-no" title="statement not covered" >                        useDesignStore.getState().renameCreativeSet(id, name);</span>
+                    }
+                } catch { /* designStore not yet loaded */ }
             },
 &nbsp;
             renameFolder: <span class="fstat-no" title="function not covered" >(i</span>d, name) =&gt; {
@@ -971,7 +1004,7 @@ export const useProjectStore = create&lt;ProjectState&gt;()(
             },
         })),
         {
-            name: 'ace-project-store',
+            name: 'glid-project-store',
             // ★ IndexedDB storage — no 5MB limit, async I/O
             storage: createJSONStorage(() =&gt; idbStorage),
             // Only persist data, not UI state like selection/search/page
@@ -1010,7 +1043,7 @@ function <span class="fstat-no" title="function not covered" >_applyExternalSync
 // Helper: broadcast current state to other tabs
 function _broadcastSync() {
     try {
-        const raw = localStorage.getItem('ace-project-store');
+        const raw = localStorage.getItem('glid-project-store');
         <span class="missing-if-branch" title="else path not taken" >E</span>if (raw &amp;&amp; _channel) _channel.postMessage(raw);
     } catch { /* ok */ }
 }
@@ -1020,7 +1053,7 @@ let _channel: BroadcastChannel | null = null;
 <span class="missing-if-branch" title="else path not taken" >E</span>if (typeof window !== 'undefined') {
     // 1. StorageEvent (fires in OTHER tabs)
     window.addEventListener('storage', <span class="fstat-no" title="function not covered" >(e</span>) =&gt; {
-<span class="cstat-no" title="statement not covered" >        if (e.key !== 'ace-project-store') <span class="cstat-no" title="statement not covered" >return;</span></span>
+<span class="cstat-no" title="statement not covered" >        if (e.key !== 'glid-project-store') <span class="cstat-no" title="statement not covered" >return;</span></span>
 <span class="cstat-no" title="statement not covered" >        if (!e.newValue) {</span>
 <span class="cstat-no" title="statement not covered" >            useProjectStore.setState({ creativeSets: [], folders: [], trash: [] });</span>
 <span class="cstat-no" title="statement not covered" >            return;</span>
@@ -1030,7 +1063,7 @@ let _channel: BroadcastChannel | null = null;
 &nbsp;
     // 2. BroadcastChannel (fires in ALL other same-origin tabs, instantly)
     try {
-        _channel = new BroadcastChannel('ace-project-sync');
+        _channel = new BroadcastChannel('glid-project-sync');
         _channel.onmessage = <span class="fstat-no" title="function not covered" >(e</span>) =&gt; {
 <span class="cstat-no" title="statement not covered" >            if (typeof e.data === 'string') {</span>
 <span class="cstat-no" title="statement not covered" >                _applyExternalSync(e.data);</span>
@@ -1045,7 +1078,7 @@ let _channel: BroadcastChannel | null = null;
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-03-12T14:04:49.400Z
+                at 2026-03-18T16:07:41.605Z
             </div>
         <script src="../prettify.js"></script>
         <script>
