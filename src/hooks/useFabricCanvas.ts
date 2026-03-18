@@ -295,10 +295,28 @@ export function useFabricCanvas(
                 const e = opt.e as WheelEvent;
                 if (e.ctrlKey || e.metaKey) {
                     e.preventDefault(); e.stopPropagation();
-                    const delta = e.deltaY > 0 ? -0.08 : 0.08;
-                    let newZoom = (fc.getZoom() || 1) + delta;
+
+                    // ★ Canva-style zoom: smooth multiplicative factor, ~3x slower than before
+                    // Before: additive ±0.08 (jumpy). Now: multiplicative ×0.975/1.025 (smooth).
+                    const zoomFactor = e.deltaY > 0 ? 0.975 : 1.025;
+                    let newZoom = (fc.getZoom() || 1) * zoomFactor;
                     newZoom = Math.max(0.1, Math.min(5, newZoom));
-                    fc.zoomToPoint(fc.getScenePoint(e), newZoom);
+
+                    // ★ Canva-style: zoom toward artboard CENTER, not cursor position.
+                    // This ensures the canvas artboard always stays visible and centered
+                    // — users never "lose" the canvas by zooming into empty gray space.
+                    const vpt = fc.viewportTransform!;
+                    const artboardCenterX = width / 2;
+                    const artboardCenterY = height / 2;
+                    // Convert artboard center to screen coordinates
+                    const screenCX = artboardCenterX * vpt[0] + vpt[4];
+                    const screenCY = artboardCenterY * vpt[3] + vpt[5];
+                    // Compute new viewport to keep artboard center at the same screen position
+                    vpt[0] = newZoom;
+                    vpt[3] = newZoom;
+                    vpt[4] = screenCX - artboardCenterX * newZoom;
+                    vpt[5] = screenCY - artboardCenterY * newZoom;
+                    fc.setViewportTransform(vpt);
                     fc.renderAll();
                 }
             });
