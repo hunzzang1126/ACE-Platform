@@ -95,9 +95,9 @@ const t1Elements: DesignElement[] = [
         content: 'THE FUTURE\nIS HERE', fontSize: 48, fontWeight: 800,
         color: '#ffffff', zIndex: 2, role: 'headline',
     }),
-    textEl('t1-body', 'Body', 20, 120, 240, 55, {
+    textEl('t1-body', 'Body', 20, 125, 240, 45, {
         content: 'Experience the next generation\nof creative tools.',
-        fontSize: 18, fontWeight: 400, color: '#94a3b8', zIndex: 2, role: 'body',
+        fontSize: 14, fontWeight: 400, color: '#94a3b8', zIndex: 2, role: 'body',
     }),
     btnEl('t1-cta', 'CTA', 20, 190, 140, 42, {
         label: 'Learn More', fontSize: 15, color: '#ffffff',
@@ -117,8 +117,8 @@ const t2Elements: DesignElement[] = [
         content: 'SUMMER COLLECTION', fontSize: 32, fontWeight: 800,
         color: '#ffffff', fontFamily: 'Inter', zIndex: 2, role: 'headline',
     }),
-    textEl('t2-body', 'Subline', 30, 52, 400, 24, {
-        content: 'Up to 50% off · Limited time only', fontSize: 16, fontWeight: 500,
+    textEl('t2-body', 'Subline', 30, 52, 400, 22, {
+        content: 'Up to 50% off · Limited time only', fontSize: 14, fontWeight: 500,
         color: 'rgba(255,255,255,0.85)', zIndex: 2, role: 'body',
     }),
     btnEl('t2-cta', 'CTA', 590, 22, 115, 46, {
@@ -141,9 +141,9 @@ const t3Elements: DesignElement[] = [
         content: 'Simplify your\nworkflow', fontSize: 34, fontWeight: 700,
         color: '#1e293b', zIndex: 2, role: 'headline',
     }),
-    textEl('t3-body', 'Body', 24, 100, 252, 55, {
-        content: 'Automate repetitive tasks and focus on what matters. Trusted by 10,000+ teams.',
-        fontSize: 14, fontWeight: 400, color: '#64748b', zIndex: 2, role: 'body',
+    textEl('t3-body', 'Body', 24, 100, 252, 45, {
+        content: 'Automate repetitive tasks\nand focus on what matters.',
+        fontSize: 12, fontWeight: 400, color: '#64748b', zIndex: 2, role: 'body',
     }),
     btnEl('t3-cta', 'CTA', 24, 175, 140, 40, {
         label: 'Start Free Trial', fontSize: 14, color: '#ffffff',
@@ -172,9 +172,9 @@ const t4Elements: DesignElement[] = [
     shapeEl('t4-divider', 'Divider', 50, 310, 60, 1, {
         fill: '#c9a84c', zIndex: 1,
     }),
-    textEl('t4-body', 'Body', 16, 330, 130, 120, {
-        content: 'Premium wealth\nmanagement for\ndiscerning investors.', 
-        fontSize: 16, fontWeight: 400, color: '#888888', textAlign: 'center', zIndex: 2, role: 'body',
+    textEl('t4-body', 'Body', 16, 330, 130, 80, {
+        content: 'Premium wealth\nmanagement for investors.', 
+        fontSize: 13, fontWeight: 400, color: '#888888', textAlign: 'center', zIndex: 2, role: 'body',
     }),
     btnEl('t4-cta', 'CTA', 30, 510, 100, 38, {
         label: 'Inquire', fontSize: 15, color: '#0c0c0c',
@@ -201,8 +201,8 @@ const t5Elements: DesignElement[] = [
         content: 'DESIGN\nSUMMIT', fontSize: 110, fontWeight: 900,
         color: '#ffffff', textAlign: 'left', zIndex: 3, role: 'headline',
     }),
-    textEl('t5-subline', 'Subline', 80, 560, 700, 40, {
-        content: 'Where creativity meets technology', fontSize: 28, fontWeight: 400,
+    textEl('t5-subline', 'Subline', 80, 560, 700, 36, {
+        content: 'Where creativity meets technology', fontSize: 22, fontWeight: 400,
         color: '#a78bfa', zIndex: 3, role: 'body',
     }),
     shapeEl('t5-line', 'Accent Line', 80, 620, 80, 3, {
