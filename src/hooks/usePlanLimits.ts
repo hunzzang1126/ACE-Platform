@@ -57,7 +57,7 @@ export function usePlanLimits() {
                 .select('ai_generations_used, exports_used')
                 .eq('user_id', user.id)
                 .eq('month', month)
-                .single();
+                .maybeSingle();
 
             if (data) {
                 setUsage(prev => ({

@@ -163,7 +163,7 @@ export const useAuthStore = create<AuthState>()(
                         .select('plan')
                         .eq('user_id', supaUser.id)
                         .eq('status', 'active')
-                        .single();
+                        .maybeSingle();
                     if (sub?.plan) userPlan = sub.plan as PlanTier;
                 } catch { /* no subscription = starter */ }
                 user.plan = userPlan;
