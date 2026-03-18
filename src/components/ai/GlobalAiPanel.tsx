@@ -13,7 +13,7 @@ import { useUnifiedAgent, type AgentIntent } from '@/hooks/useUnifiedAgent';
 import { getModelForRole, type AceModelRole } from '@/services/modelRouter';
 import type { AgentMessage } from '@/ai/agentContext';
 import {
-    IcAi, IcSend, IcClose, IcChevronRight,
+    IcSend, IcClose, IcChevronRight,
     IcLoader, IcCheck, IcError,
 } from '@/components/ui/Icons';
 
@@ -143,7 +143,7 @@ export function GlobalAiPanel() {
             >
                 {open
                     ? <IcChevronRight size={14} color="#64748b" />
-                    : <IcAi size={16} color="#475569" />}
+                    : <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: -0.5, background: 'linear-gradient(135deg, #ff6b6b, #ee5a9f, #8b5cf6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>G</span>}
             </button>
 
             {/* Panel content */}
@@ -151,9 +151,9 @@ export function GlobalAiPanel() {
                 <div style={panelInnerStyle}>
                     {/* ── Header ────────────────────── */}
                     <div style={headerStyle}>
-                        <IcAi size={18} color="#7c3aed" />
+                        <span style={glidLogoStyle}>G</span>
                         <div style={{ flex: 1 }}>
-                            <div style={{ fontWeight: 600, fontSize: 13, color: '#1e293b', letterSpacing: -0.3 }}>ACE AI</div>
+                            <div style={{ fontWeight: 600, fontSize: 13, color: '#1e293b', letterSpacing: -0.3 }}>GLID AI</div>
                             <div style={{ fontSize: 10, color: '#64748b', marginTop: 1 }}>{contextLabel}</div>
                         </div>
                         <button onClick={() => agent.clearChat()} style={headerBtnStyle} title="New conversation">
@@ -174,7 +174,7 @@ export function GlobalAiPanel() {
                         {/* Empty state */}
                         {agent.messages.length === 0 && agent.state.phase === 'idle' && (
                             <div style={emptyStyle}>
-                                <IcAi size={36} color="#7c3aed" />
+                                <span style={glidLogoLargeStyle}>GLID</span>
                                 <div style={{ marginTop: 16, fontSize: 14, fontWeight: 500, color: '#1e293b' }}>
                                     What would you like to create?
                                 </div>
@@ -329,7 +329,7 @@ function ActionCardInline({ card }: { card: ActionCardData }) {
     const [expanded, setExpanded] = useState(false);
     const hasExpandable = !!card.expandedDetail;
 
-    const icon = card.status === 'running' ? <IcLoader size={12} color="#7c3aed" />
+    const icon = card.status === 'running' ? <IcLoader size={12} color="#ee5a9f" />
         : card.status === 'done' ? <IcCheck size={12} color="#16a34a" />
             : card.status === 'error' ? <IcError size={12} color="#dc2626" />
                 : <span style={{ width: 12, display: 'inline-block', textAlign: 'center', color: '#94a3b8' }}>·</span>;
@@ -339,7 +339,7 @@ function ActionCardInline({ card }: { card: ActionCardData }) {
             ...actionCardStyle,
             borderColor: card.status === 'done' ? 'rgba(22,163,106,0.2)'
                 : card.status === 'error' ? 'rgba(220,38,38,0.2)'
-                    : card.status === 'running' ? 'rgba(124,58,237,0.2)'
+                    : card.status === 'running' ? 'rgba(238,90,159,0.2)'
                         : 'rgba(0,0,0,0.06)',
             boxShadow: card.status === 'done' ? '0 0 8px rgba(22,163,106,0.08)' : 'none',
         }}>
@@ -496,13 +496,13 @@ const dropOverlayStyle: CSSProperties = {
     position: 'absolute', inset: 0, zIndex: 10,
     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
     background: 'rgba(255,255,255,0.92)',
-    border: '2px dashed #7c3aed', borderRadius: 8,
+    border: '2px dashed #ee5a9f', borderRadius: 8,
     margin: 8,
 };
 
 const userBubbleStyle: CSSProperties = {
     padding: '8px 14px', margin: '4px 14px', alignSelf: 'flex-end',
-    background: 'linear-gradient(135deg, #7c3aed, #6d28d9)', borderRadius: '12px 12px 4px 12px',
+    background: 'linear-gradient(135deg, #ff6b6b, #ee5a9f, #8b5cf6)', borderRadius: '12px 12px 4px 12px',
     maxWidth: '85%', fontSize: 13, lineHeight: '1.6', color: '#ffffff',
 };
 
@@ -571,7 +571,23 @@ const inputFieldStyle: CSSProperties = {
 
 const sendBtnStyle: CSSProperties = {
     width: 34, height: 34, borderRadius: 8,
-    background: 'linear-gradient(135deg, #7c3aed, #6d28d9)', border: 'none', cursor: 'pointer',
+    background: 'linear-gradient(135deg, #ff6b6b, #ee5a9f, #8b5cf6)', border: 'none', cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     transition: 'opacity 0.15s ease',
+};
+
+// ── GLID Logo Styles ─────────────────────────────
+
+const glidLogoStyle: CSSProperties = {
+    fontSize: 16, fontWeight: 800, letterSpacing: -0.5,
+    background: 'linear-gradient(135deg, #ff6b6b, #ee5a9f, #8b5cf6)',
+    WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+    lineHeight: 1,
+};
+
+const glidLogoLargeStyle: CSSProperties = {
+    fontSize: 36, fontWeight: 900, letterSpacing: -1.5,
+    background: 'linear-gradient(135deg, #ff6b6b, #ee5a9f, #8b5cf6)',
+    WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+    lineHeight: 1,
 };
