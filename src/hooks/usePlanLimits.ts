@@ -27,7 +27,9 @@ function getCurrentMonth(): string {
 
 export function usePlanLimits() {
     const user = useAuthStore(s => s.user);
-    const plan: PlanTier = (user?.plan as PlanTier) ?? 'starter';
+    const role = useAuthStore(s => s.role);
+    // ★ Admin override: admins get full enterprise access regardless of subscription
+    const plan: PlanTier = role === 'admin' ? 'enterprise' : ((user?.plan as PlanTier) ?? 'starter');
     const limits = PLAN_LIMITS[plan];
 
     const [usage, setUsage] = useState<UsageData>({
