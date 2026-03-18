@@ -13,6 +13,10 @@ import { IcFolder } from '@/components/ui/Icons';
 import { APP_VERSION } from '@/version';
 import { usePlanLimits } from '@/hooks/usePlanLimits';
 import { UpgradeModal, type UpgradeReason } from '@/components/billing/UpgradeModal';
+import { DashboardTemplateGallery } from '@/components/dashboard/DashboardTemplateGallery';
+import { BrandCloudSection } from '@/components/dashboard/BrandCloudSection';
+
+type DashboardTab = 'projects' | 'templates' | 'brand-cloud';
 
 function getGreeting(): string {
     const h = new Date().getHours();
@@ -24,6 +28,7 @@ function getGreeting(): string {
 export function DashboardPage() {
     const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('');
+    const [activeTab, setActiveTab] = useState<DashboardTab>('projects');
 
     // Auth store — dynamic user name
     const displayName = useAuthStore((s) => s.user?.displayName ?? '');
@@ -249,6 +254,50 @@ export function DashboardPage() {
                     </button>
                 </div>
 
+                {/* ── Tab Navigation ── */}
+                <div style={{
+                    display: 'flex', gap: 4, padding: '0 24px', marginBottom: 16,
+                }}>
+                    {(['projects', 'templates', 'brand-cloud'] as DashboardTab[]).map(tab => (
+                        <button
+                            key={tab}
+                            onClick={() => setActiveTab(tab)}
+                            style={{
+                                padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                                cursor: 'pointer', transition: 'all 0.15s', border: 'none',
+                                background: activeTab === tab ? 'rgba(129,140,248,0.12)' : 'transparent',
+                                color: activeTab === tab ? '#818cf8' : '#64748b',
+                            }}
+                        >
+                            {tab === 'projects' ? 'Projects' : tab === 'templates' ? 'Templates' : 'Brand Cloud'}
+                        </button>
+                    ))}
+                </div>
+
+                {/* ── Tab Content ── */}
+                {activeTab === 'templates' && <DashboardTemplateGallery />}
+                {activeTab === 'brand-cloud' && (
+                    limits.brandCloudEnabled || isAdmin ? (
+                        <BrandCloudSection />
+                    ) : (
+                        <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+                            <p style={{ color: '#94a3b8', fontSize: 14, marginBottom: 16 }}>
+                                Brand Cloud is available on Pro and Enterprise plans
+                            </p>
+                            <button
+                                onClick={() => navigate('/pricing')}
+                                style={{
+                                    padding: '8px 24px', borderRadius: 8, border: 'none', fontSize: 13, fontWeight: 600,
+                                    cursor: 'pointer', background: 'linear-gradient(135deg, #818cf8, #6366f1)', color: '#fff',
+                                }}
+                            >
+                                Upgrade to Pro
+                            </button>
+                        </div>
+                    )
+                )}
+                {activeTab === 'projects' && (
+                    <>
                 {/* Search */}
                 <div className="dashboard-search-bar">
                     <svg className="dashboard-search-bar__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -313,6 +362,8 @@ export function DashboardPage() {
                         )}
                     </div>
                 </div>
+                    </>
+                )}
 
                 {/* Version Footer */}
                 <footer className="dashboard-footer">
