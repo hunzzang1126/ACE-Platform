@@ -77,16 +77,3 @@ export function EditorTopBar({ setName, variantLabel, canvasWidth = 300, canvasH
         </header>
     );
 }
-
-const dropdownStyle: React.CSSProperties = {
-    position: 'absolute', top: '100%', right: 0, marginTop: 4,
-    background: 'rgba(22, 27, 38, 0.98)', border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 10, padding: 4, minWidth: 180, zIndex: 100,
-    boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-};
-
-const dropdownItem: React.CSSProperties = {
-    display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-    padding: '8px 12px', background: 'none', border: 'none',
-    color: '#c9d1d9', fontSize: 13, cursor: 'pointer', borderRadius: 6, textAlign: 'left',
-};

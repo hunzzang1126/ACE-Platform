@@ -351,9 +351,11 @@ export function DetailEditorPage() {
                         alignItems: 'center',
                         gap: 6,
                         padding: '6px 16px',
-                        borderRadius: 6,
+                        borderRadius: 8,
                         border: 'none',
-                        background: saveStatus === 'saved' ? '#238636' : '#1f6feb',
+                        background: saveStatus === 'saved'
+                            ? 'var(--success)'
+                            : 'var(--accent-gradient)',
                         color: '#fff',
                         fontSize: 13,
                         fontWeight: 600,
