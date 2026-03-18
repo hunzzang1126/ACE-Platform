@@ -204,7 +204,7 @@ export function fabricToEngineNode(obj: FabricObject): EngineNode {
 }
 
 // ── Custom properties to include in serialization ──
-export const GLID_CUSTOM_PROPS = ['__glidId', '__glidZIndex', '__glidArtboard', '__glidName', '__glidGradientStart', '__glidGradientEnd', '__glidGradientAngle'];
+export const GLID_CUSTOM_PROPS = ['__glidId', '__glidZIndex', '__glidArtboard', '__glidName', '__glidGradientStart', '__glidGradientEnd', '__glidGradientAngle', '__glidCustomStyles'];
 
 // Patch a Fabric object to include Glid custom props in toObject()
 export function patchAceProps(obj: FabricObject): void {
@@ -218,6 +218,7 @@ export function patchAceProps(obj: FabricObject): void {
         if ((this as any).__glidGradientStart) data.__glidGradientStart = (this as any).__glidGradientStart;
         if ((this as any).__glidGradientEnd) data.__glidGradientEnd = (this as any).__glidGradientEnd;
         if ((this as any).__glidGradientAngle != null) data.__glidGradientAngle = (this as any).__glidGradientAngle;
+        if ((this as any).__glidCustomStyles) data.__glidCustomStyles = (this as any).__glidCustomStyles;
         return data;
     };
 }

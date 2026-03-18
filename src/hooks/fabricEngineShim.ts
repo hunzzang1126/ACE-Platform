@@ -225,19 +225,19 @@ export function createEngineShim(
                             ? atob(src.split(',')[1] ?? '') || decodeURIComponent(src.split(',')[1] ?? '')
                             : '';
                         const vbMatch = svgText.match(/viewBox=["']([^"']+)["']/);
-                        if (vbMatch) {
+                        if (vbMatch && vbMatch[1]) {
                             const parts = vbMatch[1].trim().split(/[,\s]+/).map(Number);
-                            if (parts.length >= 4 && parts[2] > 0 && parts[3] > 0) {
-                                resolvedNatW = resolvedNatW > 0 ? resolvedNatW : parts[2];
-                                resolvedNatH = resolvedNatH > 0 ? resolvedNatH : parts[3];
+                            if (parts.length >= 4 && (parts[2] ?? 0) > 0 && (parts[3] ?? 0) > 0) {
+                                resolvedNatW = resolvedNatW > 0 ? resolvedNatW : (parts[2] ?? 0);
+                                resolvedNatH = resolvedNatH > 0 ? resolvedNatH : (parts[3] ?? 0);
                                 console.log(`[EngineShim] SVG viewBox dimensions: ${resolvedNatW}x${resolvedNatH}`);
                             }
                         }
                         // Also check explicit width/height attributes
                         const wMatch = svgText.match(/\bwidth=["'](\d+(?:\.\d+)?)/);
                         const hMatch = svgText.match(/\bheight=["'](\d+(?:\.\d+)?)/);
-                        if (wMatch && resolvedNatW === 0) resolvedNatW = parseFloat(wMatch[1]);
-                        if (hMatch && resolvedNatH === 0) resolvedNatH = parseFloat(hMatch[1]);
+                        if (wMatch && wMatch[1] && resolvedNatW === 0) resolvedNatW = parseFloat(wMatch[1]);
+                        if (hMatch && hMatch[1] && resolvedNatH === 0) resolvedNatH = parseFloat(hMatch[1]);
                     } catch {
                         // SVG parse failed — use default fallback
                     }
@@ -311,6 +311,29 @@ export function createEngineShim(
             objs.forEach((o, i) => fc.moveObjectTo(o, i + 1)); // +1: artboard at 0
             fc.renderAll();
             syncState();
+        },
+
+        // ★ Set custom CSS styles on Fabric objects matching a name pattern.
+        // Stores as __glidCustomStyles for persistence through save/load cycle.
+        setCustomStyles: (elementName: string, styles: Record<string, string>) => {
+            const nameLower = elementName.toLowerCase();
+            for (const obj of userObjects()) {
+                const objName = ((obj as any).__glidName ?? '').toLowerCase();
+                if (objName.includes(nameLower)) {
+                    const existing = (obj as any).__glidCustomStyles || {};
+                    (obj as any).__glidCustomStyles = { ...existing, ...styles };
+                }
+            }
+            fc.renderAll();
+        },
+
+        // ★ Sync __glidZIndex from actual Fabric stack order.
+        // MUST be called before save to ensure z-order is preserved correctly.
+        syncZIndexFromStack: () => {
+            const objs = userObjects();
+            objs.forEach((o, i) => {
+                (o as any).__glidZIndex = i;
+            });
         },
 
         // ── Grouping ─────────────────────────────────────

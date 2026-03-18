@@ -480,6 +480,9 @@ export function executeDesignTool(
                 return { success: false, message: 'element_name and styles object are required.' };
             }
 
+            // ★ Write to BOTH Zustand store AND Fabric objects for persistence
+            // Note: customStyles on DesignElements will be preserved by useCanvasSync
+            // save pipeline which merges customStyles back after reading from engine.
             let updated = 0;
             for (const variant of cs.variants) {
                 for (const el of variant.elements) {

@@ -64,6 +64,13 @@ export function useCanvasSync(
 
         // Convert engine nodes → DesignElements using proven legacy pipeline
         try {
+            // ★ FIX: Sync z-index from actual Fabric stack order BEFORE reading.
+            // Without this, __glidZIndex values from creation time are saved,
+            // not the current stack position (which may have changed via reorder).
+            if (typeof engine.syncZIndexFromStack === 'function') {
+                engine.syncZIndexFromStack();
+            }
+
             const raw = engine.get_all_nodes();
             const nodes: EngineNode[] = JSON.parse(raw);
             for (const node of nodes) {
@@ -86,6 +93,32 @@ export function useCanvasSync(
 
         // Sort by zIndex
         elements.sort((a, b) => a.zIndex - b.zIndex);
+
+        // ★ FIX: Preserve customStyles from existing store elements.
+        // set_custom_style writes to DesignElements in Zustand store,
+        // but the save pipeline reads from Fabric canvas which doesn't store CSS.
+        // Merge customStyles back by matching element name or id.
+        const existingVariant = cs.variants.find(v => v.id === variantId);
+        if (existingVariant) {
+            const stylesByName = new Map<string, Record<string, string>>();
+            const stylesById = new Map<string, Record<string, string>>();
+            for (const el of existingVariant.elements) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const cs = (el as any).customStyles;
+                if (cs && Object.keys(cs).length > 0) {
+                    if (el.name) stylesByName.set(el.name, cs);
+                    stylesById.set(el.id, cs);
+                }
+            }
+            for (const el of elements) {
+                const existing = (el.name ? stylesByName.get(el.name) : undefined)
+                    || stylesById.get(el.id);
+                if (existing) {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    (el as any).customStyles = existing;
+                }
+            }
+        }
 
         // ★★ CRITICAL: Restore idb:// refs for image elements.
         // The engine holds runtime blob: URLs (created by resolveAsset during restore).
