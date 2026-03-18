@@ -43,6 +43,14 @@ async function renderVariantToCanvas(variant: BannerVariant): Promise<string> {
         ctx.save();
         ctx.globalAlpha = el.opacity ?? 1;
 
+        // ★ Apply shadow/glow effect to Canvas2D context
+        if (el.shadow) {
+            ctx.shadowOffsetX = el.shadow.offsetX;
+            ctx.shadowOffsetY = el.shadow.offsetY;
+            ctx.shadowBlur = el.shadow.blur;
+            ctx.shadowColor = el.shadow.color;
+        }
+
         if (el.type === 'image' && el.src) {
             // ★ Fetch image as blob to avoid CORS tainting
             try {
@@ -670,6 +678,15 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                                                 return base;
                                             })() : {};
 
+                                            // ★ Shadow effect: convert BaseElement.shadow → CSS shadow
+                                            const shadowStyle: React.CSSProperties = (() => {
+                                                if (!el.shadow) return {};
+                                                const { offsetX, offsetY, blur, color } = el.shadow;
+                                                const shadowVal = `${offsetX}px ${offsetY}px ${blur}px ${color}`;
+                                                if (el.type === 'text') return { textShadow: shadowVal };
+                                                return { boxShadow: shadowVal };
+                                            })();
+
                                             return (
                                                 <div
                                                     key={el.id}
@@ -685,6 +702,7 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                                                         transition: isPlaying ? 'none' : undefined,
                                                         ...animStyle,
                                                         ...shapeStyle,
+                                                        ...shadowStyle,
                                                         ...(el.type === 'text' ? { color: el.color, fontSize: el.fontSize, fontFamily: el.fontFamily, fontWeight: el.fontWeight, fontStyle: el.fontStyle ?? 'normal', display: 'flex', alignItems: 'flex-start', justifyContent: el.textAlign === 'center' ? 'center' : el.textAlign === 'right' ? 'flex-end' : 'flex-start', overflow: 'visible', whiteSpace: 'normal' as const, wordBreak: 'break-word' as const, lineHeight: el.lineHeight ?? 1.2, letterSpacing: el.letterSpacing ? `${el.letterSpacing}px` : undefined, textAlign: el.textAlign as 'left' | 'center' | 'right' } : {}),
                                                         ...(el.type === 'button' ? { backgroundColor: el.backgroundColor, borderRadius: el.borderRadius ?? 0, color: el.color, fontSize: el.fontSize, fontFamily: el.fontFamily, fontWeight: el.fontWeight, display: 'flex', alignItems: 'center', justifyContent: 'center' } : {}),
                                                         ...(el.type === 'image' ? { overflow: 'hidden' } : {}),

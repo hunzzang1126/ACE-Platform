@@ -160,25 +160,51 @@ BEHAVIOR:
 - You have FULL AUTONOMY — no design pipeline needed
 - If user asks about design, suggest navigating to canvas editor`;
 
-        case 'canvas-editor':
+        case 'canvas-editor': {
+            // Build existing element summary for AI context
+            const designState = useDesignStore.getState();
+            const cs = designState.creativeSet;
+            const masterV = cs?.variants?.find(v => v.id === cs.masterVariantId);
+            const elementSummary = masterV?.elements?.length
+                ? masterV.elements.map(el => {
+                    const content = (el as any).content || (el as any).label || '';
+                    return `  - "${el.name}" (${el.type})${content ? `: "${content.slice(0, 40)}"` : ''}`;
+                }).join('\n')
+                : '  (empty canvas)';
+
+            const hasElements = (masterV?.elements?.length ?? 0) > 0;
+
             return `${base}
 
 CURRENT CONTEXT: Canvas Editor — Project: "${ctx.projectName}"
 ${ctx.canvasSize ? `Canvas: ${ctx.canvasSize.w}x${ctx.canvasSize.h}px` : ''}
 ${ctx.elementCount} element(s) on canvas.
 
+EXISTING ELEMENTS:
+${elementSummary}
+
 AVAILABLE ACTIONS:
-- Generate full designs (triggers structured design pipeline)
-- Add individual elements (text, shapes, buttons)
-- Modify element properties (color, font, position)
-- Apply animations
-- Execute custom styling
+- generate_full_design: Generate a COMPLETE design from scratch (clears existing elements!)
+- add_text: Add a text element to the existing design
+- add_shape: Add a shape element to the existing design
+- add_button: Add a CTA button to the existing design
+- update_element_text: Change text content of an existing element
+- update_element_property: Modify a property (color, fontSize, fontWeight, opacity, etc.)
+- set_animation: Apply animation presets to elements
+- set_custom_style: Apply CSS effects (glow, shadow, etc.)
+- list_elements: List all elements on canvas
+
+CRITICAL ROUTING RULES:
+${hasElements ? `- The canvas ALREADY HAS ${ctx.elementCount} elements. DO NOT use generate_full_design unless the user EXPLICITLY asks to "redesign", "start over", or "create from scratch".
+- For follow-up requests like "add a button", "change the color", "make text bigger": use individual tools (add_button, update_element_property, etc.)
+- NEVER clear/destroy existing elements when the user asks for a modification or addition.
+- Always use list_elements first if you're unsure what's already on the canvas.` : `- The canvas is empty. For design requests, use generate_full_design.`}
 
 BEHAVIOR:
-- For "design" or "create" requests → use generate_full_design tool
-- For specific edits → use individual tools (add_text, update_element_property)
 - Be creative and professional in design suggestions
-- Always explain design decisions briefly`;
+- Always explain design decisions briefly
+- When modifying, reference existing element names from the list above`;
+        }
     }
 }
 
