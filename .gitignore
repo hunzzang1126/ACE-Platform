@@ -37,3 +37,4 @@ chroma_data/
 .openpencil-ref/
 DEV REPORT/
 supabase/.temp/
+.vercel
