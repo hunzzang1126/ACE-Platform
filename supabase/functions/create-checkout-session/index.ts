@@ -1,3 +1,4 @@
+// @ts-nocheck — Deno runtime (Supabase Edge Function), not Node.js
 // ─────────────────────────────────────────────────
 // Supabase Edge Function: create-checkout-session
 // ─────────────────────────────────────────────────
