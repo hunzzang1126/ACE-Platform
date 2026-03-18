@@ -56,6 +56,7 @@ function makeSpec(overrides?: Partial<LayoutSpec>): LayoutSpec {
         alignment: 'center',
         headlineZone: { xPct: 0.08, yPct: 0.2, wPct: 0.84, hPct: 0.3 },
         ctaZone: { xPct: 0.25, yPct: 0.78, wPct: 0.5, hPct: 0.12 },
+        hasCTA: true,
         headlineFontSize: 28,
         subheadlineFontSize: 12,
         accentStrategy: 'none',
@@ -111,6 +112,15 @@ describe('aiLayoutEngine — buildLayoutFromSpec', () => {
             const elements = buildLayoutFromSpec(makeSpec(), DEFAULT_CONTENT, DEFAULT_PALETTE, W, H);
             const ctaLabel = elements.find(e => e.name === 'cta_label');
             expect(ctaLabel?.content).toBe('LEARN MORE');
+        });
+
+        // ★ REGRESSION: CTA is now conditional based on hasCTA flag
+        it('omits CTA when hasCTA is false', () => {
+            const spec = makeSpec({ hasCTA: false });
+            const elements = buildLayoutFromSpec(spec, DEFAULT_CONTENT, DEFAULT_PALETTE, W, H);
+            const names = elements.map(e => e.name);
+            expect(names).not.toContain('cta_button');
+            expect(names).not.toContain('cta_label');
         });
     });
 

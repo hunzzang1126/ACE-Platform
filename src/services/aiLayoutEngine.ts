@@ -242,7 +242,8 @@ export function buildLayoutFromSpec(
     });
     } // end subheadline if-block
 
-    // ── 6. CTA Button ──
+    // ── 6. CTA Button (only for commercial/ad designs) ──
+    if (spec.hasCTA) {
     const ctaW = Math.round(canvasW * spec.ctaZone.wPct);
     let ctaX = Math.round(canvasW * spec.ctaZone.xPct);
     // ★ CENTER OVERRIDE: center CTA on canvas
@@ -278,6 +279,7 @@ export function buildLayoutFromSpec(
         text_align: 'center',
         letter_spacing: 1,
     });
+    } // end CTA if-block
 
     return elements;
 }

@@ -48,6 +48,8 @@ export interface LayoutSpec {
     headlineZone: { xPct: number; yPct: number; wPct: number; hPct: number };
     /** CTA zone (% of canvas) */
     ctaZone: { xPct: number; yPct: number; wPct: number; hPct: number };
+    /** Whether to include a CTA button. Only for commercial/ad designs. */
+    hasCTA: boolean;
     /** Recommended headline font size (px) — calculated from content length */
     headlineFontSize: number;
     /** Recommended subheadline font size (px) */
@@ -189,17 +191,22 @@ export function generateLayoutSpecSync(
     const headlineZone = getHeadlineZone(layoutType, ratio);
     const ctaZone = getCtaZone(layoutType, ratio);
 
+    // ★ CTA is only for commercial/advertising moods
+    const commercialMoods = new Set(['promotional', 'energetic']);
+    const hasCTA = commercialMoods.has(mood);
+
     return {
         layoutType,
         alignment,
         headlineZone,
         ctaZone,
+        hasCTA,
         headlineFontSize: headlineFs,
         subheadlineFontSize: subheadlineFs,
         accentStrategy,
         spacing,
         mood,
-        reasoning: `${layoutType} layout (${ratio} canvas, ${headlineLen}-char headline, ${mood} mood)`,
+        reasoning: `${layoutType} layout (${ratio} canvas, ${headlineLen}-char headline, ${mood} mood${hasCTA ? '' : ', no CTA'})`,
     };
 }
 
@@ -352,6 +359,7 @@ Return JSON:
             alignment: parsed.alignment || 'center',
             headlineZone: getHeadlineZone(parsed.layoutType || 'centered-stack', ratio),
             ctaZone: getCtaZone(parsed.layoutType || 'centered-stack', ratio),
+            hasCTA: (parsed as any).hasCTA ?? new Set(['promotional', 'energetic']).has(parsed.mood || ''),
             headlineFontSize: headlineFs,
             subheadlineFontSize: subheadlineFs,
             accentStrategy: sanitizedAccent as AccentStrategy,
