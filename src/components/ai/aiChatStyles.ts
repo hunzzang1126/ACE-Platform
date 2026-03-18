@@ -1,103 +1,30 @@
 // ─────────────────────────────────────────────────
-// AI Chat Panel — Styles
+// AI Chat Styles — Premium gradient + glow design
+// ─────────────────────────────────────────────────
+// All styles use CSS custom properties for theme compat.
 // ─────────────────────────────────────────────────
 
 import type { CSSProperties } from 'react';
 
-export const panelStyle: CSSProperties = {
-    display: 'flex', flexDirection: 'column',
-    height: '100%', width: '100%',
-    background: '#f0f2f5',
-    borderLeft: '1px solid rgba(255,255,255,0.06)',
-    fontFamily: 'Inter, system-ui, sans-serif',
-    color: '#e6edf3',
-};
+// ── No longer exporting panelStyle etc as inline objects.
+// We use CSS classes in ai-chat.css instead.
+// These remain for backward compat — components that haven't migrated yet.
 
-export const headerStyle: CSSProperties = {
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    padding: '10px 14px',
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
-    background: 'rgba(255,255,255,0.02)',
-};
-
-export const iconBtnStyle: CSSProperties = {
-    background: 'none', border: 'none', cursor: 'pointer',
-    fontSize: 16, padding: 4,
-};
-
-export const settingsStyle: CSSProperties = {
-    padding: '12px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)',
-    background: 'rgba(255,255,255,0.02)', display: 'flex', flexDirection: 'column', gap: 8,
-};
-
-export const labelStyle: CSSProperties = {
-    fontSize: 11, color: '#8b949e', display: 'flex', flexDirection: 'column', gap: 3,
-};
-
-export const settingsInputStyle: CSSProperties = {
-    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 6, padding: '5px 8px', color: '#e6edf3', fontSize: 12,
-    fontFamily: 'monospace', outline: 'none',
-};
-
-export const saveBtnStyle: CSSProperties = {
-    background: 'rgba(74,158,255,0.15)', border: '1px solid rgba(74,158,255,0.3)',
-    borderRadius: 6, padding: '5px 12px', color: '#4a9eff', fontSize: 12,
-    cursor: 'pointer', alignSelf: 'flex-end',
-};
-
-export const messagesStyle: CSSProperties = {
-    flex: 1, overflowY: 'auto', padding: '12px',
-    display: 'flex', flexDirection: 'column', gap: 8,
-};
-
-export const bubbleBase: CSSProperties = {
-    padding: '10px 14px', borderRadius: 10,
-    border: '1px solid rgba(255,255,255,0.06)',
-};
-
-export const progressCardStyle: CSSProperties = {
-    background: 'rgba(255,255,255,0.02)',
-    border: '1px solid rgba(255,255,255,0.06)',
-    borderRadius: 10,
-    alignSelf: 'flex-start',
-    width: '100%',
-    overflow: 'hidden',
-};
-
-export const progressHeaderStyle: CSSProperties = {
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    padding: '8px 14px',
-    borderBottom: '1px solid rgba(255,255,255,0.04)',
-};
-
-export const generatingStyle: CSSProperties = {
-    display: 'flex', alignItems: 'center', gap: 8,
-    padding: '10px 14px',
-    borderTop: '1px solid rgba(255,255,255,0.04)',
-    fontSize: 12, color: '#8b949e',
-    fontStyle: 'italic',
-};
-
-export const inputContainerStyle: CSSProperties = {
-    display: 'flex', gap: 6, padding: '10px 12px',
-    borderTop: '1px solid rgba(255,255,255,0.06)',
-    background: 'rgba(255,255,255,0.02)',
-};
-
-export const inputFieldStyle: CSSProperties = {
-    flex: 1, background: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8,
-    padding: '8px 12px', color: '#e6edf3', fontSize: 13,
-    fontFamily: 'inherit', outline: 'none',
-};
-
-export const sendBtnStyle: CSSProperties = {
-    width: 34, height: 34, borderRadius: 8,
-    background: 'rgba(74,158,255,0.2)', border: '1px solid rgba(74,158,255,0.3)',
-    color: '#4a9eff', fontSize: 18, cursor: 'pointer',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-};
+export const panelStyle: CSSProperties = {};
+export const headerStyle: CSSProperties = {};
+export const iconBtnStyle: CSSProperties = {};
+export const settingsStyle: CSSProperties = {};
+export const labelStyle: CSSProperties = {};
+export const settingsInputStyle: CSSProperties = {};
+export const saveBtnStyle: CSSProperties = {};
+export const messagesStyle: CSSProperties = {};
+export const bubbleBase: CSSProperties = {};
+export const progressCardStyle: CSSProperties = {};
+export const progressHeaderStyle: CSSProperties = {};
+export const generatingStyle: CSSProperties = {};
+export const inputContainerStyle: CSSProperties = {};
+export const inputFieldStyle: CSSProperties = {};
+export const sendBtnStyle: CSSProperties = {};
 
 // ── Natural language labels for tool names ──────
 export const TOOL_LABELS: Record<string, string> = {
@@ -137,4 +64,5 @@ export const TOOL_LABELS: Record<string, string> = {
     create_layout: 'Creating a layout',
     animate_all: 'Animating all elements',
     analyze_scene: 'Analyzing current scene',
+    generate_full_design: 'Generating full design',
 };
