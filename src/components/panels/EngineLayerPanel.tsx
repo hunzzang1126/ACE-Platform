@@ -97,7 +97,7 @@ export function EngineLayerPanel({ nodes, selection, actions }: Props) {
                     );
                 })}
                 {nodes.length === 0 && (
-                    <div style={{ color: '#484f58', fontSize: 11, padding: '12px 8px', textAlign: 'center' }}>
+                    <div style={{ color: '#94a3b8', fontSize: 11, padding: '12px 8px', textAlign: 'center' }}>
                         No elements yet. Click the canvas with a shape tool or press R/E to add.
                     </div>
                 )}
@@ -138,7 +138,7 @@ const typeIconStyle: React.CSSProperties = {
 };
 
 const deleteBtnStyle: React.CSSProperties = {
-    background: 'none', border: 'none', color: '#484f58',
+    background: 'none', border: 'none', color: '#94a3b8',
     cursor: 'pointer', padding: '2px', display: 'flex',
     opacity: 0.6,
 };

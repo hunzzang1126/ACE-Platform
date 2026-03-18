@@ -224,7 +224,7 @@ export default function ExportTestPage() {
         <div style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center',
             justifyContent: 'center', minHeight: '100vh',
-            background: '#0d1117', fontFamily: 'Inter, system-ui, sans-serif', color: '#e6edf3',
+            background: '#f0f2f5', fontFamily: 'Inter, system-ui, sans-serif', color: '#e6edf3',
         }}>
             <h1 style={{ fontSize: 22, fontWeight: 600, marginBottom: 12, letterSpacing: -0.5 }}>
                 Glid Engine — Video & Export
@@ -344,7 +344,7 @@ function Btn({ onClick, label, accent, disabled }: {
                 background: accent ? 'rgba(74,158,255,0.15)' : 'rgba(255,255,255,0.04)',
                 border: `1px solid ${accent ? 'rgba(74,158,255,0.3)' : 'rgba(255,255,255,0.08)'}`,
                 borderRadius: 6, padding: '6px 14px',
-                color: disabled ? '#484f58' : accent ? '#4a9eff' : '#8b949e',
+                color: disabled ? '#94a3b8' : accent ? '#4a9eff' : '#8b949e',
                 cursor: disabled ? 'default' : 'pointer', fontSize: 13, fontFamily: 'inherit',
                 transition: 'all 0.15s', opacity: disabled ? 0.6 : 1,
             }}

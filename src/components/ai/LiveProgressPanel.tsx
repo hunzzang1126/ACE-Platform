@@ -168,7 +168,7 @@ function ProgressEntry({ index, entry }: {
                 }}
             >
                 <span style={{
-                    fontSize: 13, fontWeight: 600, color: '#484f58',
+                    fontSize: 13, fontWeight: 600, color: '#94a3b8',
                     minWidth: 16, textAlign: 'right', lineHeight: '20px',
                     flexShrink: 0,
                 }}>
@@ -185,7 +185,7 @@ function ProgressEntry({ index, entry }: {
                 <svg
                     width={12} height={12} viewBox="0 0 12 12"
                     style={{
-                        marginTop: 4, flexShrink: 0, color: '#484f58',
+                        marginTop: 4, flexShrink: 0, color: '#94a3b8',
                         transform: expanded ? 'rotate(0deg)' : 'rotate(-90deg)',
                         transition: 'transform 0.15s ease',
                     }}

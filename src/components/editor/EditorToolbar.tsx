@@ -123,7 +123,7 @@ export function EditorToolbar({ actions, onTriggerImageUpload, onTriggerVideoUpl
                 className="ed-tool-btn"
                 onClick={handleAddRect}
                 title="Quick Add Rectangle (R)"
-                style={{ color: actions ? '#8b949e' : '#484f58' }}
+                style={{ color: actions ? '#8b949e' : '#94a3b8' }}
             >
                 <span className="ed-tool-icon">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -137,7 +137,7 @@ export function EditorToolbar({ actions, onTriggerImageUpload, onTriggerVideoUpl
                 className="ed-tool-btn"
                 onClick={handleAddEllipse}
                 title="Quick Add Ellipse (E)"
-                style={{ color: actions ? '#8b949e' : '#484f58' }}
+                style={{ color: actions ? '#8b949e' : '#94a3b8' }}
             >
                 <span className="ed-tool-icon">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -173,7 +173,7 @@ export function EditorToolbar({ actions, onTriggerImageUpload, onTriggerVideoUpl
                         top: 0,
                         width: 320,
                         maxHeight: 480,
-                        background: 'var(--bg-elevated, #1a1f2e)',
+                        background: 'var(--bg-elevated, #ffffff)',
                         border: '1px solid rgba(255,255,255,0.1)',
                         borderRadius: 10,
                         boxShadow: '0 12px 40px rgba(0,0,0,0.5)',

@@ -188,8 +188,8 @@ const styles: Record<string, React.CSSProperties> = {
         backdropFilter: 'blur(4px)',
     },
     card: {
-        width: 380, background: '#1a1f2e', borderRadius: 12,
-        border: '1px solid #2a2f3e', padding: 24,
+        width: 380, background: '#ffffff', borderRadius: 12,
+        border: '1px solid #e2e8f0', padding: 24,
         display: 'flex', flexDirection: 'column', gap: 16,
         boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
         fontFamily: 'Inter, system-ui, sans-serif',
@@ -202,7 +202,7 @@ const styles: Record<string, React.CSSProperties> = {
     },
     form: { display: 'flex', flexDirection: 'column', gap: 10 },
     input: {
-        padding: '10px 14px', background: '#0f1218', border: '1px solid #2a2f3e',
+        padding: '10px 14px', background: '#f5f5f7', border: '1px solid #e2e8f0',
         borderRadius: 6, color: '#e0e0e0', fontSize: 13, outline: 'none',
         transition: 'border-color 0.15s',
     },
@@ -223,7 +223,7 @@ const styles: Record<string, React.CSSProperties> = {
         padding: '0 4px',
     },
     googleBtn: {
-        padding: '10px 0', background: '#ffffff10', border: '1px solid #2a2f3e',
+        padding: '10px 0', background: '#ffffff10', border: '1px solid #e2e8f0',
         borderRadius: 6, color: '#ccc', fontSize: 12, fontWeight: 500, cursor: 'pointer',
         transition: 'all 0.15s',
     },

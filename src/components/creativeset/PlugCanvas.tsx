@@ -296,8 +296,8 @@ export function PlugCanvas({ variants, cardRefs, containerRef }: PlugCanvasProps
                                 return (
                                     <g style={{ pointerEvents: 'auto' }}>
                                         {/* Unconnected: dashed dark socket */}
-                                        <circle cx={tPort.x} cy={tPort.y} r={14} fill="#0d1520" stroke="#484f58" strokeWidth={2.5} strokeDasharray="5 3" filter="url(#plug-shadow)" />
-                                        <circle cx={tPort.x} cy={tPort.y} r={4} fill="#484f58" opacity={0.4} />
+                                        <circle cx={tPort.x} cy={tPort.y} r={14} fill="#0d1520" stroke="#94a3b8" strokeWidth={2.5} strokeDasharray="5 3" filter="url(#plug-shadow)" />
+                                        <circle cx={tPort.x} cy={tPort.y} r={4} fill="#94a3b8" opacity={0.4} />
                                     </g>
                                 );
                             })()}

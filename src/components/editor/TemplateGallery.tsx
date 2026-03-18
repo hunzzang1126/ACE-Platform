@@ -128,7 +128,7 @@ export function TemplateGallery({ onApply, onClose }: Props) {
 
 const styles: Record<string, React.CSSProperties> = {
     root: {
-        width: 320, background: '#1a1f2e', borderLeft: '1px solid #2a2f3e',
+        width: 320, background: '#ffffff', borderLeft: '1px solid #e2e8f0',
         display: 'flex', flexDirection: 'column', gap: 8, color: '#e0e0e0',
         fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12,
         height: '100%', overflow: 'hidden',
@@ -143,15 +143,15 @@ const styles: Record<string, React.CSSProperties> = {
         padding: '2px 6px',
     },
     search: {
-        margin: '0 14px', padding: '6px 10px', background: '#0f1218',
-        border: '1px solid #2a2f3e', borderRadius: 6, color: '#ccc',
+        margin: '0 14px', padding: '6px 10px', background: '#f5f5f7',
+        border: '1px solid #e2e8f0', borderRadius: 6, color: '#ccc',
         fontSize: 11, outline: 'none',
     },
     tabs: {
         display: 'flex', gap: 2, padding: '0 14px', flexWrap: 'wrap',
     },
     tab: {
-        padding: '4px 8px', background: 'transparent', border: '1px solid #2a2f3e',
+        padding: '4px 8px', background: 'transparent', border: '1px solid #e2e8f0',
         borderRadius: 4, color: '#888', cursor: 'pointer', fontSize: 9,
         transition: 'all 0.15s',
     },
@@ -167,11 +167,11 @@ const styles: Record<string, React.CSSProperties> = {
         lineHeight: 1.6,
     },
     card: {
-        background: '#0f1218', borderRadius: 6, border: '1px solid #2a2f3e',
+        background: '#f5f5f7', borderRadius: 6, border: '1px solid #e2e8f0',
         overflow: 'hidden', transition: 'border-color 0.15s',
     },
     thumb: {
-        width: '100%', height: 100, background: '#161b26',
+        width: '100%', height: 100, background: '#f5f5f7',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         overflow: 'hidden',
     },

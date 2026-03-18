@@ -221,7 +221,7 @@ export default function EngineTestPage() {
         <div style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center',
             justifyContent: 'center', minHeight: '100vh',
-            background: '#0d1117', fontFamily: 'Inter, system-ui, sans-serif', color: '#e6edf3',
+            background: '#f0f2f5', fontFamily: 'Inter, system-ui, sans-serif', color: '#e6edf3',
         }}>
             <h1 style={{ fontSize: 22, fontWeight: 600, marginBottom: 12, letterSpacing: -0.5 }}>
                 Glid Engine — Interactive Canvas
@@ -298,7 +298,7 @@ function ToolbarBtn({ onClick, disabled, label }: { onClick: () => void; disable
                 background: disabled ? 'transparent' : 'rgba(255,255,255,0.06)',
                 border: '1px solid rgba(255,255,255,0.08)',
                 borderRadius: 6, padding: '4px 10px',
-                color: disabled ? '#484f58' : '#e6edf3',
+                color: disabled ? '#94a3b8' : '#e6edf3',
                 cursor: disabled ? 'not-allowed' : 'pointer',
                 fontSize: 12, fontFamily: 'inherit',
                 transition: 'all 0.15s',

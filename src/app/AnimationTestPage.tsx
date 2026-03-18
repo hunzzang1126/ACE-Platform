@@ -163,7 +163,7 @@ export default function AnimationTestPage() {
         <div style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center',
             justifyContent: 'center', minHeight: '100vh',
-            background: '#0d1117', fontFamily: 'Inter, system-ui, sans-serif', color: '#e6edf3',
+            background: '#f0f2f5', fontFamily: 'Inter, system-ui, sans-serif', color: '#e6edf3',
         }}>
             <h1 style={{ fontSize: 22, fontWeight: 600, marginBottom: 12, letterSpacing: -0.5 }}>
                 Glid Engine — Animation

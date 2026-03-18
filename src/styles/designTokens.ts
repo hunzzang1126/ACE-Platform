@@ -2,7 +2,8 @@
 // Design Tokens — Centralized design system values
 // ─────────────────────────────────────────────────
 // All colors, spacing, typography, and animation tokens.
-// Single source of truth for the entire Glid UI.
+// Single source of truth for the entire ACE UI.
+// Vibrant Light Theme — Purple↔Cyan accent gradient
 // ─────────────────────────────────────────────────
 
 /**
@@ -10,61 +11,61 @@
  * Every component should reference these instead of hardcoding colors.
  */
 export const colors = {
-    // ── Theme ──
+    // ── Theme (Light) ──
     bg: {
-        primary: '#0d1117',
-        secondary: '#161b22',
-        tertiary: '#1c2128',
-        elevated: 'rgba(22, 27, 38, 0.95)',
-        overlay: 'rgba(0, 0, 0, 0.5)',
+        primary: '#f0f2f5',
+        secondary: '#ffffff',
+        tertiary: '#fafbfc',
+        elevated: '#ffffff',
+        overlay: 'rgba(0, 0, 0, 0.3)',
     },
     surface: {
-        default: 'rgba(255, 255, 255, 0.04)',
-        hover: 'rgba(255, 255, 255, 0.08)',
-        active: 'rgba(255, 255, 255, 0.12)',
-        selected: 'rgba(74, 158, 255, 0.12)',
+        default: 'rgba(0, 0, 0, 0.03)',
+        hover: '#f3f0ff',
+        active: '#ede9fe',
+        selected: 'rgba(124, 58, 237, 0.08)',
     },
     border: {
-        default: 'rgba(255, 255, 255, 0.06)',
-        subtle: 'rgba(255, 255, 255, 0.04)',
-        strong: 'rgba(255, 255, 255, 0.12)',
-        focus: '#4a9eff',
+        default: 'rgba(0, 0, 0, 0.08)',
+        subtle: 'rgba(0, 0, 0, 0.04)',
+        strong: 'rgba(0, 0, 0, 0.15)',
+        focus: '#7c3aed',
     },
     text: {
-        primary: '#e6edf3',
-        secondary: '#8b949e',
-        muted: '#484f58',
-        link: '#4a9eff',
-        inverse: '#0d1117',
+        primary: '#1a1a2e',
+        secondary: '#64748b',
+        muted: '#94a3b8',
+        link: '#7c3aed',
+        inverse: '#ffffff',
     },
     // ── Semantic ──
     accent: {
-        blue: '#1f6feb',
-        blueHover: '#388bfd',
-        blueSubtle: 'rgba(31, 111, 235, 0.12)',
+        blue: '#7c3aed',
+        blueHover: '#6d28d9',
+        blueSubtle: 'rgba(124, 58, 237, 0.08)',
     },
     success: {
-        default: '#238636',
-        subtle: 'rgba(35, 134, 54, 0.12)',
-        text: '#3fb950',
+        default: '#10b981',
+        subtle: 'rgba(16, 185, 129, 0.1)',
+        text: '#059669',
     },
     warning: {
-        default: '#d29922',
-        subtle: 'rgba(210, 153, 34, 0.12)',
-        text: '#e3b341',
+        default: '#f59e0b',
+        subtle: 'rgba(245, 158, 11, 0.1)',
+        text: '#d97706',
     },
     danger: {
-        default: '#da3633',
-        subtle: 'rgba(218, 54, 51, 0.12)',
-        text: '#f85149',
+        default: '#ef4444',
+        subtle: 'rgba(239, 68, 68, 0.1)',
+        text: '#dc2626',
     },
     // ── Canvas ──
     canvas: {
-        selection: '#4a9eff',
-        selectionFill: 'rgba(74, 158, 255, 0.1)',
-        guideEdge: '#ff6b9d',
-        guideCenter: '#67d5ff',
-        guideSpacing: '#ffa557',
+        selection: '#7c3aed',
+        selectionFill: 'rgba(124, 58, 237, 0.08)',
+        guideEdge: '#f43f5e',
+        guideCenter: '#06b6d4',
+        guideSpacing: '#f59e0b',
     },
 } as const;
 
@@ -129,15 +130,15 @@ export const radius = {
 } as const;
 
 /**
- * Shadow tokens.
+ * Shadow tokens (light context — softer).
  */
 export const shadows = {
-    sm: '0 1px 2px rgba(0, 0, 0, 0.3)',
-    md: '0 4px 12px rgba(0, 0, 0, 0.4)',
-    lg: '0 8px 32px rgba(0, 0, 0, 0.5)',
-    xl: '0 16px 64px rgba(0, 0, 0, 0.6)',
-    dropdown: '0 8px 32px rgba(0, 0, 0, 0.5)',
-    modal: '0 24px 80px rgba(0, 0, 0, 0.7)',
+    sm: '0 1px 3px rgba(0, 0, 0, 0.08)',
+    md: '0 4px 12px rgba(0, 0, 0, 0.1)',
+    lg: '0 8px 32px rgba(0, 0, 0, 0.12)',
+    xl: '0 16px 48px rgba(0, 0, 0, 0.15)',
+    dropdown: '0 8px 32px rgba(0, 0, 0, 0.12)',
+    modal: '0 24px 64px rgba(0, 0, 0, 0.18)',
 } as const;
 
 /**

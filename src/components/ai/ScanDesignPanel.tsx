@@ -166,7 +166,7 @@ export function ScanDesignPanel({ engine, canvasW, canvasH }: Props) {
             <div
                 style={{
                     ...s.dropZone,
-                    borderColor: isDragging ? '#388bfd' : '#21262d',
+                    borderColor: isDragging ? '#388bfd' : '#e2e8f0',
                     background: isDragging ? 'rgba(56,139,253,0.07)' : 'transparent',
                 }}
                 onDragEnter={(e) => { e.preventDefault(); setIsDragging(true); }}
@@ -209,7 +209,7 @@ export function ScanDesignPanel({ engine, canvasW, canvasH }: Props) {
                     <button
                         style={{
                             ...s.refBtn,
-                            background: showReference ? '#21262d' : 'transparent',
+                            background: showReference ? '#e2e8f0' : 'transparent',
                             color: showReference ? '#e6edf3' : '#6e7681',
                         }}
                         onClick={toggleReference}
@@ -250,7 +250,7 @@ function hexToRgb(hex: string): [number, number, number] {
 // ── Styles ──
 const s: Record<string, React.CSSProperties> = {
     panel: {
-        background: '#0d1117', border: '1px solid #21262d', borderRadius: 10,
+        background: '#f0f2f5', border: '1px solid #e2e8f0', borderRadius: 10,
         padding: '14px', display: 'flex', flexDirection: 'column', gap: 10,
         fontSize: 12, color: '#c9d1d9', fontFamily: 'Inter, system-ui, sans-serif',
     },
@@ -263,10 +263,10 @@ const s: Record<string, React.CSSProperties> = {
         cursor: 'pointer', transition: 'all 0.12s ease', userSelect: 'none',
         flexDirection: 'column', gap: 6,
     },
-    dropText: { fontSize: 11, color: '#484f58', textAlign: 'center' },
+    dropText: { fontSize: 11, color: '#94a3b8', textAlign: 'center' },
     previewWrapper: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 },
     previewImg: { maxHeight: 80, maxWidth: '100%', borderRadius: 4, objectFit: 'contain' },
-    previewHint: { fontSize: 10, color: '#484f58' },
+    previewHint: { fontSize: 10, color: '#94a3b8' },
     progressRow: {
         display: 'flex', alignItems: 'center', gap: 8,
         background: '#0d1f38', border: '1px solid #1f6feb', borderRadius: 6, padding: '7px 10px',
@@ -277,17 +277,17 @@ const s: Record<string, React.CSSProperties> = {
         borderRadius: 6, padding: '6px 10px', color: '#3fb950', fontSize: 11,
     },
     refBtn: {
-        border: '1px solid #30363d', borderRadius: 5, padding: '5px 10px',
+        border: '1px solid #e2e8f0', borderRadius: 5, padding: '5px 10px',
         fontSize: 11, cursor: 'pointer', transition: 'all 0.1s', width: '100%',
         textAlign: 'center',
     },
-    tipText: { fontSize: 10, color: '#484f58', lineHeight: 1.4 },
+    tipText: { fontSize: 10, color: '#94a3b8', lineHeight: 1.4 },
     errorBlock: {
         background: 'transparent', border: '1px solid #f85149',
         borderRadius: 6, padding: '6px 10px', color: '#f85149', fontSize: 11,
     },
     btn: {
-        background: '#21262d', color: '#e6edf3', border: '1px solid #30363d',
+        background: '#e2e8f0', color: '#e6edf3', border: '1px solid #e2e8f0',
         borderRadius: 6, padding: '8px 14px', fontSize: 12, fontWeight: 600,
         cursor: 'pointer', display: 'flex', alignItems: 'center',
         gap: 6, justifyContent: 'center', width: '100%',
@@ -298,5 +298,5 @@ const s: Record<string, React.CSSProperties> = {
         border: '1.5px solid rgba(120,192,255,0.2)', borderTopColor: '#79c0ff',
         animation: 'spin 0.7s linear infinite', display: 'inline-block',
     },
-    hint: { color: '#484f58', fontSize: 10, textAlign: 'center' },
+    hint: { color: '#94a3b8', fontSize: 10, textAlign: 'center' },
 };

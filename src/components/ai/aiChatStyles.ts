@@ -7,7 +7,7 @@ import type { CSSProperties } from 'react';
 export const panelStyle: CSSProperties = {
     display: 'flex', flexDirection: 'column',
     height: '100%', width: '100%',
-    background: '#0d1117',
+    background: '#f0f2f5',
     borderLeft: '1px solid rgba(255,255,255,0.06)',
     fontFamily: 'Inter, system-ui, sans-serif',
     color: '#e6edf3',

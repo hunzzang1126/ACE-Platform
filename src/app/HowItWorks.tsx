@@ -89,7 +89,7 @@ function StepVisual({ type }: { type: string }) {
                 <div className="hiw-visual-inner">
                     <svg viewBox="0 0 240 160" fill="none">
                         {/* Chat bubble */}
-                        <rect x="20" y="20" width="180" height="40" rx="12" fill="#1a1f2e" stroke="#6c5ce7" strokeWidth="1" opacity="0.8" />
+                        <rect x="20" y="20" width="180" height="40" rx="12" fill="#ffffff" stroke="#6c5ce7" strokeWidth="1" opacity="0.8" />
                         <text x="30" y="44" fill="#a29bfe" fontSize="10" fontWeight="500">"Create a Nike ad with bold typography"</text>
                         {/* Generated layout */}
                         <rect x="40" y="75" width="160" height="70" rx="6" fill="#111827" stroke="#2a3040" strokeWidth="1">
@@ -98,7 +98,7 @@ function StepVisual({ type }: { type: string }) {
                         <rect x="52" y="85" width="80" height="10" rx="2" fill="#6c5ce7" opacity="0.7">
                             <animate attributeName="width" values="0;80" dur="0.8s" begin="0.5s" fill="freeze" />
                         </rect>
-                        <rect x="52" y="100" width="120" height="6" rx="1.5" fill="#484f58" opacity="0.4">
+                        <rect x="52" y="100" width="120" height="6" rx="1.5" fill="#94a3b8" opacity="0.4">
                             <animate attributeName="width" values="0;120" dur="0.6s" begin="0.8s" fill="freeze" />
                         </rect>
                         <rect x="52" y="112" width="60" height="20" rx="10" fill="#00cec9" opacity="0.6">
@@ -114,8 +114,8 @@ function StepVisual({ type }: { type: string }) {
                         {/* Canvas with elements */}
                         <rect x="20" y="15" width="140" height="130" rx="6" fill="#0d1520" stroke="#2a3040" strokeWidth="1" />
                         <rect x="30" y="30" width="80" height="14" rx="2" fill="#6c5ce7" opacity="0.8" />
-                        <rect x="30" y="50" width="120" height="8" rx="1.5" fill="#484f58" opacity="0.5" />
-                        <rect x="30" y="62" width="90" height="8" rx="1.5" fill="#484f58" opacity="0.3" />
+                        <rect x="30" y="50" width="120" height="8" rx="1.5" fill="#94a3b8" opacity="0.5" />
+                        <rect x="30" y="62" width="90" height="8" rx="1.5" fill="#94a3b8" opacity="0.3" />
                         <rect x="30" y="80" width="50" height="24" rx="12" fill="#00cec9" opacity="0.6" />
                         {/* Selection handles */}
                         <rect x="27" y="27" width="86" height="20" rx="0" fill="none" stroke="#4a9eff" strokeWidth="1.5" strokeDasharray="4 2" />
@@ -123,11 +123,11 @@ function StepVisual({ type }: { type: string }) {
                         <circle cx="27" cy="47" r="3" fill="#4a9eff" /><circle cx="113" cy="47" r="3" fill="#4a9eff" />
                         {/* Property panel */}
                         <rect x="172" y="15" width="55" height="130" rx="6" fill="#111827" stroke="#2a3040" strokeWidth="1" />
-                        <rect x="178" y="25" width="42" height="6" rx="1" fill="#484f58" opacity="0.4" />
-                        <rect x="178" y="38" width="42" height="12" rx="3" fill="#1a1f2e" stroke="#2a3040" strokeWidth="0.5" />
-                        <rect x="178" y="56" width="42" height="6" rx="1" fill="#484f58" opacity="0.4" />
-                        <rect x="178" y="68" width="42" height="12" rx="3" fill="#1a1f2e" stroke="#2a3040" strokeWidth="0.5" />
-                        <rect x="178" y="86" width="42" height="6" rx="1" fill="#484f58" opacity="0.4" />
+                        <rect x="178" y="25" width="42" height="6" rx="1" fill="#94a3b8" opacity="0.4" />
+                        <rect x="178" y="38" width="42" height="12" rx="3" fill="#ffffff" stroke="#2a3040" strokeWidth="0.5" />
+                        <rect x="178" y="56" width="42" height="6" rx="1" fill="#94a3b8" opacity="0.4" />
+                        <rect x="178" y="68" width="42" height="12" rx="3" fill="#ffffff" stroke="#2a3040" strokeWidth="0.5" />
+                        <rect x="178" y="86" width="42" height="6" rx="1" fill="#94a3b8" opacity="0.4" />
                         <circle cx="185" cy="102" r="6" fill="#6c5ce7" opacity="0.6" />
                         <circle cx="199" cy="102" r="6" fill="#00cec9" opacity="0.6" />
                         <circle cx="213" cy="102" r="6" fill="#fd79a8" opacity="0.6" />
@@ -189,7 +189,7 @@ function StepVisual({ type }: { type: string }) {
                             <animateTransform attributeName="transform" type="translate" values="-40,0;0,0" dur="1.5s" repeatCount="indefinite" />
                             <animate attributeName="opacity" values="0;0.8" dur="1.5s" repeatCount="indefinite" />
                         </rect>
-                        <rect x="80" y="55" width="80" height="8" rx="1.5" fill="#484f58" opacity="0.5">
+                        <rect x="80" y="55" width="80" height="8" rx="1.5" fill="#94a3b8" opacity="0.5">
                             <animateTransform attributeName="transform" type="translate" values="40,0;0,0" dur="1.5s" begin="0.2s" repeatCount="indefinite" />
                             <animate attributeName="opacity" values="0;0.5" dur="1.5s" begin="0.2s" repeatCount="indefinite" />
                         </rect>
@@ -218,32 +218,32 @@ function StepVisual({ type }: { type: string }) {
                         {/* Export cards */}
                         <rect x="20" y="30" width="60" height="40" rx="6" fill="#111827" stroke="#2a3040" strokeWidth="1" />
                         <text x="50" y="47" textAnchor="middle" fill="#4a9eff" fontSize="8" fontWeight="600">HTML5</text>
-                        <text x="50" y="60" textAnchor="middle" fill="#484f58" fontSize="6">Interactive</text>
+                        <text x="50" y="60" textAnchor="middle" fill="#94a3b8" fontSize="6">Interactive</text>
 
                         <rect x="90" y="30" width="60" height="40" rx="6" fill="#111827" stroke="#2a3040" strokeWidth="1" />
                         <text x="120" y="47" textAnchor="middle" fill="#00cec9" fontSize="8" fontWeight="600">MP4</text>
-                        <text x="120" y="60" textAnchor="middle" fill="#484f58" fontSize="6">Video Ad</text>
+                        <text x="120" y="60" textAnchor="middle" fill="#94a3b8" fontSize="6">Video Ad</text>
 
                         <rect x="160" y="30" width="60" height="40" rx="6" fill="#111827" stroke="#2a3040" strokeWidth="1" />
                         <text x="190" y="47" textAnchor="middle" fill="#fd79a8" fontSize="8" fontWeight="600">PNG</text>
-                        <text x="190" y="60" textAnchor="middle" fill="#484f58" fontSize="6">Static</text>
+                        <text x="190" y="60" textAnchor="middle" fill="#94a3b8" fontSize="6">Static</text>
 
                         {/* Progress bar */}
-                        <rect x="50" y="90" width="140" height="8" rx="4" fill="#1a1f2e" />
+                        <rect x="50" y="90" width="140" height="8" rx="4" fill="#ffffff" />
                         <rect x="50" y="90" width="0" height="8" rx="4" fill="url(#exportGrad)">
                             <animate attributeName="width" values="0;140" dur="2s" repeatCount="indefinite" />
                         </rect>
                         <text x="120" y="116" textAnchor="middle" fill="#f5f5f7" fontSize="9" fontWeight="500" opacity="0.7">Exporting all formats...</text>
 
                         {/* Platform icons */}
-                        <rect x="50" y="125" width="28" height="18" rx="3" fill="#1a1f2e" stroke="#2a3040" strokeWidth="0.5" />
-                        <text x="64" y="137" textAnchor="middle" fill="#484f58" fontSize="5">Google</text>
-                        <rect x="82" y="125" width="28" height="18" rx="3" fill="#1a1f2e" stroke="#2a3040" strokeWidth="0.5" />
-                        <text x="96" y="137" textAnchor="middle" fill="#484f58" fontSize="5">Meta</text>
-                        <rect x="114" y="125" width="28" height="18" rx="3" fill="#1a1f2e" stroke="#2a3040" strokeWidth="0.5" />
-                        <text x="128" y="137" textAnchor="middle" fill="#484f58" fontSize="5">TikTok</text>
-                        <rect x="146" y="125" width="28" height="18" rx="3" fill="#1a1f2e" stroke="#2a3040" strokeWidth="0.5" />
-                        <text x="160" y="137" textAnchor="middle" fill="#484f58" fontSize="5">DV360</text>
+                        <rect x="50" y="125" width="28" height="18" rx="3" fill="#ffffff" stroke="#2a3040" strokeWidth="0.5" />
+                        <text x="64" y="137" textAnchor="middle" fill="#94a3b8" fontSize="5">Google</text>
+                        <rect x="82" y="125" width="28" height="18" rx="3" fill="#ffffff" stroke="#2a3040" strokeWidth="0.5" />
+                        <text x="96" y="137" textAnchor="middle" fill="#94a3b8" fontSize="5">Meta</text>
+                        <rect x="114" y="125" width="28" height="18" rx="3" fill="#ffffff" stroke="#2a3040" strokeWidth="0.5" />
+                        <text x="128" y="137" textAnchor="middle" fill="#94a3b8" fontSize="5">TikTok</text>
+                        <rect x="146" y="125" width="28" height="18" rx="3" fill="#ffffff" stroke="#2a3040" strokeWidth="0.5" />
+                        <text x="160" y="137" textAnchor="middle" fill="#94a3b8" fontSize="5">DV360</text>
                         <defs>
                             <linearGradient id="exportGrad" x1="0" y1="0" x2="1" y2="0">
                                 <stop offset="0%" stopColor="#6c5ce7" />

@@ -364,8 +364,8 @@ function parseElements(t: DesignTemplate): MiniElementData[] {
 function parseBgColor(t: DesignTemplate): string {
     try {
         const v: BannerVariant = JSON.parse(t.variantSnapshot);
-        return v.backgroundColor ?? '#1a1f2e';
+        return v.backgroundColor ?? '#ffffff';
     } catch {
-        return '#1a1f2e';
+        return '#ffffff';
     }
 }

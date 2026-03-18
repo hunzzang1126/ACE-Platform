@@ -204,7 +204,7 @@ export function CreativeSetTable({ items, folders, onOpenSet, onOpenFolder }: Pr
             {/* Empty state */}
             {folders.length === 0 && items.length === 0 && (
                 <div className="table-empty">
-                    <span className="empty-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#484f58" strokeWidth="1.2"><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="9" y1="21" x2="9" y2="9" /></svg></span>
+                    <span className="empty-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="1.2"><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="9" y1="21" x2="9" y2="9" /></svg></span>
                     <p>No creative sets found</p>
                 </div>
             )}

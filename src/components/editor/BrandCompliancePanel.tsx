@@ -154,7 +154,7 @@ export function BrandCompliancePanel({ nodes = [], onAutoFix, onClose }: Props) 
 
 const styles: Record<string, React.CSSProperties> = {
     root: {
-        width: 280, background: '#1a1f2e', borderLeft: '1px solid #2a2f3e',
+        width: 280, background: '#ffffff', borderLeft: '1px solid #e2e8f0',
         padding: 14, display: 'flex', flexDirection: 'column', gap: 10, color: '#e0e0e0',
         fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12, overflowY: 'auto',
     },
@@ -169,7 +169,7 @@ const styles: Record<string, React.CSSProperties> = {
     },
     scoreCard: {
         display: 'flex', alignItems: 'center', gap: 14,
-        background: '#0f1218', borderRadius: 8, padding: '12px 16px',
+        background: '#f5f5f7', borderRadius: 8, padding: '12px 16px',
     },
     grade: { fontSize: 36, fontWeight: 800, lineHeight: 1 },
     scoreInfo: { flex: 1 },

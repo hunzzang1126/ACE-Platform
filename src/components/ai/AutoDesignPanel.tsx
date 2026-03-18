@@ -117,14 +117,14 @@ export function AutoDesignPanel({ engine, canvasW, canvasH }: Props) {
     return (
         <div style={styles.panel}>
             {/* Tab Switcher */}
-            <div style={{ display: 'flex', gap: 2, background: '#161b22', borderRadius: 6, padding: 2 }}>
+            <div style={{ display: 'flex', gap: 2, background: '#fafbfc', borderRadius: 6, padding: 2 }}>
                 {(['generate', 'scan'] as const).map(tab => (
                     <button
                         key={tab}
                         style={{
                             flex: 1, padding: '5px 8px', borderRadius: 4, border: 'none',
                             fontSize: 11, fontWeight: 500, cursor: 'pointer',
-                            background: activeTab === tab ? '#21262d' : 'transparent',
+                            background: activeTab === tab ? '#e2e8f0' : 'transparent',
                             color: activeTab === tab ? '#f0f6fc' : '#6e7681',
                             transition: 'all 0.12s ease',
                         }}
@@ -164,7 +164,7 @@ export function AutoDesignPanel({ engine, canvasW, canvasH }: Props) {
                 <div
                     style={{
                         ...styles.dropZone,
-                        borderColor: isDragging ? '#58a6ff' : '#30363d',
+                        borderColor: isDragging ? '#58a6ff' : '#e2e8f0',
                         background: isDragging ? 'rgba(88,166,255,0.06)' : 'transparent',
                     }}
                     onDrop={handleDrop}
@@ -189,7 +189,7 @@ export function AutoDesignPanel({ engine, canvasW, canvasH }: Props) {
                         </div>
                     ) : (
                         <div style={styles.dropContent}>
-                            <span style={{ fontSize: 16, color: '#484f58', lineHeight: 1 }}>+</span>
+                            <span style={{ fontSize: 16, color: '#94a3b8', lineHeight: 1 }}>+</span>
                             <span style={styles.dropText}>Drop image or click to upload</span>
                         </div>
                     )}
@@ -203,7 +203,7 @@ export function AutoDesignPanel({ engine, canvasW, canvasH }: Props) {
                             ...styles.textarea,
                             borderColor: state.isGenerating
                                 ? (state.phase === 'reviewing' ? '#6e7681' : '#1f6feb')
-                                : '#30363d',
+                                : '#e2e8f0',
                         }}
                         placeholder={placeholderText}
                         value={prompt}
@@ -239,7 +239,7 @@ export function AutoDesignPanel({ engine, canvasW, canvasH }: Props) {
 
                 {/* Progress — vision review */}
                 {state.isGenerating && state.phase === 'reviewing' && (
-                    <div style={{ ...styles.progressRow, borderColor: '#30363d', background: '#161b22' }}>
+                    <div style={{ ...styles.progressRow, borderColor: '#e2e8f0', background: '#fafbfc' }}>
                         <span style={{ ...styles.spinner, borderTopColor: '#8b949e', borderColor: 'rgba(139,148,158,0.2)' }} />
                         <span style={{ ...styles.progressText, color: '#8b949e' }}>{state.progress}</span>
                     </div>
@@ -254,12 +254,12 @@ export function AutoDesignPanel({ engine, canvasW, canvasH }: Props) {
                         </div>
                         {/* Rating — saves result to design memory for few-shot learning */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span style={{ fontSize: 10, color: '#484f58' }}>Rate this design:</span>
+                            <span style={{ fontSize: 10, color: '#94a3b8' }}>Rate this design:</span>
                             <button
                                 title="Good design — save as example"
                                 style={{
-                                    background: rated === 5 ? '#238636' : '#21262d',
-                                    border: `1px solid ${rated === 5 ? '#2ea043' : '#30363d'}`,
+                                    background: rated === 5 ? '#238636' : '#e2e8f0',
+                                    border: `1px solid ${rated === 5 ? '#2ea043' : '#e2e8f0'}`,
                                     borderRadius: 5, padding: '3px 9px', cursor: 'pointer',
                                     color: rated === 5 ? '#fff' : '#8b949e', fontSize: 11,
                                     transition: 'all 0.1s',
@@ -280,8 +280,8 @@ export function AutoDesignPanel({ engine, canvasW, canvasH }: Props) {
                             <button
                                 title="Poor design — mark as low quality"
                                 style={{
-                                    background: rated === 1 ? '#6e1a1a' : '#21262d',
-                                    border: `1px solid ${rated === 1 ? '#f85149' : '#30363d'}`,
+                                    background: rated === 1 ? '#6e1a1a' : '#e2e8f0',
+                                    border: `1px solid ${rated === 1 ? '#f85149' : '#e2e8f0'}`,
                                     borderRadius: 5, padding: '3px 9px', cursor: 'pointer',
                                     color: rated === 1 ? '#fff' : '#8b949e', fontSize: 11,
                                     transition: 'all 0.1s',
@@ -337,7 +337,7 @@ export function AutoDesignPanel({ engine, canvasW, canvasH }: Props) {
 // ── Styles ──────────────────────────────────────────
 const styles: Record<string, React.CSSProperties> = {
     panel: {
-        background: '#0d1117', border: '1px solid #21262d', borderRadius: 10,
+        background: '#f0f2f5', border: '1px solid #e2e8f0', borderRadius: 10,
         padding: '14px', display: 'flex', flexDirection: 'column', gap: 10,
         fontSize: 12, color: '#c9d1d9', fontFamily: 'Inter, system-ui, sans-serif',
     },
@@ -346,7 +346,7 @@ const styles: Record<string, React.CSSProperties> = {
     title: { fontWeight: 600, fontSize: 13, color: '#f0f6fc', letterSpacing: -0.2 },
     modeBadge: {
         fontSize: 10, fontWeight: 500, color: '#8b949e',
-        background: '#21262d', border: '1px solid #30363d',
+        background: '#e2e8f0', border: '1px solid #e2e8f0',
         borderRadius: 4, padding: '1px 6px',
     },
     subtitle: { color: '#6e7681', fontSize: 11 },
@@ -359,23 +359,23 @@ const styles: Record<string, React.CSSProperties> = {
     dropContent: { display: 'flex', alignItems: 'center', gap: 8 },
     dropText: { fontSize: 11, color: '#6e7681' },
     thumbRow: { display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' },
-    thumb: { width: 36, height: 36, objectFit: 'cover', borderRadius: 4, border: '1px solid #30363d' },
+    thumb: { width: 36, height: 36, objectFit: 'cover', borderRadius: 4, border: '1px solid #e2e8f0' },
     dropHintSmall: { fontSize: 10, color: '#6e7681' },
     inputWrapper: { position: 'relative' },
     textarea: {
         width: '100%', boxSizing: 'border-box',
-        background: '#161b22', border: '1px solid',
+        background: '#fafbfc', border: '1px solid',
         borderRadius: 7, padding: '8px 10px',
         color: '#e6edf3', fontSize: 12, lineHeight: 1.5,
         fontFamily: 'inherit', resize: 'none', outline: 'none',
         transition: 'border-color 0.12s ease',
     },
-    inputHint: { fontSize: 10, color: '#484f58', marginTop: 3, textAlign: 'right' },
+    inputHint: { fontSize: 10, color: '#94a3b8', marginTop: 3, textAlign: 'right' },
     examples: { display: 'flex', flexDirection: 'column', gap: 5 },
     examplesLabel: { fontSize: 10, color: '#6e7681', fontWeight: 500, textTransform: 'uppercase', letterSpacing: 0.6 },
     examplesList: { display: 'flex', flexDirection: 'column', gap: 3 },
     exampleChip: {
-        background: 'transparent', border: '1px solid #21262d',
+        background: 'transparent', border: '1px solid #e2e8f0',
         borderRadius: 5, padding: '4px 8px',
         color: '#6e7681', fontSize: 10, textAlign: 'left',
         cursor: 'pointer', transition: 'all 0.1s ease', lineHeight: 1.4,
@@ -404,11 +404,11 @@ const styles: Record<string, React.CSSProperties> = {
         gap: 6, justifyContent: 'center', width: '100%',
         transition: 'opacity 0.12s ease', letterSpacing: -0.1,
     },
-    btnRunning: { background: 'transparent', color: '#f85149', border: '1px solid #30363d' },
+    btnRunning: { background: 'transparent', color: '#f85149', border: '1px solid #e2e8f0' },
     spinner: {
         width: 11, height: 11, borderRadius: '50%', flexShrink: 0,
         border: '1.5px solid rgba(120,192,255,0.2)', borderTopColor: '#79c0ff',
         animation: 'spin 0.7s linear infinite', display: 'inline-block',
     },
-    hint: { color: '#484f58', fontSize: 10, textAlign: 'center' },
+    hint: { color: '#94a3b8', fontSize: 10, textAlign: 'center' },
 };

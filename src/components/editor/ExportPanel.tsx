@@ -226,7 +226,7 @@ export function ExportPanel({
 
 const styles: Record<string, React.CSSProperties> = {
     root: {
-        width: 280, background: '#1a1f2e', borderLeft: '1px solid #2a2f3e',
+        width: 280, background: '#ffffff', borderLeft: '1px solid #e2e8f0',
         padding: 16, display: 'flex', flexDirection: 'column', gap: 12, color: '#e0e0e0',
         fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12, overflowY: 'auto',
     },
@@ -238,7 +238,7 @@ const styles: Record<string, React.CSSProperties> = {
     },
     sizeRow: {
         display: 'flex', justifyContent: 'space-between', padding: '8px 10px',
-        background: '#0f1218', borderRadius: 6, fontSize: 11,
+        background: '#f5f5f7', borderRadius: 6, fontSize: 11,
     },
     sizeLabel: { color: '#ccc', fontWeight: 500 },
     sizeName: { color: '#888' },
@@ -246,7 +246,7 @@ const styles: Record<string, React.CSSProperties> = {
     label: { fontSize: 10, color: '#888', textTransform: 'uppercase' as const, letterSpacing: 0.5 },
     formatRow: { display: 'flex', gap: 4 },
     formatBtn: {
-        flex: 1, padding: '6px 0', background: '#0f1218', border: '1px solid #2a2f3e',
+        flex: 1, padding: '6px 0', background: '#f5f5f7', border: '1px solid #e2e8f0',
         borderRadius: 4, color: '#888', cursor: 'pointer', fontSize: 10, fontWeight: 500,
         transition: 'all 0.15s',
     },
@@ -260,7 +260,7 @@ const styles: Record<string, React.CSSProperties> = {
     },
     networkRow: { display: 'flex', gap: 4 },
     networkBtn: {
-        flex: 1, padding: '4px 0', background: '#0f1218', border: '1px solid #2a2f3e',
+        flex: 1, padding: '4px 0', background: '#f5f5f7', border: '1px solid #e2e8f0',
         borderRadius: 4, color: '#888', cursor: 'pointer', fontSize: 9,
         transition: 'all 0.15s',
     },
@@ -268,13 +268,13 @@ const styles: Record<string, React.CSSProperties> = {
         borderColor: '#2563eb', color: '#60a5fa',
     },
     validationBox: {
-        background: '#0f1218', borderRadius: 6, padding: 8, display: 'flex', flexDirection: 'column', gap: 4,
+        background: '#f5f5f7', borderRadius: 6, padding: 8, display: 'flex', flexDirection: 'column', gap: 4,
     },
     scoreRow: { display: 'flex', justifyContent: 'space-between', fontWeight: 600, fontSize: 13 },
     scoreLabel: {},
     scoreValue: {},
     violation: {
-        display: 'flex', gap: 6, fontSize: 10, padding: '3px 0', borderTop: '1px solid #1a1f2e',
+        display: 'flex', gap: 6, fontSize: 10, padding: '3px 0', borderTop: '1px solid #ffffff',
         alignItems: 'flex-start',
     },
     violationMsg: { color: '#ccc', flex: 1 },
@@ -294,7 +294,7 @@ const styles: Record<string, React.CSSProperties> = {
         transition: 'background 0.15s',
     },
     batchBtn: {
-        padding: '8px 0', background: 'transparent', border: '1px solid #2a2f3e',
+        padding: '8px 0', background: 'transparent', border: '1px solid #e2e8f0',
         borderRadius: 6, color: '#888', fontSize: 11, cursor: 'pointer',
         transition: 'all 0.15s',
     },

@@ -51,7 +51,7 @@ const itemStyle: CSSProperties = {
 };
 
 const shortcutStyle: CSSProperties = {
-    color: '#484f58',
+    color: '#94a3b8',
     fontSize: 11,
     marginLeft: 24,
 };

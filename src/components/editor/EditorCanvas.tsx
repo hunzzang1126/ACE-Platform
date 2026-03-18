@@ -475,7 +475,7 @@ export function EditorCanvas({
                         {Math.round(zoom * 100)}%
                     </span>
                 </span>
-                <span style={{ color: '#484f58', fontSize: 10, marginLeft: 8 }}>
+                <span style={{ color: '#94a3b8', fontSize: 10, marginLeft: 8 }}>
                     {activeTool.toUpperCase()}
                 </span>
             </div>

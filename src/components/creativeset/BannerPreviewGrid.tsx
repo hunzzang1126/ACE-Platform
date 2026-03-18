@@ -842,7 +842,7 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                     >
                         <button className="banner-ctx-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <span>Export</span>
-                            <span style={{ color: '#484f58', fontSize: 11, marginLeft: 12 }}>&#9654;</span>
+                            <span style={{ color: '#94a3b8', fontSize: 11, marginLeft: 12 }}>&#9654;</span>
                         </button>
                         {/* Sub-panel */}
                         <div

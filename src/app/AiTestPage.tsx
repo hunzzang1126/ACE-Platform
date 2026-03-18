@@ -179,7 +179,7 @@ const toolbarStyle: CSSProperties = {
 const canvasContainerStyle: CSSProperties = {
     flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
     position: 'relative',
-    background: 'radial-gradient(ellipse at center, #0d1117 0%, #010409 100%)',
+    background: 'radial-gradient(ellipse at center, #f0f2f5 0%, #010409 100%)',
 };
 
 const canvasStyle: CSSProperties = {

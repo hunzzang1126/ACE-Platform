@@ -189,7 +189,7 @@ export function KeyframeInspector({ onClose }: Props) {
 
 const styles: Record<string, React.CSSProperties> = {
     root: {
-        width: 240, background: '#1a1f2e', borderLeft: '1px solid #2a2f3e',
+        width: 240, background: '#ffffff', borderLeft: '1px solid #e2e8f0',
         padding: 14, display: 'flex', flexDirection: 'column', gap: 10,
         color: '#e0e0e0', fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12,
     },
@@ -200,7 +200,7 @@ const styles: Record<string, React.CSSProperties> = {
         fontSize: 14, padding: '2px 6px',
     },
     elementLabel: {
-        fontSize: 10, color: '#888', padding: '4px 8px', background: '#0f1218',
+        fontSize: 10, color: '#888', padding: '4px 8px', background: '#f5f5f7',
         borderRadius: 4,
     },
     empty: {
@@ -215,23 +215,23 @@ const styles: Record<string, React.CSSProperties> = {
     },
     propValue: {
         fontSize: 12, color: '#60a5fa', fontWeight: 500,
-        padding: '4px 8px', background: '#0f1218', borderRadius: 4,
+        padding: '4px 8px', background: '#f5f5f7', borderRadius: 4,
     },
     input: {
-        padding: '5px 8px', background: '#0f1218', border: '1px solid #2a2f3e',
+        padding: '5px 8px', background: '#f5f5f7', border: '1px solid #e2e8f0',
         borderRadius: 4, color: '#ccc', fontSize: 11, outline: 'none',
     },
     select: {
-        padding: '5px 8px', background: '#0f1218', border: '1px solid #2a2f3e',
+        padding: '5px 8px', background: '#f5f5f7', border: '1px solid #e2e8f0',
         borderRadius: 4, color: '#ccc', fontSize: 11, outline: 'none',
     },
     deleteBtn: {
         padding: '6px 0', background: 'transparent', border: '1px solid #ef4444',
         borderRadius: 4, color: '#f87171', fontSize: 10, cursor: 'pointer',
     },
-    divider: { borderTop: '1px solid #2a2f3e', margin: '4px 0' },
+    divider: { borderTop: '1px solid #e2e8f0', margin: '4px 0' },
     addBtn: {
-        padding: '6px 0', background: 'transparent', border: '1px solid #2a2f3e',
+        padding: '6px 0', background: 'transparent', border: '1px solid #e2e8f0',
         borderRadius: 4, color: '#888', fontSize: 10, cursor: 'pointer',
         transition: 'all 0.15s',
     },
@@ -240,7 +240,7 @@ const styles: Record<string, React.CSSProperties> = {
         borderRadius: 4, color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer',
     },
     cancelBtn: {
-        flex: 1, padding: '6px 0', background: 'transparent', border: '1px solid #2a2f3e',
+        flex: 1, padding: '6px 0', background: 'transparent', border: '1px solid #e2e8f0',
         borderRadius: 4, color: '#888', fontSize: 10, cursor: 'pointer',
     },
 };

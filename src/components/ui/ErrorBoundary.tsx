@@ -89,7 +89,7 @@ export class ErrorBoundary extends Component<Props, State> {
 const containerStyle: React.CSSProperties = {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     width: '100%', height: '100vh',
-    background: '#0d1117',
+    background: '#f0f2f5',
     fontFamily: 'Inter, system-ui, sans-serif',
 };
 

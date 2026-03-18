@@ -174,11 +174,11 @@ export function GlobalAiPanel() {
                         {/* Empty state */}
                         {agent.messages.length === 0 && agent.state.phase === 'idle' && (
                             <div style={emptyStyle}>
-                                <IcAi size={36} color="#21262d" />
+                                <IcAi size={36} color="#e2e8f0" />
                                 <div style={{ marginTop: 16, fontSize: 14, fontWeight: 500, color: '#c9d1d9' }}>
                                     What would you like to create?
                                 </div>
-                                <div style={{ fontSize: 12, color: '#484f58', marginTop: 6, lineHeight: 1.5 }}>
+                                <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 6, lineHeight: 1.5 }}>
                                     Design social creatives, ads, landing pages, or any visual format.
                                     Drop a screenshot to reverse-engineer an existing design.
                                 </div>
@@ -192,7 +192,7 @@ export function GlobalAiPanel() {
                                             style={quickActionBtnStyle}
                                         >
                                             <span style={{ fontSize: 12, fontWeight: 500, color: '#c9d1d9' }}>{action.label}</span>
-                                            <span style={{ fontSize: 10, color: '#484f58', marginTop: 2 }}>{action.hint}</span>
+                                            <span style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>{action.hint}</span>
                                         </button>
                                     ))}
                                 </div>
@@ -332,7 +332,7 @@ function ActionCardInline({ card }: { card: ActionCardData }) {
     const icon = card.status === 'running' ? <IcLoader size={12} color="#58a6ff" />
         : card.status === 'done' ? <IcCheck size={12} color="#3fb950" />
             : card.status === 'error' ? <IcError size={12} color="#f85149" />
-                : <span style={{ width: 12, display: 'inline-block', textAlign: 'center', color: '#484f58' }}>·</span>;
+                : <span style={{ width: 12, display: 'inline-block', textAlign: 'center', color: '#94a3b8' }}>·</span>;
 
     return (
         <div style={{
@@ -367,7 +367,7 @@ function ActionCardInline({ card }: { card: ActionCardData }) {
                 </div>
                 {hasExpandable && (
                     <span style={{
-                        fontSize: 10, color: '#484f58', cursor: 'pointer',
+                        fontSize: 10, color: '#94a3b8', cursor: 'pointer',
                         transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
                         transition: 'transform 0.2s ease',
                         flexShrink: 0, padding: '0 2px',
@@ -425,12 +425,12 @@ function ModelDropdown({ selectedRole, onSelect }: { selectedRole: AceModelRole;
                         <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
                             <span style={{ fontSize: 12, color: active ? '#e6edf3' : '#c9d1d9' }}>{opt.label}</span>
                             {m.costPer1MInput > 0 && (
-                                <span style={{ fontSize: 10, color: '#484f58' }}>
+                                <span style={{ fontSize: 10, color: '#94a3b8' }}>
                                     ${m.costPer1MInput}/{m.costPer1MOutput}
                                 </span>
                             )}
                         </div>
-                        <div style={{ fontSize: 10, color: '#484f58', marginTop: 2 }}>{m.id}</div>
+                        <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>{m.id}</div>
                     </button>
                 );
             })}
@@ -456,7 +456,7 @@ const toggleBtnStyle: CSSProperties = {
 
 const panelInnerStyle: CSSProperties = {
     width: PANEL_WIDTH - 32, flexShrink: 0, height: '100%',
-    background: '#0d1117', borderLeft: '1px solid rgba(255,255,255,0.06)',
+    background: '#f0f2f5', borderLeft: '1px solid rgba(255,255,255,0.06)',
     display: 'flex', flexDirection: 'column',
     fontFamily: 'Inter, system-ui, sans-serif', color: '#e6edf3',
 };
@@ -478,7 +478,7 @@ const msgAreaStyle: CSSProperties = {
 
 const emptyStyle: CSSProperties = {
     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-    color: '#30363d', padding: '40px 20px', textAlign: 'center',
+    color: '#e2e8f0', padding: '40px 20px', textAlign: 'center',
 };
 
 const quickActionsStyle: CSSProperties = {
@@ -541,7 +541,7 @@ const modelSelectorBtnStyle: CSSProperties = {
 };
 
 const modelDropdownStyle: CSSProperties = {
-    background: '#161b22',
+    background: '#fafbfc',
     border: '1px solid rgba(255,255,255,0.08)',
     borderRadius: 8,
     margin: '0 8px 4px',
