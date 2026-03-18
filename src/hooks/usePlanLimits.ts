@@ -28,8 +28,8 @@ function getCurrentMonth(): string {
 export function usePlanLimits() {
     const user = useAuthStore(s => s.user);
     const role = useAuthStore(s => s.role);
-    // ★ Admin override: admins get full enterprise access regardless of subscription
-    const plan: PlanTier = role === 'admin' ? 'enterprise' : ((user?.plan as PlanTier) ?? 'starter');
+    // ★ Admin override: admins get dedicated unlimited tier
+    const plan: PlanTier = role === 'admin' ? 'admin' : ((user?.plan as PlanTier) ?? 'starter');
     const limits = PLAN_LIMITS[plan];
 
     const [usage, setUsage] = useState<UsageData>({
@@ -134,7 +134,7 @@ export function usePlanLimits() {
     return {
         // Current plan info
         plan,
-        planName: plan.charAt(0).toUpperCase() + plan.slice(1),
+        planName: plan === 'admin' ? 'Admin' : plan.charAt(0).toUpperCase() + plan.slice(1),
         limits,
 
         // Usage data
@@ -159,5 +159,6 @@ export function usePlanLimits() {
         isStarter: plan === 'starter',
         isPro: plan === 'pro',
         isEnterprise: plan === 'enterprise',
+        isAdmin: plan === 'admin',
     };
 }

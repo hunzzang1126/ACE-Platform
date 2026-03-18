@@ -5,7 +5,7 @@
 // Used by usePlanLimits hook and enforcement logic.
 // ─────────────────────────────────────────────────
 
-export type PlanTier = 'starter' | 'pro' | 'enterprise';
+export type PlanTier = 'starter' | 'pro' | 'enterprise' | 'admin';
 
 export type ExportFormat = 'png' | 'jpg' | 'html5' | 'gif' | 'mp4' | 'js_bundle';
 
@@ -60,6 +60,16 @@ export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
     enterprise: {
         maxCreativeSets: -1,
         aiGenerationsPerMonth: 5_000,
+        maxVariantsPerSet: -1,
+        allowedExports: ['png', 'jpg', 'html5', 'gif', 'mp4', 'js_bundle'],
+        maxTeamMembers: -1,
+        brandCloudEnabled: true,
+        aiVisionQAEnabled: true,
+    },
+    // ★ Admin — truly unlimited, no restrictions whatsoever
+    admin: {
+        maxCreativeSets: -1,
+        aiGenerationsPerMonth: Number.MAX_SAFE_INTEGER,
         maxVariantsPerSet: -1,
         allowedExports: ['png', 'jpg', 'html5', 'gif', 'mp4', 'js_bundle'],
         maxTeamMembers: -1,

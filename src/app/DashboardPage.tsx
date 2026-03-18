@@ -41,7 +41,8 @@ export function DashboardPage() {
     const openCreativeSet = useDesignStore((s) => s.openCreativeSet);
 
     // ★ Plan enforcement
-    const { canCreateSet, remainingSets, planName, remainingAI, limits, isStarter } = usePlanLimits();
+    const { canCreateSet, remainingSets, planName, remainingAI, limits, isStarter, isAdmin, aiUsagePercent, usage } = usePlanLimits();
+    const allSetsCount = useDesignStore(s => Object.keys(s.allCreativeSets).length);
     const [upgradeModal, setUpgradeModal] = useState<{ open: boolean; reason: UpgradeReason }>({
         open: false, reason: 'creative_set_limit',
     });
@@ -180,31 +181,71 @@ export function DashboardPage() {
                     <div className="dashboard-hero__orb dashboard-hero__orb--2" />
                 </section>
 
-                {/* ★ Plan usage indicator */}
+                {/* ── Plan Status Bar ── */}
                 <div style={{
-                    display: 'flex', gap: 16, padding: '0 24px', marginBottom: 8,
-                    fontSize: 12, color: '#64748b', alignItems: 'center',
+                    display: 'flex', gap: 12, padding: '10px 24px', marginBottom: 12,
+                    fontSize: 13, alignItems: 'center',
+                    background: 'rgba(255,255,255,0.02)', borderRadius: 8,
+                    border: '1px solid rgba(255,255,255,0.06)',
                 }}>
                     <span style={{
-                        padding: '4px 10px', borderRadius: 6,
-                        background: isStarter ? 'rgba(255,255,255,0.04)' : 'rgba(129,140,248,0.1)',
-                        color: isStarter ? '#64748b' : '#818cf8',
-                        fontWeight: 600,
+                        padding: '4px 12px', borderRadius: 6, fontWeight: 700, fontSize: 11,
+                        letterSpacing: '0.05em', textTransform: 'uppercase' as const,
+                        background: isAdmin ? 'linear-gradient(135deg, #f59e0b, #d97706)' :
+                                   isStarter ? 'rgba(255,255,255,0.06)' :
+                                   'rgba(129,140,248,0.15)',
+                        color: isAdmin ? '#fff' : isStarter ? '#94a3b8' : '#818cf8',
                     }}>
                         {planName}
                     </span>
-                    <span>AI: {remainingAI} / {limits.aiGenerationsPerMonth} remaining</span>
-                    {remainingSets >= 0 && (
-                        <span>Sets: {remainingSets} / {limits.maxCreativeSets} remaining</span>
+
+                    {isAdmin ? (
+                        <span style={{ color: '#f59e0b', fontWeight: 600 }}>Unlimited Access</span>
+                    ) : (
+                        <div style={{ display: 'flex', gap: 20, alignItems: 'center', flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ color: '#94a3b8', whiteSpace: 'nowrap' as const }}>AI</span>
+                                <div style={{ width: 100, height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                                    <div style={{
+                                        width: `${Math.min(100, aiUsagePercent)}%`, height: '100%', borderRadius: 3,
+                                        transition: 'width 0.3s ease',
+                                        background: aiUsagePercent > 80 ? '#ef4444' : aiUsagePercent > 50 ? '#f59e0b' : '#818cf8',
+                                    }} />
+                                </div>
+                                <span style={{ color: aiUsagePercent > 80 ? '#ef4444' : '#e2e8f0', fontWeight: 600, fontSize: 12 }}>
+                                    {remainingAI} left
+                                </span>
+                            </div>
+                            {remainingSets >= 0 && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <span style={{ color: '#94a3b8', whiteSpace: 'nowrap' as const }}>Sets</span>
+                                    <div style={{ width: 60, height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                                        <div style={{
+                                            width: `${limits.maxCreativeSets > 0 ? Math.min(100, (allSetsCount / limits.maxCreativeSets) * 100) : 0}%`,
+                                            height: '100%', borderRadius: 3, transition: 'width 0.3s ease',
+                                            background: remainingSets === 0 ? '#ef4444' : '#818cf8',
+                                        }} />
+                                    </div>
+                                    <span style={{ color: remainingSets === 0 ? '#ef4444' : '#e2e8f0', fontWeight: 600, fontSize: 12 }}>
+                                        {remainingSets} left
+                                    </span>
+                                </div>
+                            )}
+                        </div>
                     )}
+
                     <button
                         onClick={() => navigate('/pricing')}
                         style={{
-                            background: 'none', border: 'none', color: '#818cf8',
-                            fontSize: 12, cursor: 'pointer', padding: 0, marginLeft: 'auto',
+                            background: 'none', border: '1px solid rgba(129,140,248,0.3)',
+                            color: '#818cf8', fontSize: 12, cursor: 'pointer',
+                            padding: '4px 12px', borderRadius: 6, marginLeft: 'auto',
+                            transition: 'all 0.2s ease',
                         }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(129,140,248,0.1)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}
                     >
-                        {isStarter ? 'Upgrade Plan' : 'Manage Plan'}
+                        {isStarter ? 'Upgrade' : 'Manage Plan'}
                     </button>
                 </div>
 
