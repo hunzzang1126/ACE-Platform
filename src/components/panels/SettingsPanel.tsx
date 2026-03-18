@@ -39,22 +39,23 @@ function flagEmoji(lang: string): string {
 }
 
 export function SettingsPanel({ isOpen, onClose }: Props) {
-    const [prefs, setPrefs] = useState<UserPrefs>(loadUserPrefs);
     const user = useAuthStore(s => s.user);
     const signOut = useAuthStore(s => s.signOut);
+    const userId = user?.id;
+    const [prefs, setPrefs] = useState<UserPrefs>(() => loadUserPrefs(userId));
 
-    // Reload prefs when panel opens
+    // Reload prefs when panel opens (with correct userId)
     useEffect(() => {
-        if (isOpen) setPrefs(loadUserPrefs());
-    }, [isOpen]);
+        if (isOpen) setPrefs(loadUserPrefs(userId));
+    }, [isOpen, userId]);
 
     const update = useCallback((patch: Partial<UserPrefs>) => {
         setPrefs(prev => {
             const next = { ...prev, ...patch };
-            saveUserPrefs(next);
+            saveUserPrefs(next, userId);
             return next;
         });
-    }, []);
+    }, [userId]);
 
     if (!isOpen) return null;
 

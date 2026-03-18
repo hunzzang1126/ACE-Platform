@@ -215,7 +215,7 @@ export function OnboardingPage() {
                                 Back
                             </button>
                             <button onClick={() => {
-                                setPreferredLanguage(selected);
+                                setPreferredLanguage(selected, userId);
                                 goNext('done');
                             }} style={primaryBtnStyle}>
                                 Continue
