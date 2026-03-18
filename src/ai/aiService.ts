@@ -426,10 +426,41 @@ export class AiService {
 
     /**
      * Build Claude messages from conversation history.
+     * ★ CONVERSATION MEMORY: Compresses older messages into a summary
+     * so the AI remembers context even in 20+ message conversations.
      */
     private buildClaudeMessages(): ClaudeMessage[] {
         const messages: ClaudeMessage[] = [];
-        const recent = this.context.getRecentMessages(20);
+        const all = this.context.getHistory()
+            .filter(m => m.role === 'user' || m.role === 'assistant');
+
+        // Keep last 10 messages verbatim for full context
+        const RECENT_WINDOW = 10;
+
+        if (all.length > RECENT_WINDOW) {
+            // Summarize older messages into a compact context block
+            const older = all.slice(0, all.length - RECENT_WINDOW);
+            const summaryLines: string[] = [];
+            for (const msg of older) {
+                const prefix = msg.role === 'user' ? 'User' : 'AI';
+                // Compress each message to max 80 chars
+                const short = msg.content.replace(/\n+/g, ' ').slice(0, 80);
+                summaryLines.push(`${prefix}: ${short}`);
+            }
+            const summary = summaryLines.join('\n');
+            messages.push({
+                role: 'user',
+                content: `[CONVERSATION HISTORY — ${older.length} earlier messages summarized]\n${summary}\n[END HISTORY — recent messages follow]`,
+            });
+            // Claude needs alternating roles — inject a brief ack
+            messages.push({
+                role: 'assistant',
+                content: 'Understood, I have the conversation context.',
+            });
+        }
+
+        // Add recent messages verbatim
+        const recent = all.slice(-RECENT_WINDOW);
         for (const msg of recent) {
             messages.push({
                 role: msg.role as 'user' | 'assistant',
