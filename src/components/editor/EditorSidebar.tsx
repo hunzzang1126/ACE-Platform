@@ -142,7 +142,7 @@ export function EditorSidebar({ actions, onTriggerImageUpload, onTriggerVideoUpl
                         </button>
                     </div>
                     <div className="sidebar-panel-content">
-                        {activeTab === 'templates' && <SidebarTemplateTab />}
+                        {activeTab === 'templates' && <SidebarTemplateTab actions={actions} />}
                         {activeTab === 'elements' && <SidebarElementsTab actions={actions} />}
                         {activeTab === 'text' && <SidebarTextTab actions={actions} />}
                         {activeTab === 'uploads' && (

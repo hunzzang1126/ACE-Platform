@@ -18,11 +18,15 @@ const TEXT_PRESETS = [
 
 export function SidebarTextTab({ actions }: Props) {
     const handleAdd = useCallback((preset: typeof TEXT_PRESETS[number]) => {
-        // Use engine add_text if available via actions
-        // For now, this will be wired to the Fabric engine's addText action
-        if (actions && 'addText' in actions) {
-            (actions as any).addText?.(preset.content, preset.fontSize, preset.fontWeight);
-        }
+        if (!actions) return;
+        // ★ FIX: addText signature is (x, y, content?, opts?)
+        // Place at center of canvas
+        const cx = (actions.canvasWidth ?? 300) / 2 - 100;
+        const cy = (actions.canvasHeight ?? 250) / 2 - 20;
+        actions.addText(cx, cy, preset.content, {
+            fontSize: preset.fontSize,
+            fontWeight: preset.fontWeight,
+        });
     }, [actions]);
 
     return (
@@ -50,19 +54,34 @@ export function SidebarTextTab({ actions }: Props) {
 
             <p className="sidebar-section-label">Font combinations</p>
             <div className="sidebar-font-pairs">
-                <button className="sidebar-font-pair">
+                <button className="sidebar-font-pair" onClick={() => {
+                    if (!actions) return;
+                    const cx = (actions.canvasWidth ?? 300) / 2 - 100;
+                    actions.addText(cx, 40, 'Clean and Modern', { fontSize: 28, fontWeight: '700', fontFamily: 'Inter, system-ui, sans-serif' });
+                    actions.addText(cx, 90, 'Pair with light body text for a polished look.', { fontSize: 14, fontWeight: '400', fontFamily: 'Inter, system-ui, sans-serif' });
+                }}>
                     <span style={{ fontSize: 18, fontWeight: 700, fontFamily: 'Inter' }}>Inter Bold</span>
                     <span style={{ fontSize: 12, fontWeight: 400, fontFamily: 'Inter', color: 'var(--text-secondary)' }}>
                         Clean and modern
                     </span>
                 </button>
-                <button className="sidebar-font-pair">
+                <button className="sidebar-font-pair" onClick={() => {
+                    if (!actions) return;
+                    const cx = (actions.canvasWidth ?? 300) / 2 - 100;
+                    actions.addText(cx, 40, 'Classic Editorial', { fontSize: 28, fontWeight: '700', fontFamily: 'Georgia, serif' });
+                    actions.addText(cx, 90, 'Perfect for editorial and long-form content.', { fontSize: 14, fontWeight: '400', fontFamily: 'Georgia, serif' });
+                }}>
                     <span style={{ fontSize: 18, fontWeight: 700, fontFamily: 'Georgia, serif' }}>Georgia Bold</span>
                     <span style={{ fontSize: 12, fontWeight: 400, fontFamily: 'Georgia, serif', color: 'var(--text-secondary)' }}>
                         Classic editorial
                     </span>
                 </button>
-                <button className="sidebar-font-pair">
+                <button className="sidebar-font-pair" onClick={() => {
+                    if (!actions) return;
+                    const cx = (actions.canvasWidth ?? 300) / 2 - 100;
+                    actions.addText(cx, 40, 'Geometric Bold', { fontSize: 28, fontWeight: '700', fontFamily: 'Montserrat, sans-serif' });
+                    actions.addText(cx, 90, 'Strong geometric shapes for impactful headlines.', { fontSize: 14, fontWeight: '400', fontFamily: 'Montserrat, sans-serif' });
+                }}>
                     <span style={{ fontSize: 18, fontWeight: 700, fontFamily: 'Montserrat, sans-serif' }}>Montserrat</span>
                     <span style={{ fontSize: 12, fontWeight: 400, fontFamily: 'Montserrat, sans-serif', color: 'var(--text-secondary)' }}>
                         Geometric and bold
