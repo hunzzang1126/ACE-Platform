@@ -276,7 +276,7 @@ export function DetailEditorPage() {
             // ★ REGRESSION GUARD: If user manually saved recently, skip auto-save.
             // This prevents the stale-data overwrite that causes preview bugs.
             const timeSinceManualSave = Date.now() - lastManualSaveRef.current;
-            if (timeSinceManualSave < 2000) {
+            if (timeSinceManualSave < 5000) {
                 console.log('[DetailEditor] Auto-save skipped — manual save was recent (' + timeSinceManualSave + 'ms ago)');
                 return;
             }

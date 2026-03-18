@@ -90,6 +90,12 @@ export function fabricToEngineNode(obj: FabricObject): EngineNode {
 
     const [r, g, b] = hexToRgb01(fill);
 
+    // ★ REGRESSION GUARD: Fabric.js resize uses scaleX/scaleY to visually enlarge
+    // objects, but keeps original property values (fontSize, rx, charSpacing, etc.).
+    // We must normalize: compute scaled dimensions at scale=1.
+    const scaleX = obj.scaleX ?? 1;
+    const scaleY = obj.scaleY ?? 1;
+
     let aceType: EngineNode['type'] = 'rect';
     let name = `Rectangle #${id}`;
     if (objType === 'ellipse') {
@@ -114,20 +120,24 @@ export function fabricToEngineNode(obj: FabricObject): EngineNode {
         name = (obj as any).__glidName;
     }
 
+    // ★ Scale-aware borderRadius: Fabric's rx is in original coordinate space.
+    // When object is scaled, visual border radius = rx * min(scaleX, scaleY).
+    const effectiveBorderRadius = br * Math.min(scaleX, scaleY);
+
     const node: EngineNode = {
         id,
         type: aceType,
         x: obj.left ?? 0,
         y: obj.top ?? 0,
-        w: (obj.width ?? 0) * (obj.scaleX ?? 1),
-        h: (obj.height ?? 0) * (obj.scaleY ?? 1),
+        w: (obj.width ?? 0) * scaleX,
+        h: (obj.height ?? 0) * scaleY,
         opacity: obj.opacity ?? 1,
         z_index: (obj as any).__glidZIndex ?? 0,
         fill_r: r,
         fill_g: g,
         fill_b: b,
         fill_a: 1,
-        border_radius: br,
+        border_radius: effectiveBorderRadius,
         name,
         gradient_start: gradientStart,
         gradient_end: gradientEnd,
@@ -135,17 +145,19 @@ export function fabricToEngineNode(obj: FabricObject): EngineNode {
     };
 
     // Text-specific properties
+    // ★ REGRESSION GUARD: fontSize must include scaleY to preserve visual size
+    // after save/restore cycle. Fabric resize changes scaleY, not fontSize.
+    // Same applies to charSpacing (must scale with scaleX).
     if (aceType === 'text' && obj instanceof Textbox) {
         node.content = obj.text ?? '';
-        node.fontSize = obj.fontSize ?? 16;
+        node.fontSize = Math.round((obj.fontSize ?? 16) * scaleY);
         node.fontFamily = obj.fontFamily ?? 'Inter';
         node.fontWeight = String(obj.fontWeight ?? '400');
         node.color = typeof obj.fill === 'string' ? obj.fill : '#000000';
         node.textAlign = obj.textAlign ?? 'left';
         node.lineHeight = obj.lineHeight ?? 1.4;
-        node.letterSpacing = (obj.charSpacing ?? 0) / 10;
+        node.letterSpacing = Math.round(((obj.charSpacing ?? 0) / 10) * scaleX * 10) / 10;
         // ★ REGRESSION GUARD: Preserve fontStyle — Fabric stores 'italic' or 'normal'.
-        // engineNodeToTextElement was hardcoding 'normal', losing italic styling.
         node.fontStyle = (obj.fontStyle as string) || 'normal';
     }
 
