@@ -67,3 +67,38 @@ trigger: always_on
 - All `VITE_*` vars must be in both Vercel settings AND local `.env`
 - After adding locally: `npx vercel env add VAR_NAME production --yes`
 - Redeploy auto-triggers on git push to connected branch
+
+## 5. Progressive Test Coverage (MANDATORY — Coverage Must Only Go Up)
+
+**Core Principle: Test count MUST increase with every feature or bug fix commit. It must NEVER decrease.**
+
+**Before every push, verify:**
+```bash
+npm test 2>&1 | grep 'Tests'
+# Must show equal or higher count than previous push
+```
+
+**When modifying ANY file, add tests for:**
+- The specific function/behavior you changed
+- Edge cases you discovered while implementing
+- Regression guards for bugs you fixed (name: `it('★ REGRESSION: should not [describe bug]')`)
+
+**Rendering/Sync bug tests (MANDATORY after sync fixes):**
+- If you fix a rendering inconsistency → add a test that validates the resolver output
+- If you fix element overlap → add a test that checks element bounding boxes don't overlap
+- If you fix text rendering → add a test that verifies linebreak handling
+- Example: `builtInTemplates.test.ts` has overlap and alignment guards — add similar tests for ANY new template or layout fix
+
+**Progressive targets (ratchet — never go backwards):**
+
+| Module | Current | Target | Rule |
+|--------|---------|--------|------|
+| Stores | 49% | 90%+ | +tests with every store change |
+| Engine | varies | 85%+ | +tests with every converter/renderer change |
+| Services | 14% | 80%+ | +tests when adding/modifying any service |
+| Hooks | varies | 80%+ | +tests for any new hook logic |
+
+**Tracking:**
+- Each commit message should note test delta: `(458 → 490 tests)`
+- If a commit has 0 new tests and modifies logic → **STOP and add tests before pushing**
+- Coverage must be checked with `npx vitest run --coverage` at least once per session

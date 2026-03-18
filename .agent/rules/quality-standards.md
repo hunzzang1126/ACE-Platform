@@ -54,3 +54,32 @@ ACE는 풀 크리에이티브 플랫폼이다. 배너는 부가 기능일 뿐이
 - **Schema validation on load**: if saved data is corrupted, show warning + load what's possible
 - **Network errors (AI agent)**: show friendly message, retry button, never hang
 - **Console must be CLEAN**: no red errors during normal flows — warnings are acceptable only if documented
+
+## G. Rendering Pipeline Sync — SINGLE SOURCE OF TRUTH (ABSOLUTE RULE)
+
+**All views that render design elements MUST use the SAME coordinate resolver function.**
+
+This applies to every place that converts `ElementConstraints` → absolute `(x, y, w, h)`:
+- **Canvas Editor** (Fabric.js restore): `constraintsToAbsolute()` from `elementConverters.ts`
+- **Size Dashboard** (BannerPreviewGrid CSS preview): `constraintsToAbsolute()` from `elementConverters.ts`
+- **Export / PNG render** (renderVariantToCanvas Canvas2D): `constraintsToAbsolute()` from `elementConverters.ts`
+- **Template Preview** (DashboardTemplateGallery): Must read constraints the same way
+
+**NEVER:**
+- Create a second "resolve" function that computes x,y from constraints differently
+- Use `resolveConstraints()` from `constraints.types.ts` for rendering — it exists for schema-level math only
+- Assume that two functions with similar switch-case logic will produce identical results after save cycles
+- Render text without handling explicit `\n` linebreaks — `split(' ')` alone is WRONG
+
+**WHY:** After a save cycle, `absoluteToConstraints()` may change anchor types (`left` → `center`, `top` → `bottom`) based on element position. Two "equivalent" resolver functions can then compute different absolute positions from the changed anchors. **One function = zero drift.**
+
+**Save-cycle fidelity check:**
+1. Original constraints → `constraintsToAbsolute()` → engine position → `absoluteToConstraints()` → new constraints
+2. New constraints → `constraintsToAbsolute()` → **MUST produce the same visual position**
+3. If not → `absoluteToConstraints()` has a bug, fix it there
+
+**Text rendering sync:**
+- Canvas2D export, CSS preview, and Fabric.js must ALL render text with:
+  - Explicit `\n` linebreak support (split by `\n` first, then word-wrap)
+  - Same `lineHeight` multiplier (fontSize × lineHeight)
+  - Same `textAlign` interpretation
