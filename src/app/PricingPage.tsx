@@ -22,7 +22,8 @@ export default function PricingPage() {
     const [loading, setLoading] = useState(false);
 
     const handleSelectPlan = async (tier: PlanTier) => {
-        if (tier === currentPlan) return;
+        console.log('[pricing] handleSelectPlan called:', { tier, currentPlan, user: !!user, isConfigured: isStripeConfigured() });
+        if (tier === currentPlan) { console.log('[pricing] same plan, skipping'); return; }
         if (tier === 'starter') {
             alert('To downgrade, please contact support.');
             return;
@@ -34,19 +35,23 @@ export default function PricingPage() {
 
         // ★ Pro upgrade — Stripe Checkout
         if (!isStripeConfigured()) {
+            console.error('[pricing] Stripe NOT configured. VITE_STRIPE_PUBLISHABLE_KEY:', import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
             alert('Payment system is being set up. Please try again shortly.');
             return;
         }
         if (!user) {
+            console.log('[pricing] No user, redirecting to login');
             navigate('/login');
             return;
         }
 
+        console.log('[pricing] Starting checkout for:', { tier, userId: user.id, email: user.email });
         setLoading(true);
         const { error } = await redirectToCheckout(tier, user.id, user.email ?? '');
         setLoading(false);
 
         if (error) {
+            console.error('[pricing] Checkout error:', error);
             alert(error);
         }
     };
