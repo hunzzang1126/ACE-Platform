@@ -10,11 +10,12 @@ import type { PlanTier } from '@/schema/planTypes';
 
 // Price ID mapping from environment
 const PRICE_IDS: Partial<Record<PlanTier, string>> = {
-    pro: import.meta.env.VITE_STRIPE_PRICE_PRO_MONTHLY as string,
-    enterprise: import.meta.env.VITE_STRIPE_PRICE_ENTERPRISE_MONTHLY as string,
+    pro: (import.meta.env.VITE_STRIPE_PRICE_PRO_MONTHLY as string) || 'price_1TC46KP4cNeNUaNJ0oAafaNq',
+    enterprise: (import.meta.env.VITE_STRIPE_PRICE_ENTERPRISE_MONTHLY as string) || 'price_1TC4AhP4cNeNUaNJYD1vMeSn',
 };
 
-const PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string;
+const PUBLISHABLE_KEY = (import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string)
+    || 'pk_test_51TC3ygP4cNeNUaNJ3RKbUvXBH1DqJLqeG2MI3w91u0ZR5MjqUORtJy63RTTCoURiSzI76PZFkGv3NFVQ9iFpwebY00cXsSev98';
 
 let stripePromise: Promise<any> | null = null;
 
