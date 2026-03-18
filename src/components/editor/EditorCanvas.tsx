@@ -32,12 +32,14 @@ interface Props {
     onAddText?: (x: number, y: number) => void;
     onTriggerImageUpload?: (x: number, y: number) => void;
     onTriggerVideoUpload?: (x: number, y: number) => void;
+    children?: React.ReactNode;
 }
 
 export function EditorCanvas({
     variant, canvasRef, overlayRef, engineRef, state, actions, retryInit,
     overlayElements = [], selectedOverlayId, onOverlaySelect,
     onOverlayUpdate, onOverlayDelete, onAddText, onTriggerImageUpload, onTriggerVideoUpload,
+    children,
 }: Props) {
     const { width, height } = variant.preset;
     const activeTool = useEditorStore((s) => s.activeTool);
@@ -492,6 +494,9 @@ export function EditorCanvas({
                     onClose={closeCtxMenu}
                 />
             )}
+
+            {/* Extra children (e.g. ContextToolbar overlay) */}
+            {children}
         </div>
     );
 }

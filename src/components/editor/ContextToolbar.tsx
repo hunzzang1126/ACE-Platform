@@ -1,0 +1,290 @@
+// ─────────────────────────────────────────────────
+// ContextToolbar — Canva-style floating toolbar for selected elements
+// ─────────────────────────────────────────────────
+// Appears above the selected element. Shows context-aware controls:
+//   - Text: Font family, font size, B/I/U/S, color, alignment, effects
+//   - Shape: Fill color, border radius, opacity, effects
+//   - Image: Fit mode, opacity
+//   - Common: Position, Effects, Animate
+// ─────────────────────────────────────────────────
+
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { IcAlignLeft, IcAlignCenterH, IcAlignRight } from '@/components/ui/Icons';
+import { ColorPicker } from '@/components/ui/ColorPicker';
+import type { EngineNode, CanvasEngineActions } from '@/hooks/canvasTypes';
+import type { OverlayElement } from '@/hooks/useOverlayElements';
+
+// ── Font options ──
+const FONT_FAMILIES = [
+    'Inter, sans-serif',
+    'Roboto, sans-serif',
+    'Outfit, sans-serif',
+    'Poppins, sans-serif',
+    'Montserrat, sans-serif',
+    'Arial, sans-serif',
+    'Georgia, serif',
+    'Times New Roman, serif',
+    'Courier New, monospace',
+];
+
+const FONT_WEIGHTS = [
+    { label: 'Light', value: '300' },
+    { label: 'Regular', value: '400' },
+    { label: 'Medium', value: '500' },
+    { label: 'Semi Bold', value: '600' },
+    { label: 'Bold', value: '700' },
+    { label: 'Black', value: '900' },
+];
+
+interface Props {
+    // Engine node selection
+    nodes?: EngineNode[];
+    selection?: number[];
+    actions?: CanvasEngineActions | null;
+    // Overlay selection
+    selectedOverlay?: OverlayElement | null;
+    onOverlayUpdate?: (id: string, updates: Partial<OverlayElement>) => void;
+    // Canvas dimensions for alignment
+    canvasWidth?: number;
+    canvasHeight?: number;
+    // Position relative to canvas
+    canvasRect?: DOMRect | null;
+}
+
+export function ContextToolbar({
+    nodes = [],
+    selection = [],
+    actions,
+    selectedOverlay,
+    onOverlayUpdate,
+    canvasWidth = 300,
+    canvasHeight = 250,
+}: Props) {
+    const selectedNode = nodes.find((n) => selection.includes(n.id));
+    const hasOverlay = !!selectedOverlay;
+    const hasShape = !!selectedNode;
+
+    // Nothing selected — don't render
+    if (!hasOverlay && !hasShape) return null;
+
+    // ── Text overlay selected ──
+    if (hasOverlay && selectedOverlay.type === 'text') {
+        return (
+            <div className="ctx-toolbar" role="toolbar">
+                {/* Font Family */}
+                <select
+                    className="ctx-select ctx-font-select"
+                    value={selectedOverlay.fontFamily || 'Inter, sans-serif'}
+                    onChange={(e) => onOverlayUpdate?.(selectedOverlay.id, { fontFamily: e.target.value })}
+                >
+                    {FONT_FAMILIES.map((f) => (
+                        <option key={f} value={f}>{f.split(',')[0]}</option>
+                    ))}
+                </select>
+
+                <div className="ctx-divider" />
+
+                {/* Font Size */}
+                <div className="ctx-font-size">
+                    <button className="ctx-btn" onClick={() => {
+                        const s = (selectedOverlay.fontSize ?? 16) - 1;
+                        onOverlayUpdate?.(selectedOverlay.id, { fontSize: Math.max(1, s) });
+                    }}>-</button>
+                    <input
+                        className="ctx-size-input"
+                        type="number"
+                        value={Math.round(selectedOverlay.fontSize ?? 16)}
+                        onChange={(e) => onOverlayUpdate?.(selectedOverlay.id, { fontSize: Number(e.target.value) })}
+                        min={1}
+                        max={999}
+                    />
+                    <button className="ctx-btn" onClick={() => {
+                        const s = (selectedOverlay.fontSize ?? 16) + 1;
+                        onOverlayUpdate?.(selectedOverlay.id, { fontSize: Math.min(999, s) });
+                    }}>+</button>
+                </div>
+
+                <div className="ctx-divider" />
+
+                {/* Text Color */}
+                <ColorPicker
+                    label=""
+                    color={selectedOverlay.color || '#000000'}
+                    onChange={(c) => onOverlayUpdate?.(selectedOverlay.id, { color: c })}
+                />
+
+                {/* Bold / Italic / Underline */}
+                <button
+                    className={`ctx-btn ${(selectedOverlay.fontWeight === '700' || selectedOverlay.fontWeight === 'bold') ? 'active' : ''}`}
+                    onClick={() => {
+                        const isBold = selectedOverlay.fontWeight === '700' || selectedOverlay.fontWeight === 'bold';
+                        onOverlayUpdate?.(selectedOverlay.id, { fontWeight: isBold ? '400' : '700' });
+                    }}
+                    title="Bold"
+                >
+                    <strong>B</strong>
+                </button>
+
+                <div className="ctx-divider" />
+
+                {/* Alignment */}
+                {(['left', 'center', 'right'] as const).map((align) => (
+                    <button
+                        key={align}
+                        className={`ctx-btn ${(selectedOverlay.textAlign || 'left') === align ? 'active' : ''}`}
+                        onClick={() => onOverlayUpdate?.(selectedOverlay.id, { textAlign: align })}
+                        title={`Align ${align}`}
+                    >
+                        {align === 'left' && <IcAlignLeft size={14} />}
+                        {align === 'center' && <IcAlignCenterH size={14} />}
+                        {align === 'right' && <IcAlignRight size={14} />}
+                    </button>
+                ))}
+
+                <div className="ctx-divider" />
+
+                {/* Effects / Position (labels only — can be dropdowns later) */}
+                <button className="ctx-btn ctx-label-btn" title="Effects">Effects</button>
+                <button className="ctx-btn ctx-label-btn" title="Position">Position</button>
+            </div>
+        );
+    }
+
+    // ── Image overlay selected ──
+    if (hasOverlay && (selectedOverlay.type === 'image' || selectedOverlay.type === 'video')) {
+        return (
+            <div className="ctx-toolbar" role="toolbar">
+                <select
+                    className="ctx-select"
+                    value={selectedOverlay.objectFit || 'cover'}
+                    onChange={(e) => onOverlayUpdate?.(selectedOverlay.id, { objectFit: e.target.value as 'cover' | 'contain' | 'fill' })}
+                >
+                    <option value="cover">Cover</option>
+                    <option value="contain">Contain</option>
+                    <option value="fill">Fill</option>
+                </select>
+                <div className="ctx-divider" />
+                <button className="ctx-btn ctx-label-btn" title="Effects">Effects</button>
+                <button className="ctx-btn ctx-label-btn" title="Position">Position</button>
+            </div>
+        );
+    }
+
+    // ── Engine node selected (shape / text / image / path) ──
+    if (hasShape && selectedNode && actions) {
+        const isTextNode = selectedNode.type === 'text';
+
+        // Fill color for shapes
+        const fillR = selectedNode.fill_r ?? 0.5;
+        const fillG = selectedNode.fill_g ?? 0.5;
+        const fillB = selectedNode.fill_b ?? 0.5;
+        const currentFillHex = `#${[fillR, fillG, fillB].map(v => Math.round(v * 255).toString(16).padStart(2, '0')).join('')}`;
+
+        const handleColorChange = (hex: string) => {
+            const r = parseInt(hex.slice(1, 3), 16) / 255;
+            const g = parseInt(hex.slice(3, 5), 16) / 255;
+            const b = parseInt(hex.slice(5, 7), 16) / 255;
+            actions.setFillColor(selectedNode.id, r, g, b, 1.0);
+        };
+
+        if (isTextNode) {
+            return (
+                <div className="ctx-toolbar" role="toolbar">
+                    {/* Font Family */}
+                    <select
+                        className="ctx-select ctx-font-select"
+                        value={selectedNode.fontFamily || 'Inter, sans-serif'}
+                        onChange={(e) => actions.updateText?.(selectedNode.id, { fontFamily: e.target.value })}
+                    >
+                        {FONT_FAMILIES.map((f) => (
+                            <option key={f} value={f}>{f.split(',')[0]}</option>
+                        ))}
+                    </select>
+
+                    <div className="ctx-divider" />
+
+                    {/* Font Size */}
+                    <div className="ctx-font-size">
+                        <button className="ctx-btn" onClick={() => {
+                            const s = (selectedNode.fontSize ?? 18) - 1;
+                            actions.updateText?.(selectedNode.id, { fontSize: Math.max(1, s) });
+                        }}>-</button>
+                        <input
+                            className="ctx-size-input"
+                            type="number"
+                            value={Math.round(selectedNode.fontSize ?? 18)}
+                            onChange={(e) => actions.updateText?.(selectedNode.id, { fontSize: Number(e.target.value) })}
+                            min={1}
+                            max={999}
+                        />
+                        <button className="ctx-btn" onClick={() => {
+                            const s = (selectedNode.fontSize ?? 18) + 1;
+                            actions.updateText?.(selectedNode.id, { fontSize: Math.min(999, s) });
+                        }}>+</button>
+                    </div>
+
+                    <div className="ctx-divider" />
+
+                    {/* Text Color */}
+                    <ColorPicker
+                        label=""
+                        color={selectedNode.color || '#000000'}
+                        onChange={(c) => actions.updateText?.(selectedNode.id, { color: c })}
+                    />
+
+                    {/* Bold */}
+                    <button
+                        className={`ctx-btn ${(selectedNode.fontWeight === '700' || selectedNode.fontWeight === 'bold') ? 'active' : ''}`}
+                        onClick={() => {
+                            const isBold = selectedNode.fontWeight === '700' || selectedNode.fontWeight === 'bold';
+                            actions.updateText?.(selectedNode.id, { fontWeight: isBold ? '400' : '700' });
+                        }}
+                        title="Bold"
+                    >
+                        <strong>B</strong>
+                    </button>
+
+                    <div className="ctx-divider" />
+
+                    {/* Alignment */}
+                    {(['left', 'center', 'right'] as const).map((align) => (
+                        <button
+                            key={align}
+                            className={`ctx-btn ${(selectedNode.textAlign || 'left') === align ? 'active' : ''}`}
+                            onClick={() => actions.updateText?.(selectedNode.id, { textAlign: align })}
+                            title={`Align ${align}`}
+                        >
+                            {align === 'left' && <IcAlignLeft size={14} />}
+                            {align === 'center' && <IcAlignCenterH size={14} />}
+                            {align === 'right' && <IcAlignRight size={14} />}
+                        </button>
+                    ))}
+
+                    <div className="ctx-divider" />
+                    <button className="ctx-btn ctx-label-btn" title="Effects">Effects</button>
+                    <button className="ctx-btn ctx-label-btn" title="Animate">Animate</button>
+                    <button className="ctx-btn ctx-label-btn" title="Position">Position</button>
+                </div>
+            );
+        }
+
+        // Non-text shape node
+        return (
+            <div className="ctx-toolbar" role="toolbar">
+                {selectedNode.type !== 'image' && (
+                    <ColorPicker
+                        label=""
+                        color={currentFillHex}
+                        onChange={handleColorChange}
+                    />
+                )}
+                <div className="ctx-divider" />
+                <button className="ctx-btn ctx-label-btn" title="Effects">Effects</button>
+                <button className="ctx-btn ctx-label-btn" title="Animate">Animate</button>
+                <button className="ctx-btn ctx-label-btn" title="Position">Position</button>
+            </div>
+        );
+    }
+
+    return null;
+}

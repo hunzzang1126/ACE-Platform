@@ -10,7 +10,7 @@ import { useUIStore } from '@/stores/uiStore';
 import { EditorTopBar } from '@/components/editor/EditorTopBar';
 import { EditorSidebar } from '@/components/editor/EditorSidebar';
 import { EditorCanvas } from '@/components/editor/EditorCanvas';
-import { PropertyPanel } from '@/components/panels/PropertyPanel';
+import { ContextToolbar } from '@/components/editor/ContextToolbar';
 import { BottomPanel } from '@/components/editor/BottomPanel';
 // Vision check is now integrated into Auto-Design flow (autoDesignLoop.ts)
 // AI is now unified in GlobalAiPanel (App.tsx sidebar)
@@ -389,10 +389,9 @@ export function DetailEditorPage() {
                     onAddText={overlay.addText}
                     onTriggerImageUpload={overlay.triggerImageUpload}
                     onTriggerVideoUpload={overlay.triggerVideoUpload}
-                />
-                {/* Right panel: Property editing + secondary panels */}
-                <aside className="ed-right-panel-wrapper">
-                    <PropertyPanel
+                >
+                    {/* Canva-style floating context toolbar */}
+                    <ContextToolbar
                         nodes={state.nodes}
                         selection={state.selection}
                         actions={actions}
@@ -401,14 +400,7 @@ export function DetailEditorPage() {
                         canvasWidth={width}
                         canvasHeight={height}
                     />
-
-                    {/* Keyframe Inspector */}
-                    {keyframeInspectorOpen && (
-                        <KeyframeInspector
-                            onClose={toggleKeyframeInspector}
-                        />
-                    )}
-                </aside>
+                </EditorCanvas>
                 {/* Export Panel — slide-over */}
                 {exportPanelOpen && (
                     <ExportPanel
