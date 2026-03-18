@@ -91,16 +91,16 @@ const t1Elements: DesignElement[] = [
     shapeEl('t1-accent', 'Accent Bar', 0, 0, 4, 250, {
         fill: '#8b5cf6', zIndex: 1, role: 'accent',
     }),
-    textEl('t1-headline', 'Headline', 20, 20, 260, 80, {
-        content: 'THE FUTURE\nIS HERE', fontSize: 38, fontWeight: 800,
+    textEl('t1-headline', 'Headline', 20, 15, 260, 100, {
+        content: 'THE FUTURE\nIS HERE', fontSize: 48, fontWeight: 800,
         color: '#ffffff', zIndex: 2, role: 'headline',
     }),
-    textEl('t1-body', 'Body', 20, 115, 220, 50, {
-        content: 'Experience the next generation of creative tools.',
-        fontSize: 15, fontWeight: 400, color: '#94a3b8', zIndex: 2, role: 'body',
+    textEl('t1-body', 'Body', 20, 120, 240, 55, {
+        content: 'Experience the next generation\nof creative tools.',
+        fontSize: 18, fontWeight: 400, color: '#94a3b8', zIndex: 2, role: 'body',
     }),
-    btnEl('t1-cta', 'CTA', 20, 185, 140, 42, {
-        label: 'Learn More', fontSize: 14, color: '#ffffff',
+    btnEl('t1-cta', 'CTA', 20, 190, 140, 42, {
+        label: 'Learn More', fontSize: 15, color: '#ffffff',
         backgroundColor: '#8b5cf6', borderRadius: 8, zIndex: 3, role: 'cta',
     }),
 ];
@@ -165,19 +165,19 @@ const t4Elements: DesignElement[] = [
     shapeEl('t4-gold-line', 'Gold Line', 20, 30, 1, 540, {
         fill: '#c9a84c', zIndex: 1, opacity: 0.4, role: 'accent',
     }),
-    textEl('t4-headline', 'Headline', 24, 160, 120, 130, {
-        content: 'ELEVATE\nYOUR\nPORTFOLIO', fontSize: 28, fontWeight: 700,
+    textEl('t4-headline', 'Headline', 16, 130, 130, 160, {
+        content: 'ELEVATE\nYOUR\nPORTFOLIO', fontSize: 36, fontWeight: 700,
         color: '#c9a84c', fontFamily: 'Inter', textAlign: 'center', zIndex: 2, role: 'headline',
     }),
-    shapeEl('t4-divider', 'Divider', 36, 310, 40, 1, {
+    shapeEl('t4-divider', 'Divider', 50, 310, 60, 1, {
         fill: '#c9a84c', zIndex: 1,
     }),
-    textEl('t4-body', 'Body', 24, 330, 120, 100, {
-        content: 'Premium wealth management for discerning investors.',
-        fontSize: 14, fontWeight: 400, color: '#888888', textAlign: 'center', zIndex: 2, role: 'body',
+    textEl('t4-body', 'Body', 16, 330, 130, 120, {
+        content: 'Premium wealth\nmanagement for\ndiscerning investors.', 
+        fontSize: 16, fontWeight: 400, color: '#888888', textAlign: 'center', zIndex: 2, role: 'body',
     }),
-    btnEl('t4-cta', 'CTA', 36, 510, 90, 34, {
-        label: 'Inquire', fontSize: 14, color: '#0c0c0c',
+    btnEl('t4-cta', 'CTA', 30, 510, 100, 38, {
+        label: 'Inquire', fontSize: 15, color: '#0c0c0c',
         backgroundColor: '#c9a84c', borderRadius: 2, zIndex: 3, role: 'cta',
     }),
 ];
