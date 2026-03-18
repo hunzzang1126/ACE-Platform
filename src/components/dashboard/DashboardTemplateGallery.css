@@ -166,6 +166,7 @@
     top: 0;
     left: 0;
     transform-origin: top left;
+    overflow: hidden;
     /* transform: scale() is computed in JS via ResizeObserver */
 }
 
@@ -173,7 +174,6 @@
 .tmpl-mini {
     position: absolute;
     pointer-events: none;
-    overflow: hidden;
 }
 
 .tmpl-mini--text {
@@ -183,8 +183,6 @@
 
 .tmpl-mini__text {
     width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
     white-space: pre-line;
     font-family: Inter, system-ui, sans-serif;
 }
