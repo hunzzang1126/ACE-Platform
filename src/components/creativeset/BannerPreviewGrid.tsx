@@ -5,7 +5,7 @@
 import { useMemo, useCallback, useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { BannerVariant } from '@/schema/design.types';
-import { resolveConstraints } from '@/schema/constraints.types';
+import { constraintsToAbsolute } from '@/engine/elementConverters';
 import { computeAnimStyle, type AnimPresetType } from '@/hooks/useAnimationPresets';
 import { loadVideoBlob } from '@/stores/videoStorage';
 import type { SmartCheckStatus } from '@/hooks/useSmartCheck';
@@ -37,8 +37,8 @@ async function renderVariantToCanvas(variant: BannerVariant): Promise<string> {
     const sorted = [...variant.elements].sort((a, b) => a.zIndex - b.zIndex);
 
     for (const el of sorted) {
-        const resolved = resolveConstraints(el.constraints, w, h);
-        const { x, y, width: ew, height: eh } = resolved;
+        const resolved = constraintsToAbsolute(el.constraints, w, h);
+        const { x, y, w: ew, h: eh } = resolved;
 
         ctx.save();
         ctx.globalAlpha = el.opacity ?? 1;
@@ -85,27 +85,31 @@ async function renderVariantToCanvas(variant: BannerVariant): Promise<string> {
             const fontWeight = el.fontWeight || '400';
             ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
             ctx.textBaseline = 'top';
-            // Simple text wrapping
-            const words = el.content.split(' ');
-            let line = '';
-            let lineY = y;
             const lineHeight = fontSize * (el.lineHeight ?? 1.2);
-            for (const word of words) {
-                const test = line + (line ? ' ' : '') + word;
-                if (ctx.measureText(test).width > ew && line) {
+            // ★ Split by explicit \n first, then word-wrap each paragraph
+            const paragraphs = el.content.split('\n');
+            let lineY = y;
+            for (const paragraph of paragraphs) {
+                const words = paragraph.split(' ');
+                let line = '';
+                for (const word of words) {
+                    const test = line + (line ? ' ' : '') + word;
+                    if (ctx.measureText(test).width > ew && line) {
+                        const drawX = el.textAlign === 'center' ? x + ew / 2 - ctx.measureText(line).width / 2
+                            : el.textAlign === 'right' ? x + ew - ctx.measureText(line).width : x;
+                        ctx.fillText(line, drawX, lineY);
+                        line = word;
+                        lineY += lineHeight;
+                    } else {
+                        line = test;
+                    }
+                }
+                if (line) {
                     const drawX = el.textAlign === 'center' ? x + ew / 2 - ctx.measureText(line).width / 2
                         : el.textAlign === 'right' ? x + ew - ctx.measureText(line).width : x;
                     ctx.fillText(line, drawX, lineY);
-                    line = word;
-                    lineY += lineHeight;
-                } else {
-                    line = test;
                 }
-            }
-            if (line) {
-                const drawX = el.textAlign === 'center' ? x + ew / 2 - ctx.measureText(line).width / 2
-                    : el.textAlign === 'right' ? x + ew - ctx.measureText(line).width : x;
-                ctx.fillText(line, drawX, lineY);
+                lineY += lineHeight; // paragraph break
             }
         } else if (el.type === 'button') {
             // Button background
@@ -624,7 +628,7 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                                     {[...variant.elements]
                                         .sort((a, b) => a.zIndex - b.zIndex)
                                         .map((el) => {
-                                            const resolved = resolveConstraints(el.constraints, width, height);
+                                            const resolved = constraintsToAbsolute(el.constraints, width, height);
 
                                             // Compute animation style if playing
                                             let animStyle: React.CSSProperties = {};
@@ -657,8 +661,8 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                                                         position: 'absolute',
                                                         left: resolved.x,
                                                         top: resolved.y,
-                                                        width: resolved.width,
-                                                        height: resolved.height,
+                                                        width: resolved.w,
+                                                        height: resolved.h,
                                                         opacity: el.opacity,
                                                         zIndex: el.zIndex,
                                                         transition: isPlaying ? 'none' : undefined,
