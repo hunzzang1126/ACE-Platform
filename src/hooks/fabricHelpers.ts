@@ -5,7 +5,7 @@
 // No React dependencies.
 // ─────────────────────────────────────────────────
 
-import { Textbox, type FabricObject } from 'fabric';
+import { Textbox, Shadow, type FabricObject } from 'fabric';
 import type { EngineNode } from './canvasTypes';
 
 // ── Unique ID generator ──
@@ -199,6 +199,19 @@ export function fabricToEngineNode(obj: FabricObject): EngineNode {
             node.objectFit = 'cover';
         }
     }
+
+    // Shadow / glow effect
+    if (obj.shadow && obj.shadow instanceof Shadow) {
+        const s = obj.shadow;
+        node.shadow_offsetX = s.offsetX ?? 0;
+        node.shadow_offsetY = s.offsetY ?? 0;
+        node.shadow_blur = s.blur ?? 0;
+        node.shadow_color = s.color ?? 'rgba(0,0,0,0.5)';
+    }
+
+    // Visibility and lock state
+    node.visible = obj.visible !== false;
+    node.locked = !!(obj as any).lockMovementX;
 
     return node;
 }

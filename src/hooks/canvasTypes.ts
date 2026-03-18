@@ -42,6 +42,14 @@ export interface EngineNode {
     gradient_start?: string; // hex color
     gradient_end?: string;   // hex color
     gradient_angle?: number; // degrees, 0=top→bottom, 90=left→right
+    // Shadow fields (from Fabric Shadow object)
+    shadow_offsetX?: number;
+    shadow_offsetY?: number;
+    shadow_blur?: number;
+    shadow_color?: string;
+    // Visibility/Lock state (from Fabric object properties)
+    visible?: boolean;
+    locked?: boolean;
     // Name (for layer panel display)
     name?: string;
 }

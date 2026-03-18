@@ -232,7 +232,9 @@ export function DetailEditorPage() {
                         overlay.restoreElements(restoredOverlays);
                     }
                     syncState();
-                    isDirtyRef.current = true;
+                    // ★ FIX: Do NOT set isDirty here — this re-sync is from AI/store changes,
+                    // not user actions. Setting dirty here caused the X-button-saves-without-user-save bug.
+                    // isDirtyRef.current = true;
                 })();
             }
         }

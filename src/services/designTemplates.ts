@@ -780,14 +780,14 @@ Generate EXACTLY this JSON object:
   "headline": "${headlineLimit}. Bold, impactful, no period at end",
   "subheadline": "${subLimit}. Supporting the headline, professional tone. If the headline is already clear and the canvas is small, set to empty string.",
   "cta": "1-3 word action verb. Examples: Learn More, Get Started, Shop Now, Try Free",
-  "tag": "1-2 word category label. Examples: NEW, PREMIUM, LIMITED, 2026"
+  "tag": "1-2 word contextual label OR empty string. Only include if a natural category fits (NEW, SALE, LIMITED, 2026). For generic or travel ads, return empty string."
 }
 
 Rules:
 - Write real, professional ad copy — no lorem ipsum
 - Headline should be the star — punchy, memorable
 - CTA must be a clear call to action  
-- Tag is a tiny category marker, always uppercase
+- Tag is OPTIONAL — only use if the concept has a clear category/status. Return "" if not relevant.
 - Write all text in ${language}
 - If the user's prompt is in a different language, use THAT language instead
 - IMPORTANT: If the headline already conveys the full message (e.g. "SUMMER SALE 40% OFF"), the subheadline is OPTIONAL — set it to "" (empty string) to keep the layout clean

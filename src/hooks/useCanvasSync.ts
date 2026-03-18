@@ -23,6 +23,30 @@ import { fabricJsonToElements } from '@/engine/fabricSerializer';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Engine = any;
 
+/** Parse CSS shadow color string (rgba/rgb/hex) → [r, g, b, a] floats (0-1) */
+function parseShadowColor(color: string): [number, number, number, number] {
+    const rgbaMatch = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+    if (rgbaMatch) {
+        return [
+            parseInt(rgbaMatch[1]!) / 255,
+            parseInt(rgbaMatch[2]!) / 255,
+            parseInt(rgbaMatch[3]!) / 255,
+            rgbaMatch[4] !== undefined ? parseFloat(rgbaMatch[4]!) : 1.0,
+        ];
+    }
+    // Hex fallback
+    const hex = color.replace('#', '');
+    if (hex.length >= 6) {
+        return [
+            parseInt(hex.slice(0, 2), 16) / 255,
+            parseInt(hex.slice(2, 4), 16) / 255,
+            parseInt(hex.slice(4, 6), 16) / 255,
+            1.0,
+        ];
+    }
+    return [0, 0, 0, 0.5]; // default
+}
+
 
 // ── Hook ────────────────────────────────────────
 
@@ -316,6 +340,20 @@ export function useCanvasSync(
                 if (shape.opacity !== undefined && shape.opacity !== 1) {
                     try { engine.set_opacity(nodeId, shape.opacity); } catch { /* ok */ }
                 }
+                // ★ Restore shadow/glow effect
+                if (el.shadow) {
+                    try {
+                        const [sr, sg, sb, sa] = parseShadowColor(el.shadow.color);
+                        engine.set_shadow(nodeId, el.shadow.offsetX, el.shadow.offsetY, el.shadow.blur, sr, sg, sb, sa);
+                    } catch { /* ok */ }
+                }
+                // ★ Restore visible/locked state
+                if (el.visible === false) {
+                    try { engine.set_visible?.(nodeId, false); } catch { /* ok */ }
+                }
+                if (el.locked) {
+                    try { engine.set_locked?.(nodeId, true); } catch { /* ok */ }
+                }
 
                 restoredShapes++;
 
@@ -345,10 +383,25 @@ export function useCanvasSync(
                     text.name,
                     text.lineHeight,
                     text.letterSpacing,
+                    text.fontStyle,
                 );
 
                 if (text.opacity !== undefined && text.opacity !== 1) {
                     try { engine.set_opacity(nodeId, text.opacity); } catch { /* ok */ }
+                }
+                // ★ Restore shadow/glow effect for text
+                if (el.shadow) {
+                    try {
+                        const [sr, sg, sb, sa] = parseShadowColor(el.shadow.color);
+                        engine.set_shadow(nodeId, el.shadow.offsetX, el.shadow.offsetY, el.shadow.blur, sr, sg, sb, sa);
+                    } catch { /* ok */ }
+                }
+                // ★ Restore visible/locked
+                if (el.visible === false) {
+                    try { engine.set_visible?.(nodeId, false); } catch { /* ok */ }
+                }
+                if (el.locked) {
+                    try { engine.set_locked?.(nodeId, true); } catch { /* ok */ }
                 }
 
                 restoredShapes++;
@@ -389,6 +442,13 @@ export function useCanvasSync(
                         );
                         if (capturedImg.opacity !== undefined && capturedImg.opacity !== 1) {
                             try { engine.set_opacity(nodeId, capturedImg.opacity); } catch { /* ok */ }
+                        }
+                        // ★ Restore shadow for images
+                        if (el.shadow) {
+                            try {
+                                const [sr, sg, sb, sa] = parseShadowColor(el.shadow.color);
+                                engine.set_shadow(nodeId, el.shadow.offsetX, el.shadow.offsetY, el.shadow.blur, sr, sg, sb, sa);
+                            } catch { /* ok */ }
                         }
                     });
                 }

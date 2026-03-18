@@ -24,6 +24,8 @@ export interface BaseElement {
     zIndex: number;
     /** 블렌드 모드 */
     blendMode?: string;
+    /** Shadow / glow effect */
+    shadow?: { offsetX: number; offsetY: number; blur: number; color: string };
     /** Animation preset (persisted) */
     animation?: ElementAnimation;
     /** Semantic role for Smart Sizing layout intelligence */

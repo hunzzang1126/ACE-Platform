@@ -167,6 +167,7 @@ export function createEngineShim(
             name?: string,
             lineHeight?: number,
             letterSpacing?: number,
+            fontStyle?: string,
         ) => {
             const id = nextId();
             const tb = new Textbox(content || 'Text', {
@@ -176,6 +177,7 @@ export function createEngineShim(
                 fontSize: fontSize || 18,
                 fontFamily: fontFamily || 'Inter, system-ui, sans-serif',
                 fontWeight: fontWeight || '400',
+                fontStyle: (fontStyle === 'italic' ? 'italic' : 'normal') as any,
                 fill: rgbToHex(r, g, b),
                 textAlign: (textAlign as any) || 'left',
                 lineHeight: lineHeight ?? 1.4,
@@ -327,15 +329,38 @@ export function createEngineShim(
             fc.renderAll();
         },
 
-        // ★ Sync __glidZIndex from actual Fabric stack order.
-        // MUST be called before save to ensure z-order is preserved correctly.
+        /** Sync __glidZIndex from actual stack order (call before save) */
         syncZIndexFromStack: () => {
-            const objs = userObjects();
-            objs.forEach((o, i) => {
-                (o as any).__glidZIndex = i;
-            });
+            let idx = 0;
+            for (const obj of fc.getObjects()) {
+                if ((obj as any).__glidId != null) {
+                    (obj as any).__glidZIndex = idx++;
+                }
+            }
         },
 
+        /** Set visibility on a Fabric object by engine ID */
+        set_visible: (nodeId: number, visible: boolean) => {
+            const obj = userObjects().find(o => (o as any).__glidId === nodeId);
+            if (obj) {
+                obj.visible = visible;
+                fc.renderAll();
+            }
+        },
+
+        /** Set lock state on a Fabric object by engine ID */
+        set_locked: (nodeId: number, locked: boolean) => {
+            const obj = userObjects().find(o => (o as any).__glidId === nodeId);
+            if (obj) {
+                (obj as any).lockMovementX = locked;
+                (obj as any).lockMovementY = locked;
+                (obj as any).lockScalingX = locked;
+                (obj as any).lockScalingY = locked;
+                (obj as any).lockRotation = locked;
+                obj.selectable = !locked;
+                fc.renderAll();
+            }
+        },
         // ── Grouping ─────────────────────────────────────
         group_elements: (ids: number[], name?: string): number => {
             const objects = ids.map(findById).filter(Boolean) as FabricObject[];

@@ -219,6 +219,13 @@ export function engineNodeToShapeElement(
     const gEnd = node.gradient_end || gradientCache.get(name)?.endHex || gradientCache.get(`engine-${node.id}`)?.endHex;
     const gAngle = node.gradient_angle ?? gradientCache.get(name)?.angle ?? gradientCache.get(`engine-${node.id}`)?.angle;
 
+    const shadow = node.shadow_color ? {
+        offsetX: node.shadow_offsetX ?? 0,
+        offsetY: node.shadow_offsetY ?? 0,
+        blur: node.shadow_blur ?? 0,
+        color: node.shadow_color,
+    } : undefined;
+
     return {
         id: `engine-${node.id}`,
         name,
@@ -230,10 +237,11 @@ export function engineNodeToShapeElement(
         gradientEnd: gEnd,
         gradientAngle: gAngle,
         opacity: node.opacity ?? 1,
-        visible: true,
-        locked: false,
+        visible: node.visible !== false,
+        locked: node.locked ?? false,
         zIndex: node.z_index ?? 0,
         borderRadius: node.border_radius ?? 0,
+        shadow,
         animation,
     } as ShapeElement;
 }
@@ -246,6 +254,13 @@ export function engineNodeToTextElement(
     const constraints = absoluteToConstraints(node.x, node.y, node.w, node.h, canvasW, canvasH);
     const animation = getAnimationForElement(`engine-${node.id}`);
 
+    const shadow = node.shadow_color ? {
+        offsetX: node.shadow_offsetX ?? 0,
+        offsetY: node.shadow_offsetY ?? 0,
+        blur: node.shadow_blur ?? 0,
+        color: node.shadow_color,
+    } : undefined;
+
     return {
         id: `engine-${node.id}`,
         name: node.name || `Text ${node.id}`,
@@ -255,8 +270,6 @@ export function engineNodeToTextElement(
         fontFamily: node.fontFamily ?? 'Inter',
         fontSize: node.fontSize ?? 16,
         fontWeight: resolveFontWeight(node.fontWeight),
-        // ★ REGRESSION GUARD: Read fontStyle from node — previously hardcoded 'normal',
-        // causing italic text to lose its styling in the preview.
         fontStyle: (node.fontStyle as 'normal' | 'italic') ?? 'normal',
         color: node.color ?? '#000000',
         textAlign: node.textAlign ?? 'left',
@@ -264,9 +277,10 @@ export function engineNodeToTextElement(
         letterSpacing: node.letterSpacing ?? 0,
         autoShrink: true,
         opacity: node.opacity ?? 1,
-        visible: true,
-        locked: false,
+        visible: node.visible !== false,
+        locked: node.locked ?? false,
         zIndex: node.z_index ?? 1,
+        shadow,
         animation,
     } as TextElement;
 }
@@ -279,6 +293,13 @@ export function engineNodeToImageElement(
     const constraints = absoluteToConstraints(node.x, node.y, node.w, node.h, canvasW, canvasH);
     const animation = getAnimationForElement(`engine-${node.id}`);
 
+    const shadow = node.shadow_color ? {
+        offsetX: node.shadow_offsetX ?? 0,
+        offsetY: node.shadow_offsetY ?? 0,
+        blur: node.shadow_blur ?? 0,
+        color: node.shadow_color,
+    } : undefined;
+
     return {
         id: `engine-${node.id}`,
         name: node.name || `Image ${node.id}`,
@@ -289,9 +310,10 @@ export function engineNodeToImageElement(
         naturalWidth: node.naturalWidth,
         naturalHeight: node.naturalHeight,
         opacity: node.opacity ?? 1,
-        visible: true,
-        locked: false,
+        visible: node.visible !== false,
+        locked: node.locked ?? false,
         zIndex: node.z_index ?? 1,
+        shadow,
         animation,
     } as ImageElement;
 }

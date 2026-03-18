@@ -203,13 +203,27 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
 
                 const activeAssets = kit.assets.filter(a => !a.deletedAt);
 
-                // ★ FIX 2: ALWAYS grab logos — they're core brand assets, no keyword match needed
+                // ★ FIX: Only grab logos when brand name is relevant to the prompt.
+                // Previously used 'no keyword match needed' comment, which placed shophealth
+                // logo on Seoul travel ads. Now checks if brand name/tagline appears in prompt.
                 const logoAssets = activeAssets.filter(a => a.category === 'logo');
                 if (logoAssets.length > 0) {
-                    const logo = logoAssets[0]!;
-                    brandLogoUrl = logo.src;
-                    brandLogoW = logo.width;
-                    brandLogoH = logo.height;
+                    const brandNameLower = (kit.guidelines?.name || kit.name || '').toLowerCase();
+                    const brandTaglineLower = (kit.guidelines?.tagline || '').toLowerCase();
+                    const promptLower2 = prompt.toLowerCase();
+                    const brandIsRelevant =
+                        promptLower2.includes(brandNameLower) ||
+                        (brandTaglineLower && promptLower2.includes(brandTaglineLower)) ||
+                        promptLower2.includes('logo') ||
+                        promptLower2.includes('brand') ||
+                        promptLower2.includes('로고') ||
+                        promptLower2.includes('브랜드');
+                    if (brandIsRelevant) {
+                        const logo = logoAssets[0]!;
+                        brandLogoUrl = logo.src;
+                        brandLogoW = logo.width;
+                        brandLogoH = logo.height;
+                    }
                 }
 
                 // Match other assets by keyword from prompt

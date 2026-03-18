@@ -633,7 +633,7 @@ export async function callTemplateContent(
             headline: userProvided.headline || parsed.headline || 'Get Started Today',
             subheadline: userProvided.subheadline ?? parsed.subheadline ?? 'Professional solutions for your business.',
             cta: userProvided.cta || parsed.cta || 'Learn More',
-            tag: userProvided.tag || parsed.tag || 'NEW',
+            tag: userProvided.tag || parsed.tag || '',
         };
     } catch {
         // Fallback: use user text or defaults
@@ -641,7 +641,7 @@ export async function callTemplateContent(
             headline: userProvided.headline || 'Get Started Today',
             subheadline: userProvided.subheadline || 'Professional solutions for your business.',
             cta: userProvided.cta || 'Learn More',
-            tag: userProvided.tag || 'NEW',
+            tag: userProvided.tag || '',
         };
     }
 }
