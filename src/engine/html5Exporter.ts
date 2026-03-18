@@ -177,8 +177,11 @@ function nodeToHtml(
                 `letter-spacing: ${node.letterSpacing ?? 0}px`,
                 `overflow: hidden`,
                 `word-wrap: break-word`,
+                `white-space: pre-line`,
             );
-            return `  <div id="${cssId}" style="${styles.join('; ')}">${escapeHtml(node.content ?? '')}</div>`;
+            // ★ Convert \n to <br> for HTML
+            const htmlContent = escapeHtml(node.content ?? '').replace(/\n/g, '<br>');
+            return `  <div id="${cssId}" style="${styles.join('; ')}">${htmlContent}</div>`;
         }
 
         case 'image': {
@@ -191,20 +194,26 @@ function nodeToHtml(
         }
 
         case 'ellipse': {
-            const fill = `rgb(${Math.round(node.fill_r * 255)},${Math.round(node.fill_g * 255)},${Math.round(node.fill_b * 255)})`;
+            const fill = node.gradient_start && node.gradient_end
+                ? `linear-gradient(${node.gradient_angle ?? 135}deg, ${node.gradient_start}, ${node.gradient_end})`
+                : `rgb(${Math.round(node.fill_r * 255)},${Math.round(node.fill_g * 255)},${Math.round(node.fill_b * 255)})`;
             styles.push(`background: ${fill}`, `border-radius: 50%`);
             return `  <div id="${cssId}" style="${styles.join('; ')}"></div>`;
         }
 
         case 'rounded_rect': {
-            const fill = `rgb(${Math.round(node.fill_r * 255)},${Math.round(node.fill_g * 255)},${Math.round(node.fill_b * 255)})`;
+            const fill = node.gradient_start && node.gradient_end
+                ? `linear-gradient(${node.gradient_angle ?? 135}deg, ${node.gradient_start}, ${node.gradient_end})`
+                : `rgb(${Math.round(node.fill_r * 255)},${Math.round(node.fill_g * 255)},${Math.round(node.fill_b * 255)})`;
             styles.push(`background: ${fill}`, `border-radius: ${node.border_radius ?? 8}px`);
             return `  <div id="${cssId}" style="${styles.join('; ')}"></div>`;
         }
 
         default: {
             // rect, path
-            const fill = `rgb(${Math.round(node.fill_r * 255)},${Math.round(node.fill_g * 255)},${Math.round(node.fill_b * 255)})`;
+            const fill = node.gradient_start && node.gradient_end
+                ? `linear-gradient(${node.gradient_angle ?? 135}deg, ${node.gradient_start}, ${node.gradient_end})`
+                : `rgb(${Math.round(node.fill_r * 255)},${Math.round(node.fill_g * 255)},${Math.round(node.fill_b * 255)})`;
             styles.push(`background: ${fill}`);
             if (node.border_radius) styles.push(`border-radius: ${node.border_radius}px`);
             return `  <div id="${cssId}" style="${styles.join('; ')}"></div>`;

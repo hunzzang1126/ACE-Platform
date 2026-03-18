@@ -9,6 +9,7 @@ import type { BannerVariant, CreativeSet } from '@/schema/design.types';
 import type { DesignElement } from '@/schema/elements.types';
 import type { ElementConstraints } from '@/schema/constraints.types';
 import { resolveConstraints } from '@/schema/constraints.types';
+import { absoluteToConstraints as canonicalAbsToConstraints } from '@/engine/elementConverters';
 import { computeSmartConstraints, getSmartFontSize } from './smartLayout';
 
 // ── Types ──
@@ -229,8 +230,10 @@ export class SyncEngine {
     }
 
     /**
-     * 제약 조건 재계산 유틸리티
-     * (마스터의 절대좌표 변경 → constraints 역계산)
+     * Constraints re-calculation utility.
+     * Delegates to the canonical implementation in elementConverters.ts
+     * to ensure consistent anchor selection across all code paths.
+     * ★ REGRESSION GUARD: NEVER duplicate this logic — use the canonical function.
      */
     static absoluteToConstraints(
         x: number,
@@ -240,57 +243,6 @@ export class SyncEngine {
         parentWidth: number,
         parentHeight: number,
     ): ElementConstraints {
-        // 가장 가까운 앵커 자동 결정
-        const centerX = x + width / 2;
-        const centerY = y + height / 2;
-
-        const leftDist = x;
-        const rightDist = parentWidth - (x + width);
-        const centerXDist = Math.abs(centerX - parentWidth / 2);
-
-        const topDist = y;
-        const bottomDist = parentHeight - (y + height);
-        const centerYDist = Math.abs(centerY - parentHeight / 2);
-
-        // 가장 가까운 수평 앵커
-        let hAnchor: 'left' | 'center' | 'right';
-        let hOffset: number;
-        if (centerXDist <= leftDist && centerXDist <= rightDist) {
-            hAnchor = 'center';
-            hOffset = centerX - parentWidth / 2 - width / 2 + width / 2;
-            hOffset = x - (parentWidth - width) / 2;
-        } else if (leftDist <= rightDist) {
-            hAnchor = 'left';
-            hOffset = x;
-        } else {
-            hAnchor = 'right';
-            hOffset = rightDist;
-        }
-
-        // 가장 가까운 수직 앵커
-        let vAnchor: 'top' | 'center' | 'bottom';
-        let vOffset: number;
-        if (centerYDist <= topDist && centerYDist <= bottomDist) {
-            vAnchor = 'center';
-            vOffset = y - (parentHeight - height) / 2;
-        } else if (topDist <= bottomDist) {
-            vAnchor = 'top';
-            vOffset = y;
-        } else {
-            vAnchor = 'bottom';
-            vOffset = bottomDist;
-        }
-
-        return {
-            horizontal: { anchor: hAnchor, offset: hOffset },
-            vertical: { anchor: vAnchor, offset: vOffset },
-            size: {
-                widthMode: 'fixed',
-                heightMode: 'fixed',
-                width,
-                height,
-            },
-            rotation: 0,
-        };
+        return canonicalAbsToConstraints(x, y, width, height, parentWidth, parentHeight);
     }
 }

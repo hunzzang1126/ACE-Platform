@@ -17,7 +17,7 @@
 import { useState, useCallback, useRef } from 'react';
 import type { CreativeSet, BannerVariant } from '@/schema/design.types';
 import type { DesignElement } from '@/schema/elements.types';
-import { resolveConstraints } from '@/schema/constraints.types';
+import { constraintsToAbsolute } from '@/engine/elementConverters';
 import { runSmartSizingQA } from '@/engine/smartSizingQA';
 import { classifyRatio } from '@/engine/smartSizing';
 import { useDesignStore } from '@/stores/designStore';
@@ -142,20 +142,20 @@ function clipOutOfBounds(
     canvasH: number,
     variantId: string,
 ): { elementId: string; patch: Partial<DesignElement> } | null {
-    const bounds = resolveConstraints(el.constraints, canvasW, canvasH);
+    const bounds = constraintsToAbsolute(el.constraints, canvasW, canvasH);
 
     // Only fix completely out-of-bounds elements
     const isCompletelyOut =
-        bounds.x + bounds.width < 0 ||
-        bounds.y + bounds.height < 0 ||
+        bounds.x + bounds.w < 0 ||
+        bounds.y + bounds.h < 0 ||
         bounds.x > canvasW ||
         bounds.y > canvasH;
 
     if (!isCompletelyOut) return null;
 
     // Nudge back in using left/top anchors
-    const newX = Math.max(8, Math.min(bounds.x, canvasW - bounds.width - 8));
-    const newY = Math.max(8, Math.min(bounds.y, canvasH - bounds.height - 8));
+    const newX = Math.max(8, Math.min(bounds.x, canvasW - bounds.w - 8));
+    const newY = Math.max(8, Math.min(bounds.y, canvasH - bounds.h - 8));
 
     return {
         elementId: el.id,
@@ -202,18 +202,42 @@ function renderVariantToCanvas(variant: BannerVariant): string | null {
         .sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
 
     for (const el of sorted) {
-        const bounds = resolveConstraints(el.constraints, w, h);
-        const { x, y, width: elW, height: elH } = bounds;
+        const resolved = constraintsToAbsolute(el.constraints, w, h);
+        const { x, y, w: elW, h: elH } = resolved;
 
         ctx.save();
         ctx.globalAlpha = el.opacity ?? 1;
 
         if (el.type === 'shape') {
-            const shape = el as DesignElement & { fill?: string; borderRadius?: number; shapeType?: string };
-            ctx.fillStyle = shape.fill ?? '#6C63FF';
-            const r = Math.min(shape.borderRadius ?? 0, elW / 2, elH / 2);
+            const shape = el as DesignElement & {
+                fill?: string; borderRadius?: number; shapeType?: string;
+                gradientStart?: string; gradientEnd?: string; gradientAngle?: number;
+            };
 
-            if (shape.shapeType === 'circle') {
+            // ── Fill: gradient or solid ──
+            if (shape.gradientStart && shape.gradientEnd) {
+                const cssAngle = shape.gradientAngle ?? 135;
+                const mathAngle = (90 - cssAngle) * Math.PI / 180;
+                const cx = x + elW / 2, cy = y + elH / 2;
+                const len = Math.max(elW, elH);
+                const grad = ctx.createLinearGradient(
+                    cx - Math.cos(mathAngle) * len / 2, cy + Math.sin(mathAngle) * len / 2,
+                    cx + Math.cos(mathAngle) * len / 2, cy - Math.sin(mathAngle) * len / 2,
+                );
+                grad.addColorStop(0, shape.gradientStart);
+                grad.addColorStop(1, shape.gradientEnd);
+                ctx.fillStyle = grad;
+            } else {
+                ctx.fillStyle = shape.fill ?? '#6C63FF';
+            }
+
+            // ── Shape path: ellipse, roundRect, or rect ──
+            const r = shape.borderRadius ?? 0;
+            const isEllipse = shape.shapeType === 'ellipse'
+                || shape.shapeType === 'circle'
+                || r >= Math.min(elW, elH) / 2;
+
+            if (isEllipse) {
                 ctx.beginPath();
                 ctx.ellipse(x + elW / 2, y + elH / 2, elW / 2, elH / 2, 0, 0, Math.PI * 2);
                 ctx.fill();
@@ -227,6 +251,7 @@ function renderVariantToCanvas(variant: BannerVariant): string | null {
             const text = el as DesignElement & {
                 content?: string; fontSize?: number; fontWeight?: number;
                 fontFamily?: string; color?: string; textAlign?: string;
+                lineHeight?: number;
             };
             const fs = text.fontSize ?? 16;
             const fw = text.fontWeight ?? 400;
@@ -234,14 +259,33 @@ function renderVariantToCanvas(variant: BannerVariant): string | null {
             ctx.font = `${fw} ${fs}px ${ff}`;
             ctx.fillStyle = text.color ?? '#FFFFFF';
             ctx.textBaseline = 'top';
+            const lineHeight = fs * (text.lineHeight ?? 1.2);
 
-            const align = text.textAlign ?? 'left';
-            let textX = x;
-            if (align === 'center') textX = x + elW / 2;
-            else if (align === 'right') textX = x + elW;
-            ctx.textAlign = align as CanvasTextAlign;
-
-            ctx.fillText(text.content ?? '', textX, y, elW);
+            // ★ Split by \n first, then word-wrap each paragraph
+            const paragraphs = (text.content ?? '').split('\n');
+            let lineY = y;
+            for (const paragraph of paragraphs) {
+                const words = paragraph.split(' ');
+                let line = '';
+                for (const word of words) {
+                    const test = line + (line ? ' ' : '') + word;
+                    if (ctx.measureText(test).width > elW && line) {
+                        const drawX = text.textAlign === 'center' ? x + elW / 2 - ctx.measureText(line).width / 2
+                            : text.textAlign === 'right' ? x + elW - ctx.measureText(line).width : x;
+                        ctx.fillText(line, drawX, lineY);
+                        line = word;
+                        lineY += lineHeight;
+                    } else {
+                        line = test;
+                    }
+                }
+                if (line) {
+                    const drawX = text.textAlign === 'center' ? x + elW / 2 - ctx.measureText(line).width / 2
+                        : text.textAlign === 'right' ? x + elW - ctx.measureText(line).width : x;
+                    ctx.fillText(line, drawX, lineY);
+                }
+                lineY += lineHeight;
+            }
         } else if (el.type === 'button') {
             const btn = el as DesignElement & {
                 label?: string; fontSize?: number; fontWeight?: number;
@@ -262,10 +306,9 @@ function renderVariantToCanvas(variant: BannerVariant): string | null {
             ctx.textBaseline = 'middle';
             ctx.fillText(btn.label ?? '', x + elW / 2, y + elH / 2, elW - 16);
         } else if (el.type === 'image') {
-            // Placeholder rectangle for images (actual images would need async loading)
+            // Placeholder rectangle for images (Vision QA doesn't load actual images)
             ctx.fillStyle = '#2a3040';
             ctx.fillRect(x, y, elW, elH);
-            // Cross lines to indicate image placeholder
             ctx.strokeStyle = '#3a4050';
             ctx.lineWidth = 1;
             ctx.beginPath();
@@ -399,7 +442,7 @@ export function useSmartCheck() {
                         // Skip overridden elements
                         if (slave.overriddenElementIds?.includes(el.id)) continue;
 
-                        const bounds = resolveConstraints(el.constraints, tW, tH);
+                        const bounds = constraintsToAbsolute(el.constraints, tW, tH);
                         const patch: Record<string, unknown> = {};
 
                         // Enforce minimum font size (readability)
@@ -413,7 +456,7 @@ export function useSmartCheck() {
 
                         // Center-align text horizontally for social
                         if (el.type === 'text' || el.type === 'button') {
-                            const centerX = Math.round((tW - bounds.width) / 2);
+                            const centerX = Math.round((tW - bounds.w) / 2);
                             if (Math.abs(bounds.x - centerX) > 8) {
                                 patch.constraints = {
                                     ...el.constraints,
