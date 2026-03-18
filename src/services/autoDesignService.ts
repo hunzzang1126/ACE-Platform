@@ -524,6 +524,50 @@ import type { GeneratedContent } from '@/services/designTemplates';
 import { buildContentPrompt } from '@/services/designTemplates';
 
 /**
+ * Extract explicit text the user provided in the prompt.
+ * Patterns detected:
+ *   - headline은 "shop your health"  / headline: shop your health
+ *   - headline = shop your health
+ *   - "Shop Your Health" 라는 해드라인
+ *   - subheadline: ..., cta: ..., tag: ...
+ */
+function extractUserText(prompt: string): Partial<GeneratedContent> {
+    const result: Partial<GeneratedContent> = {};
+
+    // Pattern 1: field은/는/= "text" or field: text (Korean + English)
+    const fieldMap: [RegExp, keyof GeneratedContent][] = [
+        [/headline[은는=:\s]+["']([^"']+)["']/i, 'headline'],
+        [/headline[은는=:\s]+([^,.\n]+)/i, 'headline'],
+        [/해드라인[은는=:\s]+["']([^"']+)["']/i, 'headline'],
+        [/해드라인[은는=:\s]+([^,.\n]+)/i, 'headline'],
+        [/헤드라인[은는=:\s]+["']([^"']+)["']/i, 'headline'],
+        [/헤드라인[은는=:\s]+([^,.\n]+)/i, 'headline'],
+        [/subheadline[은는=:\s]+["']([^"']+)["']/i, 'subheadline'],
+        [/subheadline[은는=:\s]+([^,.\n]+)/i, 'subheadline'],
+        [/cta[은는=:\s]+["']([^"']+)["']/i, 'cta'],
+        [/cta[은는=:\s]+([^,.\n]+)/i, 'cta'],
+        [/tag[은는=:\s]+["']([^"']+)["']/i, 'tag'],
+    ];
+
+    for (const [regex, field] of fieldMap) {
+        if (result[field]) continue; // Already matched by a higher-priority pattern
+        const m = prompt.match(regex);
+        if (m?.[1]) {
+            result[field] = m[1].trim();
+        }
+    }
+
+    // Pattern 2: "X" 라는 해드라인/헤드라인/headline
+    const quotePattern = /["']([^"']+)["']\s*(?:라는|이라는)?\s*(?:해드라인|헤드라인|headline)/i;
+    const qm = prompt.match(quotePattern);
+    if (qm?.[1] && !result.headline) {
+        result.headline = qm[1].trim();
+    }
+
+    return result;
+}
+
+/**
  * Lightweight AI call — generates ONLY content text.
  * Positions come from the template, not from the AI.
  * Response: { headline, subheadline, cta, tag }
@@ -536,7 +580,30 @@ export async function callTemplateContent(
     signal: AbortSignal,
     language: string = 'English',
 ): Promise<GeneratedContent> {
-    const contentPrompt = buildContentPrompt(userPrompt, canvasW, canvasH, templateName, language);
+    // ★ FIX 1: Extract user-provided text FIRST — respect explicit user copy
+    const userProvided = extractUserText(userPrompt);
+    const hasUserText = Object.keys(userProvided).length > 0;
+
+    // If user provided ALL fields, skip AI generation entirely
+    if (userProvided.headline && userProvided.cta) {
+        return {
+            headline: userProvided.headline,
+            subheadline: userProvided.subheadline || '',
+            cta: userProvided.cta,
+            tag: userProvided.tag || '',
+        };
+    }
+
+    // Build content prompt with hints about pre-filled fields
+    let contentPrompt = buildContentPrompt(userPrompt, canvasW, canvasH, templateName, language);
+    if (hasUserText) {
+        const overrideHints: string[] = [];
+        if (userProvided.headline) overrideHints.push(`The user EXPLICITLY wants this headline: "${userProvided.headline}". Use it EXACTLY as-is, do NOT change or rephrase it.`);
+        if (userProvided.subheadline) overrideHints.push(`The user EXPLICITLY wants this subheadline: "${userProvided.subheadline}". Use it EXACTLY.`);
+        if (userProvided.cta) overrideHints.push(`The user EXPLICITLY wants this CTA: "${userProvided.cta}". Use it EXACTLY.`);
+        if (userProvided.tag) overrideHints.push(`The user EXPLICITLY wants this tag: "${userProvided.tag}". Use it EXACTLY.`);
+        contentPrompt += `\n\nCRITICAL OVERRIDE:\n${overrideHints.join('\n')}`;
+    }
 
     const body = {
         model: DEFAULT_CLAUDE_MODEL,
@@ -562,18 +629,19 @@ export async function callTemplateContent(
     try {
         const parsed = JSON.parse(raw) as GeneratedContent;
         return {
-            headline: parsed.headline || 'Get Started Today',
-            subheadline: parsed.subheadline || 'Professional solutions for your business.',
-            cta: parsed.cta || 'Learn More',
-            tag: parsed.tag || 'NEW',
+            // ★ User-provided values ALWAYS override AI-generated ones
+            headline: userProvided.headline || parsed.headline || 'Get Started Today',
+            subheadline: userProvided.subheadline ?? parsed.subheadline ?? 'Professional solutions for your business.',
+            cta: userProvided.cta || parsed.cta || 'Learn More',
+            tag: userProvided.tag || parsed.tag || 'NEW',
         };
     } catch {
-        // Fallback: extract fields from raw text
+        // Fallback: use user text or defaults
         return {
-            headline: 'Get Started Today',
-            subheadline: 'Professional solutions for your business.',
-            cta: 'Learn More',
-            tag: 'NEW',
+            headline: userProvided.headline || 'Get Started Today',
+            subheadline: userProvided.subheadline || 'Professional solutions for your business.',
+            cta: userProvided.cta || 'Learn More',
+            tag: userProvided.tag || 'NEW',
         };
     }
 }

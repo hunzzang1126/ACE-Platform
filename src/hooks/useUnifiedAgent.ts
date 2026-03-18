@@ -187,6 +187,8 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         let brandPaletteHint = '';
         let brandFontHint = '';
         let brandAssetHint = '';
+        let brandLogoUrl: string | null = null;
+        let brandLogoW = 0, brandLogoH = 0;
         try {
             const { useBrandKitStore } = await resilientImport(() => import('@/stores/brandKitStore'));
             const kit = useBrandKitStore.getState().getActiveKit();
@@ -198,16 +200,28 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
                 ].join(', ');
                 // Font hint for structure phase
                 brandFontHint = `Brand fonts: heading="${kit.typography.heading.family}", body="${kit.typography.body.family}", CTA="${kit.typography.cta.family}"`;
-                // Match assets by keyword from prompt
-                const promptLower = prompt.toLowerCase();
+
                 const activeAssets = kit.assets.filter(a => !a.deletedAt);
+
+                // ★ FIX 2: ALWAYS grab logos — they're core brand assets, no keyword match needed
+                const logoAssets = activeAssets.filter(a => a.category === 'logo');
+                if (logoAssets.length > 0) {
+                    const logo = logoAssets[0]!;
+                    brandLogoUrl = logo.src;
+                    brandLogoW = logo.width;
+                    brandLogoH = logo.height;
+                }
+
+                // Match other assets by keyword from prompt
+                const promptLower = prompt.toLowerCase();
                 const matchedAssets = activeAssets.filter(a =>
                     a.tags.some(t => promptLower.includes(t.toLowerCase())) ||
                     promptLower.includes(a.name.toLowerCase()) ||
                     promptLower.includes(a.category),
                 );
-                if (matchedAssets.length > 0) {
-                    brandAssetHint = `Matching brand assets: ${matchedAssets.map(a => `"${a.name}" (${a.category}, ${a.width}x${a.height})`).join(', ')}`;
+                if (matchedAssets.length > 0 || logoAssets.length > 0) {
+                    const allRelevant = [...new Set([...logoAssets, ...matchedAssets])];
+                    brandAssetHint = `Brand assets: ${allRelevant.map(a => `"${a.name}" (${a.category}, ${a.width}x${a.height})`).join(', ')}`;
                 }
                 // Guidelines
                 const g = kit.guidelines;
@@ -221,9 +235,10 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
                     brandAssetHint,
                 ].filter(Boolean).join('\n');
 
+                const logoNote = logoAssets.length > 0 ? ` (${logoAssets.length} logo)` : '';
                 const assetNote = matchedAssets.length > 0
-                    ? `${matchedAssets.length} matching asset(s)`
-                    : `${activeAssets.length} asset(s) (no keyword match)`;
+                    ? `${matchedAssets.length} matching asset(s)${logoNote}`
+                    : `${activeAssets.length} asset(s)${logoNote}`;
                 updateCard('brand-scan', 'done', `${kit.name}: ${assetNote}`, {
                     expandedDetail: brandContext,
                 });
@@ -321,8 +336,18 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
 
             try {
                 const { generateBackgroundImage } = await resilientImport(() => import('@/services/imageGenClient'));
+
+                // ★ FIX 4: Smart image style selection based on content
+                // Detect if the prompt describes real people/products → hyper-realistic
+                // vs. abstract concepts → illustration/abstract
+                const promptLow = (backgroundImagePrompt + ' ' + prompt).toLowerCase();
+                const needsRealism = /(?:person|people|woman|man|girl|boy|model|portrait|photo|face|human|여자|남자|사람|사진|모델|얼굴|product|bottle|package|food|drink|car|building|hotel|resort)/.test(promptLow);
+                const enhancedBgPrompt = needsRealism
+                    ? `${backgroundImagePrompt}. Hyper-realistic, professional photography, 8K resolution, cinematic lighting, shallow depth of field, shot on Sony A7R IV.`
+                    : backgroundImagePrompt;
+
                 const bgResult = await generateBackgroundImage(
-                    backgroundImagePrompt,
+                    enhancedBgPrompt,
                     canvasW,
                     canvasH,
                     [guide.colors.accent, guide.colors.background, guide.colors.gradientEnd],
@@ -332,10 +357,10 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
                 if (bgResult.success && bgResult.imageUrl) {
                     bgImageUrl = bgResult.imageUrl;
                     hasImageBackground = true;
-                    updateCard('bg-image', 'done', bgResult.isFallback ? 'Gradient fallback' : 'Image generated', {
+                    updateCard('bg-image', 'done', bgResult.isFallback ? 'Gradient fallback' : `Image generated (${needsRealism ? 'hyper-realistic' : 'standard'})`, {
                         expandedDetail: bgResult.isFallback
                             ? 'API not available — using gradient fallback.'
-                            : `Generated ${canvasW}x${canvasH} background via ${bgResult.model}`,
+                            : `Generated ${canvasW}x${canvasH} background via ${bgResult.model} (style: ${needsRealism ? 'hyper-realistic' : 'standard'})`,
                     });
                 } else {
                     updateCard('bg-image', 'error', bgResult.message || 'Generation failed');
@@ -510,7 +535,32 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         }
         hideCursor();
 
-        // ── Phase 7: Vision QA (Quick Patch + 15s timeout) ──
+        // ── Phase 5.5: Brand Logo Auto-Placement ──
+        // ★ FIX 2 (cont): If brand kit has a logo, place it on the canvas after all template elements
+        if (brandLogoUrl) {
+            try {
+                // Size logo proportionally — max 15% of shorter canvas dimension
+                const maxLogoSize = Math.round(Math.min(canvasW, canvasH) * 0.15);
+                const logoAspect = brandLogoW > 0 && brandLogoH > 0 ? brandLogoW / brandLogoH : 1;
+                let logoPlaceW: number, logoPlaceH: number;
+                if (logoAspect >= 1) {
+                    logoPlaceW = maxLogoSize;
+                    logoPlaceH = Math.round(maxLogoSize / logoAspect);
+                } else {
+                    logoPlaceH = maxLogoSize;
+                    logoPlaceW = Math.round(maxLogoSize * logoAspect);
+                }
+                // Default placement: bottom-right with padding
+                const logoPad = Math.round(Math.min(canvasW, canvasH) * 0.04);
+                const logoX = canvasW - logoPlaceW - logoPad;
+                const logoY = canvasH - logoPlaceH - logoPad;
+
+                await engine.add_image(logoX, logoY, brandLogoUrl, logoPlaceW, logoPlaceH, 'brand_logo');
+                narrate(`Brand logo placed on canvas.`);
+            } catch (err) {
+                console.warn('[UnifiedAgent] Failed to place brand logo:', err);
+            }
+        }
         narrate(`Reviewing and optimizing design quality...`);
         addCard('vision', 'Optimizing layout', 'running');
         try {

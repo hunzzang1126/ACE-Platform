@@ -287,6 +287,133 @@ export async function executeToolCall(
                 }
             }
 
+            // ── Canvas Modification (Atomic) ─────────
+            // ★ FIX 3: These tools were referenced in system prompts but never implemented.
+            // Without them, "rearrange" requests silently fail — AI generates tool calls
+            // that execute nothing. Now they actually mutate canvas elements.
+            case 'set_position': {
+                const node_id = num('node_id');
+                const x = num('x'), y = num('y');
+                // Resolve by node ID, or try by name for AI convenience
+                const nodeName = str('name');
+                let targetId = node_id;
+                if (targetId <= 0 && nodeName) {
+                    const found = trackedNodes.find(n => n.label.toLowerCase().includes(nodeName.toLowerCase()));
+                    if (found) targetId = found.id;
+                }
+                if (targetId <= 0) return { success: false, message: `Cannot find element (id=${node_id}, name="${nodeName}")` };
+                engine.set_position(targetId, x, y);
+                const node = trackedNodes.find(n => n.id === targetId);
+                if (node) { node.x = x; node.y = y; }
+                const result: ExecutionResult = { success: true, message: `Moved element ${targetId} to (${x}, ${y})`, nodeId: targetId };
+                trackTouch(result, toolName, params, trackedNodes);
+                return result;
+            }
+            case 'set_size': {
+                const node_id = num('node_id');
+                const w = num('w'), h = num('h');
+                const nodeName = str('name');
+                let targetId = node_id;
+                if (targetId <= 0 && nodeName) {
+                    const found = trackedNodes.find(n => n.label.toLowerCase().includes(nodeName.toLowerCase()));
+                    if (found) targetId = found.id;
+                }
+                if (targetId <= 0) return { success: false, message: `Cannot find element (id=${node_id}, name="${nodeName}")` };
+                engine.set_size(targetId, w, h);
+                const node = trackedNodes.find(n => n.id === targetId);
+                if (node) { node.width = w; node.height = h; }
+                const result: ExecutionResult = { success: true, message: `Resized element ${targetId} to ${w}x${h}`, nodeId: targetId };
+                trackTouch(result, toolName, params, trackedNodes);
+                return result;
+            }
+            case 'set_text': {
+                const node_id = num('node_id');
+                const content = str('content');
+                const nodeName = str('name');
+                let targetId = node_id;
+                if (targetId <= 0 && nodeName) {
+                    const found = trackedNodes.find(n => n.label.toLowerCase().includes(nodeName.toLowerCase()));
+                    if (found) targetId = found.id;
+                }
+                if (targetId <= 0) return { success: false, message: `Cannot find element (id=${node_id}, name="${nodeName}")` };
+                engine.update_text(targetId, { content });
+                const result: ExecutionResult = { success: true, message: `Text of element ${targetId} changed to "${content.slice(0, 40)}"`, nodeId: targetId };
+                trackTouch(result, toolName, params, trackedNodes);
+                return result;
+            }
+            case 'set_font_size': {
+                const node_id = num('node_id');
+                const font_size = num('font_size', 16);
+                const nodeName = str('name');
+                let targetId = node_id;
+                if (targetId <= 0 && nodeName) {
+                    const found = trackedNodes.find(n => n.label.toLowerCase().includes(nodeName.toLowerCase()));
+                    if (found) targetId = found.id;
+                }
+                if (targetId <= 0) return { success: false, message: `Cannot find element` };
+                engine.update_text(targetId, { fontSize: font_size });
+                const result: ExecutionResult = { success: true, message: `Font size of element ${targetId} set to ${font_size}px`, nodeId: targetId };
+                trackTouch(result, toolName, params, trackedNodes);
+                return result;
+            }
+            case 'set_fill_hex': {
+                const node_id = num('node_id');
+                const hex = str('hex', '#FFFFFF');
+                const nodeName = str('name');
+                let targetId = node_id;
+                if (targetId <= 0 && nodeName) {
+                    const found = trackedNodes.find(n => n.label.toLowerCase().includes(nodeName.toLowerCase()));
+                    if (found) targetId = found.id;
+                }
+                if (targetId <= 0) return { success: false, message: `Cannot find element` };
+                // Convert hex to 0-1 RGB
+                const c = hex.replace('#', '');
+                const r = parseInt(c.slice(0, 2), 16) / 255;
+                const g = parseInt(c.slice(2, 4), 16) / 255;
+                const b = parseInt(c.slice(4, 6), 16) / 255;
+                engine.set_fill(targetId, r, g, b, 1.0);
+                const node = trackedNodes.find(n => n.id === targetId);
+                if (node) node.color = hex;
+                const result: ExecutionResult = { success: true, message: `Fill color of element ${targetId} set to ${hex}`, nodeId: targetId };
+                trackTouch(result, toolName, params, trackedNodes);
+                return result;
+            }
+            case 'set_color': {
+                // Alias for set_fill_hex — some prompts use this name
+                const node_id = num('node_id');
+                const hex = str('hex') || str('color', '#FFFFFF');
+                const nodeName = str('name');
+                let targetId = node_id;
+                if (targetId <= 0 && nodeName) {
+                    const found = trackedNodes.find(n => n.label.toLowerCase().includes(nodeName.toLowerCase()));
+                    if (found) targetId = found.id;
+                }
+                if (targetId <= 0) return { success: false, message: `Cannot find element` };
+                const c = hex.replace('#', '');
+                const r = parseInt(c.slice(0, 2), 16) / 255;
+                const g = parseInt(c.slice(2, 4), 16) / 255;
+                const b = parseInt(c.slice(4, 6), 16) / 255;
+                engine.set_fill(targetId, r, g, b, 1.0);
+                const node = trackedNodes.find(n => n.id === targetId);
+                if (node) node.color = hex;
+                return { success: true, message: `Color of element ${targetId} set to ${hex}`, nodeId: targetId };
+            }
+            case 'remove_node': {
+                const node_id = num('node_id');
+                const nodeName = str('name');
+                let targetId = node_id;
+                if (targetId <= 0 && nodeName) {
+                    const found = trackedNodes.find(n => n.label.toLowerCase().includes(nodeName.toLowerCase()));
+                    if (found) targetId = found.id;
+                }
+                if (targetId <= 0) return { success: false, message: `Cannot find element` };
+                engine.select(targetId);
+                engine.delete_selected();
+                const idx = trackedNodes.findIndex(n => n.id === targetId);
+                if (idx >= 0) trackedNodes.splice(idx, 1);
+                return { success: true, message: `Element ${targetId} removed`, nodeId: targetId };
+            }
+
             // ── Full Design Pipeline (Meta-Tool) ─────
             case 'generate_full_design': {
                 // This is handled at a higher level in useUnifiedAgent.ts
