@@ -179,6 +179,62 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
             if (dims) { canvasW = dims.width ?? 300; canvasH = dims.height ?? 250; }
         } catch { /* ok */ }
 
+        // ── Phase 1.5: Brand Cloud Scan ──
+        // Check active brand kit for relevant assets, palette, and guidelines.
+        addCard('brand-scan', 'Scanning Brand Cloud', 'running');
+        let brandContext = '';
+        let brandPaletteHint = '';
+        let brandFontHint = '';
+        let brandAssetHint = '';
+        try {
+            const { useBrandKitStore } = await import('@/stores/brandKitStore');
+            const kit = useBrandKitStore.getState().getActiveKit();
+            if (kit) {
+                // Extract brand palette hint for color phase
+                brandPaletteHint = [
+                    `Brand colors: primary=${kit.palette.primary}, secondary=${kit.palette.secondary}`,
+                    `accent=${kit.palette.accent}, background=${kit.palette.background}, text=${kit.palette.text}`,
+                ].join(', ');
+                // Font hint for structure phase
+                brandFontHint = `Brand fonts: heading="${kit.typography.heading.family}", body="${kit.typography.body.family}", CTA="${kit.typography.cta.family}"`;
+                // Match assets by keyword from prompt
+                const promptLower = prompt.toLowerCase();
+                const activeAssets = kit.assets.filter(a => !a.deletedAt);
+                const matchedAssets = activeAssets.filter(a =>
+                    a.tags.some(t => promptLower.includes(t.toLowerCase())) ||
+                    promptLower.includes(a.name.toLowerCase()) ||
+                    promptLower.includes(a.category),
+                );
+                if (matchedAssets.length > 0) {
+                    brandAssetHint = `Matching brand assets: ${matchedAssets.map(a => `"${a.name}" (${a.category}, ${a.width}x${a.height})`).join(', ')}`;
+                }
+                // Guidelines
+                const g = kit.guidelines;
+                brandContext = [
+                    `Brand: ${g.name || kit.name}`,
+                    g.tagline ? `Tagline: "${g.tagline}"` : '',
+                    g.voiceTone ? `Voice: ${g.voiceTone}` : '',
+                    g.ctaPhrases.length > 0 ? `CTA phrases: ${g.ctaPhrases.join(', ')}` : '',
+                    brandPaletteHint,
+                    brandFontHint,
+                    brandAssetHint,
+                ].filter(Boolean).join('\n');
+
+                const assetNote = matchedAssets.length > 0
+                    ? `${matchedAssets.length} matching asset(s)`
+                    : `${activeAssets.length} asset(s) (no keyword match)`;
+                updateCard('brand-scan', 'done', `${kit.name}: ${assetNote}`, {
+                    expandedDetail: brandContext,
+                });
+                narrate(`Brand kit "${kit.name}" loaded — ${assetNote}.`);
+            } else {
+                updateCard('brand-scan', 'done', 'No active brand kit');
+            }
+        } catch {
+            updateCard('brand-scan', 'done', 'Brand Cloud scan skipped');
+        }
+        await new Promise(r => setTimeout(r, 300));
+
         // ── Phase 2: AI Copywriting (Content-First) ──
         // Content comes FIRST so structure can adapt to actual text length.
         narrate(`I'll generate the ad copy tailored for your prompt.`);
@@ -189,7 +245,11 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         const { callTemplateContent } = await import('@/services/autoDesignService');
         const { loadUserPrefs } = await import('@/stores/userPrefs');
         const preferredLang = loadUserPrefs().preferredLanguage;
-        const content = await callTemplateContent(prompt, canvasW, canvasH, 'AI Pipeline', abort.signal, preferredLang);
+        // ★ Inject brand context into content prompt if available
+        const contentPrompt = brandContext
+            ? `${prompt}\n\n[BRAND CONTEXT]\n${brandContext}`
+            : prompt;
+        const content = await callTemplateContent(contentPrompt, canvasW, canvasH, 'AI Pipeline', abort.signal, preferredLang);
 
         const copyDetail = [
             `Headline: "${content.headline}" (${content.headline.length} chars)`,
@@ -207,7 +267,11 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         addCard('structure', 'Determining layout structure', 'running');
 
         const { generateLayoutSpec } = await import('@/services/aiStructureService');
-        const spec = await generateLayoutSpec(prompt, content, canvasW, canvasH, abort.signal);
+        // ★ Include brand font/asset hints in structure prompt
+        const structurePrompt = brandFontHint
+            ? `${prompt}\n\n[BRAND FONTS]\n${brandFontHint}`
+            : prompt;
+        const spec = await generateLayoutSpec(structurePrompt, content, canvasW, canvasH, abort.signal);
 
         const structDetail = [
             `Layout: ${spec.layoutType}`,
@@ -228,7 +292,11 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         addCard('palette', 'Determining color palette', 'running');
 
         const { generateColorPalette } = await import('@/services/designStyleGuides');
-        const { palette: guide, reasoning: colorReasoning, needsBackgroundImage, backgroundImagePrompt } = await generateColorPalette(prompt, abort.signal);
+        // ★ Include brand palette hint so AI prefers brand colors
+        const colorPrompt = brandPaletteHint
+            ? `${prompt}\n\n[BRAND PALETTE]\n${brandPaletteHint}\nPrefer these brand colors when they fit the mood.`
+            : prompt;
+        const { palette: guide, reasoning: colorReasoning, needsBackgroundImage, backgroundImagePrompt } = await generateColorPalette(colorPrompt, abort.signal);
 
         const styleDetail = [
             `Background: ${guide.colors.gradientStart} -> ${guide.colors.gradientEnd}`,
