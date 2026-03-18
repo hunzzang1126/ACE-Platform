@@ -149,17 +149,27 @@
     min-height: 140px;
 }
 
-/* ── Mini Layout Container (scales to fit card) ── */
-.tmpl-card__layout {
+/* ── True-Scale Rendering (Figma approach) ── */
+/* Renders at actual canvas dimensions, CSS scales down to fit card */
+.tmpl-card__scale-wrap {
     position: relative;
-    width: 85%;
-    max-height: 85%;
-    border-radius: 4px;
+    width: 90%;
+    height: 85%;
     overflow: hidden;
+    border-radius: 4px;
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+    container-type: size;
 }
 
-/* ── Mini Elements ── */
+.tmpl-card__canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-origin: top left;
+    /* transform: scale() is computed in JS via ResizeObserver */
+}
+
+/* ── Mini Elements (now at actual pixel positions) ── */
 .tmpl-mini {
     position: absolute;
     pointer-events: none;

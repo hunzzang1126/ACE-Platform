@@ -6,7 +6,7 @@
 // Category pills, search, responsive grid, hover overlays.
 // ─────────────────────────────────────────────────
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTemplateStore, type DesignTemplate, type TemplateCategory } from '@/stores/templateStore';
 import { useDesignStore } from '@/stores/designStore';
@@ -150,23 +150,51 @@ function TemplateCard({ template: t, isHovered, onHover, onUse, onToggleFav }: C
     // Clamp aspect ratio for card display
     const displayRatio = Math.max(0.6, Math.min(aspectRatio, 2.0));
 
+    // ★ TRUE SCALE: measure wrapper → compute scale factor → apply to canvas
+    const wrapRef = useRef<HTMLDivElement>(null);
+    const [scale, setScale] = useState(0.3); // fallback
+
+    useEffect(() => {
+        const el = wrapRef.current;
+        if (!el) return;
+        const compute = () => {
+            const wW = el.clientWidth;
+            const wH = el.clientHeight;
+            if (wW > 0 && wH > 0) {
+                setScale(Math.min(wW / t.width, wH / t.height));
+            }
+        };
+        compute();
+        const ro = new ResizeObserver(compute);
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, [t.width, t.height]);
+
     return (
         <div
             className={`tmpl-card ${isHovered ? 'tmpl-card--hover' : ''}`}
             onMouseEnter={() => onHover(t.id)}
             onMouseLeave={() => onHover(null)}
         >
-            {/* ── Preview ── */}
+            {/* ── Preview — TRUE SCALE: renders at actual canvas dimensions, shrinks via CSS transform ── */}
             <div
                 className="tmpl-card__preview"
                 style={{ backgroundColor: bgColor, aspectRatio: `${displayRatio}` }}
             >
-                {/* Mini layout mockup — uses padding-bottom trick for reliable sizing */}
-                <div className="tmpl-card__layout" style={{ position: 'relative', width: '85%' }}>
-                    <div style={{ paddingBottom: `${(t.height / t.width) * 100}%` }} />
-                    <div style={{ position: 'absolute', inset: 0 }}>
+                {/* Outer wrapper clips overflow and establishes the scaling viewport */}
+                <div ref={wrapRef} className="tmpl-card__scale-wrap">
+                    {/* Inner: actual canvas dimensions, scaled down to fit */}
+                    <div
+                        className="tmpl-card__canvas"
+                        style={{
+                            width: t.width,
+                            height: t.height,
+                            backgroundColor: bgColor,
+                            transform: `scale(${scale})`,
+                        }}
+                    >
                         {elements.map((el, i) => (
-                            <MiniElement key={i} el={el} canvasW={t.width} canvasH={t.height} />
+                            <TrueScaleElement key={i} el={el} />
                         ))}
                     </div>
                 </div>
@@ -207,28 +235,29 @@ function TemplateCard({ template: t, isHovered, onHover, onUse, onToggleFav }: C
 }
 
 // ═══════════════════════════════════════════════════
-// MiniElement — Renders a scaled-down element representation
+// TrueScaleElement — Renders at ACTUAL pixel sizes
 // ═══════════════════════════════════════════════════
+// The parent container is sized to the real canvas dimensions
+// and then CSS-scaled down. So these use the REAL pixel values
+// from the template — what you see here IS what you get on canvas.
 
-function MiniElement({ el, canvasW, canvasH }: { el: MiniElementData; canvasW: number; canvasH: number }) {
-    const left = `${(el.x / canvasW) * 100}%`;
-    const top = `${(el.y / canvasH) * 100}%`;
-    const width = `${(el.w / canvasW) * 100}%`;
-    const height = `${(el.h / canvasH) * 100}%`;
-
+function TrueScaleElement({ el }: { el: MiniElementData }) {
     if (el.type === 'text') {
         return (
             <div
                 className="tmpl-mini tmpl-mini--text"
-                style={{ left, top, width, height, color: el.color }}
+                style={{
+                    left: el.x, top: el.y, width: el.w, height: el.h,
+                    color: el.color,
+                }}
             >
                 <div
                     className="tmpl-mini__text"
                     style={{
-                        fontSize: `${Math.max(4, (el.fontSize ?? 12) * 0.35)}px`,
+                        fontSize: el.fontSize ?? 12,
                         fontWeight: el.fontWeight,
                         textAlign: el.textAlign as any,
-                        lineHeight: 1.1,
+                        lineHeight: 1.2,
                     }}
                 >
                     {el.content}
@@ -242,11 +271,11 @@ function MiniElement({ el, canvasW, canvasH }: { el: MiniElementData; canvasW: n
             <div
                 className="tmpl-mini tmpl-mini--btn"
                 style={{
-                    left, top, width, height,
+                    left: el.x, top: el.y, width: el.w, height: el.h,
                     backgroundColor: el.bgColor,
-                    borderRadius: `${el.borderRadius ?? 4}px`,
+                    borderRadius: el.borderRadius ?? 4,
                     color: el.color,
-                    fontSize: `${Math.max(3, (el.fontSize ?? 12) * 0.3)}px`,
+                    fontSize: el.fontSize ?? 12,
                 }}
             >
                 {el.label}
@@ -263,9 +292,9 @@ function MiniElement({ el, canvasW, canvasH }: { el: MiniElementData; canvasW: n
         <div
             className="tmpl-mini tmpl-mini--shape"
             style={{
-                left, top, width, height,
+                left: el.x, top: el.y, width: el.w, height: el.h,
                 background: bg,
-                borderRadius: el.borderRadius ? `${Math.min(el.borderRadius, 50)}px` : undefined,
+                borderRadius: el.borderRadius ? Math.min(el.borderRadius, 999) : undefined,
                 opacity: el.opacity,
             }}
         />
