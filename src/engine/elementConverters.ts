@@ -189,7 +189,15 @@ export function nodeTypeToShapeType(type: string): 'rectangle' | 'ellipse' {
 }
 
 export function getAnimationForElement(elementId: string): ElementAnimation | undefined {
-    const config = useAnimPresetStore.getState().presets[elementId];
+    const presets = useAnimPresetStore.getState().presets;
+    // ★ FIX: Check multiple key formats because different code paths use different keys:
+    //   - Layer panel / InlineAnimatePanel: String(nodeId) = "5"
+    //   - Restore / useCanvasSync: `engine-${nodeId}` = "engine-5"
+    //   - AI executor designExecutor: el.id = "uuid-xxx"
+    // Check all three formats to find the animation wherever it's stored.
+    const config = presets[elementId]
+        || (elementId.startsWith('engine-') ? presets[elementId.slice(7)] : undefined)
+        || (!elementId.startsWith('engine-') ? presets[`engine-${elementId}`] : undefined);
     if (!config || config.anim === 'none') return undefined;
     return { preset: config.anim, duration: config.animDuration, startTime: config.startTime };
 }

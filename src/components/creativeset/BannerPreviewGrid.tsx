@@ -686,6 +686,8 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                                                 if (el.type === 'text') return { textShadow: shadowVal };
                                                 return { boxShadow: shadowVal };
                                             })();
+                                            // ★ customStyles: CSS effects from set_custom_style (glow, filter, etc)
+                                            const customStyles: React.CSSProperties = (el as any).customStyles || {};
 
                                             return (
                                                 <div
@@ -703,6 +705,7 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                                                         ...animStyle,
                                                         ...shapeStyle,
                                                         ...shadowStyle,
+                                                        ...customStyles,
                                                         ...(el.type === 'text' ? { color: el.color, fontSize: el.fontSize, fontFamily: el.fontFamily, fontWeight: el.fontWeight, fontStyle: el.fontStyle ?? 'normal', display: 'flex', alignItems: 'flex-start', justifyContent: el.textAlign === 'center' ? 'center' : el.textAlign === 'right' ? 'flex-end' : 'flex-start', overflow: 'visible', whiteSpace: 'normal' as const, wordBreak: 'break-word' as const, lineHeight: el.lineHeight ?? 1.2, letterSpacing: el.letterSpacing ? `${el.letterSpacing}px` : undefined, textAlign: el.textAlign as 'left' | 'center' | 'right' } : {}),
                                                         ...(el.type === 'button' ? { backgroundColor: el.backgroundColor, borderRadius: el.borderRadius ?? 0, color: el.color, fontSize: el.fontSize, fontFamily: el.fontFamily, fontWeight: el.fontWeight, display: 'flex', alignItems: 'center', justifyContent: 'center' } : {}),
                                                         ...(el.type === 'image' ? { overflow: 'hidden' } : {}),
