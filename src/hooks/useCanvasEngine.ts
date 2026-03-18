@@ -465,6 +465,27 @@ export function useCanvasEngine(
         return newId;
     }, [selection, nodes, syncState]);
 
+    // ── Group / Ungroup ─────────────────────────
+    const groupSelected = useCallback((): number | null => {
+        const engine = engineRef.current;
+        if (!engine || selection.length < 2) return null;
+        try {
+            const gid = engine.group_elements(selection);
+            syncState();
+            return gid;
+        } catch { /* group_elements may not exist on WASM engine */ }
+        return null;
+    }, [selection, syncState]);
+
+    const ungroupSelected = useCallback((): void => {
+        const engine = engineRef.current;
+        if (!engine || selection.length === 0) return;
+        try {
+            engine.ungroup(selection[0]);
+            syncState();
+        } catch { /* ungroup may not exist on WASM engine */ }
+    }, [selection, syncState]);
+
     // ── Alignment to canvas ──────────────────────
     const alignToCanvas = useCallback((id: number, alignment: 'left' | 'center-h' | 'right' | 'top' | 'center-v' | 'bottom') => {
         const engine = engineRef.current;
@@ -541,7 +562,7 @@ export function useCanvasEngine(
     }, [syncState]);
 
     // ── Keyboard shortcuts (extracted to separate hook) ──
-    useCanvasKeyboard({ engineRef, syncState, setTool, addRect, addEllipse, duplicateSelected });
+    useCanvasKeyboard({ engineRef, syncState, setTool, addRect, addEllipse, duplicateSelected, groupSelected, ungroupSelected });
 
     // ── Manual retry function ──
     const retryInit = useCallback(() => {
@@ -571,6 +592,7 @@ export function useCanvasEngine(
             setBrightness, setContrast, setSaturation, setHueRotate,
             addKeyframe, duplicateSelected,
             alignToCanvas,
+            groupSelected, ungroupSelected,
             canvasWidth: width, canvasHeight: height,
         },
         syncState,

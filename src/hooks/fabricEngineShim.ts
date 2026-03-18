@@ -478,6 +478,14 @@ export function createEngineShim(
             syncState();
         },
 
+        /** Rename a node (updates __glidName for layer panel + save persistence) */
+        set_name: (id: number, name: string) => {
+            const obj = findById(id);
+            if (!obj) return;
+            (obj as any).__glidName = name;
+            syncState();
+        },
+
         // ── Effects ──────────────────────────────────────
         set_shadow: (id: number, ox: number, oy: number, blur: number, r: number, g: number, b: number, a: number) => {
             const obj = findById(id);

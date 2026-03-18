@@ -454,6 +454,8 @@ export function BottomPanel({ variant, engine, nodes, selection, actions, overla
                                     key={`eng-${layer.node.id}`}
                                     node={layer.node}
                                     isSelected={selection.includes(layer.node.id)}
+                                    isRenaming={renamingId === String(layer.node.id)}
+                                    renameValue={renameValue}
                                     draggedClass={draggedClass}
                                     dropTargetClass={dropTargetClass}
                                     onStartDrag={startDrag}
@@ -461,6 +463,13 @@ export function BottomPanel({ variant, engine, nodes, selection, actions, overla
                                     justDragged={justDragged}
                                     onSelect={handleSelect}
                                     onDelete={handleDelete}
+                                    onRenameStart={(id, name) => { setRenamingId(id); setRenameValue(name); }}
+                                    onRenameChange={setRenameValue}
+                                    onRenameCommit={(id, val) => {
+                                        try { engine?.set_name(parseInt(id), val); } catch { /* ok */ }
+                                        setRenamingId(null);
+                                    }}
+                                    onRenameCancel={() => setRenamingId(null)}
                                 />
                             );
                         }

@@ -90,6 +90,8 @@ export function OverlayLayerRow({
 interface EngineRowProps {
     node: EngineNode;
     isSelected: boolean;
+    isRenaming: boolean;
+    renameValue: string;
     draggedClass: string;
     dropTargetClass: string;
     onStartDrag: (e: React.MouseEvent, id: string, idx: number) => void;
@@ -97,11 +99,16 @@ interface EngineRowProps {
     justDragged: React.RefObject<boolean>;
     onSelect: (id: number) => void;
     onDelete: (id: number) => void;
+    onRenameStart: (id: string, name: string) => void;
+    onRenameChange: (value: string) => void;
+    onRenameCommit: (id: string, value: string) => void;
+    onRenameCancel: () => void;
 }
 
 export function EngineLayerRow({
-    node, isSelected, draggedClass, dropTargetClass,
+    node, isSelected, isRenaming, renameValue, draggedClass, dropTargetClass,
     onStartDrag, idx, justDragged, onSelect, onDelete,
+    onRenameStart, onRenameChange, onRenameCommit, onRenameCancel,
 }: EngineRowProps) {
     return (
         <div
@@ -109,13 +116,37 @@ export function EngineLayerRow({
             className={`bp-layer-row bp-layer-drag-row ${isSelected ? 'selected' : ''} ${draggedClass} ${dropTargetClass}`}
             onMouseDown={(e) => {
                 const tag = (e.target as HTMLElement).tagName;
-                if (tag === 'BUTTON' || tag === 'SVG' || tag === 'PATH') return;
+                if (tag === 'BUTTON' || tag === 'INPUT' || tag === 'SVG' || tag === 'PATH') return;
                 onStartDrag(e, String(node.id), idx);
             }}
             onClick={() => { if (justDragged.current) return; onSelect(node.id); }}
         >
             <span className="bp-layer-icon">{nodeIcon(node.type)}</span>
-            <span className="bp-layer-name">{nodeLabel(node)}</span>
+            {isRenaming ? (
+                <input
+                    className="bp-rename-input"
+                    value={renameValue}
+                    onChange={(e) => onRenameChange(e.target.value)}
+                    onBlur={() => onRenameCommit(String(node.id), renameValue)}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') onRenameCommit(String(node.id), renameValue);
+                        if (e.key === 'Escape') onRenameCancel();
+                        e.stopPropagation();
+                    }}
+                    autoFocus
+                    onClick={(e) => e.stopPropagation()}
+                />
+            ) : (
+                <span
+                    className="bp-layer-name"
+                    onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        onRenameStart(String(node.id), node.name || nodeLabel(node));
+                    }}
+                >
+                    {node.name || nodeLabel(node)}
+                </span>
+            )}
             <div className="bp-layer-actions">
                 <button className="bp-layer-action-btn" title="Delete" onClick={(e) => { e.stopPropagation(); onDelete(node.id); }}>
                     <IcClose size={9} />
