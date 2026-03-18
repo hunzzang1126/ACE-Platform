@@ -57,13 +57,20 @@ async function renderVariantToCanvas(variant: BannerVariant): Promise<string> {
             } catch { /* skip failed images */ }
         } else if (el.type === 'shape') {
             const shapeEl = el as import('@/schema/elements.types').ShapeElement;
+
+            // ── Determine fill style ──
             if (shapeEl.gradientStart && shapeEl.gradientEnd) {
-                const angle = (shapeEl.gradientAngle ?? 135) * Math.PI / 180;
+                // ★ FIX: CSS gradient angle → Canvas2D math angle
+                // CSS: 0°=bottom→top, 90°=left→right, 180°=top→bottom
+                // Math: 0°=right, 90°=up
+                // Conversion: mathAngle = (90 - cssAngle)
+                const cssAngle = shapeEl.gradientAngle ?? 135;
+                const mathAngle = (90 - cssAngle) * Math.PI / 180;
                 const cx = x + ew / 2, cy = y + eh / 2;
                 const len = Math.max(ew, eh);
                 const grad = ctx.createLinearGradient(
-                    cx - Math.cos(angle) * len / 2, cy - Math.sin(angle) * len / 2,
-                    cx + Math.cos(angle) * len / 2, cy + Math.sin(angle) * len / 2,
+                    cx - Math.cos(mathAngle) * len / 2, cy + Math.sin(mathAngle) * len / 2,
+                    cx + Math.cos(mathAngle) * len / 2, cy - Math.sin(mathAngle) * len / 2,
                 );
                 grad.addColorStop(0, shapeEl.gradientStart);
                 grad.addColorStop(1, shapeEl.gradientEnd);
@@ -71,8 +78,18 @@ async function renderVariantToCanvas(variant: BannerVariant): Promise<string> {
             } else {
                 ctx.fillStyle = shapeEl.fill || '#cccccc';
             }
+
+            // ── Draw shape path ──
             const r = shapeEl.borderRadius ?? 0;
-            if (r > 0) {
+            const isEllipse = shapeEl.shapeType === 'ellipse'
+                || r >= Math.min(ew, eh) / 2;  // borderRadius >= half of smaller dimension = circle/pill
+
+            if (isEllipse) {
+                // ★ FIX: Draw actual ellipse — was missing entirely
+                ctx.beginPath();
+                ctx.ellipse(x + ew / 2, y + eh / 2, ew / 2, eh / 2, 0, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (r > 0) {
                 roundRect(ctx, x, y, ew, eh, r);
                 ctx.fill();
             } else {
