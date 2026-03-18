@@ -208,14 +208,13 @@ function applyVariantToCanvas(variant: BannerVariant, actions: CanvasEngineActio
     const cW = actions.canvasWidth || 300;
     const cH = actions.canvasHeight || 250;
 
-    // ★ Proportional scale: fit template inside canvas, preserving aspect ratio
+    // ★ Independent X/Y scaling — template FILLS entire canvas (like painting a wall)
+    // Not contain (min) because templates are STYLES, not photographs.
+    // A 160x600 skyscraper should stretch to fill a 300x250 banner, not shrink to a strip.
     const scaleX = cW / tW;
     const scaleY = cH / tH;
-    const scale = Math.min(scaleX, scaleY);
-
-    // Center offset if aspect ratios differ
-    const offsetX = (cW - tW * scale) / 2;
-    const offsetY = (cH - tH * scale) / 2;
+    // Font/radius: geometric mean keeps text visually balanced across both axes
+    const scaleFontRadius = Math.sqrt(scaleX * scaleY);
 
     for (const el of elements) {
         const rawX = el.constraints?.horizontal?.offset ?? 0;
@@ -223,11 +222,11 @@ function applyVariantToCanvas(variant: BannerVariant, actions: CanvasEngineActio
         const rawW = el.constraints?.size?.width ?? 100;
         const rawH = el.constraints?.size?.height ?? 100;
 
-        // Scale all values
-        const x = Math.round(rawX * scale + offsetX);
-        const y = Math.round(rawY * scale + offsetY);
-        const w = Math.round(rawW * scale);
-        const h = Math.round(rawH * scale);
+        // Scale X-axis with scaleX, Y-axis with scaleY (fills canvas completely)
+        const x = Math.round(rawX * scaleX);
+        const y = Math.round(rawY * scaleY);
+        const w = Math.round(rawW * scaleX);
+        const h = Math.round(rawH * scaleY);
 
         if (el.type === 'shape') {
             if (el.gradientStart && el.gradientEnd) {
@@ -236,7 +235,7 @@ function applyVariantToCanvas(variant: BannerVariant, actions: CanvasEngineActio
                     el.gradientStart,
                     el.gradientEnd,
                     el.gradientAngle ?? 0,
-                    Math.round((el.borderRadius ?? 0) * scale),
+                    Math.round((el.borderRadius ?? 0) * scaleFontRadius),
                     el.name,
                 );
             } else {
@@ -251,7 +250,7 @@ function applyVariantToCanvas(variant: BannerVariant, actions: CanvasEngineActio
                 }
             }
         } else if (el.type === 'text') {
-            const scaledFontSize = Math.max(Math.round(el.fontSize * scale), 6);
+            const scaledFontSize = Math.max(Math.round(el.fontSize * scaleFontRadius), 6);
             actions.addText(x, y, el.content ?? 'Text', {
                 fontSize: scaledFontSize,
                 fontFamily: el.fontFamily ?? 'Inter, sans-serif',
@@ -267,10 +266,10 @@ function applyVariantToCanvas(variant: BannerVariant, actions: CanvasEngineActio
                 x, y, w, h,
                 bgHex, bgHex,
                 0,
-                Math.round((el.borderRadius ?? 8) * scale),
+                Math.round((el.borderRadius ?? 8) * scaleFontRadius),
                 el.name,
             );
-            const scaledFontSize = Math.max(Math.round(el.fontSize * scale), 6);
+            const scaledFontSize = Math.max(Math.round(el.fontSize * scaleFontRadius), 6);
             actions.addText(x, y, el.label, {
                 fontSize: scaledFontSize,
                 fontFamily: 'Inter, sans-serif',
