@@ -36,3 +36,4 @@ chroma_data/
 .pencil-analysis/
 .openpencil-ref/
 DEV REPORT/
+supabase/.temp/

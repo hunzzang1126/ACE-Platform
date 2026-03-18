@@ -62,7 +62,7 @@ serve(async (req) => {
             // Upsert subscription in our DB
             await supabase.from('subscriptions').upsert({
                 user_id: userId,
-                plan_tier: plan,
+                plan: plan,
                 status: 'active',
                 stripe_customer_id: session.customer as string,
                 stripe_subscription_id: session.subscription as string,
@@ -88,7 +88,7 @@ serve(async (req) => {
                 : 'inactive';
 
             await supabase.from('subscriptions').update({
-                plan_tier: plan,
+                plan: plan,
                 status,
                 current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
                 current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
@@ -106,7 +106,7 @@ serve(async (req) => {
 
             // Downgrade to starter (free)
             await supabase.from('subscriptions').update({
-                plan_tier: 'starter',
+                plan: 'starter',
                 status: 'canceled',
                 updated_at: new Date().toISOString(),
             }).eq('user_id', userId);
