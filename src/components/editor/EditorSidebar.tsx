@@ -13,6 +13,7 @@ import { SidebarTemplateTab } from './SidebarTemplateTab';
 import { SidebarElementsTab } from './SidebarElementsTab';
 import { SidebarTextTab } from './SidebarTextTab';
 import { SidebarUploadsTab } from './SidebarUploadsTab';
+import { SidebarBrandTab } from './SidebarBrandTab';
 import { SidebarProjectsTab } from './SidebarProjectsTab';
 import { InlineEffectsPanel } from './InlineEffectsPanel';
 import { InlineAnimatePanel } from './InlineAnimatePanel';
@@ -193,10 +194,7 @@ export function EditorSidebar({ actions, nodes = [], selection = [], onTriggerIm
                             />
                         )}
                         {!activeInlinePanel && activeTab === 'brand' && (
-                            <div className="sidebar-placeholder">
-                                <p>Brand Kit</p>
-                                <span>Guidelines, logos, colors, fonts</span>
-                            </div>
+                            <SidebarBrandTab actions={actions} />
                         )}
                         {!activeInlinePanel && activeTab === 'projects' && <SidebarProjectsTab />}
                         {!activeInlinePanel && activeTab === 'ai' && (

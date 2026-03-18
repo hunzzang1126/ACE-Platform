@@ -14,7 +14,7 @@ import { immer } from 'zustand/middleware/immer';
 // ── Asset Types ──
 
 export type AssetCategory = 'logo' | 'product' | 'texture' | 'icon' | 'background' | 'photo';
-export type AssetFormat = 'png' | 'svg' | 'jpg' | 'webp';
+export type AssetFormat = 'png' | 'svg' | 'jpg' | 'webp' | 'gif' | 'avif' | 'mp4' | 'webm' | 'mov';
 
 export interface BrandAsset {
     id: string;
