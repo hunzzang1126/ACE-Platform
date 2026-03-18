@@ -372,6 +372,8 @@ export function DetailEditorPage() {
             <div className="ed-body">
                 <EditorSidebar
                     actions={actions}
+                    nodes={state.nodes}
+                    selection={state.selection}
                     onTriggerImageUpload={() => overlay.triggerImageUpload()}
                     onTriggerVideoUpload={() => overlay.triggerVideoUpload()}
                 />

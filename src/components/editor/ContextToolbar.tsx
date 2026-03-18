@@ -8,9 +8,10 @@
 //   - Common: Position, Effects, Animate
 // ─────────────────────────────────────────────────
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useCallback } from 'react';
 import { IcAlignLeft, IcAlignCenterH, IcAlignRight } from '@/components/ui/Icons';
 import { ColorPicker } from '@/components/ui/ColorPicker';
+import { useUIStore } from '@/stores/uiStore';
 import type { EngineNode, CanvasEngineActions } from '@/hooks/canvasTypes';
 import type { OverlayElement } from '@/hooks/useOverlayElements';
 
@@ -25,15 +26,6 @@ const FONT_FAMILIES = [
     'Georgia, serif',
     'Times New Roman, serif',
     'Courier New, monospace',
-];
-
-const FONT_WEIGHTS = [
-    { label: 'Light', value: '300' },
-    { label: 'Regular', value: '400' },
-    { label: 'Medium', value: '500' },
-    { label: 'Semi Bold', value: '600' },
-    { label: 'Bold', value: '700' },
-    { label: 'Black', value: '900' },
 ];
 
 interface Props {
@@ -57,15 +49,42 @@ export function ContextToolbar({
     actions,
     selectedOverlay,
     onOverlayUpdate,
-    canvasWidth = 300,
-    canvasHeight = 250,
 }: Props) {
+    const setInlinePanel = useUIStore((s) => s.setInlinePanel);
+    const activeInlinePanel = useUIStore((s) => s.activeInlinePanel);
+
     const selectedNode = nodes.find((n) => selection.includes(n.id));
     const hasOverlay = !!selectedOverlay;
     const hasShape = !!selectedNode;
 
+    const openEffects = useCallback(() => setInlinePanel('effects'), [setInlinePanel]);
+    const openAnimate = useCallback(() => setInlinePanel('animate'), [setInlinePanel]);
+    const openPosition = useCallback(() => setInlinePanel('position'), [setInlinePanel]);
+
     // Nothing selected — don't render
     if (!hasOverlay && !hasShape) return null;
+
+    // ── Shared inline panel buttons ──
+    const InlineButtons = () => (
+        <>
+            <div className="ctx-divider" />
+            <button
+                className={`ctx-btn ctx-label-btn ${activeInlinePanel === 'effects' ? 'active' : ''}`}
+                onClick={openEffects}
+                title="Effects"
+            >Effects</button>
+            <button
+                className={`ctx-btn ctx-label-btn ${activeInlinePanel === 'animate' ? 'active' : ''}`}
+                onClick={openAnimate}
+                title="Animate"
+            >Animate</button>
+            <button
+                className={`ctx-btn ctx-label-btn ${activeInlinePanel === 'position' ? 'active' : ''}`}
+                onClick={openPosition}
+                title="Position"
+            >Position</button>
+        </>
+    );
 
     // ── Text overlay selected ──
     if (hasOverlay && selectedOverlay.type === 'text') {
@@ -113,7 +132,7 @@ export function ContextToolbar({
                     onChange={(c) => onOverlayUpdate?.(selectedOverlay.id, { color: c })}
                 />
 
-                {/* Bold / Italic / Underline */}
+                {/* Bold */}
                 <button
                     className={`ctx-btn ${(selectedOverlay.fontWeight === '700' || selectedOverlay.fontWeight === 'bold') ? 'active' : ''}`}
                     onClick={() => {
@@ -141,11 +160,7 @@ export function ContextToolbar({
                     </button>
                 ))}
 
-                <div className="ctx-divider" />
-
-                {/* Effects / Position (labels only — can be dropdowns later) */}
-                <button className="ctx-btn ctx-label-btn" title="Effects">Effects</button>
-                <button className="ctx-btn ctx-label-btn" title="Position">Position</button>
+                <InlineButtons />
             </div>
         );
     }
@@ -163,9 +178,7 @@ export function ContextToolbar({
                     <option value="contain">Contain</option>
                     <option value="fill">Fill</option>
                 </select>
-                <div className="ctx-divider" />
-                <button className="ctx-btn ctx-label-btn" title="Effects">Effects</button>
-                <button className="ctx-btn ctx-label-btn" title="Position">Position</button>
+                <InlineButtons />
             </div>
         );
     }
@@ -260,10 +273,7 @@ export function ContextToolbar({
                         </button>
                     ))}
 
-                    <div className="ctx-divider" />
-                    <button className="ctx-btn ctx-label-btn" title="Effects">Effects</button>
-                    <button className="ctx-btn ctx-label-btn" title="Animate">Animate</button>
-                    <button className="ctx-btn ctx-label-btn" title="Position">Position</button>
+                    <InlineButtons />
                 </div>
             );
         }
@@ -278,10 +288,7 @@ export function ContextToolbar({
                         onChange={handleColorChange}
                     />
                 )}
-                <div className="ctx-divider" />
-                <button className="ctx-btn ctx-label-btn" title="Effects">Effects</button>
-                <button className="ctx-btn ctx-label-btn" title="Animate">Animate</button>
-                <button className="ctx-btn ctx-label-btn" title="Position">Position</button>
+                <InlineButtons />
             </div>
         );
     }

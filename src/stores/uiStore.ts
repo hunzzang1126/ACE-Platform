@@ -17,6 +17,8 @@ interface UIState {
     keyframeInspectorOpen: boolean;
     /** Canva-style sidebar — which panel tab is open (null = collapsed) */
     activeSidebarTab: string | null;
+    /** Inline panel opened from context toolbar (Effects/Animate/Position) */
+    activeInlinePanel: 'effects' | 'animate' | 'position' | null;
     /** Global notification */
     notification: { message: string; type: 'info' | 'success' | 'warning' | 'error' } | null;
 
@@ -31,6 +33,7 @@ interface UIState {
     toggleAuthModal: () => void;
     toggleKeyframeInspector: () => void;
     toggleSidebarTab: (tab: string) => void;
+    setInlinePanel: (panel: 'effects' | 'animate' | 'position' | null) => void;
     showNotification: (message: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
     dismissNotification: () => void;
 }
@@ -47,6 +50,7 @@ export const useUIStore = create<UIState>()((set) => ({
     authModalOpen: false,
     keyframeInspectorOpen: false,
     activeSidebarTab: null,
+    activeInlinePanel: null,
     notification: null,
 
     toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
@@ -61,6 +65,11 @@ export const useUIStore = create<UIState>()((set) => ({
     toggleKeyframeInspector: () => set((s) => ({ keyframeInspectorOpen: !s.keyframeInspectorOpen })),
     toggleSidebarTab: (tab: string) => set((s) => ({
         activeSidebarTab: s.activeSidebarTab === tab ? null : tab,
+        activeInlinePanel: null, // close inline panel when switching tabs
+    })),
+    setInlinePanel: (panel) => set((s) => ({
+        activeInlinePanel: s.activeInlinePanel === panel ? null : panel,
+        activeSidebarTab: panel ? null : s.activeSidebarTab, // close sidebar tab when opening inline
     })),
 
     showNotification: (message, type = 'info') => set({ notification: { message, type } }),

@@ -4,6 +4,7 @@
 // Left sidebar: narrow icon strip (60px) + slide-out content panel (~280px).
 // Each icon tab opens a different content panel (Templates, Elements, Text, etc.)
 // Clicking the active tab again closes the panel.
+// ★ Inline panels (Effects/Animate/Position) override the sidebar panel when active.
 // ─────────────────────────────────────────────────
 
 import { useCallback } from 'react';
@@ -12,7 +13,11 @@ import { SidebarTemplateTab } from './SidebarTemplateTab';
 import { SidebarElementsTab } from './SidebarElementsTab';
 import { SidebarTextTab } from './SidebarTextTab';
 import { SidebarUploadsTab } from './SidebarUploadsTab';
-import type { CanvasEngineActions } from '@/hooks/canvasTypes';
+import { SidebarProjectsTab } from './SidebarProjectsTab';
+import { InlineEffectsPanel } from './InlineEffectsPanel';
+import { InlineAnimatePanel } from './InlineAnimatePanel';
+import { InlinePositionPanel } from './InlinePositionPanel';
+import type { CanvasEngineActions, EngineNode } from '@/hooks/canvasTypes';
 
 import type { ReactNode } from 'react';
 
@@ -22,6 +27,8 @@ type Engine = any;
 interface Props {
     engine?: Engine;
     actions?: CanvasEngineActions | null;
+    nodes?: EngineNode[];
+    selection?: number[];
     onTriggerImageUpload?: () => void;
     onTriggerVideoUpload?: () => void;
 }
@@ -97,15 +104,25 @@ const TABS: TabDef[] = [
     { id: 'ai', label: 'AI', icon: <AiIcon /> },
 ];
 
-export function EditorSidebar({ actions, onTriggerImageUpload, onTriggerVideoUpload }: Props) {
+export function EditorSidebar({ actions, nodes = [], selection = [], onTriggerImageUpload, onTriggerVideoUpload }: Props) {
     const activeTab = useUIStore((s) => s.activeSidebarTab);
     const toggleTab = useUIStore((s) => s.toggleSidebarTab);
+    const activeInlinePanel = useUIStore((s) => s.activeInlinePanel);
+    const setInlinePanel = useUIStore((s) => s.setInlinePanel);
 
     const handleTabClick = useCallback((tabId: string) => {
         toggleTab(tabId);
     }, [toggleTab]);
 
-    const isOpen = activeTab !== null;
+    // Selected node for inline panels
+    const selectedNode = nodes.find((n) => selection.includes(n.id)) ?? null;
+
+    const isOpen = activeTab !== null || activeInlinePanel !== null;
+
+    // ── Determine panel title ──
+    const panelTitle = activeInlinePanel
+        ? (activeInlinePanel === 'effects' ? 'Effects' : activeInlinePanel === 'animate' ? 'Animate' : 'Position')
+        : TABS.find(t => t.id === activeTab)?.label;
 
     return (
         <div className="sidebar-root">
@@ -127,43 +144,62 @@ export function EditorSidebar({ actions, onTriggerImageUpload, onTriggerVideoUpl
             {/* Expandable panel — slides in/out */}
             {isOpen && (
                 <aside className="sidebar-panel">
-                    <div className="sidebar-panel-header">
-                        <h3 className="sidebar-panel-title">
-                            {TABS.find(t => t.id === activeTab)?.label}
-                        </h3>
-                        <button
-                            className="sidebar-panel-close"
-                            onClick={() => toggleTab(activeTab!)}
-                            title="Close panel"
-                        >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M15 18l-6-6 6-6" />
-                            </svg>
-                        </button>
-                    </div>
+                    {/* Header — only for sidebar tabs (inline panels have their own) */}
+                    {activeTab && !activeInlinePanel && (
+                        <div className="sidebar-panel-header">
+                            <h3 className="sidebar-panel-title">{panelTitle}</h3>
+                            <button
+                                className="sidebar-panel-close"
+                                onClick={() => toggleTab(activeTab)}
+                                title="Close panel"
+                            >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M15 18l-6-6 6-6" />
+                                </svg>
+                            </button>
+                        </div>
+                    )}
                     <div className="sidebar-panel-content">
-                        {activeTab === 'templates' && <SidebarTemplateTab actions={actions} />}
-                        {activeTab === 'elements' && <SidebarElementsTab actions={actions} />}
-                        {activeTab === 'text' && <SidebarTextTab actions={actions} />}
-                        {activeTab === 'uploads' && (
+                        {/* ── Inline panels (from context toolbar) ── */}
+                        {activeInlinePanel === 'effects' && (
+                            <InlineEffectsPanel
+                                selectedNode={selectedNode}
+                                actions={actions ?? null}
+                                onClose={() => setInlinePanel(null)}
+                            />
+                        )}
+                        {activeInlinePanel === 'animate' && (
+                            <InlineAnimatePanel
+                                selectedNode={selectedNode}
+                                onClose={() => setInlinePanel(null)}
+                            />
+                        )}
+                        {activeInlinePanel === 'position' && (
+                            <InlinePositionPanel
+                                selectedNode={selectedNode}
+                                actions={actions ?? null}
+                                onClose={() => setInlinePanel(null)}
+                            />
+                        )}
+
+                        {/* ── Sidebar tabs ── */}
+                        {!activeInlinePanel && activeTab === 'templates' && <SidebarTemplateTab actions={actions} />}
+                        {!activeInlinePanel && activeTab === 'elements' && <SidebarElementsTab actions={actions} />}
+                        {!activeInlinePanel && activeTab === 'text' && <SidebarTextTab actions={actions} />}
+                        {!activeInlinePanel && activeTab === 'uploads' && (
                             <SidebarUploadsTab
                                 onTriggerImageUpload={onTriggerImageUpload}
                                 onTriggerVideoUpload={onTriggerVideoUpload}
                             />
                         )}
-                        {activeTab === 'brand' && (
+                        {!activeInlinePanel && activeTab === 'brand' && (
                             <div className="sidebar-placeholder">
                                 <p>Brand Kit</p>
                                 <span>Guidelines, logos, colors, fonts</span>
                             </div>
                         )}
-                        {activeTab === 'projects' && (
-                            <div className="sidebar-placeholder">
-                                <p>Projects</p>
-                                <span>Your designs and folders</span>
-                            </div>
-                        )}
-                        {activeTab === 'ai' && (
+                        {!activeInlinePanel && activeTab === 'projects' && <SidebarProjectsTab />}
+                        {!activeInlinePanel && activeTab === 'ai' && (
                             <div className="sidebar-placeholder">
                                 <p>ACE AI</p>
                                 <span>Auto-design, smart layout, brand check</span>
