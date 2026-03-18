@@ -1,27 +1,30 @@
 // ─────────────────────────────────────────────────
-// BrandCloudSection — Dashboard Brand Kit Manager
+// BrandCloudSection — Google Drive-level asset library
 // ─────────────────────────────────────────────────
-// Manages brand kits: assets, palette, typography, guidelines.
-// Accessible from dashboard "Brand Cloud" tab (Pro+ only).
+// Tabbed navigation: Assets | Palette | Typography | Guidelines
+// Grid/list views, drag-drop upload, visual file cards.
 // ─────────────────────────────────────────────────
 
 import { useState, useCallback, useRef } from 'react';
-import { useBrandKitStore, type AssetCategory, type BrandKit } from '@/stores/brandKitStore';
+import { useBrandKitStore, type AssetCategory } from '@/stores/brandKitStore';
+import './BrandCloudSection.css';
 
+type CloudTab = 'assets' | 'palette' | 'typography' | 'guidelines';
+type ViewMode = 'grid' | 'list';
 const ASSET_CATEGORIES: AssetCategory[] = ['logo', 'product', 'texture', 'icon', 'background', 'photo'];
 
 export function BrandCloudSection() {
     const {
         kits, activeKitId, createKit, deleteKit, setActiveKit, getActiveKit,
         addAsset, removeAsset, updatePalette, updateTypography, updateGuidelines,
-        getAssetsByCategory,
     } = useBrandKitStore();
     const kit = getActiveKit();
     const [newKitName, setNewKitName] = useState('');
+    const [tab, setTab] = useState<CloudTab>('assets');
+    const [viewMode, setViewMode] = useState<ViewMode>('grid');
     const [assetFilter, setAssetFilter] = useState<AssetCategory | 'all'>('all');
+    const [isDragging, setIsDragging] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
-
-    // ── Kit Management ──
 
     const handleCreateKit = useCallback(() => {
         const name = newKitName.trim() || `Brand Kit ${kits.length + 1}`;
@@ -31,7 +34,6 @@ export function BrandCloudSection() {
     }, [newKitName, kits.length, createKit, setActiveKit]);
 
     // ── Asset Upload ──
-
     const handleFileUpload = useCallback(async (files: FileList) => {
         if (!activeKitId) return;
         for (const file of Array.from(files)) {
@@ -39,8 +41,7 @@ export function BrandCloudSection() {
             const reader = new FileReader();
             reader.onload = async () => {
                 const src = reader.result as string;
-                // Generate thumbnail (resize to 150px)
-                const thumbnail = await generateThumbnail(src, 150);
+                const thumbnail = await generateThumbnail(src, 200);
                 const hash = await hashString(src.slice(0, 2000));
                 const img = new Image();
                 img.src = src;
@@ -48,20 +49,11 @@ export function BrandCloudSection() {
                 addAsset(activeKitId, {
                     name: file.name.replace(/\.[^.]+$/, ''),
                     category: guessCategory(file.name),
-                    tags: [],
-                    role: null,
-                    src,
-                    thumbSrc: thumbnail,
-                    width: img.naturalWidth,
-                    height: img.naturalHeight,
+                    tags: [], role: null, src, thumbSrc: thumbnail,
+                    width: img.naturalWidth, height: img.naturalHeight,
                     format: file.type.split('/')[1] as any,
-                    sizeBytes: file.size,
-                    hash,
-                    metadata: {
-                        hasTransparency: file.type === 'image/png',
-                        dominantColors: [],
-                        suggestedPlacement: null,
-                    },
+                    sizeBytes: file.size, hash,
+                    metadata: { hasTransparency: file.type === 'image/png', dominantColors: [], suggestedPlacement: null },
                 });
             };
             reader.readAsDataURL(file);
@@ -69,39 +61,35 @@ export function BrandCloudSection() {
     }, [activeKitId, addAsset]);
 
     const handleDrop = useCallback((e: React.DragEvent) => {
-        e.preventDefault();
+        e.preventDefault(); setIsDragging(false);
         if (e.dataTransfer.files.length) handleFileUpload(e.dataTransfer.files);
     }, [handleFileUpload]);
 
     const filteredAssets = kit
-        ? (assetFilter === 'all'
-            ? kit.assets.filter(a => !a.deletedAt)
-            : getAssetsByCategory(kit.id, assetFilter))
+        ? kit.assets.filter(a => !a.deletedAt && (assetFilter === 'all' || a.category === assetFilter))
         : [];
 
-    // ── No kits yet ──
-
+    // ── No kits ──
     if (kits.length === 0) {
         return (
-            <div style={S.emptyState}>
-                <div style={S.emptyIcon}>
-                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" opacity="0.3">
-                        <circle cx="12" cy="12" r="10" /><path d="M8 14s1.5 2 4 2 4-2 4-2" /><line x1="9" y1="9" x2="9.01" y2="9" /><line x1="15" y1="9" x2="15.01" y2="9" />
+            <div className="brand-cloud__empty">
+                <div className="brand-cloud__empty-icon">
+                    <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="0.8" strokeLinecap="round" opacity="0.25">
+                        <path d="M18 10h-1.26A8 8 0 109 20h9a5 5 0 000-10z" />
                     </svg>
                 </div>
-                <p style={{ color: '#94a3b8', fontSize: 14, margin: '12px 0 20px' }}>
-                    Create a brand kit to manage your assets, colors, and guidelines
-                </p>
-                <div style={{ display: 'flex', gap: 8 }}>
+                <h3 className="brand-cloud__empty-title">Brand Cloud</h3>
+                <p className="brand-cloud__empty-desc">Store your brand assets, colors, and guidelines for AI-powered design generation</p>
+                <div className="brand-cloud__empty-create">
                     <input
-                        style={S.input}
+                        className="brand-cloud__input"
                         placeholder="Brand kit name..."
                         value={newKitName}
                         onChange={e => setNewKitName(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && handleCreateKit()}
                     />
-                    <button style={S.primaryBtn} onClick={handleCreateKit}>
-                        Create Kit
+                    <button className="brand-cloud__primary-btn" onClick={handleCreateKit}>
+                        Create Brand Kit
                     </button>
                 </div>
             </div>
@@ -109,197 +97,236 @@ export function BrandCloudSection() {
     }
 
     return (
-        <div style={{ padding: '0 24px' }}>
-            {/* Kit Selector */}
-            <div style={S.kitSelector}>
+        <div className="brand-cloud">
+            {/* ── Kit Selector Bar ── */}
+            <div className="brand-cloud__bar">
                 <select
-                    style={S.select}
+                    className="brand-cloud__kit-select"
                     value={activeKitId ?? ''}
                     onChange={e => setActiveKit(e.target.value || null)}
                 >
-                    {kits.map(k => (
-                        <option key={k.id} value={k.id}>{k.name}</option>
-                    ))}
+                    {kits.map(k => <option key={k.id} value={k.id}>{k.name}</option>)}
                 </select>
-                <input
-                    style={{ ...S.input, width: 160 }}
-                    placeholder="New kit name..."
-                    value={newKitName}
-                    onChange={e => setNewKitName(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleCreateKit()}
-                />
-                <button style={S.smallBtn} onClick={handleCreateKit}>+ New</button>
-                {activeKitId && (
+                <div className="brand-cloud__bar-actions">
+                    <input
+                        className="brand-cloud__input brand-cloud__input--sm"
+                        placeholder="New kit..."
+                        value={newKitName}
+                        onChange={e => setNewKitName(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && handleCreateKit()}
+                    />
+                    <button className="brand-cloud__ghost-btn" onClick={handleCreateKit}>+ New Kit</button>
+                    {activeKitId && (
+                        <button
+                            className="brand-cloud__ghost-btn brand-cloud__ghost-btn--danger"
+                            onClick={() => { deleteKit(activeKitId); setActiveKit(kits[0]?.id ?? null); }}
+                        >Delete Kit</button>
+                    )}
+                </div>
+            </div>
+
+            {/* ── Tab Navigation ── */}
+            <div className="brand-cloud__tabs">
+                {(['assets', 'palette', 'typography', 'guidelines'] as CloudTab[]).map(t => (
                     <button
-                        style={{ ...S.smallBtn, borderColor: 'rgba(239,68,68,0.3)', color: '#ef4444' }}
-                        onClick={() => { deleteKit(activeKitId); setActiveKit(kits[0]?.id ?? null); }}
+                        key={t}
+                        className={`brand-cloud__tab ${tab === t ? 'brand-cloud__tab--active' : ''}`}
+                        onClick={() => setTab(t)}
                     >
-                        Delete
+                        {t === 'assets' ? 'Assets' : t === 'palette' ? 'Colors' : t === 'typography' ? 'Typography' : 'Guidelines'}
+                        {t === 'assets' && kit && <span className="brand-cloud__tab-count">{kit.assets.filter(a => !a.deletedAt).length}</span>}
                     </button>
-                )}
+                ))}
             </div>
 
             {kit && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-                    {/* Left Column: Assets */}
-                    <div>
-                        <h3 style={S.sectionTitle}>Assets</h3>
-                        {/* Upload Zone */}
-                        <div
-                            style={S.dropZone}
-                            onDrop={handleDrop}
-                            onDragOver={e => e.preventDefault()}
-                            onClick={() => fileInputRef.current?.click()}
-                        >
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="1.5" strokeLinecap="round">
-                                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
-                            </svg>
-                            <span style={{ color: '#64748b', fontSize: 12 }}>Drop images or click to upload</span>
-                        </div>
-                        <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept="image/*"
-                            multiple
-                            style={{ display: 'none' }}
-                            onChange={e => e.target.files && handleFileUpload(e.target.files)}
-                        />
+                <>
+                    {/* ═══ ASSETS TAB ═══ */}
+                    {tab === 'assets' && (
+                        <div className="brand-cloud__assets">
+                            {/* Upload Zone */}
+                            <div
+                                className={`brand-cloud__dropzone ${isDragging ? 'brand-cloud__dropzone--active' : ''}`}
+                                onDrop={handleDrop}
+                                onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
+                                onDragLeave={() => setIsDragging(false)}
+                                onClick={() => fileInputRef.current?.click()}
+                            >
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={isDragging ? '#818cf8' : '#555'} strokeWidth="1.5" strokeLinecap="round">
+                                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
+                                </svg>
+                                <span className="brand-cloud__dropzone-text">
+                                    {isDragging ? 'Drop files here' : 'Drag and drop files, or click to browse'}
+                                </span>
+                                <span className="brand-cloud__dropzone-hint">PNG, JPG, SVG, WebP</span>
+                            </div>
+                            <input ref={fileInputRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
+                                onChange={e => e.target.files && handleFileUpload(e.target.files)} />
 
-                        {/* Category Filter */}
-                        <div style={{ display: 'flex', gap: 4, margin: '10px 0', flexWrap: 'wrap' }}>
-                            <FilterTab label="All" active={assetFilter === 'all'} onClick={() => setAssetFilter('all')} />
-                            {ASSET_CATEGORIES.map(cat => (
-                                <FilterTab key={cat} label={cat} active={assetFilter === cat} onClick={() => setAssetFilter(cat)} />
-                            ))}
-                        </div>
+                            {/* Filter + View Toggle */}
+                            <div className="brand-cloud__asset-controls">
+                                <div className="brand-cloud__filters">
+                                    <button className={`brand-cloud__filter ${assetFilter === 'all' ? 'brand-cloud__filter--active' : ''}`}
+                                        onClick={() => setAssetFilter('all')}>All</button>
+                                    {ASSET_CATEGORIES.map(cat => (
+                                        <button key={cat}
+                                            className={`brand-cloud__filter ${assetFilter === cat ? 'brand-cloud__filter--active' : ''}`}
+                                            onClick={() => setAssetFilter(cat)}>{cat}</button>
+                                    ))}
+                                </div>
+                                <div className="brand-cloud__view-toggle">
+                                    <button className={`brand-cloud__view-btn ${viewMode === 'grid' ? 'brand-cloud__view-btn--active' : ''}`}
+                                        onClick={() => setViewMode('grid')} title="Grid view">
+                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
+                                    </button>
+                                    <button className={`brand-cloud__view-btn ${viewMode === 'list' ? 'brand-cloud__view-btn--active' : ''}`}
+                                        onClick={() => setViewMode('list')} title="List view">
+                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="2" width="14" height="2" rx="0.5"/><rect x="1" y="7" width="14" height="2" rx="0.5"/><rect x="1" y="12" width="14" height="2" rx="0.5"/></svg>
+                                    </button>
+                                </div>
+                            </div>
 
-                        {/* Asset Grid */}
-                        <div style={S.assetGrid}>
+                            {/* Asset Grid/List */}
                             {filteredAssets.length === 0 ? (
-                                <p style={{ color: '#555', fontSize: 11, gridColumn: '1 / -1', textAlign: 'center', padding: 20 }}>
-                                    No assets yet — upload logos, product images, or textures
-                                </p>
-                            ) : filteredAssets.map(a => (
-                                <div key={a.id} style={S.assetCard}>
-                                    <img src={a.thumbSrc || a.src} alt={a.name} style={S.assetImg} />
-                                    <span style={S.assetName}>{a.name}</span>
-                                    <span style={S.assetMeta}>{a.category} · {a.width}x{a.height}</span>
-                                    <button
-                                        style={S.deleteAssetBtn}
-                                        onClick={() => removeAsset(kit.id, a.id)}
-                                        title="Remove asset"
-                                    >x</button>
+                                <div className="brand-cloud__no-assets">
+                                    <p>No assets yet — upload logos, product shots, or textures</p>
                                 </div>
-                            ))}
+                            ) : (
+                                <div className={viewMode === 'grid' ? 'brand-cloud__asset-grid' : 'brand-cloud__asset-list'}>
+                                    {filteredAssets.map(a => viewMode === 'grid' ? (
+                                        <div key={a.id} className="brand-cloud__acard">
+                                            <div className="brand-cloud__acard-img-wrap">
+                                                <img src={a.thumbSrc || a.src} alt={a.name} className="brand-cloud__acard-img" />
+                                                <div className="brand-cloud__acard-overlay">
+                                                    <button className="brand-cloud__acard-del"
+                                                        onClick={() => removeAsset(kit.id, a.id)}>Remove</button>
+                                                </div>
+                                            </div>
+                                            <div className="brand-cloud__acard-info">
+                                                <span className="brand-cloud__acard-name">{a.name}</span>
+                                                <span className="brand-cloud__acard-meta">{a.category} · {a.width}x{a.height}</span>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div key={a.id} className="brand-cloud__alist-row">
+                                            <img src={a.thumbSrc || a.src} alt={a.name} className="brand-cloud__alist-thumb" />
+                                            <div className="brand-cloud__alist-info">
+                                                <span className="brand-cloud__alist-name">{a.name}</span>
+                                                <span className="brand-cloud__alist-meta">{a.category} · {a.width}x{a.height} · {formatBytes(a.sizeBytes)}</span>
+                                            </div>
+                                            <button className="brand-cloud__alist-del" onClick={() => removeAsset(kit.id, a.id)}>x</button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
-                    </div>
+                    )}
 
-                    {/* Right Column: Palette + Typography + Guidelines */}
-                    <div>
-                        {/* Palette */}
-                        <h3 style={S.sectionTitle}>Palette</h3>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 20 }}>
-                            {(['primary', 'secondary', 'accent', 'background', 'text'] as const).map(key => (
-                                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <input
-                                        type="color"
-                                        value={kit.palette[key]}
-                                        onChange={e => updatePalette(kit.id, { [key]: e.target.value })}
-                                        style={S.colorInput}
-                                    />
-                                    <div>
-                                        <div style={{ fontSize: 11, color: '#ccc', textTransform: 'capitalize' }}>{key}</div>
-                                        <div style={{ fontSize: 9, color: '#555', fontFamily: 'monospace' }}>{kit.palette[key]}</div>
+                    {/* ═══ PALETTE TAB ═══ */}
+                    {tab === 'palette' && (
+                        <div className="brand-cloud__palette">
+                            <p className="brand-cloud__section-desc">Define your brand color palette. These colors will be preferred by the AI when generating designs.</p>
+                            <div className="brand-cloud__color-grid">
+                                {(['primary', 'secondary', 'accent', 'background', 'text'] as const).map(key => (
+                                    <div key={key} className="brand-cloud__color-card">
+                                        <div className="brand-cloud__color-swatch" style={{ backgroundColor: kit.palette[key] }}>
+                                            <input type="color" value={kit.palette[key]}
+                                                onChange={e => updatePalette(kit.id, { [key]: e.target.value })}
+                                                className="brand-cloud__color-picker" />
+                                        </div>
+                                        <div className="brand-cloud__color-info">
+                                            <span className="brand-cloud__color-label">{key}</span>
+                                            <span className="brand-cloud__color-hex">{kit.palette[key]}</span>
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                ))}
+                            </div>
                         </div>
+                    )}
 
-                        {/* Typography */}
-                        <h3 style={S.sectionTitle}>Typography</h3>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
+                    {/* ═══ TYPOGRAPHY TAB ═══ */}
+                    {tab === 'typography' && (
+                        <div className="brand-cloud__typo">
+                            <p className="brand-cloud__section-desc">Set preferred fonts for each text role. The AI will use these when generating designs.</p>
                             {(['heading', 'body', 'cta'] as const).map(role => (
-                                <div key={role} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <span style={{ fontSize: 11, color: '#888', width: 60, textTransform: 'capitalize' }}>{role}</span>
+                                <div key={role} className="brand-cloud__typo-row">
+                                    <div className="brand-cloud__typo-label">{role}</div>
                                     <input
-                                        style={{ ...S.input, flex: 1 }}
+                                        className="brand-cloud__input brand-cloud__input--wide"
                                         value={kit.typography[role].family}
                                         onChange={e => updateTypography(kit.id, { [role]: { ...kit.typography[role], family: e.target.value } })}
                                         placeholder="Font family..."
                                     />
+                                    <div
+                                        className="brand-cloud__typo-preview"
+                                        style={{ fontFamily: kit.typography[role].family || 'Inter' }}
+                                    >
+                                        The quick brown fox
+                                    </div>
                                 </div>
                             ))}
                         </div>
+                    )}
 
-                        {/* Guidelines */}
-                        <h3 style={S.sectionTitle}>Guidelines</h3>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                            <input
-                                style={S.input}
-                                placeholder="Brand name..."
-                                value={kit.guidelines.name}
-                                onChange={e => updateGuidelines(kit.id, { name: e.target.value })}
-                            />
-                            <input
-                                style={S.input}
-                                placeholder="Tagline..."
-                                value={kit.guidelines.tagline}
-                                onChange={e => updateGuidelines(kit.id, { tagline: e.target.value })}
-                            />
-                            <select
-                                style={S.select}
-                                value={kit.guidelines.voiceTone}
-                                onChange={e => updateGuidelines(kit.id, { voiceTone: e.target.value })}
-                            >
-                                {['Professional', 'Friendly', 'Bold', 'Luxury', 'Playful', 'Technical'].map(t => (
-                                    <option key={t} value={t}>{t}</option>
-                                ))}
-                            </select>
-                            <input
-                                style={S.input}
-                                placeholder="CTA phrases (comma separated)..."
-                                value={kit.guidelines.ctaPhrases.join(', ')}
-                                onChange={e => updateGuidelines(kit.id, {
-                                    ctaPhrases: e.target.value.split(',').map(s => s.trim()).filter(Boolean),
-                                })}
-                            />
+                    {/* ═══ GUIDELINES TAB ═══ */}
+                    {tab === 'guidelines' && (
+                        <div className="brand-cloud__guidelines">
+                            <p className="brand-cloud__section-desc">Brand guidelines inform the AI about your brand voice and preferred messaging.</p>
+                            <div className="brand-cloud__guide-fields">
+                                <label className="brand-cloud__guide-label">
+                                    <span>Brand Name</span>
+                                    <input className="brand-cloud__input brand-cloud__input--wide"
+                                        value={kit.guidelines.name} placeholder="Your brand name..."
+                                        onChange={e => updateGuidelines(kit.id, { name: e.target.value })} />
+                                </label>
+                                <label className="brand-cloud__guide-label">
+                                    <span>Tagline</span>
+                                    <input className="brand-cloud__input brand-cloud__input--wide"
+                                        value={kit.guidelines.tagline} placeholder="Your tagline..."
+                                        onChange={e => updateGuidelines(kit.id, { tagline: e.target.value })} />
+                                </label>
+                                <label className="brand-cloud__guide-label">
+                                    <span>Voice Tone</span>
+                                    <select className="brand-cloud__select" value={kit.guidelines.voiceTone}
+                                        onChange={e => updateGuidelines(kit.id, { voiceTone: e.target.value })}>
+                                        {['Professional', 'Friendly', 'Bold', 'Luxury', 'Playful', 'Technical'].map(t => (
+                                            <option key={t} value={t}>{t}</option>
+                                        ))}
+                                    </select>
+                                </label>
+                                <label className="brand-cloud__guide-label">
+                                    <span>CTA Phrases</span>
+                                    <input className="brand-cloud__input brand-cloud__input--wide"
+                                        value={kit.guidelines.ctaPhrases.join(', ')} placeholder="Learn More, Get Started, Shop Now..."
+                                        onChange={e => updateGuidelines(kit.id, {
+                                            ctaPhrases: e.target.value.split(',').map(s => s.trim()).filter(Boolean),
+                                        })} />
+                                </label>
+                            </div>
                         </div>
-                    </div>
-                </div>
+                    )}
+                </>
             )}
         </div>
-    );
-}
-
-// ── Sub-components ──
-
-function FilterTab({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
-    return (
-        <button
-            onClick={onClick}
-            style={{
-                padding: '3px 10px', borderRadius: 4, fontSize: 10, fontWeight: 500,
-                cursor: 'pointer', textTransform: 'capitalize', transition: 'all 0.15s',
-                background: active ? 'rgba(129,140,248,0.15)' : 'transparent',
-                border: `1px solid ${active ? 'rgba(129,140,248,0.4)' : 'rgba(255,255,255,0.06)'}`,
-                color: active ? '#818cf8' : '#888',
-            }}
-        >
-            {label}
-        </button>
     );
 }
 
 // ── Helpers ──
 
 function guessCategory(filename: string): AssetCategory {
-    const lower = filename.toLowerCase();
-    if (lower.includes('logo')) return 'logo';
-    if (lower.includes('icon')) return 'icon';
-    if (lower.includes('bg') || lower.includes('background')) return 'background';
-    if (lower.includes('texture') || lower.includes('pattern')) return 'texture';
-    if (lower.includes('product')) return 'product';
+    const l = filename.toLowerCase();
+    if (l.includes('logo')) return 'logo';
+    if (l.includes('icon')) return 'icon';
+    if (l.includes('bg') || l.includes('background')) return 'background';
+    if (l.includes('texture') || l.includes('pattern')) return 'texture';
+    if (l.includes('product')) return 'product';
     return 'photo';
+}
+
+function formatBytes(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 async function generateThumbnail(dataUrl: string, maxSize: number): Promise<string> {
@@ -323,73 +350,3 @@ async function hashString(str: string): Promise<string> {
     const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
     return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
-
-// ── Styles ──
-
-const S = {
-    emptyState: {
-        display: 'flex', flexDirection: 'column' as const, alignItems: 'center',
-        justifyContent: 'center', padding: '60px 20px', textAlign: 'center' as const,
-    },
-    emptyIcon: { opacity: 0.5 },
-    primaryBtn: {
-        padding: '8px 20px', borderRadius: 8, border: 'none', fontSize: 13, fontWeight: 600,
-        cursor: 'pointer', background: 'linear-gradient(135deg, #818cf8, #6366f1)', color: '#fff',
-        transition: 'all 0.2s',
-    },
-    input: {
-        padding: '8px 12px', borderRadius: 8, fontSize: 12, color: '#e5e5e7',
-        background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-        outline: 'none', fontFamily: 'inherit',
-    } as React.CSSProperties,
-    kitSelector: {
-        display: 'flex', gap: 8, alignItems: 'center', marginBottom: 20, flexWrap: 'wrap' as const,
-    },
-    select: {
-        padding: '8px 12px', borderRadius: 8, fontSize: 12, color: '#e5e5e7',
-        background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-        outline: 'none', cursor: 'pointer', fontFamily: 'inherit',
-    } as React.CSSProperties,
-    smallBtn: {
-        padding: '6px 14px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)',
-        background: 'none', color: '#ccc', fontSize: 11, fontWeight: 600,
-        cursor: 'pointer', transition: 'all 0.15s',
-    } as React.CSSProperties,
-    sectionTitle: {
-        fontSize: 11, fontWeight: 600, color: '#86868b', letterSpacing: '0.08em',
-        textTransform: 'uppercase' as const, margin: '0 0 10px',
-    },
-    dropZone: {
-        display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center',
-        gap: 8, padding: '24px 16px', borderRadius: 10,
-        border: '2px dashed rgba(255,255,255,0.08)', cursor: 'pointer',
-        transition: 'border-color 0.2s',
-    },
-    assetGrid: {
-        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8,
-    },
-    assetCard: {
-        position: 'relative' as const, borderRadius: 8, overflow: 'hidden',
-        background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
-    },
-    assetImg: {
-        width: '100%', height: 80, objectFit: 'cover' as const, display: 'block',
-    },
-    assetName: {
-        display: 'block', padding: '4px 6px 0', fontSize: 10, fontWeight: 500,
-        color: '#ccc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const,
-    },
-    assetMeta: {
-        display: 'block', padding: '0 6px 4px', fontSize: 8, color: '#666',
-    },
-    deleteAssetBtn: {
-        position: 'absolute' as const, top: 4, right: 4,
-        background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
-        border: 'none', color: '#ef4444', fontSize: 10, borderRadius: 4,
-        cursor: 'pointer', padding: '1px 5px', opacity: 0.7,
-    },
-    colorInput: {
-        width: 28, height: 28, padding: 0, border: 'none',
-        borderRadius: 6, cursor: 'pointer', background: 'none',
-    } as React.CSSProperties,
-};

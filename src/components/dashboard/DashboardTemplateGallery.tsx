@@ -1,152 +1,119 @@
 // ─────────────────────────────────────────────────
-// DashboardTemplateGallery — Full-width template grid
+// DashboardTemplateGallery — Canva-level template browser
 // ─────────────────────────────────────────────────
-// Shows all templates (built-in + user-saved) in dashboard.
-// Filter by category, search, sort, one-click apply.
+// Rich visual preview cards with mini-layout mockups.
+// Built-in templates: select only. User templates: can delete.
+// Category pills, search, responsive grid, hover overlays.
 // ─────────────────────────────────────────────────
 
 import { useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useTemplateStore, type TemplateCategory } from '@/stores/templateStore';
+import { useTemplateStore, type DesignTemplate, type TemplateCategory } from '@/stores/templateStore';
 import { useDesignStore } from '@/stores/designStore';
 import { BANNER_PRESETS } from '@/schema/presets';
+import type { DesignElement } from '@/schema/elements.types';
+import type { BannerVariant } from '@/schema/design.types';
+import './DashboardTemplateGallery.css';
 
-type SortBy = 'newest' | 'most-used' | 'name';
-const CATEGORIES = ['all', 'display', 'social', 'email', 'video', 'custom'] as const;
+type SortBy = 'newest' | 'popular' | 'name';
+const CATEGORIES: { key: string; label: string }[] = [
+    { key: 'all', label: 'All' },
+    { key: 'display', label: 'Display' },
+    { key: 'social', label: 'Social' },
+    { key: 'email', label: 'Email' },
+    { key: 'video', label: 'Video' },
+];
 
 export function DashboardTemplateGallery() {
     const navigate = useNavigate();
-    const { templates, search, getByCategory, getFavorites, toggleFavorite, instantiate, deleteTemplate } = useTemplateStore();
+    const { templates, search, getByCategory, toggleFavorite, instantiate, deleteTemplate } = useTemplateStore();
     const createCreativeSet = useDesignStore(s => s.createCreativeSet);
 
-    const [category, setCategory] = useState<string>('all');
+    const [category, setCategory] = useState('all');
     const [query, setQuery] = useState('');
     const [sortBy, setSortBy] = useState<SortBy>('newest');
-    const [showFavs, setShowFavs] = useState(false);
+    const [hoveredId, setHoveredId] = useState<string | null>(null);
 
     const filtered = useMemo(() => {
-        let result = showFavs
-            ? getFavorites()
-            : query.trim()
-                ? search(query)
-                : category !== 'all'
-                    ? getByCategory(category as TemplateCategory)
-                    : templates;
-
-        // Sort
-        result = [...result].sort((a, b) => {
+        let result = query.trim()
+            ? search(query)
+            : category !== 'all'
+                ? getByCategory(category as TemplateCategory)
+                : templates;
+        return [...result].sort((a, b) => {
             if (sortBy === 'newest') return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-            if (sortBy === 'most-used') return b.usageCount - a.usageCount;
+            if (sortBy === 'popular') return b.usageCount - a.usageCount;
             return a.name.localeCompare(b.name);
         });
-        return result;
-    }, [templates, category, query, sortBy, showFavs, getFavorites, search, getByCategory]);
+    }, [templates, category, query, sortBy, search, getByCategory]);
 
-    const handleUseTemplate = useCallback((id: string) => {
+    const handleUse = useCallback((id: string) => {
         const variant = instantiate(id);
         if (!variant) return;
         const tmpl = templates.find(t => t.id === id);
         const preset = BANNER_PRESETS.find(p => p.width === (tmpl?.width ?? 300) && p.height === (tmpl?.height ?? 250))
             ?? { id: `custom-${Date.now()}`, name: `${tmpl?.width ?? 300}x${tmpl?.height ?? 250}`, width: tmpl?.width ?? 300, height: tmpl?.height ?? 250, category: 'display' as const };
-
         const setId = createCreativeSet(tmpl?.name ?? 'From Template', preset);
-        // projectStore sync happens automatically via DashboardPage useEffect
         navigate(`/editor/${setId}`);
     }, [instantiate, templates, createCreativeSet, navigate]);
 
     return (
-        <div style={{ padding: '0 24px' }}>
-            {/* Controls bar */}
-            <div style={S.controls}>
-                {/* Search */}
-                <div style={S.searchWrap}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round">
+        <div className="tmpl-gallery">
+            {/* ── Header Bar ── */}
+            <div className="tmpl-gallery__header">
+                <div className="tmpl-gallery__search">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                         <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
                     </svg>
                     <input
-                        style={S.searchInput}
+                        className="tmpl-gallery__search-input"
                         placeholder="Search templates..."
                         value={query}
-                        onChange={e => { setQuery(e.target.value); setShowFavs(false); }}
+                        onChange={e => setQuery(e.target.value)}
                     />
                 </div>
-                {/* Sort */}
-                <select style={S.select} value={sortBy} onChange={e => setSortBy(e.target.value as SortBy)}>
+                <select className="tmpl-gallery__sort" value={sortBy} onChange={e => setSortBy(e.target.value as SortBy)}>
                     <option value="newest">Newest</option>
-                    <option value="most-used">Most Used</option>
-                    <option value="name">Name</option>
+                    <option value="popular">Popular</option>
+                    <option value="name">A-Z</option>
                 </select>
             </div>
 
-            {/* Category tabs */}
-            <div style={S.tabs}>
-                {CATEGORIES.map(cat => (
+            {/* ── Category Pills ── */}
+            <div className="tmpl-gallery__pills">
+                {CATEGORIES.map(c => (
                     <button
-                        key={cat}
-                        style={{ ...S.tab, ...(category === cat && !showFavs ? S.tabActive : {}) }}
-                        onClick={() => { setCategory(cat); setQuery(''); setShowFavs(false); }}
+                        key={c.key}
+                        className={`tmpl-pill ${category === c.key && !query ? 'tmpl-pill--active' : ''}`}
+                        onClick={() => { setCategory(c.key); setQuery(''); }}
                     >
-                        {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                        {c.label}
                     </button>
                 ))}
-                <button
-                    style={{ ...S.tab, ...(showFavs ? S.tabActive : {}), marginLeft: 'auto' }}
-                    onClick={() => { setShowFavs(!showFavs); setQuery(''); }}
-                >
-                    Favorites
-                </button>
+                <span className="tmpl-gallery__count">{filtered.length} template{filtered.length !== 1 ? 's' : ''}</span>
             </div>
 
-            {/* Template grid */}
+            {/* ── Grid ── */}
             {filtered.length === 0 ? (
-                <div style={S.empty}>
-                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" opacity="0.3">
-                        <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
-                        <rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
+                <div className="tmpl-gallery__empty">
+                    <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="0.8" strokeLinecap="round" opacity="0.25">
+                        <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
+                        <rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" />
                     </svg>
-                    <p style={{ color: '#64748b', fontSize: 13, margin: '12px 0 0' }}>
-                        {query ? 'No templates match your search' : 'Generate your first design to start building your template library'}
-                    </p>
+                    <p>{query ? `No templates match "${query}"` : 'Create designs to build your template library'}</p>
                 </div>
             ) : (
-                <div style={S.grid}>
+                <div className="tmpl-grid">
                     {filtered.map(t => (
-                        <div key={t.id} style={S.card}>
-                            {/* Thumbnail */}
-                            <div style={{ ...S.thumb, backgroundColor: getTemplateBg(t) }}>
-                                {t.thumbnailSrc ? (
-                                    <img src={t.thumbnailSrc} alt={t.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                ) : (
-                                    <div style={S.thumbPlaceholder}>
-                                        <span style={{ fontSize: 11, fontWeight: 600 }}>{t.width}x{t.height}</span>
-                                        <span style={{ fontSize: 9, opacity: 0.5 }}>{t.category}</span>
-                                    </div>
-                                )}
-                                {t.isBuiltIn && (
-                                    <span style={S.builtInBadge}>Built-in</span>
-                                )}
-                            </div>
-                            {/* Info */}
-                            <div style={S.cardBody}>
-                                <div style={S.cardName}>{t.name}</div>
-                                <div style={S.cardMeta}>
-                                    {t.width}x{t.height} · {t.usageCount} uses
-                                    {t.tags.length > 0 && ` · ${t.tags.slice(0, 2).join(', ')}`}
-                                </div>
-                            </div>
-                            {/* Actions */}
-                            <div style={S.cardActions}>
-                                <button style={S.favBtn} onClick={() => toggleFavorite(t.id)}>
-                                    {t.isFavorite ? '★' : '☆'}
-                                </button>
-                                <button style={S.useBtn} onClick={() => handleUseTemplate(t.id)}>
-                                    Use Template
-                                </button>
-                                {!t.isBuiltIn && (
-                                    <button style={S.delBtn} onClick={() => deleteTemplate(t.id)}>x</button>
-                                )}
-                            </div>
-                        </div>
+                        <TemplateCard
+                            key={t.id}
+                            template={t}
+                            isHovered={hoveredId === t.id}
+                            onHover={setHoveredId}
+                            onUse={handleUse}
+                            onToggleFav={toggleFavorite}
+                            onDelete={deleteTemplate}
+                        />
                     ))}
                 </div>
             )}
@@ -154,99 +121,214 @@ export function DashboardTemplateGallery() {
     );
 }
 
-// ── Helpers ──
+// ═══════════════════════════════════════════════════
+// TemplateCard — Rich visual preview with mini-layout
+// ═══════════════════════════════════════════════════
 
-function getTemplateBg(t: { variantSnapshot: string }): string {
+interface CardProps {
+    template: DesignTemplate;
+    isHovered: boolean;
+    onHover: (id: string | null) => void;
+    onUse: (id: string) => void;
+    onToggleFav: (id: string) => void;
+    onDelete: (id: string) => void;
+}
+
+function TemplateCard({ template: t, isHovered, onHover, onUse, onToggleFav, onDelete }: CardProps) {
+    const elements = useMemo(() => parseElements(t), [t]);
+    const bgColor = useMemo(() => parseBgColor(t), [t]);
+    const aspectRatio = t.width / t.height;
+    // Clamp aspect ratio for card display
+    const displayRatio = Math.max(0.6, Math.min(aspectRatio, 2.0));
+
+    return (
+        <div
+            className={`tmpl-card ${isHovered ? 'tmpl-card--hover' : ''}`}
+            onMouseEnter={() => onHover(t.id)}
+            onMouseLeave={() => onHover(null)}
+        >
+            {/* ── Preview ── */}
+            <div
+                className="tmpl-card__preview"
+                style={{ backgroundColor: bgColor, aspectRatio: `${displayRatio}` }}
+            >
+                {/* Mini layout mockup */}
+                <div className="tmpl-card__layout" style={{ aspectRatio: `${t.width}/${t.height}` }}>
+                    {elements.map((el, i) => (
+                        <MiniElement key={i} el={el} canvasW={t.width} canvasH={t.height} />
+                    ))}
+                </div>
+
+                {/* Badges */}
+                <div className="tmpl-card__badges">
+                    {t.isBuiltIn && <span className="tmpl-badge tmpl-badge--builtin">Starter</span>}
+                    <span className="tmpl-badge tmpl-badge--size">{t.width} x {t.height}</span>
+                </div>
+
+                {/* Favorite button */}
+                <button
+                    className={`tmpl-card__fav ${t.isFavorite ? 'tmpl-card__fav--active' : ''}`}
+                    onClick={e => { e.stopPropagation(); onToggleFav(t.id); }}
+                    title={t.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                >
+                    {t.isFavorite ? '\u2605' : '\u2606'}
+                </button>
+
+                {/* Hover Overlay */}
+                <div className="tmpl-card__overlay" onClick={() => onUse(t.id)}>
+                    <button className="tmpl-card__use-btn">
+                        Use This Template
+                    </button>
+                </div>
+            </div>
+
+            {/* ── Info ── */}
+            <div className="tmpl-card__info">
+                <div className="tmpl-card__name">{t.name}</div>
+                <div className="tmpl-card__meta">
+                    {t.category} · {t.usageCount > 0 ? `${t.usageCount} uses` : 'New'}
+                    {!t.isBuiltIn && (
+                        <button
+                            className="tmpl-card__delete"
+                            onClick={e => { e.stopPropagation(); onDelete(t.id); }}
+                            title="Delete template"
+                        >
+                            ×
+                        </button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ═══════════════════════════════════════════════════
+// MiniElement — Renders a scaled-down element representation
+// ═══════════════════════════════════════════════════
+
+function MiniElement({ el, canvasW, canvasH }: { el: MiniElementData; canvasW: number; canvasH: number }) {
+    const left = `${(el.x / canvasW) * 100}%`;
+    const top = `${(el.y / canvasH) * 100}%`;
+    const width = `${(el.w / canvasW) * 100}%`;
+    const height = `${(el.h / canvasH) * 100}%`;
+
+    if (el.type === 'text') {
+        return (
+            <div
+                className="tmpl-mini tmpl-mini--text"
+                style={{ left, top, width, height, color: el.color }}
+            >
+                <div
+                    className="tmpl-mini__text"
+                    style={{
+                        fontSize: `${Math.max(4, el.fontSize * 0.35)}px`,
+                        fontWeight: el.fontWeight,
+                        textAlign: el.textAlign as any,
+                        lineHeight: 1.1,
+                    }}
+                >
+                    {el.content}
+                </div>
+            </div>
+        );
+    }
+
+    if (el.type === 'button') {
+        return (
+            <div
+                className="tmpl-mini tmpl-mini--btn"
+                style={{
+                    left, top, width, height,
+                    backgroundColor: el.bgColor,
+                    borderRadius: `${el.borderRadius ?? 4}px`,
+                    color: el.color,
+                    fontSize: `${Math.max(3, (el.fontSize ?? 12) * 0.3)}px`,
+                }}
+            >
+                {el.label}
+            </div>
+        );
+    }
+
+    // Shape
+    const bg = el.gradientStart && el.gradientEnd
+        ? `linear-gradient(${el.gradientAngle ?? 135}deg, ${el.gradientStart}, ${el.gradientEnd})`
+        : el.fill;
+
+    return (
+        <div
+            className="tmpl-mini tmpl-mini--shape"
+            style={{
+                left, top, width, height,
+                background: bg,
+                borderRadius: el.borderRadius ? `${Math.min(el.borderRadius, 50)}px` : undefined,
+                opacity: el.opacity,
+            }}
+        />
+    );
+}
+
+// ── Data Extraction ──
+
+interface MiniElementData {
+    type: 'text' | 'shape' | 'button';
+    x: number; y: number; w: number; h: number;
+    // Text
+    content?: string; fontSize?: number; fontWeight?: number;
+    color?: string; textAlign?: string;
+    // Shape
+    fill?: string; gradientStart?: string; gradientEnd?: string;
+    gradientAngle?: number; borderRadius?: number; opacity?: number;
+    // Button
+    label?: string; bgColor?: string;
+}
+
+function parseElements(t: DesignTemplate): MiniElementData[] {
     try {
-        const v = JSON.parse(t.variantSnapshot);
+        const variant: BannerVariant = JSON.parse(t.variantSnapshot);
+        if (!variant.elements) return [];
+        return variant.elements
+            .filter((e: DesignElement) => e.visible !== false)
+            .sort((a: DesignElement, b: DesignElement) => (a.zIndex ?? 0) - (b.zIndex ?? 0))
+            .map((e: DesignElement): MiniElementData => {
+                const c = e.constraints;
+                const base = {
+                    x: c.horizontal.offset,
+                    y: c.vertical.offset,
+                    w: c.size.width,
+                    h: c.size.height,
+                };
+                if (e.type === 'text') {
+                    return {
+                        ...base, type: 'text',
+                        content: e.content, fontSize: e.fontSize, fontWeight: e.fontWeight,
+                        color: e.color, textAlign: e.textAlign,
+                    };
+                }
+                if (e.type === 'button') {
+                    return {
+                        ...base, type: 'button',
+                        label: e.label, fontSize: e.fontSize, color: e.color,
+                        bgColor: e.backgroundColor, borderRadius: e.borderRadius,
+                    };
+                }
+                return {
+                    ...base, type: 'shape',
+                    fill: e.fill, borderRadius: e.borderRadius, opacity: e.opacity,
+                    gradientStart: e.gradientStart, gradientEnd: e.gradientEnd,
+                    gradientAngle: e.gradientAngle,
+                };
+            });
+    } catch {
+        return [];
+    }
+}
+
+function parseBgColor(t: DesignTemplate): string {
+    try {
+        const v: BannerVariant = JSON.parse(t.variantSnapshot);
         return v.backgroundColor ?? '#1a1f2e';
     } catch {
         return '#1a1f2e';
     }
 }
-
-// ── Styles ──
-
-const S = {
-    controls: {
-        display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center',
-    },
-    searchWrap: {
-        display: 'flex', alignItems: 'center', gap: 8, flex: 1,
-        padding: '6px 12px', borderRadius: 8,
-        background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)',
-    },
-    searchInput: {
-        background: 'none', border: 'none', outline: 'none', color: '#e5e5e7',
-        fontSize: 12, fontFamily: 'inherit', flex: 1,
-    } as React.CSSProperties,
-    select: {
-        padding: '6px 10px', borderRadius: 8, fontSize: 11, color: '#ccc',
-        background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)',
-        outline: 'none', cursor: 'pointer', fontFamily: 'inherit',
-    } as React.CSSProperties,
-    tabs: {
-        display: 'flex', gap: 4, marginBottom: 16, flexWrap: 'wrap' as const,
-    },
-    tab: {
-        padding: '5px 12px', borderRadius: 6, fontSize: 11, fontWeight: 500,
-        cursor: 'pointer', transition: 'all 0.15s', textTransform: 'capitalize' as const,
-        background: 'transparent', border: '1px solid rgba(255,255,255,0.06)', color: '#888',
-    } as React.CSSProperties,
-    tabActive: {
-        borderColor: 'rgba(129,140,248,0.4)', color: '#818cf8',
-        background: 'rgba(129,140,248,0.08)',
-    },
-    empty: {
-        display: 'flex', flexDirection: 'column' as const, alignItems: 'center',
-        justifyContent: 'center', padding: '60px 20px', textAlign: 'center' as const, color: '#555',
-    },
-    grid: {
-        display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16,
-    },
-    card: {
-        borderRadius: 10, overflow: 'hidden',
-        background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)',
-        transition: 'border-color 0.2s, transform 0.2s',
-    },
-    thumb: {
-        width: '100%', height: 140, position: 'relative' as const,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-    },
-    thumbPlaceholder: {
-        display: 'flex', flexDirection: 'column' as const, alignItems: 'center',
-        gap: 2, color: 'rgba(255,255,255,0.4)',
-    },
-    builtInBadge: {
-        position: 'absolute' as const, top: 6, right: 6,
-        padding: '2px 8px', borderRadius: 4, fontSize: 9, fontWeight: 600,
-        background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
-        color: '#818cf8', letterSpacing: '0.03em',
-    },
-    cardBody: {
-        padding: '10px 12px 6px',
-    },
-    cardName: {
-        fontSize: 13, fontWeight: 600, color: '#e5e5e7',
-        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const,
-    },
-    cardMeta: {
-        fontSize: 10, color: '#888', marginTop: 2,
-    },
-    cardActions: {
-        display: 'flex', gap: 6, padding: '6px 12px 10px', alignItems: 'center',
-    },
-    favBtn: {
-        background: 'none', border: 'none', color: '#f59e0b', cursor: 'pointer',
-        fontSize: 16, padding: 0,
-    } as React.CSSProperties,
-    useBtn: {
-        flex: 1, padding: '6px 0', borderRadius: 6, border: 'none', fontSize: 11,
-        fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
-        background: 'rgba(129,140,248,0.15)', color: '#818cf8',
-    } as React.CSSProperties,
-    delBtn: {
-        background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 4,
-        color: '#666', cursor: 'pointer', fontSize: 10, padding: '2px 6px',
-    } as React.CSSProperties,
-};

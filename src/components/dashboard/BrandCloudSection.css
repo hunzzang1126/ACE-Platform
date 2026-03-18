@@ -1,0 +1,573 @@
+/* ═══════════════════════════════════════════════════
+   BrandCloudSection — Professional Drive-level styles
+   ═══════════════════════════════════════════════════ */
+
+.brand-cloud {
+    padding: 0 24px 40px;
+}
+
+/* ── Empty State ── */
+.brand-cloud__empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 80px 20px;
+    text-align: center;
+}
+
+.brand-cloud__empty-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #e5e5e7;
+    margin: 16px 0 6px;
+}
+
+.brand-cloud__empty-desc {
+    font-size: 13px;
+    color: #64748b;
+    max-width: 340px;
+    margin: 0 0 28px;
+    line-height: 1.5;
+}
+
+.brand-cloud__empty-create {
+    display: flex;
+    gap: 8px;
+}
+
+/* ── Inputs ── */
+.brand-cloud__input {
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #e5e5e7;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    outline: none;
+    font-family: inherit;
+    transition: border-color 0.2s;
+}
+
+.brand-cloud__input:focus {
+    border-color: rgba(129, 140, 248, 0.4);
+}
+
+.brand-cloud__input::placeholder {
+    color: #555;
+}
+
+.brand-cloud__input--sm {
+    width: 140px;
+    padding: 6px 10px;
+    font-size: 12px;
+}
+
+.brand-cloud__input--wide {
+    flex: 1;
+    width: 100%;
+}
+
+.brand-cloud__select {
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #e5e5e7;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    outline: none;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+/* ── Buttons ── */
+.brand-cloud__primary-btn {
+    padding: 8px 22px;
+    border-radius: 8px;
+    border: none;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    background: linear-gradient(135deg, #818cf8, #6366f1);
+    color: #fff;
+    transition: all 0.2s;
+}
+
+.brand-cloud__primary-btn:hover {
+    box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4);
+}
+
+.brand-cloud__ghost-btn {
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: none;
+    color: #aaa;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.brand-cloud__ghost-btn:hover {
+    background: rgba(255, 255, 255, 0.04);
+    color: #ddd;
+}
+
+.brand-cloud__ghost-btn--danger {
+    color: #888;
+}
+
+.brand-cloud__ghost-btn--danger:hover {
+    color: #ef4444;
+    border-color: rgba(239, 68, 68, 0.3);
+}
+
+/* ── Kit Selector Bar ── */
+.brand-cloud__bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.brand-cloud__kit-select {
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #e5e5e7;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    outline: none;
+    cursor: pointer;
+    font-family: inherit;
+    min-width: 160px;
+}
+
+.brand-cloud__bar-actions {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-left: auto;
+}
+
+/* ── Tabs ── */
+.brand-cloud__tabs {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding-bottom: 0;
+}
+
+.brand-cloud__tab {
+    padding: 8px 16px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    background: none;
+    border: none;
+    color: #666;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.brand-cloud__tab:hover {
+    color: #aaa;
+}
+
+.brand-cloud__tab--active {
+    color: #818cf8;
+    border-bottom-color: #818cf8;
+}
+
+.brand-cloud__tab-count {
+    background: rgba(255, 255, 255, 0.06);
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-size: 10px;
+    color: #888;
+}
+
+.brand-cloud__tab--active .brand-cloud__tab-count {
+    background: rgba(129, 140, 248, 0.12);
+    color: #818cf8;
+}
+
+/* ── Section Description ── */
+.brand-cloud__section-desc {
+    font-size: 12px;
+    color: #64748b;
+    margin: 0 0 20px;
+    line-height: 1.5;
+}
+
+/* ── Assets Tab ── */
+.brand-cloud__dropzone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 28px 16px;
+    border-radius: 12px;
+    border: 2px dashed rgba(255, 255, 255, 0.06);
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 16px;
+}
+
+.brand-cloud__dropzone:hover {
+    border-color: rgba(129, 140, 248, 0.25);
+    background: rgba(129, 140, 248, 0.03);
+}
+
+.brand-cloud__dropzone--active {
+    border-color: rgba(129, 140, 248, 0.5);
+    background: rgba(129, 140, 248, 0.06);
+}
+
+.brand-cloud__dropzone-text {
+    color: #888;
+    font-size: 13px;
+}
+
+.brand-cloud__dropzone-hint {
+    color: #555;
+    font-size: 10px;
+}
+
+/* Asset Controls */
+.brand-cloud__asset-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+}
+
+.brand-cloud__filters {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.brand-cloud__filter {
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    color: #777;
+    text-transform: capitalize;
+}
+
+.brand-cloud__filter:hover {
+    color: #aaa;
+}
+
+.brand-cloud__filter--active {
+    background: rgba(129, 140, 248, 0.1);
+    border-color: rgba(129, 140, 248, 0.3);
+    color: #818cf8;
+}
+
+.brand-cloud__view-toggle {
+    display: flex;
+    gap: 2px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 6px;
+    padding: 2px;
+}
+
+.brand-cloud__view-btn {
+    padding: 4px 6px;
+    background: none;
+    border: none;
+    color: #555;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.15s;
+}
+
+.brand-cloud__view-btn--active {
+    background: rgba(255, 255, 255, 0.06);
+    color: #ccc;
+}
+
+/* Asset Grid */
+.brand-cloud__asset-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+}
+
+.brand-cloud__no-assets {
+    text-align: center;
+    padding: 40px;
+    color: #555;
+    font-size: 12px;
+}
+
+/* Asset Card (Grid) */
+.brand-cloud__acard {
+    border-radius: 10px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: border-color 0.2s, transform 0.2s;
+}
+
+.brand-cloud__acard:hover {
+    transform: translateY(-2px);
+    border-color: rgba(129, 140, 248, 0.25);
+}
+
+.brand-cloud__acard-img-wrap {
+    position: relative;
+    height: 110px;
+    overflow: hidden;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.brand-cloud__acard-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.brand-cloud__acard-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.brand-cloud__acard:hover .brand-cloud__acard-overlay {
+    opacity: 1;
+}
+
+.brand-cloud__acard-del {
+    padding: 5px 14px;
+    border-radius: 6px;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    background: rgba(239, 68, 68, 0.15);
+    color: #fca5a5;
+    font-size: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.brand-cloud__acard-del:hover {
+    background: rgba(239, 68, 68, 0.3);
+}
+
+.brand-cloud__acard-info {
+    padding: 8px 10px;
+}
+
+.brand-cloud__acard-name {
+    display: block;
+    font-size: 11px;
+    font-weight: 500;
+    color: #ccc;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.brand-cloud__acard-meta {
+    display: block;
+    font-size: 9px;
+    color: #666;
+    margin-top: 2px;
+    text-transform: capitalize;
+}
+
+/* Asset List */
+.brand-cloud__asset-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.brand-cloud__alist-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.03);
+    transition: background 0.2s;
+}
+
+.brand-cloud__alist-row:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.brand-cloud__alist-thumb {
+    width: 40px;
+    height: 40px;
+    border-radius: 6px;
+    object-fit: cover;
+}
+
+.brand-cloud__alist-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.brand-cloud__alist-name {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    color: #ccc;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.brand-cloud__alist-meta {
+    display: block;
+    font-size: 10px;
+    color: #666;
+    text-transform: capitalize;
+}
+
+.brand-cloud__alist-del {
+    background: none;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+    color: #555;
+    cursor: pointer;
+    font-size: 11px;
+    padding: 2px 6px;
+    transition: all 0.15s;
+}
+
+.brand-cloud__alist-del:hover {
+    color: #ef4444;
+    border-color: rgba(239, 68, 68, 0.3);
+}
+
+/* ── Palette Tab ── */
+.brand-cloud__color-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 12px;
+}
+
+.brand-cloud__color-card {
+    border-radius: 10px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: transform 0.2s;
+}
+
+.brand-cloud__color-card:hover {
+    transform: translateY(-2px);
+}
+
+.brand-cloud__color-swatch {
+    height: 70px;
+    position: relative;
+    cursor: pointer;
+}
+
+.brand-cloud__color-picker {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+    border: none;
+}
+
+.brand-cloud__color-info {
+    padding: 8px 10px;
+}
+
+.brand-cloud__color-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: #ccc;
+    text-transform: capitalize;
+}
+
+.brand-cloud__color-hex {
+    display: block;
+    font-size: 10px;
+    color: #666;
+    font-family: 'SF Mono', Menlo, monospace;
+    margin-top: 2px;
+}
+
+/* ── Typography Tab ── */
+.brand-cloud__typo {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.brand-cloud__typo-row {
+    display: grid;
+    grid-template-columns: 80px 1fr;
+    gap: 10px;
+    align-items: center;
+    padding: 14px 16px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.brand-cloud__typo-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #888;
+    text-transform: capitalize;
+}
+
+.brand-cloud__typo-preview {
+    grid-column: 1 / -1;
+    font-size: 16px;
+    color: #aaa;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255, 255, 255, 0.03);
+    margin-top: 4px;
+}
+
+/* ── Guidelines Tab ── */
+.brand-cloud__guide-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.brand-cloud__guide-label {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.brand-cloud__guide-label span {
+    font-size: 11px;
+    font-weight: 600;
+    color: #888;
+}
