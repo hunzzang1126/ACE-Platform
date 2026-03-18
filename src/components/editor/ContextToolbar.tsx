@@ -56,6 +56,7 @@ export function ContextToolbar({
     const selectedNode = nodes.find((n) => selection.includes(n.id));
     const hasOverlay = !!selectedOverlay;
     const hasShape = !!selectedNode;
+    const multiSelected = selection.length >= 2;
 
     const openEffects = useCallback(() => setInlinePanel('effects'), [setInlinePanel]);
     const openAnimate = useCallback(() => setInlinePanel('animate'), [setInlinePanel]);
@@ -63,6 +64,33 @@ export function ContextToolbar({
 
     // Nothing selected — don't render
     if (!hasOverlay && !hasShape) return null;
+
+    // ── Multi-selection: show Group button ──
+    if (multiSelected && actions) {
+        return (
+            <div className="ctx-toolbar" role="toolbar">
+                <button
+                    className="ctx-btn ctx-label-btn"
+                    onClick={() => actions.groupSelected?.()}
+                    title="Group selected elements (Cmd+G)"
+                    style={{ fontWeight: 600 }}
+                >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: 4 }}>
+                        <rect x="3" y="3" width="7" height="7" rx="1" />
+                        <rect x="14" y="3" width="7" height="7" rx="1" />
+                        <rect x="3" y="14" width="7" height="7" rx="1" />
+                        <rect x="14" y="14" width="7" height="7" rx="1" />
+                        <path d="M10 10h4v4h-4z" strokeDasharray="2 1" />
+                    </svg>
+                    Make a Group
+                </button>
+                <div className="ctx-divider" />
+                <span style={{ fontSize: 11, color: 'var(--text-muted, #71717a)', padding: '0 4px' }}>
+                    {selection.length} selected
+                </span>
+            </div>
+        );
+    }
 
     // ── Shared inline panel buttons ──
     const InlineButtons = () => (
