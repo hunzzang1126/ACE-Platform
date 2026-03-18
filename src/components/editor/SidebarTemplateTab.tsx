@@ -200,43 +200,60 @@ function TemplatePreview({ template }: { template: DesignTemplate }) {
 function applyVariantToCanvas(variant: BannerVariant, actions: CanvasEngineActions) {
     const elements = variant.elements ?? [];
 
+    // ★ Template original dimensions
+    const tW = variant.preset?.width || 300;
+    const tH = variant.preset?.height || 250;
+
+    // ★ Current canvas dimensions
+    const cW = actions.canvasWidth || 300;
+    const cH = actions.canvasHeight || 250;
+
+    // ★ Proportional scale: fit template inside canvas, preserving aspect ratio
+    const scaleX = cW / tW;
+    const scaleY = cH / tH;
+    const scale = Math.min(scaleX, scaleY);
+
+    // Center offset if aspect ratios differ
+    const offsetX = (cW - tW * scale) / 2;
+    const offsetY = (cH - tH * scale) / 2;
+
     for (const el of elements) {
-        const x = el.constraints?.horizontal?.offset ?? 0;
-        const y = el.constraints?.vertical?.offset ?? 0;
-        const w = el.constraints?.size?.width ?? 100;
-        const h = el.constraints?.size?.height ?? 100;
+        const rawX = el.constraints?.horizontal?.offset ?? 0;
+        const rawY = el.constraints?.vertical?.offset ?? 0;
+        const rawW = el.constraints?.size?.width ?? 100;
+        const rawH = el.constraints?.size?.height ?? 100;
+
+        // Scale all values
+        const x = Math.round(rawX * scale + offsetX);
+        const y = Math.round(rawY * scale + offsetY);
+        const w = Math.round(rawW * scale);
+        const h = Math.round(rawH * scale);
 
         if (el.type === 'shape') {
-            // Use gradient rect if gradient is defined
             if (el.gradientStart && el.gradientEnd) {
                 actions.addGradientRect(
                     x, y, w, h,
                     el.gradientStart,
                     el.gradientEnd,
                     el.gradientAngle ?? 0,
-                    el.borderRadius ?? 0,
+                    Math.round((el.borderRadius ?? 0) * scale),
                     el.name,
                 );
             } else {
-                // Plain rect with specific color
                 const nodeId = actions.addRect(x, y);
                 if (nodeId != null) {
                     actions.setNodeSize(nodeId, w, h);
-                    // Parse fill color
                     const fillHex = el.fill || '#808080';
                     const parsed = parseColor(fillHex);
                     if (parsed) {
                         actions.setFillColor(nodeId, parsed.r, parsed.g, parsed.b, el.opacity ?? 1);
                     }
-                    if (el.borderRadius && el.borderRadius > 0) {
-                        // Round rect — set via gradient with same colors
-                        // The addGradientRect handles border radius
-                    }
                 }
             }
         } else if (el.type === 'text') {
+            const scaledFontSize = Math.max(Math.round(el.fontSize * scale), 6);
             actions.addText(x, y, el.content ?? 'Text', {
-                fontSize: el.fontSize,
+                fontSize: scaledFontSize,
                 fontFamily: el.fontFamily ?? 'Inter, sans-serif',
                 fontWeight: String(el.fontWeight),
                 color: el.color,
@@ -245,25 +262,23 @@ function applyVariantToCanvas(variant: BannerVariant, actions: CanvasEngineActio
                 width: w,
             });
         } else if (el.type === 'button') {
-            // Create button as a colored rect + text overlay
             const bgHex = el.backgroundColor || '#7c3aed';
             const nodeId = actions.addGradientRect(
                 x, y, w, h,
-                bgHex, bgHex, // solid color via gradient
+                bgHex, bgHex,
                 0,
-                el.borderRadius ?? 8,
+                Math.round((el.borderRadius ?? 8) * scale),
                 el.name,
             );
-            // Add text label on top
+            const scaledFontSize = Math.max(Math.round(el.fontSize * scale), 6);
             actions.addText(x, y, el.label, {
-                fontSize: el.fontSize,
+                fontSize: scaledFontSize,
                 fontFamily: 'Inter, sans-serif',
                 fontWeight: '700',
                 color: el.color,
                 textAlign: 'center',
                 width: w,
             });
-            // Only suppress lint — nodeId may be null
             void nodeId;
         } else if (el.type === 'image' && el.src) {
             actions.addImage(x, y, el.src, w, h);
