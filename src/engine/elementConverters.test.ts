@@ -56,6 +56,40 @@ describe('hexToRgbFloat — Hex to Float Color', () => {
         expect(g).toBeCloseTo(0, 2);
         expect(b).toBeCloseTo(0, 2);
     });
+
+    // ★ REGRESSION: rgba(255,255,255,0.85) was parsed as hex → NaN → black
+    // This exact bug caused white template subtext to turn black on save/reload.
+    it('rgba(255,255,255,0.85) → [1, 1, 1, 0.85]', () => {
+        const [r, g, b, a] = hexToRgbFloat('rgba(255,255,255,0.85)');
+        expect(r).toBeCloseTo(1, 2);
+        expect(g).toBeCloseTo(1, 2);
+        expect(b).toBeCloseTo(1, 2);
+        expect(a).toBeCloseTo(0.85, 2);
+    });
+
+    it('rgb(128, 128, 128) → ~[0.5, 0.5, 0.5, 1]', () => {
+        const [r, g, b, a] = hexToRgbFloat('rgb(128, 128, 128)');
+        expect(r).toBeCloseTo(0.502, 2);
+        expect(g).toBeCloseTo(0.502, 2);
+        expect(b).toBeCloseTo(0.502, 2);
+        expect(a).toBe(1.0);
+    });
+
+    it('rgba(0,0,0,0.5) → [0, 0, 0, 0.5]', () => {
+        const [r, g, b, a] = hexToRgbFloat('rgba(0,0,0,0.5)');
+        expect(r).toBeCloseTo(0, 2);
+        expect(g).toBeCloseTo(0, 2);
+        expect(b).toBeCloseTo(0, 2);
+        expect(a).toBeCloseTo(0.5, 2);
+    });
+
+    it('malformed input returns safe [0,0,0,1]', () => {
+        const [r, g, b, a] = hexToRgbFloat('not-a-color');
+        expect(r).toBe(0);
+        expect(g).toBe(0);
+        expect(b).toBe(0);
+        expect(a).toBe(1.0);
+    });
 });
 
 // ★ REGRESSION GUARD: Round-trip fidelity

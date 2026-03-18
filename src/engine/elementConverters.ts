@@ -135,10 +135,24 @@ export function rgbFloatToHex(r: number, g: number, b: number): string {
 }
 
 export function hexToRgbFloat(hex: string): [number, number, number, number] {
+    // Handle rgba() and rgb() formats
+    if (hex.startsWith('rgba') || hex.startsWith('rgb')) {
+        const m = hex.match(/rgba?\((\d+\.?\d*),\s*(\d+\.?\d*),\s*(\d+\.?\d*)(?:,\s*(\d+\.?\d*))?\)/);
+        if (m) {
+            return [
+                parseFloat(m[1]!) / 255,
+                parseFloat(m[2]!) / 255,
+                parseFloat(m[3]!) / 255,
+                m[4] !== undefined ? parseFloat(m[4]!) : 1.0,
+            ];
+        }
+    }
     const clean = hex.replace('#', '');
     const r = parseInt(clean.substring(0, 2), 16) / 255;
     const g = parseInt(clean.substring(2, 4), 16) / 255;
     const b = parseInt(clean.substring(4, 6), 16) / 255;
+    // ★ REGRESSION GUARD: Return safe values if hex parsing fails (e.g. malformed input)
+    if (isNaN(r) || isNaN(g) || isNaN(b)) return [0, 0, 0, 1.0];
     return [r, g, b, 1.0];
 }
 
@@ -308,7 +322,7 @@ export function overlayToDesignElement(
             fontWeight: resolveFontWeight((oel as any).fontWeight),
             // ★ REGRESSION GUARD: Preserve fontStyle from overlay (was hardcoded 'normal').
             fontStyle: ((oel as any).fontStyle as 'normal' | 'italic') ?? 'normal',
-            color: oel.color || '#000000',
+            color: oel.color ?? '#000000',
             textAlign: oel.textAlign || 'left',
             lineHeight: oel.lineHeight ?? 1.4,
             letterSpacing: oel.letterSpacing ?? 0,
