@@ -16,6 +16,7 @@ import type { AgentMessage } from '@/ai/agentContext';
 import type { NavigateFunction } from 'react-router-dom';
 import { useLocation } from 'react-router-dom';
 import { buildContext, enrichMessageWithContext, buildContextSystemPrompt } from '@/ai/contextRouter';
+import { resilientImport } from '@/utils/resilientImport';
 
 // ── Types ────────────────────────────────────────
 
@@ -187,7 +188,7 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         let brandFontHint = '';
         let brandAssetHint = '';
         try {
-            const { useBrandKitStore } = await import('@/stores/brandKitStore');
+            const { useBrandKitStore } = await resilientImport(() => import('@/stores/brandKitStore'));
             const kit = useBrandKitStore.getState().getActiveKit();
             if (kit) {
                 // Extract brand palette hint for color phase
@@ -242,8 +243,8 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         await new Promise(r => setTimeout(r, 400));
 
         const abort = new AbortController();
-        const { callTemplateContent } = await import('@/services/autoDesignService');
-        const { loadUserPrefs } = await import('@/stores/userPrefs');
+        const { callTemplateContent } = await resilientImport(() => import('@/services/autoDesignService'));
+        const { loadUserPrefs } = await resilientImport(() => import('@/stores/userPrefs'));
         const preferredLang = loadUserPrefs().preferredLanguage;
         // ★ Inject brand context into content prompt if available
         const contentPrompt = brandContext
@@ -266,7 +267,7 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         narrate(`Choosing the best layout structure for this content...`);
         addCard('structure', 'Determining layout structure', 'running');
 
-        const { generateLayoutSpec } = await import('@/services/aiStructureService');
+        const { generateLayoutSpec } = await resilientImport(() => import('@/services/aiStructureService'));
         // ★ Include brand font/asset hints in structure prompt
         const structurePrompt = brandFontHint
             ? `${prompt}\n\n[BRAND FONTS]\n${brandFontHint}`
@@ -291,7 +292,7 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         narrate(`Selecting colors that match the "${spec.mood}" mood...`);
         addCard('palette', 'Determining color palette', 'running');
 
-        const { generateColorPalette } = await import('@/services/designStyleGuides');
+        const { generateColorPalette } = await resilientImport(() => import('@/services/designStyleGuides'));
         // ★ Include brand palette hint so AI prefers brand colors
         const colorPrompt = brandPaletteHint
             ? `${prompt}\n\n[BRAND PALETTE]\n${brandPaletteHint}\nPrefer these brand colors when they fit the mood.`
@@ -319,7 +320,7 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
             });
 
             try {
-                const { generateBackgroundImage } = await import('@/services/imageGenClient');
+                const { generateBackgroundImage } = await resilientImport(() => import('@/services/imageGenClient'));
                 const bgResult = await generateBackgroundImage(
                     backgroundImagePrompt,
                     canvasW,
@@ -350,8 +351,8 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         narrate(`Building the layout: ${spec.layoutType} with ${spec.alignment} alignment...`);
         addCard('build', 'Combining layout', 'running');
 
-        const { buildLayoutFromSpec } = await import('@/services/aiLayoutEngine');
-        const { validateLayout } = await import('@/engine/layoutValidator');
+        const { buildLayoutFromSpec } = await resilientImport(() => import('@/services/aiLayoutEngine'));
+        const { validateLayout } = await resilientImport(() => import('@/engine/layoutValidator'));
 
         let allElements = buildLayoutFromSpec(spec, content, guide, canvasW, canvasH);
 
@@ -429,7 +430,7 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         await new Promise(r => setTimeout(r, 500));
 
         // Clear scene and gradient cache
-        const { clearGradientCache, cacheGradientData } = await import('@/engine/elementConverters');
+        const { clearGradientCache, cacheGradientData } = await resilientImport(() => import('@/engine/elementConverters'));
         clearGradientCache();
         try { engine.clear_scene?.(); } catch { /* ok */ }
 
@@ -513,7 +514,7 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         narrate(`Reviewing and optimizing design quality...`);
         addCard('vision', 'Optimizing layout', 'running');
         try {
-            const { runVisionHealingLoop } = await import('@/services/autoDesignLoop');
+            const { runVisionHealingLoop } = await resilientImport(() => import('@/services/autoDesignLoop'));
 
             const loopResult = await runVisionHealingLoop(engine, canvasW, canvasH, abort.signal, (msg: string) => {
                 updateCard('vision', 'running', msg);
@@ -550,7 +551,7 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
             narrate(`Scaling design to ${otherVariants.length} variant(s)...`);
             addCard('sizing', `Scaling to ${otherVariants.length} variant(s)`, 'running');
 
-            const { scaleRenderElements, renderElementsToDesignElements } = await import('@/engine/renderElementScaler');
+            const { scaleRenderElements, renderElementsToDesignElements } = await resilientImport(() => import('@/engine/renderElementScaler'));
 
             const sizeResults: string[] = [];
             for (const variant of otherVariants) {
@@ -595,7 +596,7 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
 
         narrate('I see your screenshot. Let me analyze it with Vision AI and extract the design layers.');
         addCard('scan', 'Analyzing screenshot with Vision AI', 'running');
-        const { scanDesignScreenshot } = await import('@/services/screenshotScanService');
+        const { scanDesignScreenshot } = await resilientImport(() => import('@/services/screenshotScanService'));
         const abort = new AbortController();
         const result = await scanDesignScreenshot(imageData, canvasW, canvasH, abort.signal);
         updateCard('scan', 'done', `Found ${result.elements.length} elements`);
