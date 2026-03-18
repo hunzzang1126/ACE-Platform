@@ -197,22 +197,22 @@ const t5Elements: DesignElement[] = [
         content: 'MARCH 28, 2026', fontSize: 14, fontWeight: 600,
         color: '#c4b5fd', zIndex: 3,
     }),
-    textEl('t5-headline', 'Headline', 80, 340, 920, 180, {
+    textEl('t5-headline', 'Headline', 80, 300, 920, 270, {
         content: 'DESIGN\nSUMMIT', fontSize: 110, fontWeight: 900,
         color: '#ffffff', textAlign: 'left', zIndex: 3, role: 'headline',
     }),
-    textEl('t5-subline', 'Subline', 80, 550, 800, 50, {
-        content: 'Where creativity meets technology', fontSize: 32, fontWeight: 400,
+    textEl('t5-subline', 'Subline', 80, 600, 800, 50, {
+        content: 'Where creativity meets technology', fontSize: 36, fontWeight: 400,
         color: '#a78bfa', zIndex: 3, role: 'body',
     }),
-    shapeEl('t5-line', 'Accent Line', 80, 620, 80, 3, {
+    shapeEl('t5-line', 'Accent Line', 80, 680, 80, 3, {
         fill: '#7c3aed', zIndex: 2, role: 'accent',
     }),
-    textEl('t5-location', 'Location', 80, 645, 500, 28, {
-        content: 'San Francisco · Moscone Center', fontSize: 18, fontWeight: 500,
+    textEl('t5-location', 'Location', 80, 710, 500, 30, {
+        content: 'San Francisco · Moscone Center', fontSize: 20, fontWeight: 500,
         color: '#94a3b8', zIndex: 3,
     }),
-    btnEl('t5-cta', 'CTA', 80, 860, 300, 70, {
+    btnEl('t5-cta', 'CTA', 80, 880, 300, 70, {
         label: 'Get Tickets', fontSize: 28, color: '#ffffff',
         backgroundColor: '#7c3aed', borderRadius: 14, zIndex: 4, role: 'cta',
     }),

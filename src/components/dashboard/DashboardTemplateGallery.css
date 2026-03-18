@@ -146,7 +146,8 @@
     align-items: center;
     justify-content: center;
     overflow: hidden;
-    min-height: 140px;
+    min-height: 120px;
+    max-height: 320px;
 }
 
 /* ── True-Scale Rendering (Figma approach) ── */
@@ -210,9 +211,9 @@
 }
 
 .tmpl-badge {
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 9px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 8px;
     font-weight: 600;
     letter-spacing: 0.04em;
     backdrop-filter: blur(8px);
