@@ -11,6 +11,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import type { BannerVariant } from '@/schema/design.types';
+import { BUILT_IN_TEMPLATES } from './builtInTemplates';
 
 // ── Types ──
 
@@ -175,6 +176,15 @@ export const useTemplateStore = create<TemplateState>()(
                 }
             },
         })),
-        { name: 'ace-templates', storage: createJSONStorage(() => idbStorage) },
+        {
+            name: 'ace-templates',
+            storage: createJSONStorage(() => idbStorage),
+            onRehydrateStorage: () => (state) => {
+                // ★ Seed built-in templates on first launch
+                if (state && state.templates.length === 0) {
+                    state.templates = [...BUILT_IN_TEMPLATES];
+                }
+            },
+        },
     ),
 );

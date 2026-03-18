@@ -16,6 +16,9 @@ trigger: always_on
 
 # ACE Project Rules (North America Target)
 
+0. **Sync Consistency — HIGHEST PRIORITY**:
+   User selections must NEVER desync between views. If a user picks Korean in onboarding, Settings must show Korean. If a user selects Pro plan, every status bar must reflect Pro. **Every read/write of user state must use the same storage key (with userId).** Before closing any feature, manually verify: set a value in View A → navigate to View B → confirm the same value appears. This applies to: language, plan, brand kit, theme, and ALL user preferences. **Desync = broken trust = unacceptable.**
+
 1. **Role Separation**: Strictly follow the Single Responsibility Principle. A file can have 300-600 lines ONLY IF it serves a single, cohesive purpose. Mixing UI, API, and Canvas logic in one file is strictly prohibited.
 2. **Modular Hooks**: Extract all logic into Custom Hooks. Components must remain "thin" and focus on rendering.
 3. **Language**: The entire UI must be in English. No Korean text in the production code.
