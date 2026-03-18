@@ -91,16 +91,16 @@ const t1Elements: DesignElement[] = [
     shapeEl('t1-accent', 'Accent Bar', 0, 0, 4, 250, {
         fill: '#8b5cf6', zIndex: 1, role: 'accent',
     }),
-    textEl('t1-headline', 'Headline', 20, 15, 260, 100, {
-        content: 'THE FUTURE\nIS HERE', fontSize: 48, fontWeight: 800,
+    textEl('t1-headline', 'Headline', 20, 18, 260, 80, {
+        content: 'THE FUTURE\nIS HERE', fontSize: 38, fontWeight: 800,
         color: '#ffffff', zIndex: 2, role: 'headline',
     }),
-    textEl('t1-body', 'Body', 20, 125, 240, 45, {
+    textEl('t1-body', 'Body', 20, 110, 240, 40, {
         content: 'Experience the next generation\nof creative tools.',
-        fontSize: 14, fontWeight: 400, color: '#94a3b8', zIndex: 2, role: 'body',
+        fontSize: 13, fontWeight: 400, color: '#94a3b8', zIndex: 2, role: 'body',
     }),
-    btnEl('t1-cta', 'CTA', 20, 190, 140, 42, {
-        label: 'Learn More', fontSize: 15, color: '#ffffff',
+    btnEl('t1-cta', 'CTA', 20, 170, 130, 38, {
+        label: 'Learn More', fontSize: 14, color: '#ffffff',
         backgroundColor: '#8b5cf6', borderRadius: 8, zIndex: 3, role: 'cta',
     }),
 ];
@@ -137,20 +137,20 @@ const t3Elements: DesignElement[] = [
     shapeEl('t3-top-bar', 'Top Accent', 0, 0, 300, 4, {
         fill: '#2563eb', zIndex: 1, role: 'accent',
     }),
-    textEl('t3-headline', 'Headline', 24, 25, 252, 60, {
-        content: 'Simplify your\nworkflow', fontSize: 34, fontWeight: 700,
+    textEl('t3-headline', 'Headline', 24, 20, 252, 55, {
+        content: 'Simplify your\nworkflow', fontSize: 28, fontWeight: 700,
         color: '#1e293b', zIndex: 2, role: 'headline',
     }),
-    textEl('t3-body', 'Body', 24, 100, 252, 45, {
+    textEl('t3-body', 'Body', 24, 95, 252, 40, {
         content: 'Automate repetitive tasks\nand focus on what matters.',
         fontSize: 12, fontWeight: 400, color: '#64748b', zIndex: 2, role: 'body',
     }),
-    btnEl('t3-cta', 'CTA', 24, 175, 140, 40, {
-        label: 'Start Free Trial', fontSize: 14, color: '#ffffff',
+    btnEl('t3-cta', 'CTA', 24, 155, 130, 36, {
+        label: 'Start Free Trial', fontSize: 13, color: '#ffffff',
         backgroundColor: '#2563eb', borderRadius: 6, zIndex: 3, role: 'cta',
     }),
-    textEl('t3-badge', 'Badge', 175, 185, 100, 20, {
-        content: 'No credit card required', fontSize: 11, fontWeight: 500,
+    textEl('t3-badge', 'Badge', 165, 163, 110, 20, {
+        content: 'No credit card required', fontSize: 10, fontWeight: 500,
         color: '#94a3b8', zIndex: 2,
     }),
 ];
@@ -162,22 +162,22 @@ const t4Elements: DesignElement[] = [
     shapeEl('t4-bg', 'Background', 0, 0, 160, 600, {
         fill: '#0c0c0c', zIndex: 0, role: 'background',
     }),
-    shapeEl('t4-gold-line', 'Gold Line', 20, 30, 1, 540, {
+    shapeEl('t4-gold-line', 'Gold Line', 79, 30, 1, 540, {
         fill: '#c9a84c', zIndex: 1, opacity: 0.4, role: 'accent',
     }),
-    textEl('t4-headline', 'Headline', 16, 130, 130, 160, {
-        content: 'ELEVATE\nYOUR\nPORTFOLIO', fontSize: 36, fontWeight: 700,
+    textEl('t4-headline', 'Headline', 10, 150, 140, 150, {
+        content: 'ELEVATE\nYOUR\nPORTFOLIO', fontSize: 32, fontWeight: 700,
         color: '#c9a84c', fontFamily: 'Inter', textAlign: 'center', zIndex: 2, role: 'headline',
     }),
-    shapeEl('t4-divider', 'Divider', 50, 310, 60, 1, {
+    shapeEl('t4-divider', 'Divider', 55, 320, 50, 1, {
         fill: '#c9a84c', zIndex: 1,
     }),
-    textEl('t4-body', 'Body', 16, 330, 130, 80, {
+    textEl('t4-body', 'Body', 15, 340, 130, 70, {
         content: 'Premium wealth\nmanagement for investors.', 
         fontSize: 13, fontWeight: 400, color: '#888888', textAlign: 'center', zIndex: 2, role: 'body',
     }),
-    btnEl('t4-cta', 'CTA', 30, 510, 100, 38, {
-        label: 'Inquire', fontSize: 15, color: '#0c0c0c',
+    btnEl('t4-cta', 'CTA', 30, 500, 100, 36, {
+        label: 'Inquire', fontSize: 14, color: '#0c0c0c',
         backgroundColor: '#c9a84c', borderRadius: 2, zIndex: 3, role: 'cta',
     }),
 ];
@@ -201,8 +201,8 @@ const t5Elements: DesignElement[] = [
         content: 'DESIGN\nSUMMIT', fontSize: 110, fontWeight: 900,
         color: '#ffffff', textAlign: 'left', zIndex: 3, role: 'headline',
     }),
-    textEl('t5-subline', 'Subline', 80, 560, 700, 36, {
-        content: 'Where creativity meets technology', fontSize: 22, fontWeight: 400,
+    textEl('t5-subline', 'Subline', 80, 550, 800, 50, {
+        content: 'Where creativity meets technology', fontSize: 32, fontWeight: 400,
         color: '#a78bfa', zIndex: 3, role: 'body',
     }),
     shapeEl('t5-line', 'Accent Line', 80, 620, 80, 3, {
@@ -212,9 +212,9 @@ const t5Elements: DesignElement[] = [
         content: 'San Francisco · Moscone Center', fontSize: 18, fontWeight: 500,
         color: '#94a3b8', zIndex: 3,
     }),
-    btnEl('t5-cta', 'CTA', 80, 880, 260, 60, {
-        label: 'Get Tickets', fontSize: 22, color: '#ffffff',
-        backgroundColor: '#7c3aed', borderRadius: 12, zIndex: 4, role: 'cta',
+    btnEl('t5-cta', 'CTA', 80, 860, 300, 70, {
+        label: 'Get Tickets', fontSize: 28, color: '#ffffff',
+        backgroundColor: '#7c3aed', borderRadius: 14, zIndex: 4, role: 'cta',
     }),
 ];
 

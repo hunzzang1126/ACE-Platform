@@ -65,7 +65,9 @@ export function DashboardTemplateGallery() {
             ds.replaceVariantElements(masterVid, templateVariant.elements);
         }
 
-        navigate(`/editor/${setId}`);
+        // ★ Navigate to size dashboard — route is /editor (no param).
+        // createCreativeSet already sets this CS as active.
+        navigate('/editor');
     }, [instantiate, templates, createCreativeSet, navigate]);
 
     return (
