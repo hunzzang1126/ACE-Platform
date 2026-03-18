@@ -10,6 +10,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTemplateStore, type DesignTemplate, type TemplateCategory } from '@/stores/templateStore';
 import { useDesignStore } from '@/stores/designStore';
+import type { ShapeElement } from '@/schema/elements.types';
 import { BANNER_PRESETS } from '@/schema/presets';
 import type { DesignElement } from '@/schema/elements.types';
 import type { BannerVariant } from '@/schema/design.types';
@@ -26,7 +27,7 @@ const CATEGORIES: { key: string; label: string }[] = [
 
 export function DashboardTemplateGallery() {
     const navigate = useNavigate();
-    const { templates, search, getByCategory, toggleFavorite, instantiate, deleteTemplate } = useTemplateStore();
+    const { templates, search, getByCategory, toggleFavorite, instantiate } = useTemplateStore();
     const createCreativeSet = useDesignStore(s => s.createCreativeSet);
 
     const [category, setCategory] = useState('all');
@@ -112,7 +113,6 @@ export function DashboardTemplateGallery() {
                             onHover={setHoveredId}
                             onUse={handleUse}
                             onToggleFav={toggleFavorite}
-                            onDelete={deleteTemplate}
                         />
                     ))}
                 </div>
@@ -131,10 +131,9 @@ interface CardProps {
     onHover: (id: string | null) => void;
     onUse: (id: string) => void;
     onToggleFav: (id: string) => void;
-    onDelete: (id: string) => void;
 }
 
-function TemplateCard({ template: t, isHovered, onHover, onUse, onToggleFav, onDelete }: CardProps) {
+function TemplateCard({ template: t, isHovered, onHover, onUse, onToggleFav }: CardProps) {
     const elements = useMemo(() => parseElements(t), [t]);
     const bgColor = useMemo(() => parseBgColor(t), [t]);
     const aspectRatio = t.width / t.height;
@@ -152,11 +151,14 @@ function TemplateCard({ template: t, isHovered, onHover, onUse, onToggleFav, onD
                 className="tmpl-card__preview"
                 style={{ backgroundColor: bgColor, aspectRatio: `${displayRatio}` }}
             >
-                {/* Mini layout mockup */}
-                <div className="tmpl-card__layout" style={{ aspectRatio: `${t.width}/${t.height}` }}>
-                    {elements.map((el, i) => (
-                        <MiniElement key={i} el={el} canvasW={t.width} canvasH={t.height} />
-                    ))}
+                {/* Mini layout mockup — uses padding-bottom trick for reliable sizing */}
+                <div className="tmpl-card__layout" style={{ position: 'relative', width: '85%' }}>
+                    <div style={{ paddingBottom: `${(t.height / t.width) * 100}%` }} />
+                    <div style={{ position: 'absolute', inset: 0 }}>
+                        {elements.map((el, i) => (
+                            <MiniElement key={i} el={el} canvasW={t.width} canvasH={t.height} />
+                        ))}
+                    </div>
                 </div>
 
                 {/* Badges */}
@@ -185,17 +187,9 @@ function TemplateCard({ template: t, isHovered, onHover, onUse, onToggleFav, onD
             {/* ── Info ── */}
             <div className="tmpl-card__info">
                 <div className="tmpl-card__name">{t.name}</div>
+                <div className="tmpl-card__desc">{t.description}</div>
                 <div className="tmpl-card__meta">
                     {t.category} · {t.usageCount > 0 ? `${t.usageCount} uses` : 'New'}
-                    {!t.isBuiltIn && (
-                        <button
-                            className="tmpl-card__delete"
-                            onClick={e => { e.stopPropagation(); onDelete(t.id); }}
-                            title="Delete template"
-                        >
-                            ×
-                        </button>
-                    )}
                 </div>
             </div>
         </div>
@@ -221,7 +215,7 @@ function MiniElement({ el, canvasW, canvasH }: { el: MiniElementData; canvasW: n
                 <div
                     className="tmpl-mini__text"
                     style={{
-                        fontSize: `${Math.max(4, el.fontSize * 0.35)}px`,
+                        fontSize: `${Math.max(4, (el.fontSize ?? 12) * 0.35)}px`,
                         fontWeight: el.fontWeight,
                         textAlign: el.textAlign as any,
                         lineHeight: 1.1,
@@ -312,11 +306,13 @@ function parseElements(t: DesignTemplate): MiniElementData[] {
                         bgColor: e.backgroundColor, borderRadius: e.borderRadius,
                     };
                 }
+                // Cast to ShapeElement for shape-specific fields
+                const shape = e as ShapeElement;
                 return {
                     ...base, type: 'shape',
-                    fill: e.fill, borderRadius: e.borderRadius, opacity: e.opacity,
-                    gradientStart: e.gradientStart, gradientEnd: e.gradientEnd,
-                    gradientAngle: e.gradientAngle,
+                    fill: shape.fill, borderRadius: shape.borderRadius, opacity: e.opacity,
+                    gradientStart: shape.gradientStart, gradientEnd: shape.gradientEnd,
+                    gradientAngle: shape.gradientAngle,
                 };
             });
     } catch {

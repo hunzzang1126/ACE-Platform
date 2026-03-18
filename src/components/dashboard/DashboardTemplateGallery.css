@@ -188,7 +188,7 @@
 }
 
 .tmpl-mini--shape {
-    /* shapes just use inline styles */
+    border-radius: inherit;
 }
 
 /* ── Badges ── */
@@ -313,20 +313,12 @@
     text-transform: capitalize;
 }
 
-.tmpl-card__delete {
-    margin-left: auto;
-    background: none;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 4px;
-    color: #555;
-    cursor: pointer;
-    font-size: 12px;
-    padding: 0 5px;
-    line-height: 1;
-    transition: all 0.15s;
+.tmpl-card__desc {
+    font-size: 10px;
+    color: #888;
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.tmpl-card__delete:hover {
-    color: #ef4444;
-    border-color: rgba(239, 68, 68, 0.3);
-}
