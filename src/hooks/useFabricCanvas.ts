@@ -175,7 +175,7 @@ export function useFabricCanvas(
         try {
             const fc = new Canvas(el, {
                 width: cw, height: ch,
-                backgroundColor: '#16191f',
+                backgroundColor: '#e8e8ec',
                 selection: true,
                 preserveObjectStacking: true,
                 stopContextMenu: true,
@@ -223,6 +223,21 @@ export function useFabricCanvas(
                 pushUndo('Transform element');
                 clearGuideLines();
                 syncState();
+            });
+
+            // ★ Canva-style: Textbox width-only resize.
+            // When a Textbox is scaled (via ml/mr handles), convert scaleX→width
+            // and reset scaleX/scaleY to 1 so text reflows within the new width.
+            fc.on('object:scaling', (opt) => {
+                const obj = opt.target;
+                if (!obj || !(obj instanceof Textbox)) return;
+                // Convert visual scale to actual width
+                const newWidth = (obj.width ?? 200) * (obj.scaleX ?? 1);
+                obj.set({
+                    width: Math.max(20, newWidth),
+                    scaleX: 1,
+                    scaleY: 1,
+                });
             });
             fc.on('object:added', (opt) => {
                 const obj = opt.target;
@@ -414,6 +429,15 @@ export function useFabricCanvas(
             lineHeight: opts?.lineHeight ?? 1.4,
             editable: true, splitByGrapheme: false,
         });
+        // ★ Canva-style: restrict Textbox to width-only resize.
+        // Only ml (middle-left) and mr (middle-right) handles are visible.
+        // Corner handles and mt/mb are disabled to prevent proportional scaling.
+        tb.setControlsVisibility({
+            tl: false, tr: false, bl: false, br: false,
+            mt: false, mb: false,
+            ml: true, mr: true,
+            mtr: false, // no rotation for text
+        });
         (tb as any).__glidId = id;
         (tb as any).__glidName = `Text #${id}`;
         (tb as any).__glidZIndex = getUserObjects().length;
@@ -591,6 +615,20 @@ export function useFabricCanvas(
             } else if (!(obj as any).__glidId) {
                 (obj as any).__glidId = nextId();
                 (obj as any).__glidZIndex = 0;
+            }
+            // ★ Canva-style: ensure restored Textbox objects have width-only resize handles
+            if (obj instanceof Textbox) {
+                obj.setControlsVisibility({
+                    tl: false, tr: false, bl: false, br: false,
+                    mt: false, mb: false,
+                    ml: true, mr: true,
+                    mtr: false,
+                });
+                // Normalize any stale scaling
+                if ((obj.scaleX ?? 1) !== 1 || (obj.scaleY ?? 1) !== 1) {
+                    const newWidth = (obj.width ?? 200) * (obj.scaleX ?? 1);
+                    obj.set({ width: Math.max(20, newWidth), scaleX: 1, scaleY: 1 });
+                }
             }
             patchAceProps(obj);
         });
