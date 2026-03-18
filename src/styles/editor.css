@@ -581,6 +581,14 @@
     font-weight: 600;
 }
 
+.sidebar-template-css-preview {
+    width: 100% !important;
+    max-height: 120px;
+    margin: 0 auto;
+    border-bottom: 1px solid var(--border);
+    font-family: 'Inter', system-ui, sans-serif;
+}
+
 .sidebar-template-info {
     padding: 6px 8px;
     display: flex;
