@@ -49,12 +49,22 @@ export function DashboardTemplateGallery() {
     }, [templates, category, query, sortBy, search, getByCategory]);
 
     const handleUse = useCallback((id: string) => {
-        const variant = instantiate(id);
-        if (!variant) return;
+        const templateVariant = instantiate(id);
+        if (!templateVariant) return;
         const tmpl = templates.find(t => t.id === id);
         const preset = BANNER_PRESETS.find(p => p.width === (tmpl?.width ?? 300) && p.height === (tmpl?.height ?? 250))
             ?? { id: `custom-${Date.now()}`, name: `${tmpl?.width ?? 300}x${tmpl?.height ?? 250}`, width: tmpl?.width ?? 300, height: tmpl?.height ?? 250, category: 'display' as const };
         const setId = createCreativeSet(tmpl?.name ?? 'From Template', preset);
+
+        // ★ FIX: Actually inject template elements into the created creative set.
+        // createCreativeSet makes an empty master variant — we need to populate it.
+        const ds = useDesignStore.getState();
+        const cs = ds.allCreativeSets[setId];
+        if (cs) {
+            const masterVid = cs.masterVariantId;
+            ds.replaceVariantElements(masterVid, templateVariant.elements);
+        }
+
         navigate(`/editor/${setId}`);
     }, [instantiate, templates, createCreativeSet, navigate]);
 

@@ -180,10 +180,16 @@ export const useTemplateStore = create<TemplateState>()(
             name: 'ace-templates',
             storage: createJSONStorage(() => idbStorage),
             onRehydrateStorage: () => (state) => {
-                // ★ Seed built-in templates on first launch
-                if (state && state.templates.length === 0) {
-                    state.templates = [...BUILT_IN_TEMPLATES];
-                }
+                if (!state) return;
+                // ★ Always refresh built-in templates with latest definitions
+                // (preserves user-created templates, updates built-in font sizes/layout)
+                const userTemplates = state.templates.filter(t => !t.isBuiltIn);
+                const builtInIds = new Set(BUILT_IN_TEMPLATES.map(t => t.id));
+                // Keep user templates + replace all built-ins with fresh copies
+                state.templates = [
+                    ...BUILT_IN_TEMPLATES,
+                    ...userTemplates.filter(t => !builtInIds.has(t.id)),
+                ];
             },
         },
     ),
