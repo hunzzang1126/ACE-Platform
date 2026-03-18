@@ -66,13 +66,12 @@ export async function redirectToCheckout(
         return { error: `No price configured for ${tier} plan` };
     }
 
-    const stripe = await getStripe();
-    if (!stripe) {
+    if (!PUBLISHABLE_KEY) {
         return { error: 'Stripe is not configured. Please set your publishable key.' };
     }
 
     try {
-        // ★ MVP: Use Supabase Edge Function to create checkout session
+        // ★ Create checkout session via Supabase Edge Function
         const { getSupabase } = await import('@/services/supabaseClient');
         const sb = getSupabase();
 
@@ -93,19 +92,13 @@ export async function redirectToCheckout(
                 return { error: 'Failed to create checkout session. Please try again.' };
             }
 
-            if (data?.sessionId) {
-                const result = await stripe.redirectToCheckout({ sessionId: data.sessionId });
-                if (result.error) {
-                    return { error: result.error.message ?? 'Checkout redirect failed' };
-                }
-                return { error: null }; // Success: user was redirected
-            }
-
+            // Redirect to Stripe Checkout page via URL
             if (data?.url) {
-                // Fallback: direct URL redirect
                 window.location.href = data.url;
                 return { error: null };
             }
+
+            return { error: 'No checkout URL received. Please try again.' };
         }
 
         return { error: 'Could not connect to payment service. Please try again.' };
