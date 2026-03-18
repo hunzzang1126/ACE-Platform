@@ -8,7 +8,7 @@ import { useDesignStore } from '@/stores/designStore';
 import { useEditorStore } from '@/stores/editorStore';
 import { useUIStore } from '@/stores/uiStore';
 import { EditorTopBar } from '@/components/editor/EditorTopBar';
-import { EditorToolbar } from '@/components/editor/EditorToolbar';
+import { EditorSidebar } from '@/components/editor/EditorSidebar';
 import { EditorCanvas } from '@/components/editor/EditorCanvas';
 import { PropertyPanel } from '@/components/panels/PropertyPanel';
 import { BottomPanel } from '@/components/editor/BottomPanel';
@@ -368,7 +368,7 @@ export function DetailEditorPage() {
                 </button>
             </EditorTopBar>
             <div className="ed-body">
-                <EditorToolbar
+                <EditorSidebar
                     actions={actions}
                     onTriggerImageUpload={() => overlay.triggerImageUpload()}
                     onTriggerVideoUpload={() => overlay.triggerVideoUpload()}

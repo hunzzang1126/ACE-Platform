@@ -15,7 +15,9 @@ interface UIState {
     canvasRulerVisible: boolean;
     authModalOpen: boolean;
     keyframeInspectorOpen: boolean;
-    /** 글로벌 알림 메시지 */
+    /** Canva-style sidebar — which panel tab is open (null = collapsed) */
+    activeSidebarTab: string | null;
+    /** Global notification */
     notification: { message: string; type: 'info' | 'success' | 'warning' | 'error' } | null;
 
     toggleSidebar: () => void;
@@ -28,6 +30,7 @@ interface UIState {
     toggleCanvasRuler: () => void;
     toggleAuthModal: () => void;
     toggleKeyframeInspector: () => void;
+    toggleSidebarTab: (tab: string) => void;
     showNotification: (message: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
     dismissNotification: () => void;
 }
@@ -43,6 +46,7 @@ export const useUIStore = create<UIState>()((set) => ({
     canvasRulerVisible: false,
     authModalOpen: false,
     keyframeInspectorOpen: false,
+    activeSidebarTab: null,
     notification: null,
 
     toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
@@ -55,6 +59,9 @@ export const useUIStore = create<UIState>()((set) => ({
     toggleCanvasRuler: () => set((s) => ({ canvasRulerVisible: !s.canvasRulerVisible })),
     toggleAuthModal: () => set((s) => ({ authModalOpen: !s.authModalOpen })),
     toggleKeyframeInspector: () => set((s) => ({ keyframeInspectorOpen: !s.keyframeInspectorOpen })),
+    toggleSidebarTab: (tab: string) => set((s) => ({
+        activeSidebarTab: s.activeSidebarTab === tab ? null : tab,
+    })),
 
     showNotification: (message, type = 'info') => set({ notification: { message, type } }),
     dismissNotification: () => set({ notification: null }),
