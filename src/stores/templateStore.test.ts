@@ -130,7 +130,7 @@ describe('useTemplateStore — Built-in Templates', () => {
         useTemplateStore.setState({ templates: [...BUILT_IN_TEMPLATES] });
         const templates = useTemplateStore.getState().templates;
         const builtIns = templates.filter(t => t.isBuiltIn);
-        expect(builtIns.length).toBe(5);
+        expect(builtIns.length).toBeGreaterThanOrEqual(17);
     });
 
     it('getById returns correct template', () => {

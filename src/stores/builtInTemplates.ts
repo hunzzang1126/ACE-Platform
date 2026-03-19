@@ -9,6 +9,9 @@ import type { DesignTemplate } from './templateStore';
 import type { BannerVariant } from '@/schema/design.types';
 import type { DesignElement } from '@/schema/elements.types';
 import { createDefaultConstraints } from '@/schema/elements.types';
+import { DESIGN_TEMPLATES, type GeneratedContent } from '@/services/designTemplates';
+import type { DesignStyleGuide } from '@/services/designStyleGuides';
+import type { RenderElement } from '@/services/autoDesignService';
 
 // ── Helpers ──
 
@@ -228,6 +231,147 @@ function makeTemplate(
     };
 }
 
+// ══════════════════════════════════════════════════════
+// AI Layout Template Bridge — converts designTemplates.ts
+// build() output → DesignElement[] for sidebar preview
+// ★ MUST be defined BEFORE BUILT_IN_TEMPLATES to avoid 
+//   "cannot access before initialization" errors.
+// ══════════════════════════════════════════════════════
+const PREVIEW_GUIDE: DesignStyleGuide = {
+    id: 'preview', name: 'Preview', description: '', keywords: [],
+    colors: {
+        background: '#0f172a', surface: '#1e293b', border: '#334155',
+        foreground: '#f8fafc', secondary: '#94a3b8', tertiary: '#64748b',
+        muted: '#475569', accent: '#8b5cf6', accentForeground: '#ffffff',
+        error: '#ef4444', warning: '#f59e0b', info: '#3b82f6',
+        gradientStart: '#0f172a', gradientEnd: '#1e1b4b', gradientAngle: 135,
+    },
+    typography: {
+        primaryFont: 'Inter', secondaryFont: 'Inter',
+        scale: { hero: 0.18, headline: 0.11, title: 0.08, body: 0.055, caption: 0.04, micro: 0.03 },
+        weights: { bold: '800', semibold: '600', medium: '500', normal: '400' },
+        letterSpacing: { tight: -0.5, normal: 0, wide: 1.5 },
+    },
+    spacing: { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, safe: 16 },
+    radius: 6,
+};
+
+const PREVIEW_CONTENT: GeneratedContent = {
+    headline: 'Your Headline Here',
+    subheadline: 'Supporting text for your creative',
+    cta: 'Get Started',
+    tag: 'NEW',
+};
+
+/** Sizes to generate previews for each AI template */
+const AI_TEMPLATE_SIZE_MAP: Record<string, { w: number; h: number; category: 'display' | 'social' }> = {
+    'centered-stack': { w: 300, h: 250, category: 'display' },
+    'left-aligned-card': { w: 300, h: 250, category: 'display' },
+    'bold-headline': { w: 300, h: 250, category: 'display' },
+    'split-horizontal': { w: 728, h: 90, category: 'display' },
+    'diagonal-split': { w: 300, h: 250, category: 'display' },
+    'top-down-cascade': { w: 300, h: 250, category: 'display' },
+    'right-aligned': { w: 300, h: 250, category: 'display' },
+    'minimal-clean': { w: 300, h: 250, category: 'display' },
+    'full-bleed-hero': { w: 1080, h: 1080, category: 'social' },
+    'badge-focus': { w: 300, h: 250, category: 'display' },
+    'horizontal-strip': { w: 728, h: 90, category: 'display' },
+    'tower': { w: 160, h: 600, category: 'display' },
+};
+
+function renderElementToDesignElement(
+    re: RenderElement,
+    idx: number,
+    templateId: string,
+): DesignElement {
+    const id = `${templateId}-el-${idx}`;
+    const name = re.name || `element_${idx}`;
+    const constraints = createDefaultConstraints();
+    constraints.horizontal.offset = Math.round(re.x);
+    constraints.vertical.offset = Math.round(re.y);
+    constraints.size.width = Math.round(re.w);
+    constraints.size.height = Math.round(re.h);
+
+    if (re.type === 'text') {
+        return {
+            id, name, type: 'text',
+            constraints,
+            opacity: 1, visible: true, locked: false, zIndex: idx,
+            content: re.content || '', fontFamily: 'Inter',
+            fontSize: re.font_size || 16,
+            fontWeight: parseInt(re.font_weight || '400', 10) || 400,
+            fontStyle: 'normal',
+            color: re.color_hex || '#ffffff',
+            textAlign: (re.text_align as 'left' | 'center' | 'right') || 'left',
+            lineHeight: re.line_height || 1.2,
+            letterSpacing: re.letter_spacing || 0,
+            autoShrink: true,
+        };
+    }
+
+    if (re.type === 'rounded_rect' && re.radius) {
+        const fill = (re.r != null && re.g != null && re.b != null)
+            ? `#${Math.round(re.r * 255).toString(16).padStart(2, '0')}${Math.round(re.g * 255).toString(16).padStart(2, '0')}${Math.round(re.b * 255).toString(16).padStart(2, '0')}`
+            : '#808080';
+        return {
+            id, name, type: 'shape', shapeType: 'rectangle',
+            constraints,
+            opacity: re.a ?? 1, visible: true, locked: false, zIndex: idx,
+            fill,
+            borderRadius: re.radius,
+        };
+    }
+
+    const gradientStart = re.gradient_start_hex;
+    const gradientEnd = re.gradient_end_hex;
+    const fill = (re.r != null && re.g != null && re.b != null)
+        ? `#${Math.round(re.r * 255).toString(16).padStart(2, '0')}${Math.round(re.g * 255).toString(16).padStart(2, '0')}${Math.round(re.b * 255).toString(16).padStart(2, '0')}`
+        : gradientStart || '#808080';
+
+    return {
+        id, name, type: 'shape', shapeType: 'rectangle',
+        constraints,
+        opacity: re.a ?? 1, visible: true, locked: false, zIndex: idx,
+        fill,
+        borderRadius: re.radius ?? 0,
+        gradientStart, gradientEnd,
+        gradientAngle: re.gradient_angle,
+        role: name.includes('background') ? 'background' as any : undefined,
+    };
+}
+
+function generateAiLayoutTemplates(): DesignTemplate[] {
+    const result: DesignTemplate[] = [];
+
+    for (const tmpl of DESIGN_TEMPLATES) {
+        const sizeSpec = AI_TEMPLATE_SIZE_MAP[tmpl.id];
+        if (!sizeSpec) continue;
+
+        const { w, h, category } = sizeSpec;
+        const renderElements = tmpl.build(w, h, PREVIEW_GUIDE, PREVIEW_CONTENT);
+
+        const designElements = renderElements
+            .filter((re): re is Exclude<typeof re, number> => typeof re !== 'number')
+            .map((re, idx) => renderElementToDesignElement(re, idx, `ai-${tmpl.id}`));
+
+        const bgEl = designElements.find(e => e.name?.toLowerCase().includes('background'));
+        const bgColor = (bgEl as any)?.gradientStart || (bgEl as any)?.fill || '#0f172a';
+
+        result.push(makeTemplate(
+            `ai-${tmpl.id}`,
+            tmpl.name,
+            tmpl.description,
+            category,
+            ['ai-layout', 'adaptive', ...tmpl.aspectRatios],
+            w, h, bgColor, designElements,
+        ));
+    }
+
+    return result;
+}
+
+// ── Final Template Array ──
+
 export const BUILT_IN_TEMPLATES: DesignTemplate[] = [
     makeTemplate(
         'builtin-bold-dark', 'Bold Dark', 'High-contrast tech product launch with purple accent',
@@ -254,4 +398,6 @@ export const BUILT_IN_TEMPLATES: DesignTemplate[] = [
         'social', ['event', 'social', 'conference', 'vibrant', 'purple', 'poster'],
         1080, 1080, '#1a0533', t5Elements,
     ),
+    // ★ AI Layout Templates — unified from designTemplates.ts
+    ...generateAiLayoutTemplates(),
 ];
