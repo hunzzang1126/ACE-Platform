@@ -291,34 +291,30 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         narrate(`Copy ready: "${content.headline}"`);
         await new Promise(r => setTimeout(r, 400));
 
-        // ── Phase 3: AI Structure Decision ──
-        // AI sees the actual headline length → picks optimal font size and layout.
-        narrate(`Choosing the best layout structure for this content...`);
-        addCard('structure', 'Determining layout structure', 'running');
+        // ── Phase 3: Template Selection (Proven Layout Library) ──
+        // Select from our 12 constraint-based templates that auto-adapt to ANY canvas size.
+        // Templates are filtered by aspect ratio and rotated for variety.
+        narrate(`Choosing the best layout template for ${canvasW}x${canvasH}...`);
+        addCard('structure', 'Selecting layout template', 'running');
 
-        const { generateLayoutSpec } = await resilientImport(() => import('@/services/aiStructureService'));
-        // ★ Include brand font/asset hints in structure prompt
-        const structurePrompt = brandFontHint
-            ? `${prompt}\n\n[BRAND FONTS]\n${brandFontHint}`
-            : prompt;
-        const spec = await generateLayoutSpec(structurePrompt, content, canvasW, canvasH, abort.signal);
+        const { selectTemplate } = await resilientImport(() => import('@/services/designTemplates'));
+        const template = selectTemplate(canvasW, canvasH);
+        if (!template) throw new Error('No compatible template found');
 
         const structDetail = [
-            `Layout: ${spec.layoutType}`,
-            `Alignment: ${spec.alignment}`,
-            `Headline Font: ${spec.headlineFontSize}px`,
-            `Accent: ${spec.accentStrategy}`,
-            `Mood: ${spec.mood}`,
+            `Template: ${template.name}`,
+            `Description: ${template.description}`,
+            `Aspect Ratios: ${template.aspectRatios.join(', ')}`,
         ].join('\n');
-        updateCard('structure', 'done', spec.layoutType, {
-            reasoning: spec.reasoning,
+        updateCard('structure', 'done', template.name, {
+            reasoning: `Selected "${template.name}" — ${template.description}`,
             expandedDetail: structDetail,
         });
         await new Promise(r => setTimeout(r, 400));
 
         // ── Phase 4: AI Color Palette (Mood-Aware) ──
-        // Colors are chosen LAST, informed by the structure's mood.
-        narrate(`Selecting colors that match the "${spec.mood}" mood...`);
+        // Colors are chosen to complement the selected template's style.
+        narrate(`Selecting colors for the "${template.name}" layout...`);
         addCard('palette', 'Determining color palette', 'running');
 
         const { generateColorPalette } = await resilientImport(() => import('@/services/designStyleGuides'));
@@ -386,14 +382,13 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
             await new Promise(r => setTimeout(r, 300));
         }
 
-        // ── Phase 5: Combine + Validate ──
-        narrate(`Building the layout: ${spec.layoutType} with ${spec.alignment} alignment...`);
+        // ── Phase 5: Template Build + Validate ──
+        narrate(`Building the layout: ${template.name}...`);
         addCard('build', 'Combining layout', 'running');
 
-        const { buildLayoutFromSpec } = await resilientImport(() => import('@/services/aiLayoutEngine'));
         const { validateLayout } = await resilientImport(() => import('@/engine/layoutValidator'));
 
-        let allElements = buildLayoutFromSpec(spec, content, guide, canvasW, canvasH);
+        let allElements = template.build(canvasW, canvasH, guide, content);
 
         // ★ When NanoBanana image background is active, remove the gradient rect
         // background — the ai_background image replaces it entirely.
@@ -610,7 +605,7 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
             narrate(
                 `Design quality review complete — score ${loopResult.finalScore}/100.${fixNote}${methodNote}\n` +
                 `Style: ${guide.name}\n` +
-                `Layout: ${spec.layoutType} (${spec.alignment})\n` +
+                `Layout: ${template.name}\n` +
                 `Elements: ${rendered}\n` +
                 `Canvas: ${canvasW}x${canvasH}px`
             );
