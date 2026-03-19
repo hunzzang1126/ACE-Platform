@@ -5,7 +5,7 @@
 // Grid of animation presets + duration slider.
 // ─────────────────────────────────────────────────
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { ANIM_PRESETS, useAnimPresetStore, type AnimPresetType } from '@/hooks/useAnimationPresets';
 import type { EngineNode } from '@/hooks/canvasTypes';
 
@@ -21,6 +21,12 @@ export function InlineAnimatePanel({ selectedNode, onClose }: Props) {
     const nodeId = selectedNode?.id ? String(selectedNode.id) : '';
     const current = nodeId ? getPreset(nodeId) : null;
     const [duration, setDuration] = useState(current?.animDuration ?? 0.3);
+
+    // ★ Re-sync duration when switching elements or preset changes
+    useEffect(() => {
+        const preset = nodeId ? getPreset(nodeId) : null;
+        setDuration(preset?.animDuration ?? 0.3);
+    }, [nodeId, getPreset]);
 
     const handleSelect = useCallback((preset: AnimPresetType) => {
         if (!nodeId) return;
