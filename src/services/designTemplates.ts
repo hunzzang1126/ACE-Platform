@@ -52,6 +52,19 @@ function classifyAspect(w: number, h: number): AspectCategory {
     return 'portrait';
 }
 
+/**
+ * ★ Adaptive font sizing: scales the max font cap based on canvas size.
+ * Small canvases (300×250, diag ~391) → use original cap
+ * Large canvases (1920×1080, diag ~2203) → scale cap up proportionally
+ * Reference diagonal: 500px (typical banner size)
+ */
+function adaptiveFont(baseCap: number, W: number, H: number, ratio: number): number {
+    const diag = Math.sqrt(W * W + H * H);
+    const refDiag = 500; // baseline diagonal for original caps
+    const scale = Math.max(1, diag / refDiag);
+    return Math.max(baseCap, Math.round(baseCap * scale * ratio));
+}
+
 // ══════════════════════════════════════════════════
 // LAYOUT 1: Centered Stack
 // Everything centered vertically, clean and balanced
@@ -65,7 +78,7 @@ const centeredStack: DesignTemplate = {
     build: (W, H, g, c) => {
         const [ar, ag, ab] = hex(g.colors.accent);
         const pad = Math.round(Math.min(W, H) * 0.08);
-        const headFs = Math.max(16, Math.min(48, Math.round(Math.min(W, H) * 0.12)));
+        const headFs = Math.max(16, Math.min(adaptiveFont(48, W, H, 1), Math.round(Math.min(W, H) * 0.12)));
         const subFs = Math.max(10, Math.round(headFs * 0.4));
         const tagFs = Math.max(8, Math.round(headFs * 0.3));
         const ctaFs = Math.max(10, Math.round(headFs * 0.35));
@@ -121,7 +134,7 @@ const leftAlignedCard: DesignTemplate = {
     build: (W, H, g, c) => {
         const pad = Math.round(W * 0.08);
         const [ar, ag, ab] = hex(g.colors.accent);
-        const headFs = Math.max(16, Math.min(36, Math.round(Math.min(W, H) * 0.13)));
+        const headFs = Math.max(16, Math.min(adaptiveFont(36, W, H, 1), Math.round(Math.min(W, H) * 0.13)));
         const subFs = Math.max(10, Math.round(headFs * 0.38));
         const tagFs = Math.max(8, Math.round(headFs * 0.3));
         const ctaFs = Math.max(10, Math.round(headFs * 0.35));
@@ -182,7 +195,7 @@ const boldHeadline: DesignTemplate = {
         const [ar, ag, ab] = hex(g.colors.accent);
         const pad = Math.round(Math.min(W, H) * 0.06);
         // Headline takes up 30-40% of canvas height
-        const headFs = Math.max(24, Math.min(80, Math.round(H * 0.22)));
+        const headFs = Math.max(24, Math.min(adaptiveFont(80, W, H, 1), Math.round(H * 0.22)));
         const subFs = Math.max(10, Math.round(headFs * 0.28));
         const tagFs = Math.max(8, Math.round(headFs * 0.22));
         const ctaFs = Math.max(10, Math.round(headFs * 0.25));
@@ -236,7 +249,7 @@ const splitHorizontal: DesignTemplate = {
         const [ar, ag, ab] = hex(g.colors.accent);
         const splitX = Math.round(W * 0.42);
         const rightPad = Math.round((W - splitX) * 0.1);
-        const headFs = Math.max(14, Math.min(32, Math.round((W - splitX) * 0.12)));
+        const headFs = Math.max(14, Math.min(adaptiveFont(32, W, H, 1), Math.round((W - splitX) * 0.12)));
         const subFs = Math.max(10, Math.round(headFs * 0.45));
         const tagFs = Math.max(8, Math.round(headFs * 0.3));
         const ctaFs = Math.max(9, Math.round(headFs * 0.35));
@@ -299,7 +312,7 @@ const diagonalSplit: DesignTemplate = {
     build: (W, H, g, c) => {
         const [ar, ag, ab] = hex(g.colors.accent);
         const pad = Math.round(Math.min(W, H) * 0.08);
-        const headFs = Math.max(16, Math.min(40, Math.round(Math.min(W, H) * 0.14)));
+        const headFs = Math.max(16, Math.min(adaptiveFont(40, W, H, 1), Math.round(Math.min(W, H) * 0.14)));
         const subFs = Math.max(10, Math.round(headFs * 0.38));
         const tagFs = Math.max(8, Math.round(headFs * 0.28));
         const ctaFs = Math.max(10, Math.round(headFs * 0.32));
@@ -357,7 +370,7 @@ const topDownCascade: DesignTemplate = {
     build: (W, H, g, c) => {
         const [ar, ag, ab] = hex(g.colors.accent);
         const pad = Math.round(W * 0.08);
-        const headFs = Math.max(18, Math.min(42, Math.round(Math.min(W, H) * 0.12)));
+        const headFs = Math.max(18, Math.min(adaptiveFont(42, W, H, 1), Math.round(Math.min(W, H) * 0.12)));
         const subFs = Math.max(10, Math.round(headFs * 0.4));
         const tagFs = Math.max(8, Math.round(headFs * 0.28));
         const ctaFs = Math.max(10, Math.round(headFs * 0.32));
@@ -417,7 +430,7 @@ const rightAligned: DesignTemplate = {
     build: (W, H, g, c) => {
         const [ar, ag, ab] = hex(g.colors.accent);
         const pad = Math.round(W * 0.08);
-        const headFs = Math.max(16, Math.min(38, Math.round(Math.min(W, H) * 0.13)));
+        const headFs = Math.max(16, Math.min(adaptiveFont(38, W, H, 1), Math.round(Math.min(W, H) * 0.13)));
         const subFs = Math.max(10, Math.round(headFs * 0.38));
         const tagFs = Math.max(8, Math.round(headFs * 0.28));
         const ctaFs = Math.max(10, Math.round(headFs * 0.32));
@@ -469,7 +482,7 @@ const minimalClean: DesignTemplate = {
     build: (W, H, g, c) => {
         const [ar, ag, ab] = hex(g.colors.accent);
         const pad = Math.round(Math.min(W, H) * 0.12); // Extra large padding
-        const headFs = Math.max(14, Math.min(32, Math.round(Math.min(W, H) * 0.1)));
+        const headFs = Math.max(14, Math.min(adaptiveFont(32, W, H, 1), Math.round(Math.min(W, H) * 0.1)));
         const subFs = Math.max(9, Math.round(headFs * 0.42));
         const tagFs = Math.max(7, Math.round(headFs * 0.28));
         const ctaFs = Math.max(9, Math.round(headFs * 0.3));
@@ -519,7 +532,7 @@ const fullBleedHero: DesignTemplate = {
     build: (W, H, g, c) => {
         const [ar, ag, ab] = hex(g.colors.accent);
         const pad = Math.round(Math.min(W, H) * 0.07);
-        const headFs = Math.max(18, Math.min(44, Math.round(Math.min(W, H) * 0.14)));
+        const headFs = Math.max(18, Math.min(adaptiveFont(44, W, H, 1), Math.round(Math.min(W, H) * 0.14)));
         const subFs = Math.max(10, Math.round(headFs * 0.38));
         const ctaFs = Math.max(10, Math.round(headFs * 0.3));
         const ctaW = Math.min(Math.round(W * 0.4), 180);
@@ -568,7 +581,7 @@ const badgeFocus: DesignTemplate = {
     build: (W, H, g, c) => {
         const [ar, ag, ab] = hex(g.colors.accent);
         const pad = Math.round(Math.min(W, H) * 0.06);
-        const headFs = Math.max(16, Math.min(36, Math.round(Math.min(W, H) * 0.12)));
+        const headFs = Math.max(16, Math.min(adaptiveFont(36, W, H, 1), Math.round(Math.min(W, H) * 0.12)));
         const subFs = Math.max(10, Math.round(headFs * 0.4));
         const tagFs = Math.max(12, Math.round(headFs * 0.5));
         const ctaFs = Math.max(10, Math.round(headFs * 0.32));

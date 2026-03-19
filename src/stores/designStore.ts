@@ -161,6 +161,8 @@ function mergePropertyChanges(
         if ('textAlign' in originEl) (merged as any).textAlign = (originEl as any).textAlign;
         if ('lineHeight' in originEl) (merged as any).lineHeight = (originEl as any).lineHeight;
         if ('letterSpacing' in originEl) (merged as any).letterSpacing = (originEl as any).letterSpacing;
+        // ★ FIX: Sync shadow/effect so glow/neon/drop propagates to children
+        if ('shadow' in originEl) (merged as any).shadow = (originEl as any).shadow;
 
         // ★ Do NOT touch: constraints, zIndex, name, id, type
         result.push(merged);
