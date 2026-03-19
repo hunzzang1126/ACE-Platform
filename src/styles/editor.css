@@ -582,8 +582,8 @@
 }
 
 .sidebar-template-css-preview {
-    width: 100% !important;
-    max-height: 120px;
+    width: 100%;
+    aspect-ratio: 1 / 1;
     margin: 0 auto;
     border-bottom: 1px solid var(--border);
     font-family: 'Inter', system-ui, sans-serif;
