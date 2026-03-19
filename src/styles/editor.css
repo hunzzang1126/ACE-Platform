@@ -332,7 +332,7 @@
 
 /* Expandable panel */
 .sidebar-panel {
-    width: 280px;
+    width: 340px;
     background: var(--bg-surface);
     border-right: 1px solid var(--border);
     display: flex;

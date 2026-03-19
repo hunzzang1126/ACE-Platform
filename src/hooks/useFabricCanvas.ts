@@ -534,6 +534,18 @@ export function useFabricCanvas(
         fc.discardActiveObject(); fc.renderAll(); syncState();
     }, [syncState]);
 
+    const clearAll = useCallback(() => {
+        const fc = fabricRef.current;
+        if (!fc) return;
+        skipHistory.current = true;
+        const toRemove = fc.getObjects().filter(o => !isArtboard(o) && !(o as any).__aceGuide);
+        toRemove.forEach(o => fc.remove(o));
+        fc.discardActiveObject();
+        fc.renderAll();
+        skipHistory.current = false;
+        syncState();
+    }, [syncState]);
+
     const selectNode = useCallback((id: number) => {
         const fc = fabricRef.current;
         if (!fc) return;
@@ -832,7 +844,7 @@ export function useFabricCanvas(
         addGradientRect: (x, y, w, h, c1, c2, angle?, radius?, name?) =>
             engineRef.current?.add_gradient_rect?.(x, y, w, h, c1, c2, angle, radius, name) ?? null,
         addText, updateText, getTextContent, addImage,
-        deleteSelected, selectNode, deselectAll,
+        deleteSelected, clearAll, selectNode, deselectAll,
         setNodePosition, setNodeSize, setNodeOpacity, setFillColor,
         bringToFront, sendToBack, bringForward, sendBackward,
         setShadow, removeShadow, setTextEffect, removeTextEffect, setBlendMode,

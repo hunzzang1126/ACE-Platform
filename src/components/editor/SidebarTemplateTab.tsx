@@ -38,16 +38,19 @@ export function SidebarTemplateTab({ actions }: Props) {
         applyVariantToCanvas(variant, actions);
     }, [instantiate, actions]);
 
-    // ★ Admin: edit template — load into canvas with editing flag
+    // ★ Admin: edit template — clear canvas first, then load template
     const handleEdit = useCallback((id: string, e: React.MouseEvent) => {
         e.stopPropagation(); // Don't trigger apply
         const variant = instantiate(id);
         if (!variant || !actions) return;
 
+        // ★ Clear ALL existing elements before loading new template
+        actions.clearAll();
+
         // Set the editing flag so save knows to override the template
         setEditingTemplateId(id);
 
-        // Load the template into the canvas
+        // Load the template into a fresh canvas
         applyVariantToCanvas(variant, actions);
     }, [instantiate, actions, setEditingTemplateId]);
 

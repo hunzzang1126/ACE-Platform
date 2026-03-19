@@ -94,6 +94,8 @@ export interface CanvasEngineActions {
     addImage: (x: number, y: number, src: string, w?: number, h?: number) => Promise<number | null>;
     // Common actions
     deleteSelected: () => void;
+    /** Remove ALL user objects from canvas (preserves artboard) */
+    clearAll: () => void;
     selectNode: (id: number) => void;
     deselectAll: () => void;
     setNodePosition: (id: number, x: number, y: number) => void;
