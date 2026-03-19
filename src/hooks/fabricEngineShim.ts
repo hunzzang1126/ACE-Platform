@@ -36,6 +36,10 @@ export function createEngineShim(
             return JSON.stringify(nodes);
         },
 
+        // ★ FIX: Return actual artboard dimensions so AI pipeline
+        // can render at the correct canvas size (not default 300x250).
+        get_canvas_size: () => ({ width: artboardW, height: artboardH }),
+
         // ★ SINGLE SOURCE OF TRUTH: Fabric-native serialization.
         // Returns fc.toObject() with all Glid custom props included.
         // This JSON is the canonical representation — no lossy conversion.

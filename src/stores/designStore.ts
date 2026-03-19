@@ -578,13 +578,47 @@ export const useDesignStore = create<DesignState>()(
                         const cs = getActiveCS(state);
                         if (!cs) return;
                         // Validate both variants exist
-                        const hasOrigin = cs.variants.some(v => v.id === originId);
-                        const hasTarget = cs.variants.some(v => v.id === targetId);
-                        if (!hasOrigin || !hasTarget || originId === targetId) return;
+                        const origin = cs.variants.find(v => v.id === originId);
+                        const target = cs.variants.find(v => v.id === targetId);
+                        if (!origin || !target || originId === targetId) return;
                         // Prevent circular: target can't be an origin that originId plugs into
                         if (cs.plugConnections[originId] === targetId) return;
                         if (!cs.plugConnections) cs.plugConnections = {};
                         cs.plugConnections[targetId] = originId;
+
+                        // ★ FIX: Immediately propagate origin's design to the newly plugged target.
+                        // Uses constraint-based smart sizing so different aspect ratios get proper layout.
+                        // Previously, users had to re-save the origin to trigger propagation.
+                        if (origin.elements.length > 0 && target.elements.length === 0) {
+                            // First time: full constraint-based smart sizing
+                            const adapted = smartSizeElements(
+                                origin.elements,
+                                origin.preset.width, origin.preset.height,
+                                target.preset.width, target.preset.height,
+                            );
+                            // Auto-QA sweep
+                            const targetWithAdapted: BannerVariant = { ...target, elements: adapted };
+                            const qaIssues = runSmartSizingQA([targetWithAdapted]);
+                            let finalElements = adapted;
+                            if (qaIssues.length > 0) {
+                                const fixes = generateFixes(qaIssues, [targetWithAdapted]);
+                                if (fixes.length > 0) {
+                                    finalElements = adapted.map((el) => {
+                                        const fix = fixes.find(f => f.elementId === el.id);
+                                        return fix ? { ...el, ...fix.patch } as DesignElement : el;
+                                    });
+                                }
+                            }
+                            target.elements = finalElements;
+                        } else if (origin.elements.length > 0 && target.elements.length > 0) {
+                            // Target already has elements: property-only merge
+                            target.elements = mergePropertyChanges(
+                                target.elements, origin.elements,
+                                origin.preset.width, origin.preset.height,
+                                target.preset.width, target.preset.height,
+                            );
+                        }
+
                         cs.updatedAt = new Date().toISOString();
                         state.creativeSet = cs;
                     });
