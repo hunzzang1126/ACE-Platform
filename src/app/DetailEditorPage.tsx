@@ -118,25 +118,37 @@ export function DetailEditorPage() {
                 const cs = useDesignStore.getState().creativeSet;
                 const v = cs?.variants.find(vi => vi.id === variantId);
                 if (v) {
+                    // ★ DEBUG: Log what we're about to save as the template override
+                    console.log('[TemplateSave] Variant elements count:', v.elements.length);
+                    console.log('[TemplateSave] Variant backgroundColor:', v.backgroundColor);
+                    v.elements.forEach((el, i) => {
+                        console.log(`[TemplateSave] Element[${i}]:`, el.type, el.name, 'zIndex:', el.zIndex,
+                            el.type === 'shape' ? `fill:${(el as any).fill} grad:${(el as any).gradientStart}->${(el as any).gradientEnd}` : '',
+                            el.type === 'text' ? `"${(el as any).content?.substring(0, 30)}"` : '',
+                            'constraints:', JSON.stringify(el.constraints?.size));
+                    });
+                    
                     overrideTemplate(tmplId, v, width, height);
                     console.log('[DetailEditor] Template override saved:', tmplId);
 
-                    // ★ Clean up temp creative set so it doesn't appear as a project
                     const tempCsId = useTemplateStore.getState().editingTempCsId;
-                    if (tempCsId) {
-                        // Delete from designStore
-                        useDesignStore.getState().deleteCreativeSet(tempCsId);
-                        // Delete from projectStore
-                        useProjectStore.setState(state => {
-                            state.creativeSets = state.creativeSets.filter(s => s.id !== tempCsId);
-                        });
-                        console.log('[DetailEditor] Cleaned up temp creative set:', tempCsId);
-                    }
 
-                    // ★ Navigate back to templates page after saving template
+                    // ★ Clear editing flags and navigate FIRST (before deleting CS)
                     setEditingTemplateId(null);
                     useTemplateStore.getState().setEditingTempCsId(null);
-                    setTimeout(() => navigate('/templates'), 300);
+                    navigate('/templates');
+
+                    // ★ Delete temp CS AFTER navigation (editor unmounted by then)
+                    if (tempCsId) {
+                        setTimeout(() => {
+                            useDesignStore.getState().deleteCreativeSet(tempCsId);
+                            useProjectStore.setState(state => {
+                                state.creativeSets = state.creativeSets.filter(s => s.id !== tempCsId);
+                            });
+                            console.log('[DetailEditor] Cleaned up temp creative set:', tempCsId);
+                        }, 500);
+                    }
+                    return; // Skip normal save status flow
                 }
             }
 
@@ -390,17 +402,21 @@ export function DetailEditorPage() {
                     <span>EDITING TEMPLATE — Save to update the global template</span>
                     <button
                         onClick={() => {
-                            // Clean up temp creative set
+                            // Capture temp CS ID before clearing
                             const tempCsId = useTemplateStore.getState().editingTempCsId;
-                            if (tempCsId) {
-                                useDesignStore.getState().deleteCreativeSet(tempCsId);
-                                useProjectStore.setState(state => {
-                                    state.creativeSets = state.creativeSets.filter(s => s.id !== tempCsId);
-                                });
-                            }
+                            // Navigate first, then clean up after editor unmounts
                             setEditingTemplateId(null);
                             useTemplateStore.getState().setEditingTempCsId(null);
                             navigate('/templates');
+                            // Delayed cleanup
+                            if (tempCsId) {
+                                setTimeout(() => {
+                                    useDesignStore.getState().deleteCreativeSet(tempCsId);
+                                    useProjectStore.setState(state => {
+                                        state.creativeSets = state.creativeSets.filter(s => s.id !== tempCsId);
+                                    });
+                                }, 500);
+                            }
                         }}
                         style={{
                             background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff',
