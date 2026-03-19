@@ -54,6 +54,8 @@ function applyTextEffectCSS(
         }
     }
 
+    console.log(`[applyTextEffectCSS] effect=${effectType} scale=${scale} color=${color} isTextbox=${obj instanceof Textbox} fill=${(obj as any).fill}`);
+
     switch (effectType) {
         case 'drop':
             obj.set({
@@ -785,7 +787,11 @@ export function createEngineShim(
         // through save/load cycle. CSS is re-applied on canvas restore.
         set_text_effect: (id: number, effectType: string, intensity: number, color: string) => {
             const obj = findById(id);
-            if (!obj) return;
+            if (!obj) {
+                console.warn(`[set_text_effect] findById(${id}) returned null — object not on canvas!`);
+                return;
+            }
+            console.log(`[set_text_effect] Found obj id=${id}, applying effect=${effectType}`);
 
             // Store on object for persistence
             (obj as any).__glidTextEffectType = effectType;

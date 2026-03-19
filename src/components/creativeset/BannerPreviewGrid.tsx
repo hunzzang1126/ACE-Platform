@@ -11,6 +11,30 @@ import { loadVideoBlob } from '@/stores/videoStorage';
 import type { SmartCheckStatus } from '@/hooks/useSmartCheck';
 import { PlugCanvas } from './PlugCanvas';
 import { useDesignStore } from '@/stores/designStore';
+import type { TextEffectConfig } from '@/schema/elements.types';
+
+/** Convert TextEffectConfig → CSS properties for preview rendering */
+function getTextEffectCSS(fx: TextEffectConfig | undefined): React.CSSProperties {
+    if (!fx || fx.type === 'none') return {};
+    const scale = (fx.intensity ?? 50) / 50;
+    const c = fx.color || '#ffffff';
+    switch (fx.type) {
+        case 'drop': return { textShadow: `${4 * scale}px ${4 * scale}px ${8 * scale}px ${c}cc` };
+        case 'glow': return { textShadow: `0 0 ${20 * scale}px ${c}80` };
+        case 'echo': return { textShadow: `${6 * scale}px ${6 * scale}px 0 ${c}40` };
+        case 'outline': return { WebkitTextStroke: `${Math.max(1, 2 * scale)}px ${c}`, paintOrder: 'stroke fill' } as any;
+        case 'background': return { WebkitTextStroke: `${Math.max(4, 8 * scale)}px ${c}`, paintOrder: 'stroke fill' } as any;
+        case 'splice': return { WebkitTextStroke: `${Math.max(2, 3 * scale)}px ${c}`, paintOrder: 'stroke fill' } as any;
+        case 'hollow': return { color: 'transparent', WebkitTextStroke: `${Math.max(1, 2 * scale)}px ${c}` } as any;
+        case 'neon': return { textShadow: `0 0 ${8 * scale}px ${c}, 0 0 ${20 * scale}px ${c}80, 0 0 ${40 * scale}px ${c}40` };
+        case 'glitch': return { textShadow: `${3 * scale}px 0 0 #ff0000, ${-3 * scale}px 0 0 #00ffff` };
+        case 'curve': return { textShadow: `0 ${2 * scale}px ${4 * scale}px ${c}30` };
+        case 'neon-lights': return { textShadow: `0 0 ${16 * scale}px ${c}`, WebkitTextStroke: `${Math.max(1, scale)}px ${c}60` } as any;
+        case 'tv-static': return { textShadow: `${scale}px ${-scale}px ${2 * scale}px #ffffff40` };
+        case '70s': return { WebkitTextStroke: `${Math.max(3, 5 * scale)}px ${c}`, paintOrder: 'stroke fill', textShadow: `3px 3px ${6 * scale}px #ff8c0060` } as any;
+        default: return {};
+    }
+}
 
 interface ContextMenuState {
     x: number;
@@ -104,13 +128,46 @@ async function renderVariantToCanvas(variant: BannerVariant): Promise<string> {
                 ctx.fillRect(x, y, ew, eh);
             }
         } else if (el.type === 'text' && el.content) {
-            ctx.fillStyle = el.color || '#000000';
             const fontSize = el.fontSize ?? 16;
             const fontFamily = el.fontFamily || 'Inter, system-ui, sans-serif';
             const fontWeight = el.fontWeight || '400';
             ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
             ctx.textBaseline = 'top';
             const lineHeight = fontSize * (el.lineHeight ?? 1.2);
+
+            // ★ Apply text effect to Canvas2D context
+            const fx = el.textEffect;
+            let useStroke = false;
+            let strokeColor = '';
+            let strokeWidth = 0;
+            let useFillTransparent = false;
+            if (fx && fx.type !== 'none') {
+                const fxScale = (fx.intensity ?? 50) / 50;
+                const fxColor = fx.color || '#ffffff';
+                switch (fx.type) {
+                    case 'outline': useStroke = true; strokeColor = fxColor; strokeWidth = Math.max(1, 2 * fxScale); break;
+                    case 'background': useStroke = true; strokeColor = fxColor; strokeWidth = Math.max(4, 8 * fxScale); break;
+                    case 'splice': useStroke = true; strokeColor = fxColor; strokeWidth = Math.max(2, 3 * fxScale); break;
+                    case 'hollow': useStroke = true; strokeColor = el.color || '#000'; strokeWidth = Math.max(1, 2 * fxScale); useFillTransparent = true; break;
+                    case '70s': useStroke = true; strokeColor = fxColor; strokeWidth = Math.max(3, 5 * fxScale); break;
+                    case 'neon-lights': useStroke = true; strokeColor = fxColor + '60'; strokeWidth = Math.max(1, fxScale); break;
+                    case 'drop': ctx.shadowColor = fxColor + 'cc'; ctx.shadowBlur = 8 * fxScale; ctx.shadowOffsetX = 4 * fxScale; ctx.shadowOffsetY = 4 * fxScale; break;
+                    case 'glow': ctx.shadowColor = fxColor + '80'; ctx.shadowBlur = 20 * fxScale; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0; break;
+                    case 'echo': ctx.shadowColor = fxColor + '40'; ctx.shadowBlur = 0; ctx.shadowOffsetX = 6 * fxScale; ctx.shadowOffsetY = 6 * fxScale; break;
+                    case 'neon': ctx.shadowColor = fxColor; ctx.shadowBlur = 12 * fxScale; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0; break;
+                    case 'glitch': ctx.shadowColor = '#ff0000'; ctx.shadowBlur = 0; ctx.shadowOffsetX = 3 * fxScale; ctx.shadowOffsetY = 0; break;
+                    case 'curve': ctx.shadowColor = fxColor + '30'; ctx.shadowBlur = 4 * fxScale; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 2 * fxScale; break;
+                    case 'tv-static': ctx.shadowColor = '#ffffff40'; ctx.shadowBlur = 2 * fxScale; ctx.shadowOffsetX = fxScale; ctx.shadowOffsetY = -fxScale; break;
+                }
+                if (useStroke) {
+                    ctx.strokeStyle = strokeColor;
+                    ctx.lineWidth = strokeWidth;
+                    ctx.lineJoin = 'round';
+                }
+            }
+
+            ctx.fillStyle = useFillTransparent ? 'transparent' : (el.color || '#000000');
+
             // ★ Split by explicit \n first, then word-wrap each paragraph
             const paragraphs = el.content.split('\n');
             let lineY = y;
@@ -122,6 +179,7 @@ async function renderVariantToCanvas(variant: BannerVariant): Promise<string> {
                     if (ctx.measureText(test).width > ew && line) {
                         const drawX = el.textAlign === 'center' ? x + ew / 2 - ctx.measureText(line).width / 2
                             : el.textAlign === 'right' ? x + ew - ctx.measureText(line).width : x;
+                        if (useStroke) ctx.strokeText(line, drawX, lineY);
                         ctx.fillText(line, drawX, lineY);
                         line = word;
                         lineY += lineHeight;
@@ -132,6 +190,7 @@ async function renderVariantToCanvas(variant: BannerVariant): Promise<string> {
                 if (line) {
                     const drawX = el.textAlign === 'center' ? x + ew / 2 - ctx.measureText(line).width / 2
                         : el.textAlign === 'right' ? x + ew - ctx.measureText(line).width : x;
+                    if (useStroke) ctx.strokeText(line, drawX, lineY);
                     ctx.fillText(line, drawX, lineY);
                 }
                 lineY += lineHeight; // paragraph break
@@ -688,7 +747,7 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                                                         ...shapeStyle,
                                                         ...shadowStyle,
                                                         ...customStyles,
-                                                        ...(el.type === 'text' ? { color: el.color, fontSize: el.fontSize, fontFamily: el.fontFamily, fontWeight: el.fontWeight, fontStyle: el.fontStyle ?? 'normal', display: 'flex', alignItems: 'flex-start', justifyContent: el.textAlign === 'center' ? 'center' : el.textAlign === 'right' ? 'flex-end' : 'flex-start', overflow: 'visible', whiteSpace: 'normal' as const, wordBreak: 'break-word' as const, lineHeight: el.lineHeight ?? 1.2, letterSpacing: el.letterSpacing ? `${el.letterSpacing}px` : undefined, textAlign: el.textAlign as 'left' | 'center' | 'right' } : {}),
+                                                        ...(el.type === 'text' ? { color: el.color, fontSize: el.fontSize, fontFamily: el.fontFamily, fontWeight: el.fontWeight, fontStyle: el.fontStyle ?? 'normal', display: 'flex', alignItems: 'flex-start', justifyContent: el.textAlign === 'center' ? 'center' : el.textAlign === 'right' ? 'flex-end' : 'flex-start', overflow: 'visible', whiteSpace: 'normal' as const, wordBreak: 'break-word' as const, lineHeight: el.lineHeight ?? 1.2, letterSpacing: el.letterSpacing ? `${el.letterSpacing}px` : undefined, textAlign: el.textAlign as 'left' | 'center' | 'right', ...getTextEffectCSS(el.textEffect) } : {}),
                                                         ...(el.type === 'button' ? { backgroundColor: el.backgroundColor, borderRadius: el.borderRadius ?? 0, color: el.color, fontSize: el.fontSize, fontFamily: el.fontFamily, fontWeight: el.fontWeight, display: 'flex', alignItems: 'center', justifyContent: 'center' } : {}),
                                                         ...(el.type === 'image' ? { overflow: 'hidden' } : {}),
                                                         ...(el.type === 'video' ? { overflow: 'hidden' } : {}),
