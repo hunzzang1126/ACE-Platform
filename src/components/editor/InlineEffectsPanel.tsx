@@ -317,7 +317,7 @@ const S: Record<string, React.CSSProperties> = {
     presetPreview: {
         width: '100%', height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontSize: 22, fontWeight: 700, color: '#e4e4e7', borderRadius: 6,
-        background: 'rgba(255,255,255,0.04)', fontFamily: 'Inter, system-ui, sans-serif',
+        background: '#1e1e2e', fontFamily: 'Inter, system-ui, sans-serif',
     },
     presetLabel: {
         fontSize: 10, color: 'var(--text-muted, #71717a)', whiteSpace: 'nowrap' as const,

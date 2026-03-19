@@ -269,6 +269,13 @@ export function engineNodeToTextElement(
         color: node.shadow_color,
     } : undefined;
 
+    // ★ Preserve text effect config (Canva-style: outline, neon, glitch, etc.)
+    const textEffect = (node.textEffect_type && node.textEffect_type !== 'none') ? {
+        type: node.textEffect_type,
+        intensity: node.textEffect_intensity ?? 50,
+        color: node.textEffect_color ?? '#ffffff',
+    } : undefined;
+
     return {
         id: `engine-${node.id}`,
         name: node.name || `Text ${node.id}`,
@@ -289,6 +296,7 @@ export function engineNodeToTextElement(
         locked: node.locked ?? false,
         zIndex: node.z_index ?? 1,
         shadow,
+        textEffect,
         animation,
     } as TextElement;
 }

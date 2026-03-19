@@ -396,6 +396,14 @@ export function useCanvasSync(
                         engine.set_shadow(nodeId, el.shadow.offsetX, el.shadow.offsetY, el.shadow.blur, sr, sg, sb, sa);
                     } catch { /* ok */ }
                 }
+                // ★ Restore text effect (Canva-style: outline, neon, glitch, 70s, etc.)
+                if (text.textEffect && text.textEffect.type !== 'none') {
+                    try {
+                        engine.set_text_effect(nodeId, text.textEffect.type, text.textEffect.intensity ?? 50, text.textEffect.color ?? '#ffffff');
+                    } catch (err) {
+                        console.warn('[useCanvasSync] Failed to restore text effect:', err);
+                    }
+                }
                 // ★ Restore visible/locked
                 if (el.visible === false) {
                     try { engine.set_visible?.(nodeId, false); } catch { /* ok */ }
