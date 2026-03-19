@@ -364,11 +364,11 @@ export function DetailEditorPage() {
                         cursor: saveStatus === 'saving' ? 'wait' : 'pointer',
                         transition: 'background 0.2s',
                     }}
-                    title={isMaster ? 'Save and propagate to all sizes' : 'Save this variant'}
+                    title="Save this variant"
                 >
                     {saveStatus === 'saving' ? 'Saving...'
                         : saveStatus === 'saved' ? 'Done: Saved'
-                            : isMaster ? 'Save & Propagate' : 'Save'}
+                            : 'Save'}
                 </button>
             </EditorTopBar>
             <div className="ed-body">

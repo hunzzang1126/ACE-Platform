@@ -215,7 +215,7 @@ function downloadDataURL(dataURL: string, filename: string) {
 interface Props {
     variants: BannerVariant[];
     visibleIds: Set<string>;
-    masterVariantId: string;
+    masterVariantId?: string; // ★ DEPRECATED — kept for backward compat, no longer used in UI
     onRunSmartCheck?: () => void;
     smartCheckStatus?: SmartCheckStatus;
     smartCheckProgress?: string;
@@ -243,7 +243,6 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
     const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
     const gridContainerRef = useRef<HTMLDivElement>(null);
     const plugConnections = useDesignStore(s => s.creativeSet?.plugConnections) ?? {};
-    const masterLabel = useDesignStore(s => s.creativeSet?.masterLabel);
 
     // ── Free-form card positions (variant.id → {x, y}) — persisted in store ──
     const storedPositionsRaw = useDesignStore(s => s.creativeSet?.cardPositions);
@@ -540,22 +539,7 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                         Add animations in the editor to preview here
                     </span>
                 )}
-                {/* Smart Check Button */}
-                {onRunSmartCheck && (
-                    <button
-                        className="banner-ai-qa-btn"
-                        onClick={onRunSmartCheck}
-                        disabled={smartCheckStatus === 'checking'}
-                        title="AI Vision QA: analyze all variants for visual quality"
-                    >
-                        {smartCheckStatus === 'checking'
-                            ? (smartCheckProgress || 'Checking...')
-                            : smartCheckStatus === 'done'
-                                ? 'Done: Smart Check'
-                                : 'Smart Check'
-                        }
-                    </button>
-                )}
+                {/* Smart Check removed — all cards are equal, no master-based QA */}
             </div>
 
             <div
@@ -578,7 +562,6 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                     const previewW = Math.round(width * scale);
                     const previewH = Math.round(height * scale);
                     const zoom = Math.round(scale * 100);
-                    const hasLabel = variant.id === masterLabel;
 
                     // ★ Auto-layout: calculate grid position if not yet positioned
                     const pos = cardPositions[variant.id] ?? autoGridPos(idx, previewW);
@@ -609,7 +592,6 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                             >
                                 <span className="banner-card-dims">
                                     {width} x {height}
-                                    {hasLabel && <span className="banner-card-origin">  MASTER</span>}
                                     {(variant.id in plugConnections) && <span className="banner-card-plugged">  PLUGGED</span>}
                                 </span>
                                 {selectedIds.has(variant.id) && (
@@ -957,29 +939,7 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
                         Delete {selectedIds.size > 1 ? `${selectedIds.size} Sizes` : 'Size'}
                     </button>
 
-                    {/* Label as Master (cosmetic) */}
-                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', margin: '4px 0' }} />
-                    {ctxMenu.variantId === masterLabel ? (
-                        <button
-                            className="banner-ctx-item"
-                            onClick={() => {
-                                useDesignStore.getState().clearMasterLabel();
-                                setCtxMenu(null);
-                            }}
-                        >
-                            Remove Master Label
-                        </button>
-                    ) : (
-                        <button
-                            className="banner-ctx-item"
-                            onClick={() => {
-                                useDesignStore.getState().setMasterLabel(ctxMenu.variantId);
-                                setCtxMenu(null);
-                            }}
-                        >
-                            Label as Master
-                        </button>
-                    )}
+                    {/* Master label removed — all cards are equal */}
                 </div>
             )}
         </div>
