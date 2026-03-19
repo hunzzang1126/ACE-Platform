@@ -103,10 +103,11 @@ function TemplatePreview({ template }: { template: DesignTemplate }) {
 
     const tw = template.width;
     const th = template.height;
-    // Scale to fit preview width — NO height cap, let aspect ratio drive
+    // ★ CSS transform:scale approach — render at FULL size, shrink with transform
+    // This avoids all text overflow/clipping issues from manual font scaling
     const previewW = 130;
     const scale = previewW / tw;
-    const previewH = th * scale; // ★ FIX: removed Math.min(th*scale, 120) clipping
+    const previewH = th * scale;
 
     return (
         <div
@@ -117,78 +118,89 @@ function TemplatePreview({ template }: { template: DesignTemplate }) {
                 position: 'relative',
                 overflow: 'hidden',
                 borderRadius: 6,
-                backgroundColor: variant.backgroundColor || '#f0f0f0',
             }}
         >
-            {variant.elements.map((el) => {
-                const x = (el.constraints?.horizontal?.offset ?? 0) * scale;
-                const y = (el.constraints?.vertical?.offset ?? 0) * scale;
-                const w = (el.constraints?.size?.width ?? 0) * scale;
-                const h = (el.constraints?.size?.height ?? 0) * scale;
+            {/* Inner container at FULL template size, scaled down via CSS transform */}
+            <div style={{
+                width: tw,
+                height: th,
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                transform: `scale(${scale})`,
+                transformOrigin: 'top left',
+                backgroundColor: variant.backgroundColor || '#f0f0f0',
+            }}>
+                {variant.elements.map((el) => {
+                    const x = el.constraints?.horizontal?.offset ?? 0;
+                    const y = el.constraints?.vertical?.offset ?? 0;
+                    const w = el.constraints?.size?.width ?? 0;
+                    const h = el.constraints?.size?.height ?? 0;
 
-                const baseStyle: React.CSSProperties = {
-                    position: 'absolute',
-                    left: x,
-                    top: y,
-                    width: w,
-                    height: h,
-                    opacity: el.opacity ?? 1,
-                    zIndex: el.zIndex ?? 0,
-                    overflow: 'hidden',
-                    pointerEvents: 'none',
-                };
+                    const baseStyle: React.CSSProperties = {
+                        position: 'absolute',
+                        left: x,
+                        top: y,
+                        width: w,
+                        height: h,
+                        opacity: el.opacity ?? 1,
+                        zIndex: el.zIndex ?? 0,
+                        overflow: 'hidden',
+                        pointerEvents: 'none',
+                    };
 
-                if (el.type === 'shape') {
-                    const bg = el.gradientStart && el.gradientEnd
-                        ? `linear-gradient(${el.gradientAngle ?? 0}deg, ${el.gradientStart}, ${el.gradientEnd})`
-                        : el.fill;
-                    return (
-                        <div key={el.id} style={{
-                            ...baseStyle,
-                            background: bg,
-                            borderRadius: el.borderRadius ? el.borderRadius * scale : 0,
-                        }} />
-                    );
-                }
+                    if (el.type === 'shape') {
+                        const bg = el.gradientStart && el.gradientEnd
+                            ? `linear-gradient(${el.gradientAngle ?? 0}deg, ${el.gradientStart}, ${el.gradientEnd})`
+                            : el.fill;
+                        return (
+                            <div key={el.id} style={{
+                                ...baseStyle,
+                                background: bg,
+                                borderRadius: el.borderRadius ?? 0,
+                            }} />
+                        );
+                    }
 
-                if (el.type === 'text') {
-                    return (
-                        <div key={el.id} style={{
-                            ...baseStyle,
-                            color: el.color,
-                            fontSize: Math.max(el.fontSize * scale, 3),
-                            fontWeight: el.fontWeight,
-                            fontFamily: el.fontFamily || 'Inter, sans-serif',
-                            textAlign: (el.textAlign as React.CSSProperties['textAlign']) || 'left',
-                            lineHeight: el.lineHeight || 1.2,
-                            whiteSpace: 'pre-wrap',
-                            wordBreak: 'break-word',
-                        }}>
-                            {el.content}
-                        </div>
-                    );
-                }
+                    if (el.type === 'text') {
+                        return (
+                            <div key={el.id} style={{
+                                ...baseStyle,
+                                color: el.color,
+                                fontSize: el.fontSize,
+                                fontWeight: el.fontWeight,
+                                fontFamily: el.fontFamily || 'Inter, sans-serif',
+                                textAlign: (el.textAlign as React.CSSProperties['textAlign']) || 'left',
+                                lineHeight: el.lineHeight || 1.2,
+                                whiteSpace: 'pre-wrap',
+                                wordBreak: 'break-word',
+                            }}>
+                                {el.content}
+                            </div>
+                        );
+                    }
 
-                if (el.type === 'button') {
-                    return (
-                        <div key={el.id} style={{
-                            ...baseStyle,
-                            backgroundColor: el.backgroundColor,
-                            color: el.color,
-                            fontSize: Math.max(el.fontSize * scale, 3),
-                            fontWeight: 700,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            borderRadius: (el.borderRadius ?? 6) * scale,
-                        }}>
-                            {el.label}
-                        </div>
-                    );
-                }
+                    if (el.type === 'button') {
+                        return (
+                            <div key={el.id} style={{
+                                ...baseStyle,
+                                backgroundColor: el.backgroundColor,
+                                color: el.color,
+                                fontSize: el.fontSize,
+                                fontWeight: 700,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderRadius: el.borderRadius ?? 6,
+                            }}>
+                                {el.label}
+                            </div>
+                        );
+                    }
 
-                return null;
-            })}
+                    return null;
+                })}
+            </div>
         </div>
     );
 }
