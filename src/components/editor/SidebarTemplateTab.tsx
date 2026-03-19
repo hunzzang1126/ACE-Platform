@@ -214,32 +214,31 @@ function applyVariantToCanvas(variant: BannerVariant, actions: CanvasEngineActio
     const elements = variant.elements ?? [];
 
     // ★ Template original dimensions
-    const tW = variant.preset?.width || 300;
-    const tH = variant.preset?.height || 250;
+    const tW = variant.preset?.width || 1080;
+    const tH = variant.preset?.height || 1080;
 
     // ★ Current canvas dimensions
     const cW = actions.canvasWidth || 300;
     const cH = actions.canvasHeight || 250;
 
     // ★ Independent X/Y scaling — template FILLS entire canvas (like painting a wall)
-    // Not contain (min) because templates are STYLES, not photographs.
-    // A 160x600 skyscraper should stretch to fill a 300x250 banner, not shrink to a strip.
     const scaleX = cW / tW;
     const scaleY = cH / tH;
     // Font/radius: geometric mean keeps text visually balanced across both axes
     const scaleFontRadius = Math.sqrt(scaleX * scaleY);
 
     for (const el of elements) {
-        const rawX = el.constraints?.horizontal?.offset ?? 0;
-        const rawY = el.constraints?.vertical?.offset ?? 0;
-        const rawW = el.constraints?.size?.width ?? 100;
-        const rawH = el.constraints?.size?.height ?? 100;
+        // ★ Use constraintsToAbsolute() to resolve positions against the TEMPLATE's native size,
+        // then scale to the target canvas. This handles center/right/bottom anchors correctly.
+        const abs = el.constraints
+            ? constraintsToAbsolute(el.constraints, tW, tH)
+            : { x: 0, y: 0, w: 100, h: 100 };
 
-        // Scale X-axis with scaleX, Y-axis with scaleY (fills canvas completely)
-        const x = Math.round(rawX * scaleX);
-        const y = Math.round(rawY * scaleY);
-        const w = Math.round(rawW * scaleX);
-        const h = Math.round(rawH * scaleY);
+        // Scale from template space → canvas space
+        const x = Math.round(abs.x * scaleX);
+        const y = Math.round(abs.y * scaleY);
+        const w = Math.round(abs.w * scaleX);
+        const h = Math.round(abs.h * scaleY);
 
         if (el.type === 'shape') {
             if (el.gradientStart && el.gradientEnd) {
