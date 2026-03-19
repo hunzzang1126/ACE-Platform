@@ -607,41 +607,53 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         }
 
         // ── Phase 8: Smart Sizing (Auto-propagate to all variants) ──
+        // ★ CRITICAL FIX: Only propagate when designing on the MASTER variant.
+        // If user is editing a non-master variant (e.g., 970x250), we must NOT
+        // overwrite other variants (1080x1920, 160x600) that have their own content.
+        // Previously this always propagated, causing cross-variant contamination.
         const designState = useDesignStore.getState();
         const cs = designState.creativeSet;
-        const otherVariants = cs?.variants?.filter(v => v.id !== cs.masterVariantId) ?? [];
+        const { useEditorStore } = await resilientImport(() => import('@/stores/editorStore'));
+        const currentVariantId = useEditorStore.getState().activeVariantId;
+        const isMasterVariant = currentVariantId === cs?.masterVariantId;
 
-        if (otherVariants.length > 0) {
-            narrate(`Scaling design to ${otherVariants.length} variant(s)...`);
-            addCard('sizing', `Scaling to ${otherVariants.length} variant(s)`, 'running');
+        if (isMasterVariant && cs) {
+            const otherVariants = cs.variants.filter(v => v.id !== cs.masterVariantId);
 
-            const { scaleRenderElements, renderElementsToDesignElements } = await resilientImport(() => import('@/engine/renderElementScaler'));
+            if (otherVariants.length > 0) {
+                narrate(`Scaling design to ${otherVariants.length} variant(s)...`);
+                addCard('sizing', `Scaling to ${otherVariants.length} variant(s)`, 'running');
 
-            const sizeResults: string[] = [];
-            for (const variant of otherVariants) {
-                const targetW = variant.preset.width;
-                const targetH = variant.preset.height;
+                const { scaleRenderElements, renderElementsToDesignElements } = await resilientImport(() => import('@/engine/renderElementScaler'));
 
-                // Scale master elements → target size
-                let scaledElements = scaleRenderElements(allElements, canvasW, canvasH, targetW, targetH);
+                const sizeResults: string[] = [];
+                for (const variant of otherVariants) {
+                    const targetW = variant.preset.width;
+                    const targetH = variant.preset.height;
 
-                // Validate each variant independently
-                const variantValidation = validateLayout(scaledElements, targetW, targetH);
-                scaledElements = variantValidation.elements;
+                    // Scale master elements → target size
+                    let scaledElements = scaleRenderElements(allElements, canvasW, canvasH, targetW, targetH);
 
-                const fixes = variantValidation.isClean ? '' : ` (${variantValidation.fixes.length} fix)`;
-                sizeResults.push(`${targetW}x${targetH}: ${scaledElements.length} elements${fixes}`);
+                    // Validate each variant independently
+                    const variantValidation = validateLayout(scaledElements, targetW, targetH);
+                    scaledElements = variantValidation.elements;
 
-                // ★ FIX: Actually store scaled elements to designStore
-                // Previously this was only a comment — elements were computed but never stored.
-                const variantDesignElements = renderElementsToDesignElements(scaledElements, targetW, targetH);
-                designState.replaceVariantElements(variant.id, variantDesignElements);
+                    const fixes = variantValidation.isClean ? '' : ` (${variantValidation.fixes.length} fix)`;
+                    sizeResults.push(`${targetW}x${targetH}: ${scaledElements.length} elements${fixes}`);
+
+                    // Store scaled elements to designStore
+                    const variantDesignElements = renderElementsToDesignElements(scaledElements, targetW, targetH);
+                    designState.replaceVariantElements(variant.id, variantDesignElements);
+                }
+
+                updateCard('sizing', 'done', `${otherVariants.length} variant(s) scaled`, {
+                    expandedDetail: sizeResults.join('\n'),
+                });
+                narrate(`All ${otherVariants.length} variant(s) scaled and validated.`);
             }
-
-            updateCard('sizing', 'done', `${otherVariants.length} variant(s) scaled`, {
-                expandedDetail: sizeResults.join('\n'),
-            });
-            narrate(`All ${otherVariants.length} variant(s) scaled and validated.`);
+        } else {
+            // Non-master variant: only save to THIS variant, do NOT touch others
+            narrate(`Design applied to current variant only (not master). Other variants preserved.`);
         }
 
         return `Design generated with ${rendered} elements.`;
