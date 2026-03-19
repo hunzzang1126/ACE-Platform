@@ -575,6 +575,19 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
                 console.warn('[UnifiedAgent] Failed to place brand logo:', err);
             }
         }
+
+        // ★ FIX: After all elements + background + logo are placed,
+        // force a z-index reorder and syncState to ensure the layer panel
+        // includes ALL objects (especially the background image which was
+        // added first but could be lost in rapid Fabric state updates).
+        try {
+            engine.reorder_by_z_index?.();
+        } catch { /* ok if not available */ }
+        try {
+            // Force a Fabric renderAll + syncState to flush all pending updates
+            engine.render_all?.();
+        } catch { /* ok */ }
+
         narrate(`Reviewing and optimizing design quality...`);
         addCard('vision', 'Optimizing layout', 'running');
         try {
