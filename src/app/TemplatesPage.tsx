@@ -11,6 +11,7 @@ import { useTemplateStore, type TemplateCategory, type DesignTemplate } from '@/
 import { useDesignStore } from '@/stores/designStore';
 import { useAuthStore } from '@/stores/authStore';
 import { AppSidebar } from '@/components/layout/AppSidebar';
+import { constraintsToAbsolute } from '@/engine/elementConverters';
 import type { BannerVariant, BannerPreset } from '@/schema/design.types';
 
 const CATEGORIES = ['all', 'display', 'social', 'email', 'video'] as const;
@@ -184,13 +185,13 @@ function TemplatePreview({ template }: { template: DesignTemplate }) {
                 backgroundColor: variant.backgroundColor || '#f0f0f0',
             }}>
                 {variant.elements.map((el) => {
-                    const x = el.constraints?.horizontal?.offset ?? 0;
-                    const y = el.constraints?.vertical?.offset ?? 0;
-                    const w = el.constraints?.size?.width ?? 0;
-                    const h = el.constraints?.size?.height ?? 0;
+                    // ★ Use constraintsToAbsolute — single source of truth for positions
+                    const pos = el.constraints
+                        ? constraintsToAbsolute(el.constraints, tw, th)
+                        : { x: 0, y: 0, w: 0, h: 0 };
 
                     const baseStyle: React.CSSProperties = {
-                        position: 'absolute', left: x, top: y, width: w, height: h,
+                        position: 'absolute', left: pos.x, top: pos.y, width: pos.w, height: pos.h,
                         opacity: el.opacity ?? 1, zIndex: el.zIndex ?? 0,
                         overflow: 'hidden', pointerEvents: 'none',
                     };
