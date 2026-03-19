@@ -206,11 +206,11 @@ export function useFabricCanvas(
 
             // ★ Figma-style artboard clipping: clip all canvas rendering to artboard bounds.
             // Elements can be dragged outside, but only the portion within the artboard is visible.
-            // Uses absolutePositioned:true so the clip stays fixed in canvas coordinates.
+            // DO NOT use absolutePositioned — the artboard is centered via viewport transform
+            // (vpt[4], vpt[5]). The clipPath must follow the same transform so they stay aligned.
             fc.clipPath = new Rect({
                 left: 0, top: 0,
                 width, height,
-                absolutePositioned: true,
             });
 
             const vpt = fc.viewportTransform!;
