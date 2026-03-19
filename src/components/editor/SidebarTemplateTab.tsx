@@ -1,11 +1,9 @@
 // ─────────────────────────────────────────────────
 // SidebarTemplateTab — Browse + apply templates with CSS previews
-// Admin users can edit templates (pencil icon → opens in canvas)
 // ─────────────────────────────────────────────────
 
 import { useState, useMemo, useCallback } from 'react';
 import { useTemplateStore, type TemplateCategory, type DesignTemplate } from '@/stores/templateStore';
-import { useAuthStore } from '@/stores/authStore';
 import type { CanvasEngineActions } from '@/hooks/canvasTypes';
 import type { BannerVariant } from '@/schema/design.types';
 
@@ -17,9 +15,6 @@ interface Props {
 
 export function SidebarTemplateTab({ actions }: Props) {
     const { templates, search, getByCategory, instantiate } = useTemplateStore();
-    const setEditingTemplateId = useTemplateStore(s => s.setEditingTemplateId);
-    const templateOverrides = useTemplateStore(s => s.templateOverrides);
-    const isAdmin = useAuthStore(s => s.isAdmin);
 
     const [category, setCategory] = useState<string>('all');
     const [query, setQuery] = useState('');
@@ -37,24 +32,6 @@ export function SidebarTemplateTab({ actions }: Props) {
 
         applyVariantToCanvas(variant, actions);
     }, [instantiate, actions]);
-
-    // ★ Admin: edit template — clear canvas first, then load template
-    const handleEdit = useCallback((id: string, e: React.MouseEvent) => {
-        e.stopPropagation(); // Don't trigger apply
-        const variant = instantiate(id);
-        if (!variant || !actions) return;
-
-        // ★ Clear ALL existing elements before loading new template
-        actions.clearAll();
-
-        // Set the editing flag so save knows to override the template
-        setEditingTemplateId(id);
-
-        // Load the template into a fresh canvas
-        applyVariantToCanvas(variant, actions);
-    }, [instantiate, actions, setEditingTemplateId]);
-
-    const adminMode = isAdmin();
 
     return (
         <div className="sidebar-templates">
@@ -80,7 +57,7 @@ export function SidebarTemplateTab({ actions }: Props) {
                 ))}
             </div>
 
-            {/* Template grid */}
+            {/* Template grid — apply only (admin editing via /templates page) */}
             <div className="sidebar-template-grid">
                 {filtered.length === 0 && (
                     <div className="sidebar-empty">
@@ -94,32 +71,8 @@ export function SidebarTemplateTab({ actions }: Props) {
                             <span className="sidebar-template-name">{t.name}</span>
                             <span className="sidebar-template-meta">
                                 {t.width}x{t.height}
-                                {templateOverrides[t.id] && (
-                                    <span style={{ marginLeft: 6, color: 'var(--accent)', fontSize: 9, fontWeight: 600 }}>CUSTOMIZED</span>
-                                )}
                             </span>
                         </div>
-                        {/* Admin edit button — pencil icon top-right */}
-                        {adminMode && (
-                            <button
-                                onClick={(e) => handleEdit(t.id, e)}
-                                title="Edit template (Admin)"
-                                style={{
-                                    position: 'absolute', top: 6, right: 6, zIndex: 5,
-                                    width: 24, height: 24, borderRadius: 6,
-                                    border: 'none', background: 'rgba(0,0,0,0.6)',
-                                    color: '#fff', fontSize: 11, cursor: 'pointer',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    opacity: 0.7, transition: 'opacity 0.15s',
-                                }}
-                                onMouseEnter={e => { e.currentTarget.style.opacity = '1'; }}
-                                onMouseLeave={e => { e.currentTarget.style.opacity = '0.7'; }}
-                            >
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M17 3a2.85 2.85 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                                </svg>
-                            </button>
-                        )}
                     </div>
                 ))}
             </div>

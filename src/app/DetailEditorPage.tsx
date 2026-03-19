@@ -3,7 +3,7 @@
 // Owns the useFabricCanvas hook, passes state down to all panels
 // ─────────────────────────────────────────────────
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { useParams, Navigate } from 'react-router-dom';
+import { useParams, Navigate, useNavigate } from 'react-router-dom';
 import { useDesignStore } from '@/stores/designStore';
 import { useEditorStore } from '@/stores/editorStore';
 import { useUIStore } from '@/stores/uiStore';
@@ -50,6 +50,7 @@ export function DetailEditorPage() {
     const editingTemplateId = useTemplateStore(s => s.editingTemplateId);
     const overrideTemplate = useTemplateStore(s => s.overrideTemplate);
     const setEditingTemplateId = useTemplateStore(s => s.setEditingTemplateId);
+    const navigate = useNavigate();
 
 
 
@@ -118,6 +119,9 @@ export function DetailEditorPage() {
                 if (v) {
                     overrideTemplate(tmplId, v, width, height);
                     console.log('[DetailEditor] Template override saved:', tmplId);
+                    // ★ Navigate back to templates page after saving template
+                    setEditingTemplateId(null);
+                    setTimeout(() => navigate('/templates'), 300);
                 }
             }
 
@@ -370,7 +374,7 @@ export function DetailEditorPage() {
                 }}>
                     <span>EDITING TEMPLATE — Save to update the global template</span>
                     <button
-                        onClick={() => setEditingTemplateId(null)}
+                        onClick={() => { setEditingTemplateId(null); navigate('/templates'); }}
                         style={{
                             background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff',
                             padding: '3px 12px', borderRadius: 4, cursor: 'pointer', fontSize: 11, fontWeight: 600,

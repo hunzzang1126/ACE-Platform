@@ -20,9 +20,9 @@ import EffectsTestPage from './EffectsTestPage';
 import ExportTestPage from './ExportTestPage';
 import AiTestPage from './AiTestPage';
 import PricingPage from './PricingPage';
+import { TemplatesPage } from './TemplatesPage';
 
 // Components
-import { TemplateGallery } from '../components/editor/TemplateGallery';
 import { GlobalAiPanel } from '../components/ai/GlobalAiPanel';
 import { ErrorBoundary } from '../components/ui/ErrorBoundary';
 import { ToastContainer } from '../components/ui/Toast';
@@ -78,7 +78,7 @@ export default function App() {
                     } />
                     <Route path="/templates" element={
                         <ProtectedRoute>
-                            <div className="dashboard-layout"><div style={{ flex: 1, padding: 24 }}><TemplateGallery /></div></div>
+                            <TemplatesPage />
                         </ProtectedRoute>
                     } />
                     <Route path="/trash" element={

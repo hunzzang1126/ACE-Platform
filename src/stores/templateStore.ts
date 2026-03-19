@@ -229,20 +229,14 @@ export const useTemplateStore = create<TemplateState>()(
             storage: createJSONStorage(() => idbStorage),
             onRehydrateStorage: () => (state) => {
                 if (!state) return;
-                // ★ Always refresh built-in templates with latest definitions
+                // ★ AUTO-CLEAR corrupt template overrides — reset all to built-in defaults
+                state.templateOverrides = {};
+                state.editingTemplateId = null;
+                // ★ Always refresh built-in templates with latest definitions (no overrides applied)
                 const userTemplates = state.templates.filter(t => !t.isBuiltIn);
                 const builtInIds = new Set(BUILT_IN_TEMPLATES.map(t => t.id));
-                // Keep user templates + replace all built-ins with fresh copies
-                const freshBuiltIns = BUILT_IN_TEMPLATES.map(t => {
-                    // ★ Apply admin overrides on top of built-in defaults
-                    const override = state.templateOverrides?.[t.id];
-                    if (override) {
-                        return { ...t, variantSnapshot: override, updatedAt: new Date().toISOString() };
-                    }
-                    return t;
-                });
                 state.templates = [
-                    ...freshBuiltIns,
+                    ...BUILT_IN_TEMPLATES,
                     ...userTemplates.filter(t => !builtInIds.has(t.id)),
                 ];
             },
