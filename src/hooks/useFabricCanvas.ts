@@ -180,6 +180,9 @@ export function useFabricCanvas(
                 preserveObjectStacking: true,
                 stopContextMenu: true,
                 fireRightClick: true,
+                // ★ Render selection handles above clipPath overlay so
+                // users can resize/move elements near artboard edges.
+                controlsAboveOverlay: true,
             });
 
             (fc as any).selectionColor = 'rgba(74, 158, 255, 0.08)';
