@@ -238,16 +238,30 @@ export const useTemplateStore = create<TemplateState>()(
             storage: createJSONStorage(() => idbStorage),
             onRehydrateStorage: () => (state) => {
                 if (!state) return;
-                // ★ AUTO-CLEAR corrupt template overrides — reset all to built-in defaults
-                state.templateOverrides = {};
+                // ★ Clear editing state (never persist mid-edit flags)
                 state.editingTemplateId = null;
-                // ★ Always refresh built-in templates with latest definitions (no overrides applied)
+                state.editingTempCsId = null;
+
+                // ★ Refresh built-in templates with latest code definitions
                 const userTemplates = state.templates.filter(t => !t.isBuiltIn);
                 const builtInIds = new Set(BUILT_IN_TEMPLATES.map(t => t.id));
                 state.templates = [
                     ...BUILT_IN_TEMPLATES,
                     ...userTemplates.filter(t => !builtInIds.has(t.id)),
                 ];
+
+                // ★ Re-apply persisted overrides on top of refreshed built-ins
+                // Admin edits are stored in templateOverrides and survive logout/reload
+                if (state.templateOverrides && Object.keys(state.templateOverrides).length > 0) {
+                    for (const [id, snapshot] of Object.entries(state.templateOverrides)) {
+                        const tmpl = state.templates.find(t => t.id === id);
+                        if (tmpl && snapshot) {
+                            tmpl.variantSnapshot = snapshot;
+                            tmpl.updatedAt = tmpl.updatedAt || new Date().toISOString();
+                        }
+                    }
+                    console.log('[templateStore] Re-applied', Object.keys(state.templateOverrides).length, 'template overrides');
+                }
             },
         },
     ),
