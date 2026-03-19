@@ -33,10 +33,25 @@ function applyTextEffectCSS(
 ): void {
     const scale = intensity / 50; // 1.0 at intensity=50
 
+    // ★ Store original fill BEFORE any effect modifies it.
+    // This preserves the real text color for serialization (fabricToEngineNode reads __glidOriginalFill).
+    if (obj instanceof Textbox) {
+        const curFill = obj.fill;
+        // Only capture if we don't already have one stored, AND current fill isn't already from an effect
+        if (!(obj as any).__glidOriginalFill && typeof curFill === 'string' && curFill !== 'transparent') {
+            (obj as any).__glidOriginalFill = curFill;
+        }
+    }
+
     // Clear previous effect styles
     obj.set({ shadow: undefined, stroke: undefined, strokeWidth: 0 } as any);
     if (obj instanceof Textbox) {
         obj.set({ paintFirst: 'fill' } as any);
+        // ★ Restore original fill when clearing (effects like hollow set fill='transparent')
+        if (effectType === 'none' && (obj as any).__glidOriginalFill) {
+            obj.set({ fill: (obj as any).__glidOriginalFill });
+            delete (obj as any).__glidOriginalFill;
+        }
     }
 
     switch (effectType) {
@@ -108,9 +123,10 @@ function applyTextEffectCSS(
         case 'hollow':
             // Hollow: stroke only, transparent fill
             if (obj instanceof Textbox) {
-                const prevFill = obj.fill;
+                // ★ Use stored original fill for stroke color — obj.fill may already be 'transparent' from a previous effect
+                const origFill = (obj as any).__glidOriginalFill || (typeof obj.fill === 'string' && obj.fill !== 'transparent' ? obj.fill : color);
                 obj.set({
-                    stroke: typeof prevFill === 'string' ? prevFill : color,
+                    stroke: origFill,
                     strokeWidth: Math.max(1, 2 * scale),
                     fill: 'transparent',
                     paintFirst: 'stroke',
@@ -790,6 +806,11 @@ export function createEngineShim(
             (obj as any).__glidTextEffectIntensity = 0;
             (obj as any).__glidTextEffectColor = '';
 
+            // ★ Restore original fill before clearing (effects like hollow set fill='transparent')
+            if ((obj as any).__glidOriginalFill && obj instanceof Textbox) {
+                obj.set({ fill: (obj as any).__glidOriginalFill });
+                delete (obj as any).__glidOriginalFill;
+            }
             // Clear all effect-related styles
             obj.set({ shadow: undefined, stroke: undefined, strokeWidth: 0 } as any);
             if (obj instanceof Textbox) {

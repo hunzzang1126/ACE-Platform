@@ -667,6 +667,11 @@ export function useFabricCanvas(
         (obj as any).__glidTextEffectType = 'none';
         (obj as any).__glidTextEffectIntensity = 0;
         (obj as any).__glidTextEffectColor = '';
+        // ★ Restore original fill before clearing stroke (effects like hollow set fill='transparent')
+        if ((obj as any).__glidOriginalFill && obj instanceof Textbox) {
+            obj.set({ fill: (obj as any).__glidOriginalFill });
+            delete (obj as any).__glidOriginalFill;
+        }
         obj.set({ shadow: undefined, stroke: undefined, strokeWidth: 0 } as any);
         if (obj instanceof Textbox) {
             obj.set({ paintFirst: 'fill' } as any);

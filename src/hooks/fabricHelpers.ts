@@ -153,7 +153,7 @@ export function fabricToEngineNode(obj: FabricObject): EngineNode {
         node.fontSize = Math.round((obj.fontSize ?? 16) * scaleY);
         node.fontFamily = obj.fontFamily ?? 'Inter';
         node.fontWeight = String(obj.fontWeight ?? '400');
-        node.color = typeof obj.fill === 'string' ? obj.fill : '#000000';
+        node.color = (obj as any).__glidOriginalFill || (typeof obj.fill === 'string' && obj.fill !== 'transparent' ? obj.fill : '#000000');
         node.textAlign = obj.textAlign ?? 'left';
         node.lineHeight = obj.lineHeight ?? 1.4;
         node.letterSpacing = Math.round(((obj.charSpacing ?? 0) / 10) * scaleX * 10) / 10;
@@ -224,7 +224,7 @@ export function fabricToEngineNode(obj: FabricObject): EngineNode {
 }
 
 // ── Custom properties to include in serialization ──
-export const GLID_CUSTOM_PROPS = ['__glidId', '__glidZIndex', '__glidArtboard', '__glidName', '__glidGradientStart', '__glidGradientEnd', '__glidGradientAngle', '__glidCustomStyles', '__glidTextEffectType', '__glidTextEffectIntensity', '__glidTextEffectColor'];
+export const GLID_CUSTOM_PROPS = ['__glidId', '__glidZIndex', '__glidArtboard', '__glidName', '__glidGradientStart', '__glidGradientEnd', '__glidGradientAngle', '__glidCustomStyles', '__glidTextEffectType', '__glidTextEffectIntensity', '__glidTextEffectColor', '__glidOriginalFill'];
 
 // Patch a Fabric object to include Glid custom props in toObject()
 export function patchAceProps(obj: FabricObject): void {
@@ -242,6 +242,7 @@ export function patchAceProps(obj: FabricObject): void {
         if ((this as any).__glidTextEffectType) data.__glidTextEffectType = (this as any).__glidTextEffectType;
         if ((this as any).__glidTextEffectIntensity != null) data.__glidTextEffectIntensity = (this as any).__glidTextEffectIntensity;
         if ((this as any).__glidTextEffectColor) data.__glidTextEffectColor = (this as any).__glidTextEffectColor;
+        if ((this as any).__glidOriginalFill) data.__glidOriginalFill = (this as any).__glidOriginalFill;
         return data;
     };
 }
