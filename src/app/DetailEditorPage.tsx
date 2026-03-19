@@ -7,6 +7,7 @@ import { useParams, Navigate } from 'react-router-dom';
 import { useDesignStore } from '@/stores/designStore';
 import { useEditorStore } from '@/stores/editorStore';
 import { useUIStore } from '@/stores/uiStore';
+import { useTemplateStore } from '@/stores/templateStore';
 import { EditorTopBar } from '@/components/editor/EditorTopBar';
 import { EditorSidebar } from '@/components/editor/EditorSidebar';
 import { EditorCanvas } from '@/components/editor/EditorCanvas';
@@ -44,6 +45,11 @@ export function DetailEditorPage() {
     const toggleKeyframeInspector = useUIStore(s => s.toggleKeyframeInspector);
     const toggleBrandCompliance = useUIStore(s => s.toggleBrandCompliance);
     const toggleAuthModal = useUIStore(s => s.toggleAuthModal);
+
+    // ── Template editing mode (admin) ──
+    const editingTemplateId = useTemplateStore(s => s.editingTemplateId);
+    const overrideTemplate = useTemplateStore(s => s.overrideTemplate);
+    const setEditingTemplateId = useTemplateStore(s => s.setEditingTemplateId);
 
 
 
@@ -102,6 +108,19 @@ export function DetailEditorPage() {
             console.log('[DetailEditor] Save result:', result);
             isDirtyRef.current = false; // Saved — no longer dirty
             lastManualSaveRef.current = Date.now();
+
+            // ★ Template editing mode: also override the global template
+            const tmplId = useTemplateStore.getState().editingTemplateId;
+            if (tmplId && result.success) {
+                // Read the freshly saved variant from designStore
+                const cs = useDesignStore.getState().creativeSet;
+                const v = cs?.variants.find(vi => vi.id === variantId);
+                if (v) {
+                    overrideTemplate(tmplId, v, width, height);
+                    console.log('[DetailEditor] Template override saved:', tmplId);
+                }
+            }
+
             if (result.success) {
                 setSaveStatus('saved');
             } else {
@@ -113,11 +132,9 @@ export function DetailEditorPage() {
             setSaveStatus('idle');
         }
         // ★ REGRESSION GUARD: Use 200ms timeout instead of rAF for the guard window.
-        // rAF fires too quickly, allowing the storeElementCount effect to re-dirty
-        // after save. 200ms gives Zustand effects time to settle.
         setTimeout(() => { isSavingRef.current = false; }, 200);
         setTimeout(() => setSaveStatus('idle'), 2000);
-    }, [saveToStore, engineRef, overlay.overlayElements]);
+    }, [saveToStore, engineRef, overlay.overlayElements, overrideTemplate, variantId, width, height]);
 
     // ── Export handlers ──────────────────────────────
     const handleExportPNG = useCallback((quality: number) => {
@@ -343,6 +360,26 @@ export function DetailEditorPage() {
 
     return (
         <div className="ed-layout">
+            {/* ★ Template editing banner */}
+            {editingTemplateId && (
+                <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16,
+                    padding: '8px 16px', background: 'linear-gradient(90deg, #f59e0b, #d97706)',
+                    color: '#fff', fontSize: 12, fontWeight: 600, letterSpacing: '0.03em',
+                    zIndex: 100,
+                }}>
+                    <span>EDITING TEMPLATE — Save to update the global template</span>
+                    <button
+                        onClick={() => setEditingTemplateId(null)}
+                        style={{
+                            background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff',
+                            padding: '3px 12px', borderRadius: 4, cursor: 'pointer', fontSize: 11, fontWeight: 600,
+                        }}
+                    >
+                        Cancel
+                    </button>
+                </div>
+            )}
             <EditorTopBar setName={creativeSet.name} variantLabel={variantLabel} canvasWidth={width} canvasHeight={height} engine={engineRef.current}>
                 {/* Save Button — always visible */}
                 <button
@@ -367,8 +404,8 @@ export function DetailEditorPage() {
                     title="Save this variant"
                 >
                     {saveStatus === 'saving' ? 'Saving...'
-                        : saveStatus === 'saved' ? 'Done: Saved'
-                            : 'Save'}
+                        : saveStatus === 'saved' ? (editingTemplateId ? 'Template Updated' : 'Done: Saved')
+                            : (editingTemplateId ? 'Save Template' : 'Save')}
                 </button>
             </EditorTopBar>
             <div className="ed-body">

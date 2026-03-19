@@ -48,6 +48,10 @@ export interface DesignTemplate {
 
 interface TemplateState {
     templates: DesignTemplate[];
+    /** Admin overrides: maps template ID -> serialized variantSnapshot JSON */
+    templateOverrides: Record<string, string>;
+    /** Template currently being edited in canvas (admin only) */
+    editingTemplateId: string | null;
 
     // CRUD
     saveAsTemplate: (opts: {
@@ -66,6 +70,13 @@ interface TemplateState {
     updateTemplate: (id: string, updates: Partial<Pick<DesignTemplate, 'name' | 'description' | 'category' | 'tags'>>) => void;
     toggleFavorite: (id: string) => void;
     incrementUsage: (id: string) => void;
+
+    /** Admin: override a built-in template's variant snapshot */
+    overrideTemplate: (id: string, variant: BannerVariant, width?: number, height?: number) => void;
+    /** Admin: clear override and revert to built-in default */
+    clearOverride: (id: string) => void;
+    /** Set which template is being edited (null = not editing) */
+    setEditingTemplateId: (id: string | null) => void;
 
     // Query
     getByCategory: (category: TemplateCategory) => DesignTemplate[];
@@ -86,6 +97,8 @@ export const useTemplateStore = create<TemplateState>()(
     persist(
         immer((set, get) => ({
             templates: [],
+            templateOverrides: {} as Record<string, string>,
+            editingTemplateId: null as string | null,
 
             saveAsTemplate: (opts) => {
                 const id = genId();
@@ -175,6 +188,41 @@ export const useTemplateStore = create<TemplateState>()(
                     return null;
                 }
             },
+
+            overrideTemplate: (id, variant, width, height) => {
+                const snapshot = JSON.stringify(variant);
+                // ★ Save override OUTSIDE immer set() to avoid cross-store deadlock
+                set(state => {
+                    state.templateOverrides[id] = snapshot;
+                    const tmpl = state.templates.find(t => t.id === id);
+                    if (tmpl) {
+                        tmpl.variantSnapshot = snapshot;
+                        if (width) tmpl.width = width;
+                        if (height) tmpl.height = height;
+                        tmpl.updatedAt = new Date().toISOString();
+                    }
+                    state.editingTemplateId = null;
+                });
+            },
+
+            clearOverride: (id) => {
+                set(state => {
+                    delete state.templateOverrides[id];
+                    // Revert to built-in version
+                    const builtIn = BUILT_IN_TEMPLATES.find(t => t.id === id);
+                    const tmpl = state.templates.find(t => t.id === id);
+                    if (builtIn && tmpl) {
+                        tmpl.variantSnapshot = builtIn.variantSnapshot;
+                        tmpl.width = builtIn.width;
+                        tmpl.height = builtIn.height;
+                        tmpl.updatedAt = new Date().toISOString();
+                    }
+                });
+            },
+
+            setEditingTemplateId: (id) => {
+                set(state => { state.editingTemplateId = id; });
+            },
         })),
         {
             name: 'ace-templates',
@@ -182,12 +230,19 @@ export const useTemplateStore = create<TemplateState>()(
             onRehydrateStorage: () => (state) => {
                 if (!state) return;
                 // ★ Always refresh built-in templates with latest definitions
-                // (preserves user-created templates, updates built-in font sizes/layout)
                 const userTemplates = state.templates.filter(t => !t.isBuiltIn);
                 const builtInIds = new Set(BUILT_IN_TEMPLATES.map(t => t.id));
                 // Keep user templates + replace all built-ins with fresh copies
+                const freshBuiltIns = BUILT_IN_TEMPLATES.map(t => {
+                    // ★ Apply admin overrides on top of built-in defaults
+                    const override = state.templateOverrides?.[t.id];
+                    if (override) {
+                        return { ...t, variantSnapshot: override, updatedAt: new Date().toISOString() };
+                    }
+                    return t;
+                });
                 state.templates = [
-                    ...BUILT_IN_TEMPLATES,
+                    ...freshBuiltIns,
                     ...userTemplates.filter(t => !builtInIds.has(t.id)),
                 ];
             },
