@@ -639,43 +639,40 @@ const badgeFocus: DesignTemplate = {
 const horizontalStrip: DesignTemplate = {
     id: 'horizontal-strip',
     name: 'Horizontal Strip',
-    description: 'Horizontal flow for leaderboard/banner — content left, CTA right',
-    aspectRatios: ['wide'],
+    description: 'Bold two-column layout with accent divider — modern, editorial',
+    aspectRatios: ['wide', 'landscape', 'square', 'any'],
     build: (W, H, g, c) => {
         const [ar, ag, ab] = hex(g.colors.accent);
-        const padX = Math.round(W * 0.03);
-        const headFs = Math.max(14, Math.round(H * 0.3));
-        const subFs = Math.max(10, Math.round(H * 0.16));
-        const ctaFs = Math.max(10, Math.round(H * 0.16));
-        const ctaW = Math.round(W * 0.18);
-        const ctaH = Math.round(H * 0.5);
+        const pad = Math.round(Math.min(W, H) * 0.08);
+        const headFs = Math.max(16, Math.min(adaptiveFont(48, W, H, 1), Math.round(Math.min(W, H) * 0.12)));
+        const subFs = Math.max(10, Math.round(headFs * 0.38));
+        const tagFs = Math.max(8, Math.round(headFs * 0.28));
 
         return [
             { type: 'rect', name: 'background', x: 0, y: 0, w: W, h: H,
               gradient_start_hex: g.colors.gradientStart, gradient_end_hex: g.colors.gradientEnd, gradient_angle: 90 },
-            { type: 'rect', name: 'accent_line', x: 0, y: 0, w: W, h: 2,
+            { type: 'rect', name: 'accent_line', x: 0, y: 0, w: W, h: 4,
               r: ar, g: ag, b: ab, a: 0.8 },
 
-            { type: 'text', name: 'headline', x: padX, y: Math.round(H * 0.18),
-              w: Math.round(W * 0.52), h: Math.round(headFs * 1.3),
+            { type: 'text', name: 'tag_text', x: pad, y: Math.round(H * 0.12),
+              w: W - 2 * pad, h: tagFs + 6,
+              content: c.tag.toUpperCase(), font_size: tagFs, font_weight: '600',
+              color_hex: g.colors.accent, text_align: 'left', letter_spacing: 3 },
+
+            { type: 'text', name: 'headline', x: pad, y: Math.round(H * 0.25),
+              w: W - 2 * pad, h: headFs * 2.5,
               content: c.headline, font_size: headFs, font_weight: '800',
-              color_hex: g.colors.foreground, text_align: 'left', letter_spacing: -0.5 },
-            { type: 'text', name: 'subheadline', x: padX, y: Math.round(H * 0.58),
-              w: Math.round(W * 0.52), h: Math.round(subFs * 1.3),
+              color_hex: g.colors.foreground, text_align: 'left', letter_spacing: -0.5, line_height: 1.1 },
+
+            { type: 'text', name: 'subheadline', x: pad, y: Math.round(H * 0.58),
+              w: Math.round(W * 0.7), h: subFs * 3,
               content: c.subheadline, font_size: subFs, font_weight: '400',
-              color_hex: g.colors.secondary, text_align: 'left' },
+              color_hex: g.colors.secondary, text_align: 'left', line_height: 1.4 },
 
-            { type: 'rounded_rect', name: 'cta_button',
-              x: W - padX - ctaW, y: Math.round((H - ctaH) / 2),
-              w: ctaW, h: ctaH, r: ar, g: ag, b: ab, a: 1.0, radius: 0 },
-            { type: 'text', name: 'cta_label',
-              x: W - padX - ctaW, y: Math.round((H - ctaFs) / 2),
-              w: ctaW, h: ctaFs + 4,
-              content: c.cta.toUpperCase(), font_size: ctaFs, font_weight: '700',
-              color_hex: g.colors.accentForeground, text_align: 'center', letter_spacing: 1.5 },
-
-            { type: 'rect', name: 'divider', x: W - padX - ctaW - Math.round(W * 0.03), y: Math.round(H * 0.22),
-              w: 1, h: Math.round(H * 0.56), r: 0.2, g: 0.2, b: 0.2, a: 1.0 },
+            // Decorative vertical line
+            { type: 'rect', name: 'divider', x: W - pad - 2, y: Math.round(H * 0.15),
+              w: 2, h: Math.round(H * 0.7),
+              r: ar, g: ag, b: ab, a: 0.15 },
         ];
     },
 };
@@ -688,17 +685,14 @@ const horizontalStrip: DesignTemplate = {
 const tower: DesignTemplate = {
     id: 'tower',
     name: 'Tower',
-    description: 'Vertical tower with center-aligned stack — for portrait sizes',
-    aspectRatios: ['portrait'],
+    description: 'Vertical center-aligned stack with generous spacing — elegant, poster-like',
+    aspectRatios: ['portrait', 'square', 'any'],
     build: (W, H, g, c) => {
-        const padX = Math.round(W * 0.1);
+        const pad = Math.round(Math.min(W, H) * 0.1);
         const [ar, ag, ab] = hex(g.colors.accent);
-        const headFs = Math.max(16, Math.round(W * 0.16));
-        const subFs = Math.max(10, Math.round(W * 0.08));
-        const tagFs = Math.max(8, Math.round(W * 0.06));
-        const ctaFs = Math.max(10, Math.round(W * 0.07));
-        const ctaW = W - 2 * padX;
-        const ctaH = Math.round(H * 0.06);
+        const headFs = Math.max(16, Math.min(adaptiveFont(48, W, H, 1), Math.round(Math.min(W, H) * 0.12)));
+        const subFs = Math.max(10, Math.round(headFs * 0.38));
+        const tagFs = Math.max(8, Math.round(headFs * 0.28));
 
         return [
             { type: 'rect', name: 'background', x: 0, y: 0, w: W, h: H,
@@ -706,29 +700,24 @@ const tower: DesignTemplate = {
             { type: 'rect', name: 'accent_line', x: 0, y: 0, w: W, h: 4,
               r: ar, g: ag, b: ab, a: 1.0 },
 
-            { type: 'text', name: 'tag_text', x: padX, y: Math.round(H * 0.06), w: W - 2 * padX, h: tagFs + 6,
+            { type: 'text', name: 'tag_text', x: pad, y: Math.round(H * 0.15),
+              w: W - 2 * pad, h: tagFs + 6,
               content: c.tag.toUpperCase(), font_size: tagFs, font_weight: '600',
-              color_hex: g.colors.accent, text_align: 'center', letter_spacing: 2 },
+              color_hex: g.colors.accent, text_align: 'center', letter_spacing: 3 },
 
-            { type: 'text', name: 'headline', x: padX, y: Math.round(H * 0.15),
-              w: W - 2 * padX, h: headFs * 3.5,
+            { type: 'text', name: 'headline', x: pad, y: Math.round(H * 0.28),
+              w: W - 2 * pad, h: headFs * 2.5,
               content: c.headline, font_size: headFs, font_weight: '700',
               color_hex: g.colors.foreground, text_align: 'center', letter_spacing: -0.3, line_height: 1.1 },
 
-            { type: 'text', name: 'subheadline', x: padX, y: Math.round(H * 0.38),
-              w: W - 2 * padX, h: subFs * 5,
+            { type: 'text', name: 'subheadline', x: pad, y: Math.round(H * 0.58),
+              w: W - 2 * pad, h: subFs * 3,
               content: c.subheadline, font_size: subFs, font_weight: '400',
               color_hex: g.colors.secondary, text_align: 'center', line_height: 1.5 },
 
-            { type: 'rounded_rect', name: 'cta_button', x: padX, y: H - Math.round(H * 0.12) - ctaH,
-              w: ctaW, h: ctaH, r: ar, g: ag, b: ab, a: 1.0, radius: 8 },
-            { type: 'text', name: 'cta_label', x: padX, y: H - Math.round(H * 0.12) - ctaH + Math.round((ctaH - ctaFs) / 2),
-              w: ctaW, h: ctaFs + 4,
-              content: c.cta.toUpperCase(), font_size: ctaFs, font_weight: '600',
-              color_hex: g.colors.accentForeground, text_align: 'center', letter_spacing: 1.5 },
-
-            { type: 'ellipse', name: 'decorative_dot', x: W - padX - 20, y: Math.round(H * 0.55),
-              w: 40, h: 40, r: ar, g: ag, b: ab, a: 0.05 },
+            // Decorative dot
+            { type: 'ellipse', name: 'decorative_dot', x: Math.round((W - 40) / 2), y: Math.round(H * 0.82),
+              w: 40, h: 40, r: ar, g: ag, b: ab, a: 0.1 },
         ];
     },
 };
