@@ -98,8 +98,16 @@ export function useCanvasSync(
             const raw = engine.get_all_nodes();
             const nodes: EngineNode[] = JSON.parse(raw);
             for (const node of nodes) {
+                // ★ DEBUG: trace text effect persistence
+                if (node.type === 'text' && node.textEffect_type && node.textEffect_type !== 'none') {
+                    console.log(`[useCanvasSync] SAVE: text "${node.name}" has effect: ${node.textEffect_type} intensity=${node.textEffect_intensity} color=${node.textEffect_color}`);
+                }
                 if (node.type === 'text') {
-                    elements.push(engineNodeToTextElement(node, canvasW, canvasH));
+                    const el = engineNodeToTextElement(node, canvasW, canvasH);
+                    if (el.textEffect) {
+                        console.log(`[useCanvasSync] SAVE → element textEffect:`, JSON.stringify(el.textEffect));
+                    }
+                    elements.push(el);
                 } else if (node.type === 'image') {
                     elements.push(engineNodeToImageElement(node, canvasW, canvasH));
                 } else {
@@ -398,11 +406,14 @@ export function useCanvasSync(
                 }
                 // ★ Restore text effect (Canva-style: outline, neon, glitch, 70s, etc.)
                 if (text.textEffect && text.textEffect.type !== 'none') {
+                    console.log(`[useCanvasSync] RESTORE: text "${el.name}" effect: ${text.textEffect.type} intensity=${text.textEffect.intensity} color=${text.textEffect.color} → nodeId=${nodeId}`);
                     try {
                         engine.set_text_effect(nodeId, text.textEffect.type, text.textEffect.intensity ?? 50, text.textEffect.color ?? '#ffffff');
                     } catch (err) {
                         console.warn('[useCanvasSync] Failed to restore text effect:', err);
                     }
+                } else {
+                    console.log(`[useCanvasSync] RESTORE: text "${el.name}" — NO textEffect`);
                 }
                 // ★ Restore visible/locked
                 if (el.visible === false) {

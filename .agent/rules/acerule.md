@@ -14,6 +14,15 @@ trigger: always_on
 
 ---
 
+# ABSOLUTE RULE: NO BROWSER TESTING BOT
+
+> **NEVER use `browser_subagent` for QA or testing. EVER.**
+> ACE uses Supabase Auth — the bot CANNOT log in. It will waste 100% of the time
+> clicking around login screens. The user will test manually.
+> Build, commit, push — then tell the user what to test. That's it.
+
+---
+
 # ACE Project Rules (North America Target)
 
 0. **Sync Consistency — HIGHEST PRIORITY**:

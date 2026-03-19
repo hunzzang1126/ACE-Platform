@@ -375,6 +375,27 @@ export function DetailEditorPage() {
         return () => window.removeEventListener('keydown', handler);
     }, [overlay, engineRef]);
 
+    // ★ Prevent browser-level zoom (Ctrl+wheel / Cmd+wheel / pinch)
+    // This stops macOS trackpad gestures from zooming the entire page,
+    // which breaks the panel layout. Canvas zoom is handled by Fabric internally.
+    useEffect(() => {
+        const preventBrowserZoom = (e: WheelEvent) => {
+            if (e.ctrlKey || e.metaKey) {
+                e.preventDefault();
+            }
+        };
+        // gesturestart/gesturechange prevent Safari pinch-to-zoom
+        const preventGesture = (e: Event) => { e.preventDefault(); };
+        document.addEventListener('wheel', preventBrowserZoom, { passive: false });
+        document.addEventListener('gesturestart', preventGesture, { passive: false } as any);
+        document.addEventListener('gesturechange', preventGesture, { passive: false } as any);
+        return () => {
+            document.removeEventListener('wheel', preventBrowserZoom);
+            document.removeEventListener('gesturestart', preventGesture);
+            document.removeEventListener('gesturechange', preventGesture);
+        };
+    }, []);
+
     // Wrapper: selecting an overlay also deselects engine shapes (and vice versa)
     const handleOverlaySelect = useCallback((id: string | null) => {
         if (id != null) {

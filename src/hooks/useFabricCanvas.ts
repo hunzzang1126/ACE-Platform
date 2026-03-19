@@ -312,7 +312,7 @@ export function useFabricCanvas(
                     // Before: additive ±0.08 (jumpy). Now: multiplicative ×0.975/1.025 (smooth).
                     const zoomFactor = e.deltaY > 0 ? 0.975 : 1.025;
                     let newZoom = (fc.getZoom() || 1) * zoomFactor;
-                    newZoom = Math.max(0.1, Math.min(5, newZoom));
+                    newZoom = Math.max(0.2, Math.min(4, newZoom));
 
                     // ★ Canva-style: zoom toward artboard CENTER, not cursor position.
                     // This ensures the canvas artboard always stays visible and centered
@@ -818,6 +818,25 @@ export function useFabricCanvas(
             const tag = (e.target as HTMLElement)?.tagName;
             if (tag === 'INPUT' || tag === 'TEXTAREA') return;
             if ((e.target as HTMLElement)?.isContentEditable) return;
+            if ((e.metaKey || e.ctrlKey) && e.key === '0') {
+                e.preventDefault();
+                // ★ Reset zoom to fit artboard in container
+                const fc = fabricRef.current;
+                if (fc) {
+                    const container = containerRef.current;
+                    const cw = container?.clientWidth ?? 1200;
+                    const ch = container?.clientHeight ?? 700;
+                    const fitZoom = Math.min(cw / width * 0.85, ch / height * 0.85, 1);
+                    const vpt = fc.viewportTransform!;
+                    vpt[0] = fitZoom;
+                    vpt[3] = fitZoom;
+                    vpt[4] = (cw - width * fitZoom) / 2;
+                    vpt[5] = (ch - height * fitZoom) / 2;
+                    fc.setViewportTransform(vpt);
+                    fc.renderAll();
+                }
+                return;
+            }
             if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return; }
             if ((e.metaKey || e.ctrlKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) { e.preventDefault(); redo(); return; }
             if (!e.metaKey && !e.ctrlKey && !e.altKey) {
