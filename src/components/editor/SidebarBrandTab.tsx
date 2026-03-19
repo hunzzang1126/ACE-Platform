@@ -1,7 +1,8 @@
 // ─────────────────────────────────────────────────
-// SidebarBrandTab — Compact brand kit panel for editor sidebar
+// SidebarBrandTab — Canva-style brand kit panel
 // ─────────────────────────────────────────────────
-// Accordion layout: Assets | Colors | Typography | Guidelines
+// Left nav list + right content area within sidebar panel.
+// Sections: All Assets | Logos | Colors | Fonts | Guidelines | Photos
 // Click asset → add to canvas. Drag-drop upload supported.
 // Reuses brandKitStore (same data as dashboard BrandCloudSection).
 // ─────────────────────────────────────────────────
@@ -14,7 +15,16 @@ interface Props {
     actions?: CanvasEngineActions | null;
 }
 
-const CATEGORIES: AssetCategory[] = ['logo', 'product', 'texture', 'icon', 'background', 'photo'];
+type NavSection = 'all' | 'logo' | 'colors' | 'fonts' | 'guidelines' | 'photos';
+
+const NAV_ITEMS: { id: NavSection; label: string }[] = [
+    { id: 'all', label: 'All Assets' },
+    { id: 'logo', label: 'Logos' },
+    { id: 'colors', label: 'Colors' },
+    { id: 'fonts', label: 'Fonts' },
+    { id: 'guidelines', label: 'Guidelines' },
+    { id: 'photos', label: 'Photos' },
+];
 
 function guessCategory(filename: string): AssetCategory {
     const l = filename.toLowerCase();
@@ -67,12 +77,12 @@ export function SidebarBrandTab({ actions }: Props) {
         addAsset, removeAsset, updatePalette, updateTypography, updateGuidelines,
     } = useBrandKitStore();
     const kit = getActiveKit();
-    const [openSection, setOpenSection] = useState<'assets' | 'colors' | 'type' | 'guide'>('assets');
-    const [filter, setFilter] = useState<AssetCategory | 'all'>('all');
+    const [activeNav, setActiveNav] = useState<NavSection>('all');
+    const [searchQuery, setSearchQuery] = useState('');
     const [isDragging, setIsDragging] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // ── Asset Upload (any file type/size) ──
+    // ── Asset Upload ──
     const handleFileUpload = useCallback(async (files: FileList) => {
         let kitId = activeKitId;
         if (!kitId) {
@@ -115,7 +125,6 @@ export function SidebarBrandTab({ actions }: Props) {
         if (e.dataTransfer.files.length) handleFileUpload(e.dataTransfer.files);
     }, [handleFileUpload]);
 
-    // ── Click asset → add to canvas ──
     const handleAssetClick = useCallback(async (asset: { src: string; width: number; height: number }) => {
         if (!actions?.addImage) return;
         const maxW = (actions.canvasWidth ?? 300) * 0.5;
@@ -127,11 +136,17 @@ export function SidebarBrandTab({ actions }: Props) {
         await actions.addImage(x, y, asset.src, w, h);
     }, [actions]);
 
-    const filteredAssets = kit
-        ? kit.assets.filter(a => !a.deletedAt && (filter === 'all' || a.category === filter))
-        : [];
-
-    const toggle = (s: typeof openSection) => setOpenSection(prev => prev === s ? s : s);
+    const getFilteredAssets = () => {
+        if (!kit) return [];
+        let assets = kit.assets.filter(a => !a.deletedAt);
+        if (activeNav === 'logo') assets = assets.filter(a => a.category === 'logo');
+        else if (activeNav === 'photos') assets = assets.filter(a => a.category === 'photo' || a.category === 'product' || a.category === 'background');
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase();
+            assets = assets.filter(a => a.name.toLowerCase().includes(q) || a.category.includes(q));
+        }
+        return assets;
+    };
 
     // ── No brand kit — create one ──
     if (kits.length === 0) {
@@ -149,147 +164,203 @@ export function SidebarBrandTab({ actions }: Props) {
         );
     }
 
+    const filteredAssets = getFilteredAssets();
+
     return (
         <div style={S.root}>
-            {/* Kit selector (if multiple) */}
+            {/* Search */}
+            <div style={S.searchWrap}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" style={{ flexShrink: 0 }}>
+                    <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+                <input
+                    style={S.searchInput}
+                    type="text"
+                    placeholder="Search..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                />
+            </div>
+
+            {/* Kit selector */}
             {kits.length > 1 && (
                 <select style={S.kitSelect} value={activeKitId ?? ''} onChange={e => setActiveKit(e.target.value || null)}>
                     {kits.map(k => <option key={k.id} value={k.id}>{k.name}</option>)}
                 </select>
             )}
 
-            {/* ═══ ASSETS SECTION ═══ */}
-            <button style={S.sectionBtn} onClick={() => toggle('assets')}>
-                <span>Assets</span>
-                <span style={S.badge}>{filteredAssets.length}</span>
-            </button>
-            {openSection === 'assets' && (
-                <div style={S.sectionBody}>
-                    {/* Upload zone */}
-                    <div
-                        style={{ ...S.dropZone, ...(isDragging ? S.dropZoneActive : {}) }}
-                        onDrop={handleDrop}
-                        onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
-                        onDragLeave={() => setIsDragging(false)}
-                        onClick={() => fileInputRef.current?.click()}
+            {/* Nav list */}
+            <nav style={S.navList}>
+                {NAV_ITEMS.map(item => (
+                    <button
+                        key={item.id}
+                        style={{
+                            ...S.navItem,
+                            ...(activeNav === item.id ? S.navItemActive : {}),
+                        }}
+                        onClick={() => setActiveNav(item.id)}
                     >
-                        <span style={S.dropText}>{isDragging ? 'Drop files' : 'Upload or drop files'}</span>
-                        <span style={S.dropHint}>Any image, GIF, or video</span>
-                    </div>
-                    <input ref={fileInputRef} type="file" accept="image/*,video/*" multiple style={{ display: 'none' }}
-                        onChange={e => e.target.files && handleFileUpload(e.target.files)} />
+                        {item.label}
+                    </button>
+                ))}
+            </nav>
 
-                    {/* Category filter */}
-                    <div style={S.filters}>
-                        <button style={filter === 'all' ? S.filterActive : S.filterBtn} onClick={() => setFilter('all')}>All</button>
-                        {CATEGORIES.map(c => (
-                            <button key={c} style={filter === c ? S.filterActive : S.filterBtn}
-                                onClick={() => setFilter(c)}>{c}</button>
-                        ))}
-                    </div>
+            <div style={S.divider} />
 
-                    {/* Asset grid */}
-                    {filteredAssets.length === 0 ? (
-                        <p style={S.noAssets}>No assets yet</p>
-                    ) : (
-                        <div style={S.assetGrid}>
-                            {filteredAssets.map(a => (
-                                <div key={a.id} style={S.assetCard} onClick={() => handleAssetClick(a)} title={`${a.name} (${a.width}x${a.height}) — Click to add to canvas`}>
-                                    <img src={a.thumbSrc || a.src} alt={a.name} style={S.assetImg} />
-                                    <div style={S.assetInfo}>
-                                        <span style={S.assetName}>{a.name}</span>
-                                        <span style={S.assetMeta}>{a.category} · {formatBytes(a.sizeBytes)}</span>
+            {/* Content area based on active nav */}
+            <div style={S.content}>
+                {/* Assets (all, logo, photos) */}
+                {(activeNav === 'all' || activeNav === 'logo' || activeNav === 'photos') && (
+                    <>
+                        {/* Upload zone */}
+                        <div
+                            style={{ ...S.dropZone, ...(isDragging ? S.dropZoneActive : {}) }}
+                            onDrop={handleDrop}
+                            onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
+                            onDragLeave={() => setIsDragging(false)}
+                            onClick={() => fileInputRef.current?.click()}
+                        >
+                            <span style={S.dropText}>{isDragging ? 'Drop files' : 'Upload or drop files'}</span>
+                            <span style={S.dropHint}>Any image, GIF, or video</span>
+                        </div>
+                        <input ref={fileInputRef} type="file" accept="image/*,video/*" multiple style={{ display: 'none' }}
+                            onChange={e => e.target.files && handleFileUpload(e.target.files)} />
+
+                        {/* Asset grid */}
+                        {filteredAssets.length === 0 ? (
+                            <p style={S.noItems}>No assets yet</p>
+                        ) : (
+                            <div style={S.assetGrid}>
+                                {filteredAssets.map(a => (
+                                    <div key={a.id} style={S.assetCard} onClick={() => handleAssetClick(a)} title={`${a.name} (${a.width}x${a.height})`}>
+                                        <img src={a.thumbSrc || a.src} alt={a.name} style={S.assetImg} />
+                                        <div style={S.assetInfo}>
+                                            <span style={S.assetName}>{a.name}</span>
+                                            <span style={S.assetMeta}>{formatBytes(a.sizeBytes)}</span>
+                                        </div>
+                                        <button style={S.assetDel} onClick={e => { e.stopPropagation(); removeAsset(kit!.id, a.id); }} title="Remove">
+                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                <path d="M18 6L6 18M6 6l12 12" />
+                                            </svg>
+                                        </button>
                                     </div>
-                                    <button style={S.assetDel} onClick={e => { e.stopPropagation(); removeAsset(kit!.id, a.id); }} title="Remove">x</button>
-                                </div>
+                                ))}
+                            </div>
+                        )}
+                    </>
+                )}
+
+                {/* Colors */}
+                {activeNav === 'colors' && kit && (
+                    <div style={S.colorSection}>
+                        <p style={S.sectionTitle}>Brand Colors</p>
+                        <div style={S.colorGrid}>
+                            {(['primary', 'secondary', 'accent', 'background', 'text'] as const).map(key => (
+                                <label key={key} style={S.colorRow}>
+                                    <div style={{ ...S.swatch, backgroundColor: kit.palette[key] }}>
+                                        <input type="color" value={kit.palette[key]}
+                                            onChange={e => updatePalette(kit.id, { [key]: e.target.value })}
+                                            style={S.hiddenInput} />
+                                    </div>
+                                    <div style={S.colorInfo}>
+                                        <span style={S.colorLabel}>{key}</span>
+                                        <span style={S.colorHex}>{kit.palette[key]}</span>
+                                    </div>
+                                </label>
                             ))}
                         </div>
-                    )}
-                </div>
-            )}
+                    </div>
+                )}
 
-            {/* ═══ COLORS SECTION ═══ */}
-            <button style={S.sectionBtn} onClick={() => toggle('colors')}>Colors</button>
-            {openSection === 'colors' && kit && (
-                <div style={S.sectionBody}>
-                    <div style={S.colorGrid}>
-                        {(['primary', 'secondary', 'accent', 'background', 'text'] as const).map(key => (
-                            <label key={key} style={S.colorRow}>
-                                <div style={{ ...S.swatch, backgroundColor: kit.palette[key] }}>
-                                    <input type="color" value={kit.palette[key]}
-                                        onChange={e => updatePalette(kit.id, { [key]: e.target.value })}
-                                        style={S.colorInput} />
+                {/* Fonts */}
+                {activeNav === 'fonts' && kit && (
+                    <div style={S.fontSection}>
+                        <p style={S.sectionTitle}>Typography</p>
+                        {(['heading', 'body', 'cta'] as const).map(role => (
+                            <div key={role} style={S.fontRow}>
+                                <span style={S.fontLabel}>{role}</span>
+                                <input
+                                    style={S.fontInput}
+                                    value={kit.typography[role].family}
+                                    onChange={e => updateTypography(kit.id, { [role]: { ...kit.typography[role], family: e.target.value } })}
+                                    placeholder="Font family..."
+                                />
+                                <div style={{ ...S.fontPreview, fontFamily: kit.typography[role].family }}>
+                                    The quick brown fox
                                 </div>
-                                <div style={S.colorInfo}>
-                                    <span style={S.colorLabel}>{key}</span>
-                                    <span style={S.colorHex}>{kit.palette[key]}</span>
-                                </div>
-                            </label>
+                            </div>
                         ))}
                     </div>
-                </div>
-            )}
+                )}
 
-            {/* ═══ TYPOGRAPHY SECTION ═══ */}
-            <button style={S.sectionBtn} onClick={() => toggle('type')}>Typography</button>
-            {openSection === 'type' && kit && (
-                <div style={S.sectionBody}>
-                    {(['heading', 'body', 'cta'] as const).map(role => (
-                        <div key={role} style={S.typeRow}>
-                            <span style={S.typeLabel}>{role}</span>
-                            <input
-                                style={S.typeInput}
-                                value={kit.typography[role].family}
-                                onChange={e => updateTypography(kit.id, { [role]: { ...kit.typography[role], family: e.target.value } })}
-                                placeholder="Font family..."
-                            />
-                        </div>
-                    ))}
-                </div>
-            )}
-
-            {/* ═══ GUIDELINES SECTION ═══ */}
-            <button style={S.sectionBtn} onClick={() => toggle('guide')}>Guidelines</button>
-            {openSection === 'guide' && kit && (
-                <div style={S.sectionBody}>
-                    <input style={S.guideInput} value={kit.guidelines.name} placeholder="Brand name..."
-                        onChange={e => updateGuidelines(kit.id, { name: e.target.value })} />
-                    <input style={S.guideInput} value={kit.guidelines.tagline} placeholder="Tagline..."
-                        onChange={e => updateGuidelines(kit.id, { tagline: e.target.value })} />
-                    <select style={S.guideSelect} value={kit.guidelines.voiceTone}
-                        onChange={e => updateGuidelines(kit.id, { voiceTone: e.target.value })}>
-                        {['Professional', 'Friendly', 'Bold', 'Luxury', 'Playful', 'Technical'].map(t => (
-                            <option key={t} value={t}>{t}</option>
-                        ))}
-                    </select>
-                    <input style={S.guideInput} value={kit.guidelines.ctaPhrases.join(', ')} placeholder="CTA phrases (comma separated)..."
-                        onChange={e => updateGuidelines(kit.id, { ctaPhrases: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} />
-                </div>
-            )}
+                {/* Guidelines */}
+                {activeNav === 'guidelines' && kit && (
+                    <div style={S.guideSection}>
+                        <p style={S.sectionTitle}>Brand Guidelines</p>
+                        <label style={S.guideRow}>
+                            <span style={S.guideLabel}>Brand Name</span>
+                            <input style={S.guideInput} value={kit.guidelines.name} placeholder="Brand name..."
+                                onChange={e => updateGuidelines(kit.id, { name: e.target.value })} />
+                        </label>
+                        <label style={S.guideRow}>
+                            <span style={S.guideLabel}>Tagline</span>
+                            <input style={S.guideInput} value={kit.guidelines.tagline} placeholder="Tagline..."
+                                onChange={e => updateGuidelines(kit.id, { tagline: e.target.value })} />
+                        </label>
+                        <label style={S.guideRow}>
+                            <span style={S.guideLabel}>Voice Tone</span>
+                            <select style={S.guideSelect} value={kit.guidelines.voiceTone}
+                                onChange={e => updateGuidelines(kit.id, { voiceTone: e.target.value })}>
+                                {['Professional', 'Friendly', 'Bold', 'Luxury', 'Playful', 'Technical'].map(t => (
+                                    <option key={t} value={t}>{t}</option>
+                                ))}
+                            </select>
+                        </label>
+                        <label style={S.guideRow}>
+                            <span style={S.guideLabel}>CTA Phrases</span>
+                            <input style={S.guideInput} value={kit.guidelines.ctaPhrases.join(', ')} placeholder="CTA phrases..."
+                                onChange={e => updateGuidelines(kit.id, { ctaPhrases: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} />
+                        </label>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
 
-// ── Inline Styles (compact sidebar layout) ──
-
+// ── Inline Styles ──
 const S: Record<string, React.CSSProperties> = {
-    root: { display: 'flex', flexDirection: 'column', gap: 0 },
-    empty: { padding: 24, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 },
-    emptyTitle: { fontSize: 14, fontWeight: 600, color: 'var(--text-primary, #e4e4e7)', margin: 0 },
-    emptyDesc: { fontSize: 11, color: 'var(--text-muted, #71717a)', margin: 0, lineHeight: 1.4 },
-    createBtn: { marginTop: 8, padding: '8px 20px', background: 'var(--accent, #818cf8)', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
-    kitSelect: { margin: '8px 12px', padding: '5px 8px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 4, color: '#ccc', fontSize: 11 },
-    sectionBtn: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '8px 12px', background: 'none', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.06)', color: 'var(--text-secondary, #a1a1aa)', fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase' as const, cursor: 'pointer' },
-    badge: { background: 'rgba(255,255,255,0.08)', padding: '1px 6px', borderRadius: 8, fontSize: 10, color: 'var(--text-muted, #71717a)' },
-    sectionBody: { padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 8 },
+    root: { display: 'flex', flexDirection: 'column', gap: 0, height: '100%' },
+    searchWrap: {
+        display: 'flex', alignItems: 'center', gap: 8,
+        margin: '8px 12px', padding: '6px 10px',
+        background: 'rgba(255,255,255,0.04)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        borderRadius: 6,
+    },
+    searchInput: {
+        flex: 1, background: 'none', border: 'none', outline: 'none',
+        color: 'var(--text-primary, #e4e4e7)', fontSize: 12,
+    },
+    kitSelect: { margin: '0 12px', padding: '5px 8px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 4, color: '#ccc', fontSize: 11 },
+    navList: { display: 'flex', flexDirection: 'column', gap: 1, padding: '4px 8px' },
+    navItem: {
+        display: 'flex', alignItems: 'center', padding: '7px 12px',
+        background: 'none', border: 'none', borderRadius: 6,
+        color: 'var(--text-secondary, #a1a1aa)', fontSize: 12, cursor: 'pointer',
+        textAlign: 'left' as const, transition: 'all 0.15s',
+    },
+    navItemActive: {
+        background: 'rgba(129,140,248,0.12)', color: 'var(--text-primary, #e4e4e7)', fontWeight: 500,
+    },
+    divider: { height: 1, background: 'rgba(255,255,255,0.06)', margin: '4px 12px' },
+    content: { flex: 1, padding: '8px 12px', overflowY: 'auto' as const, display: 'flex', flexDirection: 'column', gap: 8 },
+    // Assets
     dropZone: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '14px 8px', border: '1px dashed rgba(255,255,255,0.12)', borderRadius: 6, cursor: 'pointer', transition: 'border-color 0.2s' },
     dropZoneActive: { borderColor: '#818cf8', background: 'rgba(129,140,248,0.05)' },
     dropText: { fontSize: 11, color: 'var(--text-secondary, #a1a1aa)' },
     dropHint: { fontSize: 10, color: 'var(--text-muted, #71717a)' },
-    filters: { display: 'flex', flexWrap: 'wrap' as const, gap: 4 },
-    filterBtn: { padding: '2px 8px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 4, color: 'var(--text-muted, #71717a)', fontSize: 10, cursor: 'pointer' },
-    filterActive: { padding: '2px 8px', background: 'rgba(129,140,248,0.15)', border: '1px solid rgba(129,140,248,0.3)', borderRadius: 4, color: '#818cf8', fontSize: 10, cursor: 'pointer' },
-    noAssets: { fontSize: 11, color: 'var(--text-muted, #71717a)', textAlign: 'center', padding: 12 },
+    noItems: { fontSize: 11, color: 'var(--text-muted, #71717a)', textAlign: 'center', padding: 12 },
     assetGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 },
     assetCard: { position: 'relative' as const, borderRadius: 6, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer', transition: 'border-color 0.15s' },
     assetImg: { width: '100%', height: 70, objectFit: 'cover' as const, display: 'block' },
@@ -297,16 +368,31 @@ const S: Record<string, React.CSSProperties> = {
     assetName: { fontSize: 10, color: 'var(--text-primary, #e4e4e7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const },
     assetMeta: { fontSize: 9, color: 'var(--text-muted, #71717a)' },
     assetDel: { position: 'absolute' as const, top: 4, right: 4, width: 18, height: 18, borderRadius: 9, background: 'rgba(0,0,0,0.6)', border: 'none', color: '#999', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.6 },
-    colorGrid: { display: 'flex', flexDirection: 'column', gap: 6 },
-    colorRow: { display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' },
-    swatch: { width: 28, height: 28, borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', position: 'relative' as const, overflow: 'hidden', flexShrink: 0 },
-    colorInput: { position: 'absolute' as const, opacity: 0, width: '100%', height: '100%', cursor: 'pointer' },
+    // Common
+    sectionTitle: { fontSize: 12, fontWeight: 600, color: 'var(--text-primary, #e4e4e7)', margin: '0 0 8px 0' },
+    empty: { padding: 24, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 },
+    emptyTitle: { fontSize: 14, fontWeight: 600, color: 'var(--text-primary, #e4e4e7)', margin: 0 },
+    emptyDesc: { fontSize: 11, color: 'var(--text-muted, #71717a)', margin: 0, lineHeight: 1.4 },
+    createBtn: { marginTop: 8, padding: '8px 20px', background: 'var(--accent, #818cf8)', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+    // Colors
+    colorSection: { display: 'flex', flexDirection: 'column' },
+    colorGrid: { display: 'flex', flexDirection: 'column', gap: 8 },
+    colorRow: { display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' },
+    swatch: { width: 32, height: 32, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', position: 'relative' as const, overflow: 'hidden', flexShrink: 0 },
+    hiddenInput: { position: 'absolute' as const, opacity: 0, width: '100%', height: '100%', cursor: 'pointer' },
     colorInfo: { display: 'flex', flexDirection: 'column' },
-    colorLabel: { fontSize: 11, color: 'var(--text-primary, #e4e4e7)', textTransform: 'capitalize' as const },
+    colorLabel: { fontSize: 12, color: 'var(--text-primary, #e4e4e7)', textTransform: 'capitalize' as const },
     colorHex: { fontSize: 10, color: 'var(--text-muted, #71717a)', fontFamily: 'monospace' },
-    typeRow: { display: 'flex', alignItems: 'center', gap: 8 },
-    typeLabel: { fontSize: 11, color: 'var(--text-secondary, #a1a1aa)', width: 58, textTransform: 'capitalize' as const, flexShrink: 0 },
-    typeInput: { flex: 1, padding: '4px 8px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 4, color: '#ccc', fontSize: 11 },
-    guideInput: { padding: '5px 8px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 4, color: '#ccc', fontSize: 11, width: '100%' },
-    guideSelect: { padding: '5px 8px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 4, color: '#ccc', fontSize: 11, width: '100%' },
+    // Fonts
+    fontSection: { display: 'flex', flexDirection: 'column', gap: 12 },
+    fontRow: { display: 'flex', flexDirection: 'column', gap: 4 },
+    fontLabel: { fontSize: 11, color: 'var(--text-secondary, #a1a1aa)', textTransform: 'capitalize' as const, fontWeight: 500 },
+    fontInput: { padding: '5px 8px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 4, color: '#ccc', fontSize: 12 },
+    fontPreview: { fontSize: 11, color: 'var(--text-muted, #71717a)', padding: '4px 0', fontStyle: 'italic' as const },
+    // Guidelines
+    guideSection: { display: 'flex', flexDirection: 'column', gap: 10 },
+    guideRow: { display: 'flex', flexDirection: 'column', gap: 3 },
+    guideLabel: { fontSize: 11, color: 'var(--text-secondary, #a1a1aa)', fontWeight: 500 },
+    guideInput: { padding: '6px 8px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 4, color: '#ccc', fontSize: 12, width: '100%' },
+    guideSelect: { padding: '6px 8px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 4, color: '#ccc', fontSize: 12, width: '100%' },
 };

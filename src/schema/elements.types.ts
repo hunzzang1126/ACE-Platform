@@ -4,6 +4,20 @@
 import type { ElementConstraints } from './constraints.types';
 import type { LayoutRole } from './layoutRoles';
 
+/** All available text effect types */
+export type TextEffectType =
+    | 'none' | 'drop' | 'glow' | 'echo'
+    | 'outline' | 'background' | 'splice' | 'hollow'
+    | 'neon' | 'glitch' | 'curve'
+    | 'neon-lights' | 'tv-static' | '70s';
+
+/** Persisted text effect configuration */
+export interface TextEffectConfig {
+    type: TextEffectType;
+    intensity: number;   // 0-100
+    color: string;       // hex color e.g. '#ff0000'
+}
+
 /** Serializable animation config — persisted with the element */
 export interface ElementAnimation {
     preset: 'none' | 'fade' | 'slide-left' | 'slide-right' | 'slide-up' | 'slide-down' | 'scale' | 'ascend' | 'descend';
@@ -26,6 +40,8 @@ export interface BaseElement {
     blendMode?: string;
     /** Shadow / glow effect */
     shadow?: { offsetX: number; offsetY: number; blur: number; color: string };
+    /** Text effect (persisted — Canva-style effects like Outline, Neon, Glitch, etc.) */
+    textEffect?: TextEffectConfig;
     /** Animation preset (persisted) */
     animation?: ElementAnimation;
     /** Semantic role for Smart Sizing layout intelligence */

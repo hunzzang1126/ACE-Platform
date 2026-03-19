@@ -1,14 +1,17 @@
 // ─────────────────────────────────────────────────
-// InlineEffectsPanel — Shadow presets (Canva-style)
+// InlineEffectsPanel — Canva-style text effects panel
 // ─────────────────────────────────────────────────
-// Opens as left-panel overlay when Effects button clicked in context toolbar.
-// ★ Reads current shadow from selected node to determine active preset.
-// ★ Supports color customization for all presets.
-// ★ Enhanced neon: multi-layer glow for neon-sign look.
+// Full effects library with 14 presets: Drop, Glow, Echo, Outline,
+// Background, Splice, Hollow, Neon, Glitch, Curve, Neon Lights,
+// TV Static, 70s.
+// ★ SYNC ARCHITECTURE: All state written via actions.setTextEffect()
+// → stored as __glid* on Fabric object → persisted through save/load.
+// Zero local-only state for effect type.
 // ─────────────────────────────────────────────────
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import type { CanvasEngineActions, EngineNode } from '@/hooks/canvasTypes';
+import type { TextEffectType } from '@/schema/elements.types';
 
 interface Props {
     selectedNode: EngineNode | null;
@@ -16,234 +19,343 @@ interface Props {
     onClose: () => void;
 }
 
-interface ShadowPreset {
+interface EffectPreset {
+    type: TextEffectType;
     label: string;
-    offsetX: number;
-    offsetY: number;
-    blur: number;
-    color: [number, number, number, number];
-    /** Extra layers for multi-glow effects (neon) */
-    extraLayers?: Array<{ blur: number; color: [number, number, number, number] }>;
+    section: 'shadow' | 'style' | 'shape' | 'advanced';
+    defaultColor: string;
+    /** CSS preview style for the "Ag" preview card */
+    previewCSS: React.CSSProperties;
 }
 
-const SHADOW_PRESETS: ShadowPreset[] = [
-    { label: 'None', offsetX: 0, offsetY: 0, blur: 0, color: [0, 0, 0, 0] },
-    { label: 'Drop', offsetX: 4, offsetY: 4, blur: 8, color: [0, 0, 0, 0.3] },
-    { label: 'Glow', offsetX: 0, offsetY: 0, blur: 16, color: [0.5, 0.3, 1, 0.5] },
-    { label: 'Echo', offsetX: 6, offsetY: 6, blur: 0, color: [0, 0, 0, 0.15] },
-    { label: 'Soft', offsetX: 0, offsetY: 2, blur: 12, color: [0, 0, 0, 0.2] },
-    { label: 'Hard', offsetX: 3, offsetY: 3, blur: 0, color: [0, 0, 0, 0.4] },
-    { label: 'Lift', offsetX: 0, offsetY: 8, blur: 24, color: [0, 0, 0, 0.15] },
+const EFFECT_PRESETS: EffectPreset[] = [
+    // ── Shadow section ──
     {
-        label: 'Neon', offsetX: 0, offsetY: 0, blur: 8, color: [0, 1, 0.8, 0.9],
-        // ★ Multi-layer neon: tight inner + wide outer glow for neon-sign effect
-        extraLayers: [
-            { blur: 20, color: [0, 1, 0.8, 0.5] },
-            { blur: 40, color: [0, 1, 0.8, 0.25] },
-        ],
+        type: 'drop', label: 'Drop', section: 'shadow',
+        defaultColor: '#000000',
+        previewCSS: { textShadow: '4px 4px 8px rgba(0,0,0,0.5)' },
+    },
+    {
+        type: 'glow', label: 'Glow', section: 'shadow',
+        defaultColor: '#7c3aed',
+        previewCSS: { textShadow: '0 0 16px rgba(124,58,237,0.7)' },
+    },
+    {
+        type: 'echo', label: 'Echo', section: 'shadow',
+        defaultColor: '#6b7280',
+        previewCSS: { textShadow: '6px 6px 0 rgba(107,114,128,0.3)' },
+    },
+    // ── Style section ──
+    {
+        type: 'outline', label: 'Outline', section: 'style',
+        defaultColor: '#3b82f6',
+        previewCSS: { WebkitTextStroke: '2px #3b82f6' },
+    },
+    {
+        type: 'background', label: 'Background', section: 'style',
+        defaultColor: '#a78bfa',
+        previewCSS: { backgroundColor: 'rgba(167,139,250,0.3)', padding: '2px 6px', borderRadius: 4 },
+    },
+    {
+        type: 'splice', label: 'Splice', section: 'style',
+        defaultColor: '#ec4899',
+        previewCSS: { WebkitTextStroke: '2px #ec4899', color: 'transparent', fontWeight: 700 },
+    },
+    {
+        type: 'hollow', label: 'Hollow', section: 'style',
+        defaultColor: '#6366f1',
+        previewCSS: { WebkitTextStroke: '1.5px currentColor', color: 'transparent' },
+    },
+    {
+        type: 'neon', label: 'Neon', section: 'style',
+        defaultColor: '#00ff88',
+        previewCSS: {
+            color: '#00ff88',
+            textShadow: '0 0 8px #00ff88, 0 0 20px rgba(0,255,136,0.5), 0 0 40px rgba(0,255,136,0.25)',
+        },
+    },
+    {
+        type: 'glitch', label: 'Glitch', section: 'style',
+        defaultColor: '#ff0055',
+        previewCSS: { textShadow: '-3px 0 #00ffff, 3px 0 #ff0000', color: '#ff0055' },
+    },
+    // ── Shape section ──
+    {
+        type: 'curve', label: 'Curve', section: 'shape',
+        defaultColor: '#f59e0b',
+        previewCSS: { textShadow: '0 2px 4px rgba(245,158,11,0.3)', fontStyle: 'italic' },
+    },
+    // ── Advanced section ──
+    {
+        type: 'neon-lights', label: 'Neon Lights', section: 'advanced',
+        defaultColor: '#22c55e',
+        previewCSS: {
+            color: '#22c55e',
+            textShadow: '0 0 16px #22c55e, 0 0 32px rgba(34,197,94,0.4)',
+            WebkitTextStroke: '0.5px rgba(34,197,94,0.6)',
+        },
+    },
+    {
+        type: 'tv-static', label: 'TV Static', section: 'advanced',
+        defaultColor: '#94a3b8',
+        previewCSS: { textShadow: '1px -1px 2px rgba(255,255,255,0.4)', letterSpacing: '2px' },
+    },
+    {
+        type: '70s', label: '70s', section: 'advanced',
+        defaultColor: '#f97316',
+        previewCSS: {
+            WebkitTextStroke: '3px #f97316',
+            textShadow: '4px 4px 0 rgba(255,140,0,0.4)',
+        },
     },
 ];
 
 /**
- * Detect which preset best matches the node's current shadow.
- * Returns the preset label, or 'None' if no shadow.
+ * Detect current effect from node's persisted __glid* properties.
  */
-function detectPreset(node: EngineNode | null): string {
-    if (!node) return 'None';
-    const sc = node.shadow_color;
-    if (!sc || sc === 'transparent' || sc === 'rgba(0,0,0,0)') return 'None';
-
-    // Parse shadow color to RGBA floats
-    const blur = node.shadow_blur ?? 0;
-    const offX = node.shadow_offsetX ?? 0;
-    const offY = node.shadow_offsetY ?? 0;
-
-    // Match by structure: offset+blur pattern (color may differ due to customization)
-    for (const p of SHADOW_PRESETS) {
-        if (p.label === 'None') continue;
-        // Check offset/blur signature (within tolerance)
-        const matchOff = Math.abs(offX - p.offsetX) < 3 && Math.abs(offY - p.offsetY) < 3;
-        const matchBlur = Math.abs(blur - p.blur) < 6;
-        if (matchOff && matchBlur) return p.label;
-    }
-
-    // Fallback: if shadow exists but no preset matches, show as custom/Glow
-    return 'Glow';
-}
-
-/** Convert RGBA float [0-1] to hex */
-function rgbaToHex(r: number, g: number, b: number): string {
-    const h = (v: number) => Math.round(v * 255).toString(16).padStart(2, '0');
-    return `#${h(r)}${h(g)}${h(b)}`;
-}
-
-/** Parse hex to RGBA float */
-function hexToRgba(hex: string): [number, number, number] {
-    const c = hex.replace('#', '');
-    return [parseInt(c.slice(0, 2), 16) / 255, parseInt(c.slice(2, 4), 16) / 255, parseInt(c.slice(4, 6), 16) / 255];
+function detectCurrentEffect(node: EngineNode | null): {
+    type: TextEffectType;
+    intensity: number;
+    color: string;
+} {
+    if (!node) return { type: 'none', intensity: 50, color: '#000000' };
+    const t = node.textEffect_type ?? 'none';
+    return {
+        type: t,
+        intensity: node.textEffect_intensity ?? 50,
+        color: node.textEffect_color ?? '#000000',
+    };
 }
 
 export function InlineEffectsPanel({ selectedNode, actions, onClose }: Props) {
-    // ★ FIX: Detect active preset from node's current shadow on mount/selection change
-    const detectedPreset = useMemo(() => detectPreset(selectedNode), [selectedNode]);
-    const [activePreset, setActivePreset] = useState<string>(detectedPreset);
-    const [intensity, setIntensity] = useState(50);
+    const detected = useMemo(() => detectCurrentEffect(selectedNode), [selectedNode]);
+    const [activeType, setActiveType] = useState<TextEffectType>(detected.type);
+    const [intensity, setIntensity] = useState(detected.intensity);
+    const [customColor, setCustomColor] = useState(detected.color);
 
-    // ★ Color customization state
-    const currentPresetDef = SHADOW_PRESETS.find(p => p.label === activePreset);
-    const defaultColor = currentPresetDef ? rgbaToHex(currentPresetDef.color[0], currentPresetDef.color[1], currentPresetDef.color[2]) : '#000000';
-    const [customColor, setCustomColor] = useState(defaultColor);
-
-    // Sync active preset when selection changes
+    // ★ SYNC: Re-sync when selection changes
     useEffect(() => {
-        setActivePreset(detectedPreset);
-    }, [detectedPreset]);
+        setActiveType(detected.type);
+        setIntensity(detected.intensity);
+        setCustomColor(detected.color);
+    }, [detected.type, detected.intensity, detected.color]);
 
-    // Sync color when preset changes
-    useEffect(() => {
-        if (currentPresetDef) {
-            setCustomColor(rgbaToHex(currentPresetDef.color[0], currentPresetDef.color[1], currentPresetDef.color[2]));
-        }
-    }, [activePreset]); // eslint-disable-line react-hooks/exhaustive-deps
-
-    const applyShadow = useCallback((preset: ShadowPreset, colorHex: string, intensityVal: number) => {
+    const applyEffect = useCallback((type: TextEffectType, color: string, intensityVal: number) => {
         if (!selectedNode || !actions) return;
-
-        if (preset.label === 'None') {
-            actions.removeShadow(selectedNode.id);
-            return;
-        }
-
-        const scale = intensityVal / 50;
-        const [r, g, b] = hexToRgba(colorHex);
-        const alpha = preset.color[3];
-
-        // Apply primary shadow
-        actions.setShadow(
-            selectedNode.id,
-            preset.offsetX * scale,
-            preset.offsetY * scale,
-            preset.blur * scale,
-            r, g, b, alpha,
-        );
-
-        // ★ For neon: apply additional textShadow via custom styles for multi-layer effect
-        if (preset.extraLayers && preset.extraLayers.length > 0) {
-            const layers = [
-                `0 0 ${Math.round(preset.blur * scale)}px rgba(${Math.round(r*255)},${Math.round(g*255)},${Math.round(b*255)},${alpha})`,
-                ...preset.extraLayers.map(l => {
-                    const a = l.color[3];
-                    return `0 0 ${Math.round(l.blur * scale)}px rgba(${Math.round(r*255)},${Math.round(g*255)},${Math.round(b*255)},${a})`;
-                }),
-            ];
-            // Apply multi-layer neon via custom style (CSS textShadow supports multiple layers)
-            if (typeof actions.setCustomStyle === 'function') {
-                actions.setCustomStyle(selectedNode.id, { textShadow: layers.join(', ') });
-            }
+        if (type === 'none') {
+            actions.removeTextEffect(selectedNode.id);
         } else {
-            // Clear any previous neon custom style
-            if (typeof actions.setCustomStyle === 'function') {
-                actions.setCustomStyle(selectedNode.id, { textShadow: '' });
-            }
+            actions.setTextEffect(selectedNode.id, type, intensityVal, color);
         }
     }, [selectedNode, actions]);
 
-    const handlePreset = useCallback((preset: ShadowPreset) => {
-        setActivePreset(preset.label);
-        const newColor = rgbaToHex(preset.color[0], preset.color[1], preset.color[2]);
-        setCustomColor(newColor);
-        applyShadow(preset, newColor, intensity);
-    }, [applyShadow, intensity]);
+    const handlePresetClick = useCallback((preset: EffectPreset) => {
+        setActiveType(preset.type);
+        setCustomColor(preset.defaultColor);
+        setIntensity(50);
+        applyEffect(preset.type, preset.defaultColor, 50);
+    }, [applyEffect]);
 
     const handleIntensity = useCallback((val: number) => {
         setIntensity(val);
-        const preset = SHADOW_PRESETS.find(p => p.label === activePreset);
-        if (preset && preset.label !== 'None') {
-            applyShadow(preset, customColor, val);
+        if (activeType !== 'none') {
+            applyEffect(activeType, customColor, val);
         }
-    }, [activePreset, customColor, applyShadow]);
+    }, [activeType, customColor, applyEffect]);
 
     const handleColorChange = useCallback((hex: string) => {
         setCustomColor(hex);
-        const preset = SHADOW_PRESETS.find(p => p.label === activePreset);
-        if (preset && preset.label !== 'None') {
-            applyShadow(preset, hex, intensity);
+        if (activeType !== 'none') {
+            applyEffect(activeType, hex, intensity);
         }
-    }, [activePreset, intensity, applyShadow]);
+    }, [activeType, intensity, applyEffect]);
+
+    const handleRemoveEffect = useCallback(() => {
+        setActiveType('none');
+        if (selectedNode && actions) {
+            actions.removeTextEffect(selectedNode.id);
+        }
+    }, [selectedNode, actions]);
+
+    const renderSection = (sectionKey: string, label: string, presets: EffectPreset[]) => (
+        <div key={sectionKey}>
+            <p style={S.sectionLabel}>{label}</p>
+            <div style={S.grid}>
+                {presets.map((preset) => (
+                    <button
+                        key={preset.type}
+                        style={{
+                            ...S.presetBtn,
+                            ...(activeType === preset.type ? S.presetBtnActive : {}),
+                        }}
+                        onClick={() => handlePresetClick(preset)}
+                    >
+                        <div style={{ ...S.presetPreview, ...preset.previewCSS }}>
+                            Ag
+                        </div>
+                        <span style={S.presetLabel}>{preset.label}</span>
+                    </button>
+                ))}
+            </div>
+        </div>
+    );
+
+    const shadowPresets = EFFECT_PRESETS.filter(p => p.section === 'shadow');
+    const stylePresets = EFFECT_PRESETS.filter(p => p.section === 'style');
+    const shapePresets = EFFECT_PRESETS.filter(p => p.section === 'shape');
+    const advancedPresets = EFFECT_PRESETS.filter(p => p.section === 'advanced');
 
     return (
-        <div className="inline-panel">
-            <div className="inline-panel-header">
-                <h3>Effects</h3>
-                <button className="inline-panel-close" onClick={onClose}>
+        <div style={S.root}>
+            <div style={S.header}>
+                <h3 style={S.title}>Effects</h3>
+                <button style={S.closeBtn} onClick={onClose}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <path d="M18 6L6 18M6 6l12 12" />
                     </svg>
                 </button>
             </div>
 
-            <div className="inline-panel-body">
-                <p className="sidebar-section-label">Shadow</p>
-                <div className="inline-preset-grid">
-                    {SHADOW_PRESETS.map((preset) => (
-                        <button
-                            key={preset.label}
-                            className={`inline-preset-btn ${activePreset === preset.label ? 'active' : ''}`}
-                            onClick={() => handlePreset(preset)}
-                        >
-                            <div className="inline-preset-preview" style={{
-                                boxShadow: preset.label === 'None' ? 'none' :
-                                    preset.extraLayers
-                                        ? [
-                                            `0 0 ${preset.blur}px rgba(${Math.round(preset.color[0]*255)},${Math.round(preset.color[1]*255)},${Math.round(preset.color[2]*255)},${preset.color[3]})`,
-                                            ...preset.extraLayers.map(l =>
-                                                `0 0 ${l.blur}px rgba(${Math.round(l.color[0]*255)},${Math.round(l.color[1]*255)},${Math.round(l.color[2]*255)},${l.color[3]})`
-                                            ),
-                                        ].join(', ')
-                                        : `${preset.offsetX}px ${preset.offsetY}px ${preset.blur}px rgba(${Math.round(preset.color[0]*255)},${Math.round(preset.color[1]*255)},${Math.round(preset.color[2]*255)},${preset.color[3]})`,
-                            }}>
-                                Ag
-                            </div>
-                            <span className="inline-preset-label">{preset.label}</span>
-                        </button>
-                    ))}
-                </div>
+            <div style={S.body}>
+                {renderSection('shadow', 'Shadow', shadowPresets)}
+                <div style={S.divider} />
+                {renderSection('style', 'Style', stylePresets)}
+                <div style={S.divider} />
+                {renderSection('shape', 'Shape', shapePresets)}
+                <div style={S.divider} />
+                {renderSection('advanced', 'Advanced', advancedPresets)}
 
-                {activePreset !== 'None' && (
+                {/* Controls: shown when an effect is active */}
+                {activeType !== 'none' && (
                     <>
-                        <div className="inline-divider" />
-                        <p className="sidebar-section-label">Color</p>
-                        <div className="inline-slider-row" style={{ gap: 8 }}>
-                            <input
-                                type="color"
-                                value={customColor}
-                                onChange={(e) => handleColorChange(e.target.value)}
-                                style={{
-                                    width: 32, height: 32, padding: 0, border: 'none',
-                                    borderRadius: 6, cursor: 'pointer', background: 'transparent',
-                                }}
-                            />
-                            <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
-                                {customColor.toUpperCase()}
-                            </span>
-                        </div>
-
-                        <div className="inline-divider" />
-                        <p className="sidebar-section-label">Intensity</p>
-                        <div className="inline-slider-row">
+                        <div style={S.divider} />
+                        <p style={S.sectionLabel}>Intensity</p>
+                        <div style={S.sliderRow}>
+                            <button style={S.stepBtn} onClick={() => handleIntensity(Math.max(0, intensity - 5))}>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M5 12h14" />
+                                </svg>
+                            </button>
                             <input
                                 type="range"
-                                className="inline-slider"
+                                style={S.slider}
                                 min={0}
                                 max={100}
                                 value={intensity}
                                 onChange={(e) => handleIntensity(Number(e.target.value))}
                             />
-                            <span className="inline-slider-value">{intensity}</span>
+                            <button style={S.stepBtn} onClick={() => handleIntensity(Math.min(100, intensity + 5))}>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M12 5v14M5 12h14" />
+                                </svg>
+                            </button>
+                            <span style={S.sliderVal}>{intensity}</span>
+                        </div>
+
+                        <div style={S.divider} />
+                        <p style={S.sectionLabel}>Color</p>
+                        <div style={S.colorRow}>
+                            <input
+                                type="color"
+                                value={customColor}
+                                onChange={(e) => handleColorChange(e.target.value)}
+                                style={S.colorInput}
+                            />
+                            <span style={S.colorHex}>{customColor.toUpperCase()}</span>
                         </div>
                     </>
                 )}
+
+                {/* Remove Effect */}
+                <div style={S.divider} />
+                <button
+                    style={{
+                        ...S.removeBtn,
+                        ...(activeType === 'none' ? { opacity: 0.4, cursor: 'default' } : {}),
+                    }}
+                    onClick={handleRemoveEffect}
+                    disabled={activeType === 'none'}
+                >
+                    Remove Effect
+                </button>
             </div>
         </div>
     );
 }
+
+// ── Inline Styles ──
+const S: Record<string, React.CSSProperties> = {
+    root: { display: 'flex', flexDirection: 'column', height: '100%' },
+    header: {
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)',
+    },
+    title: { fontSize: 14, fontWeight: 600, color: 'var(--text-primary, #e4e4e7)', margin: 0 },
+    closeBtn: {
+        background: 'none', border: 'none', color: 'var(--text-muted, #71717a)',
+        cursor: 'pointer', padding: 4, borderRadius: 4, display: 'flex',
+    },
+    body: {
+        padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 12,
+        overflowY: 'auto', flex: 1,
+    },
+    sectionLabel: {
+        fontSize: 11, fontWeight: 600, color: 'var(--text-secondary, #a1a1aa)',
+        textTransform: 'uppercase' as const, letterSpacing: '0.05em', margin: '0 0 6px 0',
+    },
+    grid: {
+        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8,
+    },
+    presetBtn: {
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+        padding: 6, background: 'rgba(255,255,255,0.03)', border: '1.5px solid transparent',
+        borderRadius: 8, cursor: 'pointer', transition: 'all 0.15s',
+    },
+    presetBtnActive: {
+        borderColor: 'var(--accent, #818cf8)', background: 'rgba(129,140,248,0.08)',
+    },
+    presetPreview: {
+        width: '100%', height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 22, fontWeight: 700, color: '#e4e4e7', borderRadius: 6,
+        background: 'rgba(255,255,255,0.04)', fontFamily: 'Inter, system-ui, sans-serif',
+    },
+    presetLabel: {
+        fontSize: 10, color: 'var(--text-muted, #71717a)', whiteSpace: 'nowrap' as const,
+    },
+    divider: {
+        height: 1, background: 'rgba(255,255,255,0.06)', margin: '4px 0',
+    },
+    sliderRow: {
+        display: 'flex', alignItems: 'center', gap: 8,
+    },
+    slider: {
+        flex: 1, height: 4, appearance: 'none' as const,
+        background: 'rgba(255,255,255,0.12)', borderRadius: 2, outline: 'none',
+        WebkitAppearance: 'none' as const, cursor: 'pointer',
+    },
+    sliderVal: {
+        fontSize: 12, color: 'var(--text-secondary, #a1a1aa)', fontFamily: 'monospace',
+        width: 28, textAlign: 'right' as const,
+    },
+    stepBtn: {
+        width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)',
+        borderRadius: 4, color: 'var(--text-secondary, #a1a1aa)', cursor: 'pointer',
+    },
+    colorRow: {
+        display: 'flex', alignItems: 'center', gap: 8,
+    },
+    colorInput: {
+        width: 32, height: 32, padding: 0, border: 'none', borderRadius: 6,
+        cursor: 'pointer', background: 'transparent',
+    },
+    colorHex: {
+        fontSize: 12, color: 'var(--text-secondary, #a1a1aa)', fontFamily: 'monospace',
+    },
+    removeBtn: {
+        width: '100%', padding: '8px 0', background: 'rgba(239,68,68,0.08)',
+        border: '1px solid rgba(239,68,68,0.2)', borderRadius: 6,
+        color: '#ef4444', fontSize: 12, fontWeight: 500, cursor: 'pointer',
+        transition: 'background 0.15s',
+    },
+};

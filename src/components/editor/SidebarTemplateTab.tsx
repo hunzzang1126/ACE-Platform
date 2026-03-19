@@ -103,10 +103,10 @@ function TemplatePreview({ template }: { template: DesignTemplate }) {
 
     const tw = template.width;
     const th = template.height;
-    // Scale to fit 130px wide preview
+    // Scale to fit preview width — NO height cap, let aspect ratio drive
     const previewW = 130;
     const scale = previewW / tw;
-    const previewH = Math.min(th * scale, 120); // cap height
+    const previewH = th * scale; // ★ FIX: removed Math.min(th*scale, 120) clipping
 
     return (
         <div

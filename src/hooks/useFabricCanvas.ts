@@ -15,6 +15,7 @@ import { Canvas, Rect, Ellipse, Shadow, PencilBrush, Textbox, FabricImage, Line,
 import { useEditorStore } from '@/stores/editorStore';
 import { useHistoryStore } from '@/stores/historyStore';
 import type { EngineNode, CanvasEngineState, CanvasEngineActions, UseCanvasEngineResult } from './canvasTypes';
+import type { TextEffectType } from '@/schema/elements.types';
 import {
     nextId, nextColor, rgbToHex, hexToRgb01,
     isArtboard, fabricToEngineNode, patchAceProps, GLID_CUSTOM_PROPS,
@@ -633,6 +634,35 @@ export function useFabricCanvas(
     const setHueRotate = useCallback((_id: number, _deg: number) => { }, []);
     const addKeyframe = useCallback((_nodeId: number, _property: string, _time: number, _value: number, _easing: string) => { }, []);
 
+    // ── Text Effects (Canva-style) ──
+    // ★ SYNC: Effect type/intensity/color stored as __glid* props on Fabric object
+    // → serialized via GLID_CUSTOM_PROPS → survives save/load/undo/redo.
+    const setTextEffect = useCallback((id: number, effectType: TextEffectType, intensity: number, color: string) => {
+        const obj = findById(id);
+        if (!obj) return;
+        (obj as any).__glidTextEffectType = effectType;
+        (obj as any).__glidTextEffectIntensity = intensity;
+        (obj as any).__glidTextEffectColor = color;
+        // Apply visual via engine shim helper
+        engineRef.current?.set_text_effect?.(id, effectType, intensity, color);
+        fabricRef.current?.renderAll();
+        syncState();
+    }, [findById, syncState]);
+
+    const removeTextEffect = useCallback((id: number) => {
+        const obj = findById(id);
+        if (!obj) return;
+        (obj as any).__glidTextEffectType = 'none';
+        (obj as any).__glidTextEffectIntensity = 0;
+        (obj as any).__glidTextEffectColor = '';
+        obj.set({ shadow: undefined, stroke: undefined, strokeWidth: 0 } as any);
+        if (obj instanceof Textbox) {
+            obj.set({ paintFirst: 'fill' } as any);
+        }
+        fabricRef.current?.renderAll();
+        syncState();
+    }, [findById, syncState]);
+
     // ── Undo / Redo ──
     const restoreArtboardFlags = useCallback((fc: Canvas) => {
         fc.getObjects().forEach((obj) => {
@@ -805,7 +835,7 @@ export function useFabricCanvas(
         deleteSelected, selectNode, deselectAll,
         setNodePosition, setNodeSize, setNodeOpacity, setFillColor,
         bringToFront, sendToBack, bringForward, sendBackward,
-        setShadow, removeShadow, setBlendMode,
+        setShadow, removeShadow, setTextEffect, removeTextEffect, setBlendMode,
         setBrightness, setContrast, setSaturation, setHueRotate,
         addKeyframe, duplicateSelected,
         groupSelected: (name?: string) => {

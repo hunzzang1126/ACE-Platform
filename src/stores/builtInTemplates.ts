@@ -263,20 +263,20 @@ const PREVIEW_CONTENT: GeneratedContent = {
     tag: 'NEW',
 };
 
-/** Sizes to generate previews for each AI template */
+/** Sizes to generate previews for each AI template — ALL 1080x1080 social */
 const AI_TEMPLATE_SIZE_MAP: Record<string, { w: number; h: number; category: 'display' | 'social' }> = {
-    'centered-stack': { w: 300, h: 250, category: 'display' },
-    'left-aligned-card': { w: 300, h: 250, category: 'display' },
-    'bold-headline': { w: 300, h: 250, category: 'display' },
-    'split-horizontal': { w: 728, h: 90, category: 'display' },
-    'diagonal-split': { w: 300, h: 250, category: 'display' },
-    'top-down-cascade': { w: 300, h: 250, category: 'display' },
-    'right-aligned': { w: 300, h: 250, category: 'display' },
-    'minimal-clean': { w: 300, h: 250, category: 'display' },
+    'centered-stack': { w: 1080, h: 1080, category: 'social' },
+    'left-aligned-card': { w: 1080, h: 1080, category: 'social' },
+    'bold-headline': { w: 1080, h: 1080, category: 'social' },
+    'split-horizontal': { w: 1080, h: 1080, category: 'social' },
+    'diagonal-split': { w: 1080, h: 1080, category: 'social' },
+    'top-down-cascade': { w: 1080, h: 1080, category: 'social' },
+    'right-aligned': { w: 1080, h: 1080, category: 'social' },
+    'minimal-clean': { w: 1080, h: 1080, category: 'social' },
     'full-bleed-hero': { w: 1080, h: 1080, category: 'social' },
-    'badge-focus': { w: 300, h: 250, category: 'display' },
-    'horizontal-strip': { w: 728, h: 90, category: 'display' },
-    'tower': { w: 160, h: 600, category: 'display' },
+    'badge-focus': { w: 1080, h: 1080, category: 'social' },
+    'horizontal-strip': { w: 1080, h: 1080, category: 'social' },
+    'tower': { w: 1080, h: 1080, category: 'social' },
 };
 
 function renderElementToDesignElement(
@@ -340,6 +340,58 @@ function renderElementToDesignElement(
     };
 }
 
+// ★ 12 unique style guides — one per AI template
+const AI_STYLE_GUIDES: Record<string, DesignStyleGuide> = {
+    'centered-stack': {
+        ...PREVIEW_GUIDE, id: 'sunset', name: 'Sunset',
+        colors: { ...PREVIEW_GUIDE.colors, background: '#1a0800', surface: '#2d1600', foreground: '#fff5eb', accent: '#ff6b35', secondary: '#ffd700', gradientStart: '#1a0800', gradientEnd: '#3d1e00', gradientAngle: 135, border: '#4a2800', tertiary: '#ff9f1c', muted: '#8b6914', accentForeground: '#ffffff', error: '#ef4444', warning: '#f59e0b', info: '#ff6b35' },
+    },
+    'left-aligned-card': {
+        ...PREVIEW_GUIDE, id: 'ocean', name: 'Ocean',
+        colors: { ...PREVIEW_GUIDE.colors, background: '#001a2e', surface: '#002d4f', foreground: '#e0f7ff', accent: '#00d4ff', secondary: '#0077b6', gradientStart: '#001a2e', gradientEnd: '#003050', gradientAngle: 180, border: '#004060', tertiary: '#48cae4', muted: '#4a6670', accentForeground: '#ffffff', error: '#ef4444', warning: '#f59e0b', info: '#0077b6' },
+    },
+    'bold-headline': {
+        ...PREVIEW_GUIDE, id: 'magenta', name: 'Magenta',
+        colors: { ...PREVIEW_GUIDE.colors, background: '#1a0011', surface: '#2d001e', foreground: '#ffe0f0', accent: '#ff0055', secondary: '#ff66aa', gradientStart: '#1a0011', gradientEnd: '#330022', gradientAngle: 135, border: '#4a0030', tertiary: '#ff3377', muted: '#8b4466', accentForeground: '#ffffff', error: '#ef4444', warning: '#f59e0b', info: '#ff0055' },
+    },
+    'split-horizontal': {
+        ...PREVIEW_GUIDE, id: 'emerald', name: 'Emerald',
+        colors: { ...PREVIEW_GUIDE.colors, background: '#001a0e', surface: '#002d18', foreground: '#e0fff0', accent: '#059669', secondary: '#34d399', gradientStart: '#001a0e', gradientEnd: '#003020', gradientAngle: 135, border: '#004020', tertiary: '#10b981', muted: '#4a7060', accentForeground: '#ffffff', error: '#ef4444', warning: '#f59e0b', info: '#059669' },
+    },
+    'diagonal-split': {
+        ...PREVIEW_GUIDE, id: 'hiphop', name: 'Street',
+        colors: { ...PREVIEW_GUIDE.colors, background: '#0a0a0a', surface: '#1a1a2e', foreground: '#ffffff', accent: '#e94560', secondary: '#ff6b6b', gradientStart: '#0a0a0a', gradientEnd: '#1a1a2e', gradientAngle: 160, border: '#2d2d4e', tertiary: '#c23152', muted: '#666680', accentForeground: '#ffffff', error: '#ef4444', warning: '#f59e0b', info: '#e94560' },
+    },
+    'top-down-cascade': {
+        ...PREVIEW_GUIDE, id: 'royal', name: 'Royal',
+        colors: { ...PREVIEW_GUIDE.colors, background: '#0d001a', surface: '#1a0033', foreground: '#f0e0ff', accent: '#7c3aed', secondary: '#c084fc', gradientStart: '#0d001a', gradientEnd: '#1a0040', gradientAngle: 135, border: '#2d0060', tertiary: '#a855f7', muted: '#6b4a8f', accentForeground: '#ffffff', error: '#ef4444', warning: '#f59e0b', info: '#7c3aed' },
+    },
+    'right-aligned': {
+        ...PREVIEW_GUIDE, id: 'coral', name: 'Coral',
+        colors: { ...PREVIEW_GUIDE.colors, background: '#1a0808', surface: '#2d1414', foreground: '#fff0e8', accent: '#f43f5e', secondary: '#fbbf24', gradientStart: '#1a0808', gradientEnd: '#2d1010', gradientAngle: 135, border: '#4a2020', tertiary: '#fb7185', muted: '#8b6060', accentForeground: '#ffffff', error: '#ef4444', warning: '#fbbf24', info: '#f43f5e' },
+    },
+    'minimal-clean': {
+        ...PREVIEW_GUIDE, id: 'arctic', name: 'Arctic',
+        colors: { ...PREVIEW_GUIDE.colors, background: '#f8fafc', surface: '#f1f5f9', foreground: '#0f172a', accent: '#3b82f6', secondary: '#60a5fa', gradientStart: '#f8fafc', gradientEnd: '#e2e8f0', gradientAngle: 180, border: '#cbd5e1', tertiary: '#2563eb', muted: '#94a3b8', accentForeground: '#ffffff', error: '#ef4444', warning: '#f59e0b', info: '#3b82f6' },
+    },
+    'full-bleed-hero': {
+        ...PREVIEW_GUIDE, id: 'cyber', name: 'Cyber',
+        colors: { ...PREVIEW_GUIDE.colors, background: '#0a0a14', surface: '#0f0f23', foreground: '#e0ffe0', accent: '#00ff88', secondary: '#00cc6a', gradientStart: '#0a0a14', gradientEnd: '#0f1a0f', gradientAngle: 135, border: '#1a2d1a', tertiary: '#22c55e', muted: '#4a6640', accentForeground: '#000000', error: '#ef4444', warning: '#f59e0b', info: '#00ff88' },
+    },
+    'badge-focus': {
+        ...PREVIEW_GUIDE, id: 'gold', name: 'Gold',
+        colors: { ...PREVIEW_GUIDE.colors, background: '#0c0c0c', surface: '#1c1c1c', foreground: '#fff8e0', accent: '#d4af37', secondary: '#b8860b', gradientStart: '#0c0c0c', gradientEnd: '#1a1400', gradientAngle: 135, border: '#2d2400', tertiary: '#daa520', muted: '#8b7840', accentForeground: '#000000', error: '#ef4444', warning: '#d4af37', info: '#daa520' },
+    },
+    'horizontal-strip': {
+        ...PREVIEW_GUIDE, id: 'electric', name: 'Electric',
+        colors: { ...PREVIEW_GUIDE.colors, background: '#001033', surface: '#001a4f', foreground: '#e0f0ff', accent: '#60a5fa', secondary: '#1e40af', gradientStart: '#001033', gradientEnd: '#0a2050', gradientAngle: 135, border: '#1a3060', tertiary: '#3b82f6', muted: '#4a6090', accentForeground: '#ffffff', error: '#ef4444', warning: '#f59e0b', info: '#60a5fa' },
+    },
+    'tower': {
+        ...PREVIEW_GUIDE, id: 'pastel', name: 'Pastel',
+        colors: { ...PREVIEW_GUIDE.colors, background: '#fce4ec', surface: '#f8bbd0', foreground: '#880e4f', accent: '#e91e63', secondary: '#f48fb1', gradientStart: '#fce4ec', gradientEnd: '#f8bbd0', gradientAngle: 180, border: '#f06292', tertiary: '#ec407a', muted: '#c48b9f', accentForeground: '#ffffff', error: '#ef4444', warning: '#f59e0b', info: '#e91e63' },
+    },
+};
+
 function generateAiLayoutTemplates(): DesignTemplate[] {
     const result: DesignTemplate[] = [];
 
@@ -348,14 +400,16 @@ function generateAiLayoutTemplates(): DesignTemplate[] {
         if (!sizeSpec) continue;
 
         const { w, h, category } = sizeSpec;
-        const renderElements = tmpl.build(w, h, PREVIEW_GUIDE, PREVIEW_CONTENT);
+        // ★ Use unique style guide per template for visual diversity
+        const guide = AI_STYLE_GUIDES[tmpl.id] ?? PREVIEW_GUIDE;
+        const renderElements = tmpl.build(w, h, guide, PREVIEW_CONTENT);
 
         const designElements = renderElements
             .filter((re): re is Exclude<typeof re, number> => typeof re !== 'number')
             .map((re, idx) => renderElementToDesignElement(re, idx, `ai-${tmpl.id}`));
 
         const bgEl = designElements.find(e => e.name?.toLowerCase().includes('background'));
-        const bgColor = (bgEl as any)?.gradientStart || (bgEl as any)?.fill || '#0f172a';
+        const bgColor = (bgEl as any)?.gradientStart || (bgEl as any)?.fill || guide.colors.background;
 
         result.push(makeTemplate(
             `ai-${tmpl.id}`,

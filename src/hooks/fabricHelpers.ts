@@ -209,6 +209,13 @@ export function fabricToEngineNode(obj: FabricObject): EngineNode {
         node.shadow_color = s.color ?? 'rgba(0,0,0,0.5)';
     }
 
+    // Text effect (Canva-style: outline, neon, glitch, etc.)
+    if ((obj as any).__glidTextEffectType && (obj as any).__glidTextEffectType !== 'none') {
+        node.textEffect_type = (obj as any).__glidTextEffectType;
+        node.textEffect_intensity = (obj as any).__glidTextEffectIntensity ?? 50;
+        node.textEffect_color = (obj as any).__glidTextEffectColor ?? '#ffffff';
+    }
+
     // Visibility and lock state
     node.visible = obj.visible !== false;
     node.locked = !!(obj as any).lockMovementX;
@@ -217,7 +224,7 @@ export function fabricToEngineNode(obj: FabricObject): EngineNode {
 }
 
 // ── Custom properties to include in serialization ──
-export const GLID_CUSTOM_PROPS = ['__glidId', '__glidZIndex', '__glidArtboard', '__glidName', '__glidGradientStart', '__glidGradientEnd', '__glidGradientAngle', '__glidCustomStyles'];
+export const GLID_CUSTOM_PROPS = ['__glidId', '__glidZIndex', '__glidArtboard', '__glidName', '__glidGradientStart', '__glidGradientEnd', '__glidGradientAngle', '__glidCustomStyles', '__glidTextEffectType', '__glidTextEffectIntensity', '__glidTextEffectColor'];
 
 // Patch a Fabric object to include Glid custom props in toObject()
 export function patchAceProps(obj: FabricObject): void {
@@ -232,6 +239,9 @@ export function patchAceProps(obj: FabricObject): void {
         if ((this as any).__glidGradientEnd) data.__glidGradientEnd = (this as any).__glidGradientEnd;
         if ((this as any).__glidGradientAngle != null) data.__glidGradientAngle = (this as any).__glidGradientAngle;
         if ((this as any).__glidCustomStyles) data.__glidCustomStyles = (this as any).__glidCustomStyles;
+        if ((this as any).__glidTextEffectType) data.__glidTextEffectType = (this as any).__glidTextEffectType;
+        if ((this as any).__glidTextEffectIntensity != null) data.__glidTextEffectIntensity = (this as any).__glidTextEffectIntensity;
+        if ((this as any).__glidTextEffectColor) data.__glidTextEffectColor = (this as any).__glidTextEffectColor;
         return data;
     };
 }

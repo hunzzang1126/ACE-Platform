@@ -20,6 +20,214 @@ import {
  * This provides the same API surface as the WASM engine so AI executors
  * and other services can work with either backend.
  */
+
+// ── Text Effect CSS Application ──────────────────
+// Maps effect type → Fabric Shadow / stroke / paintFirst properties.
+// Uses ONLY Fabric-native APIs that serialize correctly.
+function applyTextEffectCSS(
+    obj: FabricObject,
+    effectType: string,
+    intensity: number,
+    color: string,
+    _fc: Canvas,
+): void {
+    const scale = intensity / 50; // 1.0 at intensity=50
+
+    // Clear previous effect styles
+    obj.set({ shadow: undefined, stroke: undefined, strokeWidth: 0 } as any);
+    if (obj instanceof Textbox) {
+        obj.set({ paintFirst: 'fill' } as any);
+    }
+
+    switch (effectType) {
+        case 'drop':
+            obj.set({
+                shadow: new Shadow({
+                    color: color + 'cc',
+                    blur: 8 * scale,
+                    offsetX: 4 * scale,
+                    offsetY: 4 * scale,
+                }),
+            });
+            break;
+
+        case 'glow':
+            obj.set({
+                shadow: new Shadow({
+                    color: color + '80',
+                    blur: 20 * scale,
+                    offsetX: 0,
+                    offsetY: 0,
+                }),
+            });
+            break;
+
+        case 'echo':
+            obj.set({
+                shadow: new Shadow({
+                    color: color + '40',
+                    blur: 0,
+                    offsetX: 6 * scale,
+                    offsetY: 6 * scale,
+                }),
+            });
+            break;
+
+        case 'outline':
+            if (obj instanceof Textbox) {
+                obj.set({
+                    stroke: color,
+                    strokeWidth: Math.max(1, 2 * scale),
+                    paintFirst: 'stroke',
+                } as any);
+            }
+            break;
+
+        case 'background':
+            // Background highlight: thick stroke behind text acts as highlight
+            if (obj instanceof Textbox) {
+                obj.set({
+                    stroke: color,
+                    strokeWidth: Math.max(4, 8 * scale),
+                    paintFirst: 'stroke',
+                } as any);
+            }
+            break;
+
+        case 'splice':
+            // Splice: outer colored stroke + explicit fill creates split-tone effect
+            if (obj instanceof Textbox) {
+                obj.set({
+                    stroke: color,
+                    strokeWidth: Math.max(2, 3 * scale),
+                    paintFirst: 'stroke',
+                } as any);
+            }
+            break;
+
+        case 'hollow':
+            // Hollow: stroke only, transparent fill
+            if (obj instanceof Textbox) {
+                const prevFill = obj.fill;
+                obj.set({
+                    stroke: typeof prevFill === 'string' ? prevFill : color,
+                    strokeWidth: Math.max(1, 2 * scale),
+                    fill: 'transparent',
+                    paintFirst: 'stroke',
+                } as any);
+            }
+            break;
+
+        case 'neon': {
+            // Multi-layer neon glow
+            const layers = [
+                `0 0 ${Math.round(8 * scale)}px ${color}`,
+                `0 0 ${Math.round(20 * scale)}px ${color}80`,
+                `0 0 ${Math.round(40 * scale)}px ${color}40`,
+            ];
+            obj.set({
+                shadow: new Shadow({
+                    color: color,
+                    blur: 12 * scale,
+                    offsetX: 0,
+                    offsetY: 0,
+                }),
+            });
+            // Store multi-layer as custom style for CSS preview
+            (obj as any).__glidCustomStyles = {
+                ...((obj as any).__glidCustomStyles || {}),
+                textShadow: layers.join(', '),
+            };
+            break;
+        }
+
+        case 'glitch': {
+            // Glitch: red & cyan offset shadows
+            obj.set({
+                shadow: new Shadow({
+                    color: '#ff0000',
+                    blur: 0,
+                    offsetX: 3 * scale,
+                    offsetY: 0,
+                }),
+            });
+            // Store cyan layer as custom style
+            (obj as any).__glidCustomStyles = {
+                ...((obj as any).__glidCustomStyles || {}),
+                textShadow: `${Math.round(-3 * scale)}px 0 0 #00ffff, ${Math.round(3 * scale)}px 0 0 #ff0000`,
+            };
+            break;
+        }
+
+        case 'curve':
+            // Curve: visual only in canvas. Store the intent for CSS preview.
+            obj.set({
+                shadow: new Shadow({
+                    color: color + '30',
+                    blur: 4 * scale,
+                    offsetX: 0,
+                    offsetY: 2 * scale,
+                }),
+            });
+            break;
+
+        case 'neon-lights': {
+            // Animated neon: strong multi-color glow
+            obj.set({
+                shadow: new Shadow({
+                    color: color,
+                    blur: 16 * scale,
+                    offsetX: 0,
+                    offsetY: 0,
+                }),
+            });
+            if (obj instanceof Textbox) {
+                obj.set({
+                    stroke: color + '60',
+                    strokeWidth: Math.max(1, 1 * scale),
+                    paintFirst: 'stroke',
+                } as any);
+            }
+            break;
+        }
+
+        case 'tv-static':
+            // TV Static: slight offset + noise-like effect via shadow
+            obj.set({
+                shadow: new Shadow({
+                    color: '#ffffff40',
+                    blur: 2 * scale,
+                    offsetX: 1 * scale,
+                    offsetY: -1 * scale,
+                }),
+            });
+            break;
+
+        case '70s': {
+            // Retro 70s: thick colored outline + warm shadow
+            if (obj instanceof Textbox) {
+                obj.set({
+                    stroke: color,
+                    strokeWidth: Math.max(3, 5 * scale),
+                    paintFirst: 'stroke',
+                    shadow: new Shadow({
+                        color: '#ff8c0060',
+                        blur: 0,
+                        offsetX: 4 * scale,
+                        offsetY: 4 * scale,
+                    }),
+                } as any);
+            }
+            break;
+        }
+
+        case 'none':
+        default:
+            // Already cleared above
+            break;
+    }
+}
+
 export function createEngineShim(
     fc: Canvas,
     syncState: () => void,
@@ -554,6 +762,44 @@ export function createEngineShim(
             const obj = findById(id);
             if (obj) { obj.set({ shadow: undefined }); fc.renderAll(); }
         },
+
+        // ── Text Effects (Canva-style) ──────────────────
+        // ★ SYNC ARCHITECTURE: Effect type/intensity/color stored as __glid* props
+        // on the Fabric object → serialized via GLID_CUSTOM_PROPS → persisted
+        // through save/load cycle. CSS is re-applied on canvas restore.
+        set_text_effect: (id: number, effectType: string, intensity: number, color: string) => {
+            const obj = findById(id);
+            if (!obj) return;
+
+            // Store on object for persistence
+            (obj as any).__glidTextEffectType = effectType;
+            (obj as any).__glidTextEffectIntensity = intensity;
+            (obj as any).__glidTextEffectColor = color;
+
+            // Apply visual effect
+            applyTextEffectCSS(obj, effectType, intensity, color, fc);
+            fc.renderAll();
+            syncState();
+        },
+
+        remove_text_effect: (id: number) => {
+            const obj = findById(id);
+            if (!obj) return;
+
+            (obj as any).__glidTextEffectType = 'none';
+            (obj as any).__glidTextEffectIntensity = 0;
+            (obj as any).__glidTextEffectColor = '';
+
+            // Clear all effect-related styles
+            obj.set({ shadow: undefined, stroke: undefined, strokeWidth: 0 } as any);
+            if (obj instanceof Textbox) {
+                obj.set({ paintFirst: 'fill' } as any);
+            }
+
+            fc.renderAll();
+            syncState();
+        },
+
         set_blend_mode: () => { },
         set_brightness: () => { },
         set_contrast: () => { },

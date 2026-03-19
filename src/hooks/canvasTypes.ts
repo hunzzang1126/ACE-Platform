@@ -1,6 +1,7 @@
 // ─────────────────────────────────────────────────
 // Canvas Types — Shared type definitions for engine hooks
 // ─────────────────────────────────────────────────
+import type { TextEffectType } from '@/schema/elements.types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Engine = any;
@@ -47,6 +48,10 @@ export interface EngineNode {
     shadow_offsetY?: number;
     shadow_blur?: number;
     shadow_color?: string;
+    // Text effect fields (persisted Canva-style effects)
+    textEffect_type?: TextEffectType;
+    textEffect_intensity?: number;
+    textEffect_color?: string;
     // Visibility/Lock state (from Fabric object properties)
     visible?: boolean;
     locked?: boolean;
@@ -103,6 +108,9 @@ export interface CanvasEngineActions {
     // Effects
     setShadow: (id: number, offsetX: number, offsetY: number, blur: number, r: number, g: number, b: number, a: number) => void;
     removeShadow: (id: number) => void;
+    // Text effects (Canva-style: outline, neon, glitch, etc.)
+    setTextEffect: (id: number, effectType: TextEffectType, intensity: number, color: string) => void;
+    removeTextEffect: (id: number) => void;
     setBlendMode: (id: number, mode: string) => void;
     setBrightness: (id: number, v: number) => void;
     setContrast: (id: number, v: number) => void;
