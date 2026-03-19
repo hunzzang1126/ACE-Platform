@@ -43,7 +43,8 @@ export function TemplatesPage() {
 
         // Create a temporary creative set from the template
         const preset: BannerPreset = {
-            label: `${tmpl.width}x${tmpl.height}`,
+            id: `tmpl-preset-${tmpl.id}`,
+            name: `${tmpl.width}x${tmpl.height}`,
             width: tmpl.width,
             height: tmpl.height,
             category: 'display',
@@ -63,8 +64,9 @@ export function TemplatesPage() {
             }
         });
 
-        // Set editing flag so save knows to update the template
+        // Set editing flags so save knows to update the template and clean up
         setEditingTemplateId(tmpl.id);
+        useTemplateStore.getState().setEditingTempCsId(csId);
 
         // Navigate to the canvas editor
         navigate(`/editor/detail/${targetVariantId}`);

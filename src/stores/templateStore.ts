@@ -52,6 +52,8 @@ interface TemplateState {
     templateOverrides: Record<string, string>;
     /** Template currently being edited in canvas (admin only) */
     editingTemplateId: string | null;
+    /** Temp creative set ID created for template editing (cleanup after save) */
+    editingTempCsId: string | null;
 
     // CRUD
     saveAsTemplate: (opts: {
@@ -77,6 +79,8 @@ interface TemplateState {
     clearOverride: (id: string) => void;
     /** Set which template is being edited (null = not editing) */
     setEditingTemplateId: (id: string | null) => void;
+    /** Set temp creative set ID for cleanup */
+    setEditingTempCsId: (id: string | null) => void;
 
     // Query
     getByCategory: (category: TemplateCategory) => DesignTemplate[];
@@ -99,6 +103,7 @@ export const useTemplateStore = create<TemplateState>()(
             templates: [],
             templateOverrides: {} as Record<string, string>,
             editingTemplateId: null as string | null,
+            editingTempCsId: null as string | null,
 
             saveAsTemplate: (opts) => {
                 const id = genId();
@@ -222,6 +227,10 @@ export const useTemplateStore = create<TemplateState>()(
 
             setEditingTemplateId: (id) => {
                 set(state => { state.editingTemplateId = id; });
+            },
+
+            setEditingTempCsId: (id) => {
+                set(state => { state.editingTempCsId = id; });
             },
         })),
         {

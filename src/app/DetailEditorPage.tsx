@@ -8,6 +8,7 @@ import { useDesignStore } from '@/stores/designStore';
 import { useEditorStore } from '@/stores/editorStore';
 import { useUIStore } from '@/stores/uiStore';
 import { useTemplateStore } from '@/stores/templateStore';
+import { useProjectStore } from '@/stores/projectStore';
 import { EditorTopBar } from '@/components/editor/EditorTopBar';
 import { EditorSidebar } from '@/components/editor/EditorSidebar';
 import { EditorCanvas } from '@/components/editor/EditorCanvas';
@@ -119,8 +120,22 @@ export function DetailEditorPage() {
                 if (v) {
                     overrideTemplate(tmplId, v, width, height);
                     console.log('[DetailEditor] Template override saved:', tmplId);
+
+                    // ★ Clean up temp creative set so it doesn't appear as a project
+                    const tempCsId = useTemplateStore.getState().editingTempCsId;
+                    if (tempCsId) {
+                        // Delete from designStore
+                        useDesignStore.getState().deleteCreativeSet(tempCsId);
+                        // Delete from projectStore
+                        useProjectStore.setState(state => {
+                            state.creativeSets = state.creativeSets.filter(s => s.id !== tempCsId);
+                        });
+                        console.log('[DetailEditor] Cleaned up temp creative set:', tempCsId);
+                    }
+
                     // ★ Navigate back to templates page after saving template
                     setEditingTemplateId(null);
+                    useTemplateStore.getState().setEditingTempCsId(null);
                     setTimeout(() => navigate('/templates'), 300);
                 }
             }
@@ -374,7 +389,19 @@ export function DetailEditorPage() {
                 }}>
                     <span>EDITING TEMPLATE — Save to update the global template</span>
                     <button
-                        onClick={() => { setEditingTemplateId(null); navigate('/templates'); }}
+                        onClick={() => {
+                            // Clean up temp creative set
+                            const tempCsId = useTemplateStore.getState().editingTempCsId;
+                            if (tempCsId) {
+                                useDesignStore.getState().deleteCreativeSet(tempCsId);
+                                useProjectStore.setState(state => {
+                                    state.creativeSets = state.creativeSets.filter(s => s.id !== tempCsId);
+                                });
+                            }
+                            setEditingTemplateId(null);
+                            useTemplateStore.getState().setEditingTempCsId(null);
+                            navigate('/templates');
+                        }}
                         style={{
                             background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff',
                             padding: '3px 12px', borderRadius: 4, cursor: 'pointer', fontSize: 11, fontWeight: 600,
