@@ -23,14 +23,10 @@ function getTextEffectCSS(fx: TextEffectConfig | undefined): React.CSSProperties
         case 'glow': return { textShadow: `0 0 ${20 * scale}px ${c}80` };
         case 'echo': return { textShadow: `${6 * scale}px ${6 * scale}px 0 ${c}40` };
         case 'outline': return { WebkitTextStroke: `${Math.max(1, 2 * scale)}px ${c}`, paintOrder: 'stroke fill' } as any;
-        case 'background': return { WebkitTextStroke: `${Math.max(4, 8 * scale)}px ${c}`, paintOrder: 'stroke fill' } as any;
         case 'splice': return { WebkitTextStroke: `${Math.max(2, 3 * scale)}px ${c}`, paintOrder: 'stroke fill' } as any;
-        case 'hollow': return { color: 'transparent', WebkitTextStroke: `${Math.max(1, 2 * scale)}px ${c}` } as any;
         case 'neon': return { textShadow: `0 0 ${8 * scale}px ${c}, 0 0 ${20 * scale}px ${c}80, 0 0 ${40 * scale}px ${c}40` };
         case 'glitch': return { textShadow: `${3 * scale}px 0 0 #ff0000, ${-3 * scale}px 0 0 #00ffff` };
         case 'curve': return { textShadow: `0 ${2 * scale}px ${4 * scale}px ${c}30` };
-        case 'neon-lights': return { textShadow: `0 0 ${16 * scale}px ${c}`, WebkitTextStroke: `${Math.max(1, scale)}px ${c}60` } as any;
-        case 'tv-static': return { textShadow: `${scale}px ${-scale}px ${2 * scale}px #ffffff40` };
         case '70s': return { WebkitTextStroke: `${Math.max(3, 5 * scale)}px ${c}`, paintOrder: 'stroke fill', textShadow: `3px 3px ${6 * scale}px #ff8c0060` } as any;
         default: return {};
     }
@@ -146,18 +142,14 @@ async function renderVariantToCanvas(variant: BannerVariant): Promise<string> {
                 const fxColor = fx.color || '#ffffff';
                 switch (fx.type) {
                     case 'outline': useStroke = true; strokeColor = fxColor; strokeWidth = Math.max(1, 2 * fxScale); break;
-                    case 'background': useStroke = true; strokeColor = fxColor; strokeWidth = Math.max(4, 8 * fxScale); break;
                     case 'splice': useStroke = true; strokeColor = fxColor; strokeWidth = Math.max(2, 3 * fxScale); break;
-                    case 'hollow': useStroke = true; strokeColor = el.color || '#000'; strokeWidth = Math.max(1, 2 * fxScale); useFillTransparent = true; break;
                     case '70s': useStroke = true; strokeColor = fxColor; strokeWidth = Math.max(3, 5 * fxScale); break;
-                    case 'neon-lights': useStroke = true; strokeColor = fxColor + '60'; strokeWidth = Math.max(1, fxScale); break;
                     case 'drop': ctx.shadowColor = fxColor + 'cc'; ctx.shadowBlur = 8 * fxScale; ctx.shadowOffsetX = 4 * fxScale; ctx.shadowOffsetY = 4 * fxScale; break;
                     case 'glow': ctx.shadowColor = fxColor + '80'; ctx.shadowBlur = 20 * fxScale; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0; break;
                     case 'echo': ctx.shadowColor = fxColor + '40'; ctx.shadowBlur = 0; ctx.shadowOffsetX = 6 * fxScale; ctx.shadowOffsetY = 6 * fxScale; break;
                     case 'neon': ctx.shadowColor = fxColor; ctx.shadowBlur = 12 * fxScale; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0; break;
                     case 'glitch': ctx.shadowColor = '#ff0000'; ctx.shadowBlur = 0; ctx.shadowOffsetX = 3 * fxScale; ctx.shadowOffsetY = 0; break;
                     case 'curve': ctx.shadowColor = fxColor + '30'; ctx.shadowBlur = 4 * fxScale; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 2 * fxScale; break;
-                    case 'tv-static': ctx.shadowColor = '#ffffff40'; ctx.shadowBlur = 2 * fxScale; ctx.shadowOffsetX = fxScale; ctx.shadowOffsetY = -fxScale; break;
                 }
                 if (useStroke) {
                     ctx.strokeStyle = strokeColor;

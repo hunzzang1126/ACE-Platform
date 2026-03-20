@@ -43,14 +43,18 @@ function applyTextEffectCSS(
         }
     }
 
-    // Clear previous effect styles
+    // Clear ALL previous effect styles (prevents residual ghost effects)
     obj.set({ shadow: undefined, stroke: undefined, strokeWidth: 0 } as any);
+    // ★ Clear custom styles used by neon/glitch multi-layer effects
+    delete (obj as any).__glidCustomStyles;
     if (obj instanceof Textbox) {
         obj.set({ paintFirst: 'fill' } as any);
-        // ★ Restore original fill when clearing (effects like hollow set fill='transparent')
-        if (effectType === 'none' && (obj as any).__glidOriginalFill) {
+        // ★ Restore original fill when switching effects (previous effect may have set fill='transparent')
+        if ((obj as any).__glidOriginalFill) {
             obj.set({ fill: (obj as any).__glidOriginalFill });
-            delete (obj as any).__glidOriginalFill;
+            if (effectType === 'none') {
+                delete (obj as any).__glidOriginalFill;
+            }
         }
     }
 
@@ -100,37 +104,12 @@ function applyTextEffectCSS(
             }
             break;
 
-        case 'background':
-            // Background highlight: thick stroke behind text acts as highlight
-            if (obj instanceof Textbox) {
-                obj.set({
-                    stroke: color,
-                    strokeWidth: Math.max(4, 8 * scale),
-                    paintFirst: 'stroke',
-                } as any);
-            }
-            break;
-
         case 'splice':
             // Splice: outer colored stroke + explicit fill creates split-tone effect
             if (obj instanceof Textbox) {
                 obj.set({
                     stroke: color,
                     strokeWidth: Math.max(2, 3 * scale),
-                    paintFirst: 'stroke',
-                } as any);
-            }
-            break;
-
-        case 'hollow':
-            // Hollow: stroke only, transparent fill
-            if (obj instanceof Textbox) {
-                // ★ Use stored original fill for stroke color — obj.fill may already be 'transparent' from a previous effect
-                const origFill = (obj as any).__glidOriginalFill || (typeof obj.fill === 'string' && obj.fill !== 'transparent' ? obj.fill : color);
-                obj.set({
-                    stroke: origFill,
-                    strokeWidth: Math.max(1, 2 * scale),
-                    fill: 'transparent',
                     paintFirst: 'stroke',
                 } as any);
             }
@@ -153,7 +132,6 @@ function applyTextEffectCSS(
             });
             // Store multi-layer as custom style for CSS preview
             (obj as any).__glidCustomStyles = {
-                ...((obj as any).__glidCustomStyles || {}),
                 textShadow: layers.join(', '),
             };
             break;
@@ -171,7 +149,6 @@ function applyTextEffectCSS(
             });
             // Store cyan layer as custom style
             (obj as any).__glidCustomStyles = {
-                ...((obj as any).__glidCustomStyles || {}),
                 textShadow: `${Math.round(-3 * scale)}px 0 0 #00ffff, ${Math.round(3 * scale)}px 0 0 #ff0000`,
             };
             break;
@@ -185,38 +162,6 @@ function applyTextEffectCSS(
                     blur: 4 * scale,
                     offsetX: 0,
                     offsetY: 2 * scale,
-                }),
-            });
-            break;
-
-        case 'neon-lights': {
-            // Animated neon: strong multi-color glow
-            obj.set({
-                shadow: new Shadow({
-                    color: color,
-                    blur: 16 * scale,
-                    offsetX: 0,
-                    offsetY: 0,
-                }),
-            });
-            if (obj instanceof Textbox) {
-                obj.set({
-                    stroke: color + '60',
-                    strokeWidth: Math.max(1, 1 * scale),
-                    paintFirst: 'stroke',
-                } as any);
-            }
-            break;
-        }
-
-        case 'tv-static':
-            // TV Static: slight offset + noise-like effect via shadow
-            obj.set({
-                shadow: new Shadow({
-                    color: '#ffffff40',
-                    blur: 2 * scale,
-                    offsetX: 1 * scale,
-                    offsetY: -1 * scale,
                 }),
             });
             break;

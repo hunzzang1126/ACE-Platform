@@ -1,9 +1,8 @@
 // ─────────────────────────────────────────────────
 // InlineEffectsPanel — Canva-style text effects panel
 // ─────────────────────────────────────────────────
-// Full effects library with 14 presets: Drop, Glow, Echo, Outline,
-// Background, Splice, Hollow, Neon, Glitch, Curve, Neon Lights,
-// TV Static, 70s.
+// Full effects library with 9 presets: Drop, Glow, Echo, Outline,
+// Splice, Neon, Glitch, Curve, 70s.
 // ★ SYNC ARCHITECTURE: All state written via actions.setTextEffect()
 // → stored as __glid* on Fabric object → persisted through save/load.
 // Zero local-only state for effect type.
@@ -52,19 +51,9 @@ const EFFECT_PRESETS: EffectPreset[] = [
         previewCSS: { WebkitTextStroke: '2px #3b82f6' },
     },
     {
-        type: 'background', label: 'Background', section: 'style',
-        defaultColor: '#a78bfa',
-        previewCSS: { backgroundColor: 'rgba(167,139,250,0.3)', padding: '2px 6px', borderRadius: 4 },
-    },
-    {
         type: 'splice', label: 'Splice', section: 'style',
         defaultColor: '#ec4899',
         previewCSS: { WebkitTextStroke: '2px #ec4899', color: 'transparent', fontWeight: 700 },
-    },
-    {
-        type: 'hollow', label: 'Hollow', section: 'style',
-        defaultColor: '#6366f1',
-        previewCSS: { WebkitTextStroke: '1.5px currentColor', color: 'transparent' },
     },
     {
         type: 'neon', label: 'Neon', section: 'style',
@@ -86,20 +75,6 @@ const EFFECT_PRESETS: EffectPreset[] = [
         previewCSS: { textShadow: '0 2px 4px rgba(245,158,11,0.3)', fontStyle: 'italic' },
     },
     // ── Advanced section ──
-    {
-        type: 'neon-lights', label: 'Neon Lights', section: 'advanced',
-        defaultColor: '#22c55e',
-        previewCSS: {
-            color: '#22c55e',
-            textShadow: '0 0 16px #22c55e, 0 0 32px rgba(34,197,94,0.4)',
-            WebkitTextStroke: '0.5px rgba(34,197,94,0.6)',
-        },
-    },
-    {
-        type: 'tv-static', label: 'TV Static', section: 'advanced',
-        defaultColor: '#94a3b8',
-        previewCSS: { textShadow: '1px -1px 2px rgba(255,255,255,0.4)', letterSpacing: '2px' },
-    },
     {
         type: '70s', label: '70s', section: 'advanced',
         defaultColor: '#f97316',

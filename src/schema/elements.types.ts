@@ -7,9 +7,8 @@ import type { LayoutRole } from './layoutRoles';
 /** All available text effect types */
 export type TextEffectType =
     | 'none' | 'drop' | 'glow' | 'echo'
-    | 'outline' | 'background' | 'splice' | 'hollow'
-    | 'neon' | 'glitch' | 'curve'
-    | 'neon-lights' | 'tv-static' | '70s';
+    | 'outline' | 'splice'
+    | 'neon' | 'glitch' | 'curve' | '70s';
 
 /** Persisted text effect configuration */
 export interface TextEffectConfig {
