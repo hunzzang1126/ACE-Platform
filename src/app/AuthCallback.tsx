@@ -5,6 +5,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
+import { getSupabase } from '@/services/supabaseClient';
 
 export function AuthCallback() {
     const navigate = useNavigate();
@@ -12,6 +13,24 @@ export function AuthCallback() {
 
     useEffect(() => {
         const handleCallback = async () => {
+            const sb = getSupabase();
+
+            // ★ PKCE flow: exchange authorization code for session
+            const url = new URL(window.location.href);
+            const code = url.searchParams.get('code');
+
+            if (code && sb) {
+                console.log('[AuthCallback] PKCE code detected, exchanging...');
+                const { error } = await sb.auth.exchangeCodeForSession(code);
+                if (error) {
+                    console.error('[AuthCallback] Code exchange failed:', error.message);
+                    navigate('/login', { replace: true });
+                    return;
+                }
+                console.log('[AuthCallback] Code exchange OK');
+            }
+
+            // Now sync the session (should find it after exchange)
             await syncSession();
 
             const { isAuthenticated, isApproved, user } = useAuthStore.getState();
@@ -44,6 +63,7 @@ export function AuthCallback() {
                     navigate(hasOnboarded ? '/dashboard' : '/onboarding', { replace: true });
                 }
             } else {
+                console.warn('[AuthCallback] No session after exchange — redirecting to login');
                 navigate('/login', { replace: true });
             }
         };
@@ -62,3 +82,4 @@ export function AuthCallback() {
         </div>
     );
 }
+
