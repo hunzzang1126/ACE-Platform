@@ -143,6 +143,9 @@ AVAILABLE ACTIONS:
 - Remove existing size variants
 - Navigate to canvas editor for any variant
 - Navigate back to main dashboard
+- update_element_text: Change text content of an element across ALL size variants at once
+- update_element_property: Modify a property (color, fontSize, fontWeight, fontFamily, opacity, etc.) across ALL variants
+- list_elements: List all elements in the master design with their names and content
 
 COMMON AD SIZES (suggest these when user asks):
 - 300x250 (Medium Rectangle)
@@ -154,11 +157,20 @@ COMMON AD SIZES (suggest these when user asks):
 - 250x250 (Square)
 - 336x280 (Large Rectangle)
 
+BATCH OPERATIONS — execute_dynamic_action (FALLBACK ONLY):
+When the user requests a complex batch operation that CANNOT be handled by individual tools above (e.g., "translate all text elements to English", "swap all fonts to Montserrat", "rename all elements"), use execute_dynamic_action to write JavaScript that directly manipulates the design store.
+
+AUTONOMY RULES:
+1. Use structured tools (update_element_text, update_element_property) FIRST for all modifications
+2. Use execute_dynamic_action ONLY when structured tools cannot accomplish the task (e.g., iterating all elements by condition, batch translations, conditional logic)
+3. NEVER use execute_dynamic_action to create or position design elements — suggest navigating to the canvas editor instead
+4. When using execute_dynamic_action, explain what the code will do BEFORE executing
+
 BEHAVIOR:
-- Execute sizing requests directly
+- Execute sizing and text modification requests directly
 - When user says "add all standard sizes", add the common sizes above
-- You have FULL AUTONOMY — no design pipeline needed
-- If user asks about design, suggest navigating to canvas editor`;
+- When user asks to change text, use update_element_text — it applies across ALL variants automatically
+- If user asks about design layout, suggest navigating to canvas editor`;
 
         case 'canvas-editor': {
             // Build existing element summary for AI context
@@ -193,6 +205,27 @@ AVAILABLE ACTIONS:
 - set_animation: Apply animation presets to elements
 - set_custom_style: Apply CSS effects (glow, shadow, etc.)
 - list_elements: List all elements on canvas
+
+CTA BUTTON QUALITY RULES (MANDATORY):
+- CTA button text MUST be contextual action copy: "Shop Now", "Learn More", "Get Started", "Try Free", "Book Now", "Sign Up", "Discover", "Explore"
+- NEVER use generic text like "Click Here", "Button", "CTA", or the font name as button text
+- CTA font should match the design's visual tone (not always Inter — use the design's primary font or a complementary font)
+- CTA background color should contrast with the design background for maximum visibility
+
+TEXT COPY QUALITY RULES (MANDATORY):
+- Headlines must be punchy, concise (3-8 words), and relevant to the brand/product
+- Subtext/body copy must be descriptive and add value — NEVER use placeholder text like "text", "subtext", "body", "description"
+- Instead write actual marketing copy: "Elevate your style", "Limited time offer", "Free shipping on orders $50+"
+- Match the tone of the brand (luxury = elegant, tech = clean, food = warm)
+
+BATCH OPERATIONS — execute_dynamic_action (FALLBACK ONLY):
+For complex batch operations that structured tools cannot handle (e.g., "translate all text", "swap all fonts"), use execute_dynamic_action to write JavaScript.
+
+AUTONOMY RULES:
+1. For design creation and element manipulation → ALWAYS use structured tools
+2. For batch operations structured tools CANNOT handle → use execute_dynamic_action as FALLBACK ONLY
+3. NEVER use execute_dynamic_action to create, position, or style design elements — that's what the structured tools are for
+4. When using execute_dynamic_action, explain what the code will do BEFORE executing
 
 CRITICAL ROUTING RULES:
 ${hasElements ? `- The canvas ALREADY HAS ${ctx.elementCount} elements. DO NOT use generate_full_design unless the user EXPLICITLY asks to "redesign", "start over", or "create from scratch".

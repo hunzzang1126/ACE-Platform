@@ -202,17 +202,18 @@ const add_shape: ToolDefinition = {
 
 const add_button: ToolDefinition = {
     name: 'add_button',
-    description: 'Add a CTA button (rounded rectangle + centered text) to the banner. Creates BOTH a shape background and text label. Always centered horizontally. Added to ALL size variants.',
+    description: 'Add a CTA button (rounded rectangle + centered text) to the banner. Creates BOTH a shape background and text label. Always centered horizontally. Added to ALL size variants. Button text should be contextual action copy like "Shop Now", "Learn More", "Get Started".',
     parameters: {
         type: 'object',
         properties: {
-            text: { type: 'string', description: 'Button text (auto-uppercased). e.g. "Register Now"' },
+            text: { type: 'string', description: 'Button text — use contextual action copy (e.g. "Shop Now", "Learn More", "Try Free"). Default "Shop Now"' },
             y: { type: 'number', description: 'Y position from top (px)' },
             width: { type: 'number', description: 'Button width (px). Default: 60% of canvas width' },
             height: { type: 'number', description: 'Button height (px). Default 40' },
             bgColor: { type: 'string', description: 'Background color (hex). Default "#c9a84c"' },
             textColor: { type: 'string', description: 'Text color (hex). Default "#ffffff"' },
             fontSize: { type: 'number', description: 'Font size (px). Default 14' },
+            fontFamily: { type: 'string', description: 'Font family for button text. Should match or complement the design font. Default "Inter"' },
             borderRadius: { type: 'number', description: 'Border radius (px). Default 6' },
             name: { type: 'string', description: 'Button name. Default "CTA Button"' },
             role: { type: 'string', description: 'Semantic role for smart sizing. Default "cta"' },

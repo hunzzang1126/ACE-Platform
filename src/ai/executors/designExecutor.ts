@@ -318,11 +318,12 @@ export function executeDesignTool(
         case 'add_button': {
             if (!designStore.creativeSet) return { success: false, message: 'No creative set open.' };
 
-            const text = ((params.text as string) || 'CLICK HERE').toUpperCase();
+            const text = (params.text as string) || 'Shop Now';
             let y = Number(params.y) || 200;
             const bgColor = (params.bgColor as string) || '#c9a84c';
             const textColor = (params.textColor as string) || '#ffffff';
             const fontSize = Number(params.fontSize) || 14;
+            const fontFamily = (params.fontFamily as string) || 'Inter';
             const borderRadius = Number(params.borderRadius) || 6;
             const elName = (params.name as string) || 'CTA Button';
             const role = (params.role as string) || 'cta';
@@ -392,7 +393,7 @@ export function executeDesignTool(
                         name: elName,
                         type: 'text' as const,
                         content: text,
-                        fontFamily: 'Inter',
+                        fontFamily,
                         fontSize,
                         fontWeight: 700,
                         fontStyle: 'normal' as const,
