@@ -29,7 +29,6 @@ export function getSupabase(): SupabaseClient | null {
             persistSession: true,
             autoRefreshToken: true,
             detectSessionInUrl: true, // handles OAuth callback
-            flowType: 'pkce', // ★ PKCE flow — works without third-party cookies
         },
     });
 
