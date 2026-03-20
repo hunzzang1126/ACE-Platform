@@ -12,6 +12,11 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import type { BannerVariant } from '@/schema/design.types';
 import { BUILT_IN_TEMPLATES } from './builtInTemplates';
+import {
+    fetchTemplateOverrides,
+    upsertTemplateOverride,
+    deleteTemplateOverride,
+} from '@/services/supabaseClient';
 
 // ── Types ──
 
@@ -91,6 +96,9 @@ interface TemplateState {
 
     /** Instantiate a template -> returns variant data */
     instantiate: (templateId: string) => BannerVariant | null;
+
+    /** Fetch global overrides from Supabase and apply to templates */
+    syncOverridesFromCloud: () => Promise<void>;
 }
 
 function genId(): string {
@@ -196,7 +204,7 @@ export const useTemplateStore = create<TemplateState>()(
 
             overrideTemplate: (id, variant, width, height) => {
                 const snapshot = JSON.stringify(variant);
-                // ★ Save override OUTSIDE immer set() to avoid cross-store deadlock
+                // ★ Save locally first (immediate)
                 set(state => {
                     state.templateOverrides[id] = snapshot;
                     const tmpl = state.templates.find(t => t.id === id);
@@ -208,6 +216,19 @@ export const useTemplateStore = create<TemplateState>()(
                     }
                     state.editingTemplateId = null;
                 });
+                // ★ Push to Supabase (fire-and-forget) so ALL users see the change
+                (async () => {
+                    try {
+                        const { useAuthStore } = await import('@/stores/authStore');
+                        const userId = useAuthStore.getState().user?.id;
+                        if (userId) {
+                            const tmpl = get().templates.find(t => t.id === id);
+                            await upsertTemplateOverride(id, snapshot, userId, tmpl?.width, tmpl?.height);
+                        }
+                    } catch (e) {
+                        console.warn('[templateStore] Failed to push override to cloud:', e);
+                    }
+                })();
             },
 
             clearOverride: (id) => {
@@ -223,6 +244,10 @@ export const useTemplateStore = create<TemplateState>()(
                         tmpl.updatedAt = new Date().toISOString();
                     }
                 });
+                // ★ Delete from Supabase (fire-and-forget)
+                deleteTemplateOverride(id).catch(e => {
+                    console.warn('[templateStore] Failed to delete override from cloud:', e);
+                });
             },
 
             setEditingTemplateId: (id) => {
@@ -231,6 +256,30 @@ export const useTemplateStore = create<TemplateState>()(
 
             setEditingTempCsId: (id) => {
                 set(state => { state.editingTempCsId = id; });
+            },
+
+            syncOverridesFromCloud: async () => {
+                try {
+                    const cloudOverrides = await fetchTemplateOverrides();
+                    if (Object.keys(cloudOverrides).length === 0) return;
+
+                    set(state => {
+                        for (const [id, override] of Object.entries(cloudOverrides)) {
+                            // ★ Cloud overrides take precedence over local
+                            state.templateOverrides[id] = override.snapshot;
+                            const tmpl = state.templates.find(t => t.id === id);
+                            if (tmpl) {
+                                tmpl.variantSnapshot = override.snapshot;
+                                if (override.width) tmpl.width = override.width;
+                                if (override.height) tmpl.height = override.height;
+                                tmpl.updatedAt = new Date().toISOString();
+                            }
+                        }
+                    });
+                    console.log('[templateStore] Synced', Object.keys(cloudOverrides).length, 'overrides from cloud');
+                } catch (e) {
+                    console.warn('[templateStore] Cloud sync failed (will use local):', e);
+                }
             },
         })),
         {
@@ -250,8 +299,7 @@ export const useTemplateStore = create<TemplateState>()(
                     ...userTemplates.filter(t => !builtInIds.has(t.id)),
                 ];
 
-                // ★ Re-apply persisted overrides on top of refreshed built-ins
-                // Admin edits are stored in templateOverrides and survive logout/reload
+                // ★ Re-apply LOCAL persisted overrides immediately (fast)
                 if (state.templateOverrides && Object.keys(state.templateOverrides).length > 0) {
                     for (const [id, snapshot] of Object.entries(state.templateOverrides)) {
                         const tmpl = state.templates.find(t => t.id === id);
@@ -260,8 +308,14 @@ export const useTemplateStore = create<TemplateState>()(
                             tmpl.updatedAt = tmpl.updatedAt || new Date().toISOString();
                         }
                     }
-                    console.log('[templateStore] Re-applied', Object.keys(state.templateOverrides).length, 'template overrides');
+                    console.log('[templateStore] Re-applied', Object.keys(state.templateOverrides).length, 'local overrides');
                 }
+
+                // ★ Then fetch CLOUD overrides async (updates all users)
+                // This runs AFTER hydration, so non-admin users get admin edits
+                setTimeout(() => {
+                    useTemplateStore.getState().syncOverridesFromCloud();
+                }, 500); // slight delay to not block initial render
             },
         },
     ),

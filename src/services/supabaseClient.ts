@@ -208,3 +208,119 @@ export async function markOnboardingComplete(
         console.warn('[markOnboardingComplete] Supabase update failed:', e);
     }
 }
+
+// ── Template Overrides (Global) ─────────────────
+
+export interface TemplateOverrideRow {
+    template_id: string;
+    variant_snapshot: any; // JSONB
+    width?: number;
+    height?: number;
+    updated_by: string | null;
+    updated_at: string;
+}
+
+/**
+ * Fetch ALL template overrides from Supabase.
+ * Returns a map of templateId → { snapshot, width, height }.
+ * Called on app load by ALL users so they see admin-edited templates.
+ */
+export async function fetchTemplateOverrides(): Promise<
+    Record<string, { snapshot: string; width?: number; height?: number }>
+> {
+    const sb = getSupabase();
+    if (!sb) return {};
+
+    try {
+        const { data, error } = await sb
+            .from('template_overrides')
+            .select('template_id, variant_snapshot, width, height');
+
+        if (error || !data) {
+            console.warn('[fetchTemplateOverrides] Error:', error?.message);
+            return {};
+        }
+
+        const result: Record<string, { snapshot: string; width?: number; height?: number }> = {};
+        for (const row of data) {
+            result[row.template_id] = {
+                snapshot: typeof row.variant_snapshot === 'string'
+                    ? row.variant_snapshot
+                    : JSON.stringify(row.variant_snapshot),
+                width: row.width ?? undefined,
+                height: row.height ?? undefined,
+            };
+        }
+        console.log('[fetchTemplateOverrides] Loaded', Object.keys(result).length, 'global overrides');
+        return result;
+    } catch (e) {
+        console.warn('[fetchTemplateOverrides] Failed:', e);
+        return {};
+    }
+}
+
+/**
+ * Upsert a template override to Supabase (admin only).
+ * Fire-and-forget safe — local save is the primary path.
+ */
+export async function upsertTemplateOverride(
+    templateId: string,
+    variantSnapshot: string,
+    userId: string,
+    width?: number,
+    height?: number,
+): Promise<{ error: string | null }> {
+    const sb = getSupabase();
+    if (!sb) return { error: 'Supabase not configured' };
+
+    try {
+        const { error } = await sb
+            .from('template_overrides')
+            .upsert({
+                template_id: templateId,
+                variant_snapshot: JSON.parse(variantSnapshot), // store as JSONB
+                width: width ?? null,
+                height: height ?? null,
+                updated_by: userId,
+                updated_at: new Date().toISOString(),
+            }, { onConflict: 'template_id' });
+
+        if (error) {
+            console.warn('[upsertTemplateOverride] Error:', error.message);
+            return { error: error.message };
+        }
+        console.log('[upsertTemplateOverride] Saved override for', templateId);
+        return { error: null };
+    } catch (e: any) {
+        console.warn('[upsertTemplateOverride] Failed:', e);
+        return { error: e.message ?? 'Unknown error' };
+    }
+}
+
+/**
+ * Delete a template override from Supabase (admin only).
+ * Reverts template to built-in default for all users.
+ */
+export async function deleteTemplateOverride(
+    templateId: string,
+): Promise<{ error: string | null }> {
+    const sb = getSupabase();
+    if (!sb) return { error: 'Supabase not configured' };
+
+    try {
+        const { error } = await sb
+            .from('template_overrides')
+            .delete()
+            .eq('template_id', templateId);
+
+        if (error) {
+            console.warn('[deleteTemplateOverride] Error:', error.message);
+            return { error: error.message };
+        }
+        console.log('[deleteTemplateOverride] Removed override for', templateId);
+        return { error: null };
+    } catch (e: any) {
+        console.warn('[deleteTemplateOverride] Failed:', e);
+        return { error: e.message ?? 'Unknown error' };
+    }
+}
