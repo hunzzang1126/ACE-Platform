@@ -189,6 +189,9 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         let brandAssetHint = '';
         let brandLogoUrl: string | null = null;
         let brandLogoW = 0, brandLogoH = 0;
+        // ★ NEW: Brand vision blocks for multimodal AI
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let brandVisionBlocks: any[] = [];
         try {
             const { useBrandKitStore } = await resilientImport(() => import('@/stores/brandKitStore'));
             const kit = useBrandKitStore.getState().getActiveKit();
@@ -204,8 +207,6 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
                 const activeAssets = kit.assets.filter(a => !a.deletedAt);
 
                 // ★ FIX: Only grab logos when brand name is relevant to the prompt.
-                // Previously used 'no keyword match needed' comment, which placed shophealth
-                // logo on Seoul travel ads. Now checks if brand name/tagline appears in prompt.
                 const logoAssets = activeAssets.filter(a => a.category === 'logo');
                 if (logoAssets.length > 0) {
                     const brandNameLower = (kit.guidelines?.name || kit.name || '').toLowerCase();
@@ -249,6 +250,17 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
                     brandAssetHint,
                 ].filter(Boolean).join('\n');
 
+                // ★ NEW: Build vision blocks so AI can SEE brand assets
+                try {
+                    const { buildBrandVisionBlocks } = await resilientImport(() => import('@/services/brandContextBuilder'));
+                    brandVisionBlocks = buildBrandVisionBlocks(kit);
+                    if (brandVisionBlocks.length > 0) {
+                        narrate(`AI can now visually see ${Math.floor(brandVisionBlocks.length / 2)} brand asset(s).`);
+                    }
+                } catch {
+                    // Vision blocks are optional — text context still works
+                }
+
                 const logoNote = logoAssets.length > 0 ? ` (${logoAssets.length} logo)` : '';
                 const assetNote = matchedAssets.length > 0
                     ? `${matchedAssets.length} matching asset(s)${logoNote}`
@@ -291,25 +303,88 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         narrate(`Copy ready: "${content.headline}"`);
         await new Promise(r => setTimeout(r, 400));
 
-        // ── Phase 3: Template Selection (Proven Layout Library) ──
-        // Select from our 12 constraint-based templates that auto-adapt to ANY canvas size.
-        // Templates are filtered by aspect ratio and rotated for variety.
-        narrate(`Choosing the best layout template for ${canvasW}x${canvasH}...`);
-        addCard('structure', 'Selecting layout template', 'running');
+        // ── Phase 3: Template Selection (AI Vision-Based) ──
+        // AI SEES rendered template previews and picks the best layout for the user's request.
+        narrate(`Analyzing layout templates for ${canvasW}x${canvasH}...`);
+        addCard('structure', 'AI selecting layout template', 'running');
 
-        const { selectTemplate } = await resilientImport(() => import('@/services/designTemplates'));
-        const template = selectTemplate(canvasW, canvasH);
-        if (!template) throw new Error('No compatible template found');
+        let template: import('@/services/designTemplates').DesignTemplate | null = null;
 
-        const structDetail = [
-            `Template: ${template.name}`,
-            `Description: ${template.description}`,
-            `Aspect Ratios: ${template.aspectRatios.join(', ')}`,
-        ].join('\n');
-        updateCard('structure', 'done', template.name, {
-            reasoning: `Selected "${template.name}" — ${template.description}`,
-            expandedDetail: structDetail,
-        });
+        try {
+            // Render template grid and send to AI for vision-based selection
+            const { renderTemplateGrid, buildTemplateSelectionPrompt, getTemplateById } =
+                await resilientImport(() => import('@/services/templatePreviewRenderer'));
+            const { callWithRole } = await resilientImport(() => import('@/services/openRouterClient'));
+
+            const gridDataUrl = renderTemplateGrid(canvasW, canvasH);
+            const selectionPrompt = buildTemplateSelectionPrompt(canvasW, canvasH);
+
+            // Extract base64 from data URL
+            const gridBase64 = gridDataUrl.split(',')[1] ?? '';
+
+            // ★ AI Vision call: send template grid image + user prompt
+            const aiResponse = await callWithRole('planner', {
+                messages: [{
+                    role: 'user',
+                    content: [
+                        { type: 'text', text: `${selectionPrompt}\n\nUser's design request: "${prompt}"` },
+                        {
+                            type: 'image',
+                            source: {
+                                type: 'base64',
+                                media_type: 'image/png',
+                                data: gridBase64,
+                            },
+                        },
+                        // Include brand vision blocks if available
+                        ...brandVisionBlocks,
+                    ],
+                }],
+                max_tokens: 200,
+            }, abort.signal) as { content?: Array<{ type: string; text?: string }> };
+
+            // Parse AI response for template ID
+            const aiText = aiResponse?.content?.find(b => b.type === 'text')?.text ?? '';
+            const jsonMatch = aiText.match(/\{[^}]+\}/);
+            if (jsonMatch) {
+                const parsed = JSON.parse(jsonMatch[0]);
+                const selectedId = parsed.templateId || parsed.template_id;
+                const reason = parsed.reason || '';
+                if (selectedId) {
+                    template = getTemplateById(selectedId) ?? null;
+                    if (template) {
+                        updateCard('structure', 'done', `${template.name} (AI selected)`, {
+                            reasoning: reason || `AI selected "${template.name}" based on visual analysis`,
+                            expandedDetail: [
+                                `Template: ${template.name}`,
+                                `ID: ${template.id}`,
+                                `Reason: ${reason}`,
+                                `Method: AI Vision-based selection`,
+                            ].join('\n'),
+                        });
+                        narrate(`AI chose "${template.name}" — ${reason}`);
+                    }
+                }
+            }
+        } catch (err) {
+            console.warn('[UnifiedAgent] AI template selection failed, falling back:', err);
+        }
+
+        // Fallback: use rotation if AI selection failed
+        if (!template) {
+            const { selectTemplate } = await resilientImport(() => import('@/services/designTemplates'));
+            template = selectTemplate(canvasW, canvasH);
+            if (!template) throw new Error('No compatible template found');
+            updateCard('structure', 'done', template.name, {
+                reasoning: `Fallback: "${template.name}" — ${template.description}`,
+                expandedDetail: [
+                    `Template: ${template.name}`,
+                    `Description: ${template.description}`,
+                    `Aspect Ratios: ${template.aspectRatios.join(', ')}`,
+                    `Method: Rotation fallback`,
+                ].join('\n'),
+            });
+        }
         await new Promise(r => setTimeout(r, 400));
 
         // ── Phase 4: AI Color Palette (Mood-Aware) ──

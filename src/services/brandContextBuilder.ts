@@ -80,14 +80,16 @@ export function buildBrandContextForPlanner(kit: BrandKit): string {
         sections.push(`FORBIDDEN WORDS: ${kit.guidelines.forbiddenWords.join(', ')}`);
     }
 
-    // AI Instructions
+    // AI Instructions — contextual, not forced
     sections.push(`
 INSTRUCTIONS FOR PLANNER:
-- ALWAYS use brand palette colors. Do NOT invent new colors.
-- If logos are available, INCLUDE the primary logo in the layout plan.
-- Product images should be placed in hero zones.
-- CTA text must come from ctaPhrases list unless user specifies otherwise.
-- Respect logoPlacementRules for logo positioning.`);
+- This brand kit is AVAILABLE but NOT mandatory. Use it ONLY if the design request relates to this brand.
+- If the user mentions a DIFFERENT brand (e.g. "Nike ad", "Apple promo"), do NOT use this brand kit's assets or colors.
+- If the design IS for this brand: prefer brand palette colors and include the primary logo.
+- Product images should be placed in hero zones when relevant.
+- CTA text: prefer ctaPhrases list, but user-specified CTA overrides.
+- Respect logoPlacementRules for logo positioning.
+- You can SEE the brand assets in the attached images. Use your visual judgment to decide which assets fit the design request.`);
 
     return sections.join('\n');
 }
@@ -158,6 +160,81 @@ export function buildBrandComplianceForCritic(kit: BrandKit): BrandComplianceRul
 
 export function buildCompactBrandContext(kit: BrandKit): string {
     return `Brand: "${kit.guidelines.name}" | Colors: ${kit.palette.primary}, ${kit.palette.secondary}, ${kit.palette.accent} | Font: ${kit.typography.heading.family} | Voice: ${kit.guidelines.voiceTone} | Logos: ${kit.assets.filter(a => a.category === 'logo' && !a.deletedAt).length} | Products: ${kit.assets.filter(a => a.category === 'product' && !a.deletedAt).length}`;
+}
+
+// ── Vision Blocks for Multimodal AI ──────────────
+// Extracts brand asset thumbnails as Anthropic-format image content blocks
+// so the AI can VISUALLY see what each logo/product looks like.
+
+export interface VisionBlock {
+    type: 'image';
+    source: {
+        type: 'base64';
+        media_type: string;
+        data: string;
+    };
+}
+
+export interface VisionTextBlock {
+    type: 'text';
+    text: string;
+}
+
+/**
+ * Build multimodal vision blocks from brand kit assets.
+ * Returns an array of alternating text labels + image blocks
+ * that can be injected into the user message content array.
+ */
+export function buildBrandVisionBlocks(kit: BrandKit): (VisionBlock | VisionTextBlock)[] {
+    const blocks: (VisionBlock | VisionTextBlock)[] = [];
+    const activeAssets = kit.assets.filter(a => !a.deletedAt);
+
+    if (activeAssets.length === 0) return blocks;
+
+    blocks.push({
+        type: 'text',
+        text: `\n[BRAND KIT VISUAL ASSETS — "${kit.guidelines.name || kit.name}"]\nBelow are the actual images of brand assets. Use your vision to identify what each one is.`,
+    });
+
+    // Send up to 6 assets (to avoid token overload)
+    const assetsToShow = activeAssets.slice(0, 6);
+
+    for (const asset of assetsToShow) {
+        // Use thumbSrc (150px) for efficiency, fall back to src
+        const imgSrc = asset.thumbSrc || asset.src;
+        if (!imgSrc) continue;
+
+        // Extract base64 data from data URL
+        const match = imgSrc.match(/^data:(image\/[^;]+);base64,(.+)$/);
+        if (!match) continue;
+
+        const [, mediaType, base64Data] = match;
+
+        // Label
+        blocks.push({
+            type: 'text',
+            text: `Asset: "${asset.name}" (${asset.category}, ${asset.width}x${asset.height}, role: ${asset.role || 'none'})`,
+        });
+
+        // Image
+        blocks.push({
+            type: 'image',
+            source: {
+                type: 'base64',
+                media_type: mediaType!,
+                data: base64Data!,
+            },
+        });
+    }
+
+    if (assetsToShow.length < activeAssets.length) {
+        blocks.push({
+            type: 'text',
+            text: `(${activeAssets.length - assetsToShow.length} more assets not shown)`,
+        });
+    }
+
+    return blocks;
 }
 
 // ── Helpers ──
