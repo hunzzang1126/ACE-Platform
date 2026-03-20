@@ -3,6 +3,9 @@
 // ─────────────────────────────────────────────────
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 
+// Cloud Sync
+import { useCloudSync } from '@/hooks/useCloudSync';
+
 // Pages
 import { LandingPage } from './LandingPage';
 import { LoginPage } from './LoginPage';
@@ -28,10 +31,17 @@ import { ErrorBoundary } from '../components/ui/ErrorBoundary';
 import { ToastContainer } from '../components/ui/Toast';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 
+/** Renderless component that activates cloud sync on login */
+function CloudSyncProvider() {
+    useCloudSync();
+    return null;
+}
+
 export default function App() {
     return (
         <ErrorBoundary>
             <BrowserRouter>
+                <CloudSyncProvider />
                 <Routes>
                     {/* ── Public Routes ── */}
                     <Route path="/" element={<LandingPage />} />
