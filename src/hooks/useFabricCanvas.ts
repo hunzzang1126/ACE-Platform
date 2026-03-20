@@ -673,6 +673,8 @@ export function useFabricCanvas(
             delete (obj as any).__glidOriginalFill;
         }
         obj.set({ shadow: undefined, stroke: undefined, strokeWidth: 0 } as any);
+        delete (obj as any).__glidCustomStyles;
+        obj.dirty = true;
         if (obj instanceof Textbox) {
             obj.set({ paintFirst: 'fill' } as any);
         }

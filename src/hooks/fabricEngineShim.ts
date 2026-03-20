@@ -47,6 +47,9 @@ function applyTextEffectCSS(
     obj.set({ shadow: undefined, stroke: undefined, strokeWidth: 0 } as any);
     // ★ Clear custom styles used by neon/glitch multi-layer effects
     delete (obj as any).__glidCustomStyles;
+    // ★ Force Fabric texture cache invalidation — without this, Fabric may
+    // re-use the cached bitmap of the old effect even after property reset.
+    obj.dirty = true;
     if (obj instanceof Textbox) {
         obj.set({ paintFirst: 'fill' } as any);
         // ★ Restore original fill when switching effects (previous effect may have set fill='transparent')
@@ -764,6 +767,8 @@ export function createEngineShim(
             }
             // Clear all effect-related styles
             obj.set({ shadow: undefined, stroke: undefined, strokeWidth: 0 } as any);
+            delete (obj as any).__glidCustomStyles;
+            obj.dirty = true;
             if (obj instanceof Textbox) {
                 obj.set({ paintFirst: 'fill' } as any);
             }
