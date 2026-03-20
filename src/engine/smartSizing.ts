@@ -13,6 +13,7 @@
 import type { DesignElement } from '@/schema/elements.types';
 import type { ElementConstraints } from '@/schema/constraints.types';
 import { resolveConstraints } from '@/schema/constraints.types';
+import { constraintsToAbsolute } from './elementConverters';
 
 // ── Aspect Ratio Categories ─────────────────────
 
@@ -218,6 +219,8 @@ export function smartSizeElements(
         return JSON.parse(JSON.stringify(originElements));
     }
 
+    console.log(`[smartSizing] ★ Running: ${originW}x${originH} → ${targetW}x${targetH}, ${originElements.length} elements`);
+
     // ★ Independent X/Y scaling — template FILLS entire canvas (like painting a wall)
     const scaleX = targetW / originW;
     const scaleY = targetH / originH;
@@ -225,7 +228,8 @@ export function smartSizeElements(
     const scaleFontRadius = Math.sqrt(scaleX * scaleY);
 
     return originElements.map((el) => {
-        const resolved = resolveConstraints(el.constraints, originW, originH);
+        // ★ Use constraintsToAbsolute — SINGLE SOURCE OF TRUTH per quality standards
+        const abs = constraintsToAbsolute(el.constraints, originW, originH);
         const role = detectElementRole(el, originW, originH);
 
         // ── Background: always fill 100% of target canvas ──
@@ -236,6 +240,7 @@ export function smartSizeElements(
                 size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width: targetW, height: targetH },
                 rotation: el.constraints.rotation,
             };
+            console.log(`[smartSizing]   BG → ${targetW}x${targetH} (100%)`);
             return {
                 ...JSON.parse(JSON.stringify(el)),
                 constraints: newConstraints,
@@ -244,10 +249,10 @@ export function smartSizeElements(
 
         // ── All other elements: independent X/Y stretch fill ──
         // Same technique as template drops — stretches to fill canvas
-        const newX = Math.round(resolved.x * scaleX);
-        const newY = Math.round(resolved.y * scaleY);
-        const newW = Math.max(4, Math.round(resolved.width * scaleX));
-        const newH = Math.max(4, Math.round(resolved.height * scaleY));
+        const newX = Math.round(abs.x * scaleX);
+        const newY = Math.round(abs.y * scaleY);
+        const newW = Math.max(4, Math.round(abs.w * scaleX));
+        const newH = Math.max(4, Math.round(abs.h * scaleY));
 
         const newConstraints: ElementConstraints = {
             horizontal: { anchor: 'left' as const, offset: newX },
