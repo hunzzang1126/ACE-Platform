@@ -232,6 +232,8 @@ export function smartSizeElements(
         const abs = constraintsToAbsolute(el.constraints, originW, originH);
         const role = detectElementRole(el, originW, originH);
 
+        console.log(`[smartSizing]   el="${el.name}" type=${el.type} role=${role} origin=(${abs.x},${abs.y},${abs.w}x${abs.h})`);
+
         // ── Background: always fill 100% of target canvas ──
         if (role === 'background') {
             const newConstraints: ElementConstraints = {
@@ -240,7 +242,7 @@ export function smartSizeElements(
                 size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width: targetW, height: targetH },
                 rotation: el.constraints.rotation,
             };
-            console.log(`[smartSizing]   BG → ${targetW}x${targetH} (100%)`);
+            console.log(`[smartSizing]     → BG FILL ${targetW}x${targetH}`);
             return {
                 ...JSON.parse(JSON.stringify(el)),
                 constraints: newConstraints,
@@ -253,6 +255,7 @@ export function smartSizeElements(
         const newY = Math.round(abs.y * scaleY);
         const newW = Math.max(4, Math.round(abs.w * scaleX));
         const newH = Math.max(4, Math.round(abs.h * scaleY));
+        console.log(`[smartSizing]     → scaled=(${newX},${newY},${newW}x${newH})`);
 
         const newConstraints: ElementConstraints = {
             horizontal: { anchor: 'left' as const, offset: newX },
