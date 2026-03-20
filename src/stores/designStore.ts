@@ -506,40 +506,39 @@ export const useDesignStore = create<DesignState>()(
                                 const targetW = target.preset.width;
                                 const targetH = target.preset.height;
 
-                                // ★ BUG 3/6 FIX: If target already has elements,
-                                // only sync property changes (color, fill, opacity, content, src).
-                                // Do NOT re-run layout — that destroys manual arrangement.
-                                const targetHasExisting = target.elements.length > 0;
+                                // ★ ALWAYS re-run smart sizing for layout, then merge visual properties.
+                                // Smart sizing gives proper aspect-ratio-aware positions.
+                                // Property merge ensures colors/text/opacity stay in sync with origin.
+                                const adapted = smartSizeElements(
+                                    elements,
+                                    originW, originH,
+                                    targetW, targetH,
+                                );
 
+                                // If target already has elements, merge visual properties from origin
+                                // onto the newly-laid-out elements (so colors/text stay synced)
                                 let finalElements: DesignElement[];
-
-                                if (targetHasExisting) {
-                                    // ── Property-only merge: preserve layout, sync appearances ──
-                                    finalElements = mergePropertyChanges(target.elements, elements, originW, originH, targetW, targetH);
+                                if (target.elements.length > 0) {
+                                    finalElements = mergePropertyChanges(adapted, elements, originW, originH, targetW, targetH);
                                 } else {
-                                    // ── First time: full smart sizing ──
-                                    const adapted = smartSizeElements(
-                                        elements,
-                                        originW, originH,
-                                        targetW, targetH,
-                                    );
-                                    // Auto-QA sweep
-                                    const targetWithAdapted: BannerVariant = { ...target, elements: adapted };
-                                    const qaIssues = runSmartSizingQA([targetWithAdapted]);
                                     finalElements = adapted;
-                                    if (qaIssues.length > 0) {
-                                        const fixes = generateFixes(qaIssues, [targetWithAdapted]);
-                                        if (fixes.length > 0) {
-                                            finalElements = adapted.map((el) => {
-                                                const fix = fixes.find(f => f.elementId === el.id);
-                                                return fix ? { ...el, ...fix.patch } as DesignElement : el;
-                                            });
-                                            // ★ BUG 5: Capture plain values, NOT Immer proxies
-                                            pendingRefreshes.push({
-                                                variantId: target.id,
-                                                fixCount: fixes.length,
-                                            });
-                                        }
+                                }
+
+                                // Auto-QA sweep
+                                const targetWithAdapted: BannerVariant = { ...target, elements: finalElements };
+                                const qaIssues = runSmartSizingQA([targetWithAdapted]);
+                                if (qaIssues.length > 0) {
+                                    const fixes = generateFixes(qaIssues, [targetWithAdapted]);
+                                    if (fixes.length > 0) {
+                                        finalElements = finalElements.map((el) => {
+                                            const fix = fixes.find(f => f.elementId === el.id);
+                                            return fix ? { ...el, ...fix.patch } as DesignElement : el;
+                                        });
+                                        // ★ BUG 5: Capture plain values, NOT Immer proxies
+                                        pendingRefreshes.push({
+                                            variantId: target.id,
+                                            fixCount: fixes.length,
+                                        });
                                     }
                                 }
 
@@ -588,11 +587,10 @@ export const useDesignStore = create<DesignState>()(
                         if (!cs.plugConnections) cs.plugConnections = {};
                         cs.plugConnections[targetId] = originId;
 
-                        // ★ FIX: Immediately propagate origin's design to the newly plugged target.
-                        // Uses constraint-based smart sizing so different aspect ratios get proper layout.
-                        // Previously, users had to re-save the origin to trigger propagation.
-                        if (origin.elements.length > 0 && target.elements.length === 0) {
-                            // First time: full constraint-based smart sizing
+                        // ★ FIX: ALWAYS re-run smart sizing on plug connection.
+                        // Plugging is a deliberate action — the user WANTS the layout to adapt.
+                        // Property-only merge is only for ongoing save propagation (replaceVariantElements).
+                        if (origin.elements.length > 0) {
                             const adapted = smartSizeElements(
                                 origin.elements,
                                 origin.preset.width, origin.preset.height,
@@ -611,14 +609,15 @@ export const useDesignStore = create<DesignState>()(
                                     });
                                 }
                             }
-                            target.elements = finalElements;
-                        } else if (origin.elements.length > 0 && target.elements.length > 0) {
-                            // Target already has elements: property-only merge
-                            target.elements = mergePropertyChanges(
-                                target.elements, origin.elements,
-                                origin.preset.width, origin.preset.height,
-                                target.preset.width, target.preset.height,
-                            );
+                            // Preserve user overrides on specific elements
+                            const overridden = new Set(target.overriddenElementIds);
+                            target.elements = finalElements.map((adaptedEl) => {
+                                if (overridden.has(adaptedEl.id)) {
+                                    const existing = target.elements.find(e => e.id === adaptedEl.id);
+                                    return existing ?? adaptedEl;
+                                }
+                                return adaptedEl;
+                            });
                         }
 
                         cs.updatedAt = new Date().toISOString();
