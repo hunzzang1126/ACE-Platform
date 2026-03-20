@@ -494,6 +494,8 @@ export const useDesignStore = create<DesignState>()(
                             .filter(([, originId]) => originId === variantId)
                             .map(([targetId]) => targetId);
 
+                        console.log(`[designStore] replaceVariantElements: variantId=${variantId}, plugConnections=`, JSON.stringify(plugs), `pluggedTargetIds=`, pluggedTargetIds);
+
                         if (pluggedTargetIds.length > 0) {
                             const originW = variant.preset.width;
                             const originH = variant.preset.height;
@@ -587,10 +589,13 @@ export const useDesignStore = create<DesignState>()(
                         if (!cs.plugConnections) cs.plugConnections = {};
                         cs.plugConnections[targetId] = originId;
 
+                        console.log(`[designStore] connectPlug: origin=${originId} (${origin.preset.width}x${origin.preset.height}) → target=${targetId} (${target.preset.width}x${target.preset.height}), origin.elements=${origin.elements.length}`);
+
                         // ★ FIX: ALWAYS re-run smart sizing on plug connection.
                         // Plugging is a deliberate action — the user WANTS the layout to adapt.
                         // Property-only merge is only for ongoing save propagation (replaceVariantElements).
                         if (origin.elements.length > 0) {
+                            console.log(`[designStore] connectPlug: calling smartSizeElements...`);
                             const adapted = smartSizeElements(
                                 origin.elements,
                                 origin.preset.width, origin.preset.height,
