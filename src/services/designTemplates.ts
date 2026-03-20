@@ -770,29 +770,31 @@ export function buildContentPrompt(userPrompt: string, canvasW: number, canvasH:
     const isSmall = canvasW < 200 || canvasH < 200;
 
     const headlineLimit = isWide ? '3-5 words, single line' : isTall ? '2-4 words per line, 2-3 lines' : '2-5 words per line, 1-2 lines';
-    const subLimit = isSmall ? '1 short sentence (max 8 words)' : '1-2 sentences (max 15 words total)';
+    const subLimit = isSmall ? 'empty string (canvas too small)' : '1-2 sentences, max 15 words total';
 
-    return `You are a world-class copywriter. Generate ad copy for this creative:
+    return `You are a world-class ad copywriter. Generate copy for a ${canvasW}x${canvasH}px creative.
 
-Template: ${templateName} (${canvasW}x${canvasH}px)
 Brief: "${userPrompt}"
+Template: ${templateName}
+Language: ${language} (if prompt is in a different language, use THAT language)
 
-Generate EXACTLY this JSON object:
+Return EXACTLY this JSON structure with your generated copy as the values:
 {
-  "headline": "${headlineLimit}. Bold, impactful, no period at end",
-  "subheadline": "${subLimit}. Supporting the headline, professional tone. If the headline is already clear and the canvas is small, set to empty string.",
-  "cta": "1-3 word action verb. Examples: Learn More, Get Started, Shop Now, Try Free",
-  "tag": "1-2 word contextual label OR empty string. Only include if a natural category fits (NEW, SALE, LIMITED, 2026). For generic or travel ads, return empty string."
+  "headline": "YOUR HEADLINE HERE",
+  "subheadline": "YOUR SUBHEADLINE HERE",
+  "cta": "YOUR CTA HERE",
+  "tag": "YOUR TAG HERE"
 }
 
-Rules:
-- Write real, professional ad copy — no lorem ipsum
-- Headline should be the star — punchy, memorable
-- CTA must be a clear call to action  
-- Tag is OPTIONAL — only use if the concept has a clear category/status. Return "" if not relevant.
-- Write all text in ${language}
-- If the user's prompt is in a different language, use THAT language instead
-- IMPORTANT: If the headline already conveys the full message (e.g. "SUMMER SALE 40% OFF"), the subheadline is OPTIONAL — set it to "" (empty string) to keep the layout clean
-- ${isSmall ? 'This canvas is very SMALL — subheadline should be empty "" to avoid crowding' : 'Only include subheadline if it adds genuine value'}
-- Return ONLY the JSON object, no explanation`;
+FIELD RULES:
+- headline: ${headlineLimit}. Must be bold, punchy, memorable. No period at end.
+- subheadline: ${subLimit}. Supports the headline with additional context. Set to "" if headline is self-explanatory or canvas is small.
+- cta: 1-3 word call-to-action verb phrase. Examples: "Learn More", "Shop Now", "Get Started", "Try Free".
+- tag: 1-2 word label like "NEW", "SALE", "LIMITED", "2026". Set to "" if no natural category fits.
+
+CRITICAL:
+- Write REAL ad copy relevant to the brief. Do NOT output placeholder text, field descriptions, or technical terms.
+- The values must be actual advertising text a human would read.
+- Do NOT put font names, CSS properties, or layout instructions in the copy.
+- Return ONLY the JSON object. No explanation, no markdown fences.`;
 }
