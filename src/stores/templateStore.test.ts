@@ -148,3 +148,164 @@ describe('useTemplateStore — Built-in Templates', () => {
         expect(result).toBeUndefined();
     });
 });
+
+// ─────────────────────────────────────────────────
+// Template Override Tests (Admin global edit system)
+// ─────────────────────────────────────────────────
+describe('useTemplateStore — Template Overrides', () => {
+    beforeEach(() => {
+        // Seed with built-in templates
+        useTemplateStore.setState({
+            templates: [...BUILT_IN_TEMPLATES],
+            templateOverrides: {},
+            editingTemplateId: null,
+            editingTempCsId: null,
+        });
+    });
+
+    const overrideVariant: BannerVariant = {
+        id: 'override-v1',
+        preset: { id: 'p1', name: '1080x1080', width: 1080, height: 1080, category: 'social' },
+        elements: [
+            {
+                id: 'el-override-1', name: 'Override Text', type: 'text',
+                constraints: { horizontal: { anchor: 'center', offset: 0 }, vertical: { anchor: 'center', offset: 0 }, size: { widthMode: 'fixed', heightMode: 'fixed', width: 200, height: 50 }, rotation: 0 },
+                opacity: 1, visible: true, locked: false, zIndex: 1,
+                content: 'ADMIN EDITED', fontSize: 24, fontWeight: 700, color: '#ff0000',
+            } as any,
+        ],
+        backgroundColor: '#111111',
+        overriddenElementIds: [],
+        syncLocked: false,
+    };
+
+    it('overrideTemplate saves variant snapshot locally', () => {
+        const templateId = BUILT_IN_TEMPLATES[0].id;
+        useTemplateStore.getState().overrideTemplate(templateId, overrideVariant);
+
+        const overrides = useTemplateStore.getState().templateOverrides;
+        expect(overrides[templateId]).toBeDefined();
+        expect(JSON.parse(overrides[templateId]).backgroundColor).toBe('#111111');
+    });
+
+    it('overrideTemplate updates the template in the templates array', () => {
+        const templateId = BUILT_IN_TEMPLATES[0].id;
+        const originalSnapshot = BUILT_IN_TEMPLATES[0].variantSnapshot;
+
+        useTemplateStore.getState().overrideTemplate(templateId, overrideVariant);
+
+        const tmpl = useTemplateStore.getState().templates.find(t => t.id === templateId);
+        expect(tmpl).toBeDefined();
+        expect(tmpl!.variantSnapshot).not.toBe(originalSnapshot);
+        expect(JSON.parse(tmpl!.variantSnapshot).backgroundColor).toBe('#111111');
+    });
+
+    it('overrideTemplate updates width and height when provided', () => {
+        const templateId = BUILT_IN_TEMPLATES[0].id;
+        useTemplateStore.getState().overrideTemplate(templateId, overrideVariant, 500, 500);
+
+        const tmpl = useTemplateStore.getState().templates.find(t => t.id === templateId);
+        expect(tmpl!.width).toBe(500);
+        expect(tmpl!.height).toBe(500);
+    });
+
+    it('overrideTemplate clears editingTemplateId', () => {
+        useTemplateStore.getState().setEditingTemplateId('some-id');
+        expect(useTemplateStore.getState().editingTemplateId).toBe('some-id');
+
+        const templateId = BUILT_IN_TEMPLATES[0].id;
+        useTemplateStore.getState().overrideTemplate(templateId, overrideVariant);
+        expect(useTemplateStore.getState().editingTemplateId).toBeNull();
+    });
+
+    it('clearOverride reverts template to built-in default', () => {
+        const templateId = BUILT_IN_TEMPLATES[0].id;
+        const originalSnapshot = BUILT_IN_TEMPLATES[0].variantSnapshot;
+
+        // Override then clear
+        useTemplateStore.getState().overrideTemplate(templateId, overrideVariant);
+        useTemplateStore.getState().clearOverride(templateId);
+
+        const tmpl = useTemplateStore.getState().templates.find(t => t.id === templateId);
+        expect(tmpl!.variantSnapshot).toBe(originalSnapshot);
+        expect(useTemplateStore.getState().templateOverrides[templateId]).toBeUndefined();
+    });
+
+    it('clearOverride removes from templateOverrides map', () => {
+        const templateId = BUILT_IN_TEMPLATES[0].id;
+        useTemplateStore.getState().overrideTemplate(templateId, overrideVariant);
+        expect(useTemplateStore.getState().templateOverrides[templateId]).toBeDefined();
+
+        useTemplateStore.getState().clearOverride(templateId);
+        expect(useTemplateStore.getState().templateOverrides[templateId]).toBeUndefined();
+    });
+
+    it('multiple independent overrides work concurrently', () => {
+        const id1 = BUILT_IN_TEMPLATES[0].id;
+        const id2 = BUILT_IN_TEMPLATES[1].id;
+
+        useTemplateStore.getState().overrideTemplate(id1, overrideVariant);
+        useTemplateStore.getState().overrideTemplate(id2, {
+            ...overrideVariant, id: 'override-v2', backgroundColor: '#222222',
+        });
+
+        const overrides = useTemplateStore.getState().templateOverrides;
+        expect(Object.keys(overrides).length).toBe(2);
+        expect(JSON.parse(overrides[id1]).backgroundColor).toBe('#111111');
+        expect(JSON.parse(overrides[id2]).backgroundColor).toBe('#222222');
+    });
+
+    it('clearing one override does not affect another', () => {
+        const id1 = BUILT_IN_TEMPLATES[0].id;
+        const id2 = BUILT_IN_TEMPLATES[1].id;
+
+        useTemplateStore.getState().overrideTemplate(id1, overrideVariant);
+        useTemplateStore.getState().overrideTemplate(id2, {
+            ...overrideVariant, id: 'override-v2', backgroundColor: '#222222',
+        });
+
+        useTemplateStore.getState().clearOverride(id1);
+        expect(useTemplateStore.getState().templateOverrides[id1]).toBeUndefined();
+        expect(useTemplateStore.getState().templateOverrides[id2]).toBeDefined();
+    });
+
+    it('override variant snapshot is valid JSON', () => {
+        const templateId = BUILT_IN_TEMPLATES[0].id;
+        useTemplateStore.getState().overrideTemplate(templateId, overrideVariant);
+
+        const snapshot = useTemplateStore.getState().templateOverrides[templateId];
+        expect(() => JSON.parse(snapshot)).not.toThrow();
+        const parsed = JSON.parse(snapshot);
+        expect(parsed.elements).toBeInstanceOf(Array);
+        expect(parsed.elements[0].content).toBe('ADMIN EDITED');
+    });
+
+    it('overriding same template twice updates (not duplicates)', () => {
+        const templateId = BUILT_IN_TEMPLATES[0].id;
+
+        useTemplateStore.getState().overrideTemplate(templateId, overrideVariant);
+        useTemplateStore.getState().overrideTemplate(templateId, {
+            ...overrideVariant, backgroundColor: '#333333',
+        });
+
+        const overrides = useTemplateStore.getState().templateOverrides;
+        // Only one entry, not two
+        expect(Object.keys(overrides).filter(k => k === templateId).length).toBe(1);
+        expect(JSON.parse(overrides[templateId]).backgroundColor).toBe('#333333');
+    });
+
+    it('instantiate uses overridden snapshot if present', () => {
+        const templateId = BUILT_IN_TEMPLATES[0].id;
+        useTemplateStore.getState().overrideTemplate(templateId, overrideVariant);
+
+        const result = useTemplateStore.getState().instantiate(templateId);
+        expect(result).not.toBeNull();
+        expect(result!.backgroundColor).toBe('#111111');
+        expect(result!.elements[0]).toBeDefined();
+        expect((result!.elements[0] as any).content).toBe('ADMIN EDITED');
+    });
+
+    it('syncOverridesFromCloud action exists on the store', () => {
+        expect(typeof useTemplateStore.getState().syncOverridesFromCloud).toBe('function');
+    });
+});
