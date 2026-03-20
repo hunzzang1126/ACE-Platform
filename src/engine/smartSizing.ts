@@ -1,20 +1,18 @@
 // ─────────────────────────────────────────────────
-// Smart Sizing Engine — AI-Powered Adaptive Layout
+// Smart Sizing Engine — Template-Proven Adaptive Layout
 // ─────────────────────────────────────────────────
 // Converts a master design → optimized layout for any target size.
-// Uses aspect ratio classification + element role detection
-// to intelligently reposition elements.
+// Uses the SAME strategy as template drops (applyVariantToCanvas):
+// independent X/Y scaling (stretch fill) + geometric mean for fonts.
 //
-// ★ ROLE-AWARE SIZING (v2):
-// Elements WITH semantic roles → use computeSmartConstraints() from smartLayout.ts
-// (aspect-ratio-aware: ultra-wide gets horizontal flow, portrait gets vertical stack)
-// Elements WITHOUT roles → proportional fallback scaling
+// ★ v3: TEMPLATE-PROVEN STRATEGY
+// All elements → independent scaleX/scaleY stretch (fills canvas like painting a wall)
+// Fonts/radii → √(scaleX × scaleY) geometric mean (balanced)
+// Background → always 100% coverage
 
 import type { DesignElement } from '@/schema/elements.types';
 import type { ElementConstraints } from '@/schema/constraints.types';
 import { resolveConstraints } from '@/schema/constraints.types';
-import type { LayoutRole } from '@/schema/layoutRoles';
-import { computeSmartConstraints, getSmartFontSize } from './smartLayout';
 
 // ── Aspect Ratio Categories ─────────────────────
 
@@ -187,50 +185,26 @@ export const LAYOUT_ZONES: Record<SizeCategory, LayoutMap> = {
     },
 };
 
-// ── Smart Sizing (Role-Aware + Proportional Fallback) ───
-// ★ v2: Elements with LayoutRole → smartLayout.ts rules (aspect-ratio aware)
-// Elements without roles → proportional scaling fallback
+// ── Smart Sizing (Template-Proven Strategy) ─────────
+// ★ v3: Same approach as applyVariantToCanvas() in SidebarTemplateTab.tsx
 
 const MIN_FONT = 8; // minimum font size in px
-
-/**
- * Roles that should use the smart layout engine for positioning.
- * These get aspect-ratio-aware placement instead of proportional scaling.
- */
-const SMART_LAYOUT_ROLES = new Set<string>([
-    'background', 'headline', 'subline', 'subtext', 'cta', 'logo',
-    'tnc', 'hero', 'accent', 'detail', 'badge',
-]);
-
-/**
- * Map ElementRole (detected) → LayoutRole (smartLayout.ts).
- * Some detected roles have different names than LayoutRoles.
- */
-function toLayoutRole(detectedRole: ElementRole, elementRole?: LayoutRole): LayoutRole | null {
-    // Prefer the explicit element.role (LayoutRole) if present
-    if (elementRole) return elementRole;
-
-    // Map detected ElementRole → LayoutRole
-    const mapping: Partial<Record<ElementRole, LayoutRole>> = {
-        background: 'background',
-        headline: 'headline',
-        subtext: 'subline',
-        cta: 'cta',
-        logo: 'logo',
-        image: 'hero',
-    };
-    return mapping[detectedRole] ?? null;
-}
 
 /**
  * Apply smart sizing from origin elements → target variant.
  * Returns new array of elements adapted for the target size.
  *
- * ★ HYBRID STRATEGY:
- * 1. Elements with roles → computeSmartConstraints() for aspect-ratio-aware layout
- *    (ultra-wide: horizontal flow, portrait: vertical stack, etc.)
- * 2. Elements without roles → proportional scaling fallback
- * 3. Background → always covers 100% of target canvas
+ * ★ TEMPLATE-PROVEN STRATEGY (v3):
+ * Uses the EXACT same scaling technique as applyVariantToCanvas() in
+ * SidebarTemplateTab.tsx — this is what makes template drops into
+ * any size (1080×1080 → 728×90) look perfect.
+ *
+ * Key: Independent X/Y scaling (stretch fill) + geometric mean for fonts.
+ * - Position/size: scaleX for horizontal, scaleY for vertical (fills canvas)
+ * - Font/radius:   √(scaleX × scaleY) (balanced geometric mean)
+ * - Background:    always 100% coverage
+ *
+ * No role dependency — works with any design regardless of which elements exist.
  */
 export function smartSizeElements(
     originElements: DesignElement[],
@@ -244,57 +218,36 @@ export function smartSizeElements(
         return JSON.parse(JSON.stringify(originElements));
     }
 
+    // ★ Independent X/Y scaling — template FILLS entire canvas (like painting a wall)
     const scaleX = targetW / originW;
     const scaleY = targetH / originH;
-    // Uniform scale for proportional fallback
-    const uniformScale = Math.min(scaleX, scaleY);
+    // ★ Geometric mean keeps fonts/radii visually balanced across both axes
+    const scaleFontRadius = Math.sqrt(scaleX * scaleY);
 
     return originElements.map((el) => {
         const resolved = resolveConstraints(el.constraints, originW, originH);
-        const detectedRole = detectElementRole(el, originW, originH);
-        const layoutRole = toLayoutRole(detectedRole, el.role);
+        const role = detectElementRole(el, originW, originH);
 
-        // ── Path 1: Role-aware smart layout ──
-        // Uses computeSmartConstraints() for aspect-ratio-aware positioning
-        if (layoutRole && SMART_LAYOUT_ROLES.has(layoutRole)) {
-            const clone = JSON.parse(JSON.stringify(el)) as DesignElement;
-
-            const smartConstraints = computeSmartConstraints({
-                role: layoutRole,
-                canvasW: targetW,
-                canvasH: targetH,
-                elWidth: resolved.width,
-                elHeight: resolved.height,
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                fontSize: (el as any).fontSize ?? undefined,
-            });
-
-            clone.constraints = smartConstraints;
-
-            // Smart font size based on role + target canvas dimensions
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            if ((el.type === 'text' || el.type === 'button') && (el as any).fontSize) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                (clone as any).fontSize = getSmartFontSize(layoutRole, targetW, targetH);
-            }
-
-            return clone;
+        // ── Background: always fill 100% of target canvas ──
+        if (role === 'background') {
+            const newConstraints: ElementConstraints = {
+                horizontal: { anchor: 'left' as const, offset: 0 },
+                vertical: { anchor: 'top' as const, offset: 0 },
+                size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width: targetW, height: targetH },
+                rotation: el.constraints.rotation,
+            };
+            return {
+                ...JSON.parse(JSON.stringify(el)),
+                constraints: newConstraints,
+            } as DesignElement;
         }
 
-        // ── Path 2: Proportional fallback (no role / decoration) ──
-        let newX: number, newY: number, newW: number, newH: number;
-
-        // Proportional position + uniform size scaling
-        newW = Math.max(4, Math.round(resolved.width * uniformScale));
-        newH = Math.max(4, Math.round(resolved.height * uniformScale));
-        const relCenterX = (resolved.x + resolved.width / 2) / originW;
-        const relCenterY = (resolved.y + resolved.height / 2) / originH;
-        newX = Math.round(relCenterX * targetW - newW / 2);
-        newY = Math.round(relCenterY * targetH - newH / 2);
-
-        // Clamp to canvas bounds
-        newX = Math.max(0, Math.min(newX, targetW - Math.min(newW, targetW)));
-        newY = Math.max(0, Math.min(newY, targetH - Math.min(newH, targetH)));
+        // ── All other elements: independent X/Y stretch fill ──
+        // Same technique as template drops — stretches to fill canvas
+        const newX = Math.round(resolved.x * scaleX);
+        const newY = Math.round(resolved.y * scaleY);
+        const newW = Math.max(4, Math.round(resolved.width * scaleX));
+        const newH = Math.max(4, Math.round(resolved.height * scaleY));
 
         const newConstraints: ElementConstraints = {
             horizontal: { anchor: 'left' as const, offset: newX },
@@ -303,14 +256,18 @@ export function smartSizeElements(
             rotation: el.constraints.rotation,
         };
 
-        // Scale font proportionally with a floor
-        let fontPatch: Partial<DesignElement> = {};
+        // ★ Font + border radius: geometric mean (balanced across both axes)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const fontPatch: Record<string, unknown> = {};
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if ((el.type === 'text' || el.type === 'button') && (el as any).fontSize) {
-            fontPatch = {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                fontSize: Math.max(MIN_FONT, Math.round((el as any).fontSize * uniformScale)),
-            };
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            fontPatch.fontSize = Math.max(MIN_FONT, Math.round((el as any).fontSize * scaleFontRadius));
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if ((el as any).borderRadius) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            fontPatch.borderRadius = Math.round((el as any).borderRadius * scaleFontRadius);
         }
 
         return {
