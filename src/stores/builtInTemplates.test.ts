@@ -38,6 +38,15 @@ describe('BUILT_IN_TEMPLATES', () => {
         }
     });
 
+    it('all curated templates are social category (1080x1080)', () => {
+        const curated = BUILT_IN_TEMPLATES.filter(t => t.id.startsWith('builtin-'));
+        for (const t of curated) {
+            expect(t.category).toBe('social');
+            expect(t.width).toBe(1080);
+            expect(t.height).toBe(1080);
+        }
+    });
+
     it('all templates have non-empty name and description', () => {
         for (const t of BUILT_IN_TEMPLATES) {
             expect(t.name.length).toBeGreaterThan(0);
@@ -116,9 +125,9 @@ describe('BUILT_IN_TEMPLATES', () => {
                 expect(el.constraints.vertical).toBeDefined();
                 expect(el.constraints.size).toBeDefined();
                 // Offsets may be negative for decorative elements (intentional off-canvas effects)
-                // but should generally be within -200px of canvas bounds
-                expect(el.constraints.horizontal.offset).toBeGreaterThanOrEqual(-200);
-                expect(el.constraints.vertical.offset).toBeGreaterThanOrEqual(-200);
+                // AI templates can have decorative bleed elements up to -500px
+                expect(el.constraints.horizontal.offset).toBeGreaterThanOrEqual(-500);
+                expect(el.constraints.vertical.offset).toBeGreaterThanOrEqual(-500);
             }
         }
     });
@@ -150,34 +159,34 @@ describe('BUILT_IN_TEMPLATES', () => {
 
     // ── Per-template snapshot tests ──
 
-    it('T1 Bold Dark: 300x250 with correct element count', () => {
+    it('T1 Bold Dark: 1080x1080 with correct element count', () => {
         const t = BUILT_IN_TEMPLATES.find(t => t.id === 'builtin-bold-dark')!;
-        expect(t.width).toBe(300);
-        expect(t.height).toBe(250);
+        expect(t.width).toBe(1080);
+        expect(t.height).toBe(1080);
         const variant = JSON.parse(t.variantSnapshot);
         expect(variant.elements.length).toBe(4); // bg, accent, headline, body
     });
 
-    it('T2 Warm Gradient: 728x90 leaderboard', () => {
+    it('T2 Warm Gradient: 1080x1080 social', () => {
         const t = BUILT_IN_TEMPLATES.find(t => t.id === 'builtin-warm-gradient')!;
-        expect(t.width).toBe(728);
-        expect(t.height).toBe(90);
+        expect(t.width).toBe(1080);
+        expect(t.height).toBe(1080);
         const variant = JSON.parse(t.variantSnapshot);
         expect(variant.elements.length).toBe(3); // bg, headline, subline
     });
 
-    it('T3 Clean Minimal: 300x250 SaaS', () => {
+    it('T3 Clean Minimal: 1080x1080 SaaS', () => {
         const t = BUILT_IN_TEMPLATES.find(t => t.id === 'builtin-clean-minimal')!;
-        expect(t.width).toBe(300);
-        expect(t.height).toBe(250);
+        expect(t.width).toBe(1080);
+        expect(t.height).toBe(1080);
         const variant = JSON.parse(t.variantSnapshot);
         expect(variant.elements.length).toBe(5); // bg, top-bar, headline, body, badge
     });
 
-    it('T4 Luxury Gold: 160x600 skyscraper', () => {
+    it('T4 Luxury Gold: 1080x1080 premium', () => {
         const t = BUILT_IN_TEMPLATES.find(t => t.id === 'builtin-luxury-gold')!;
-        expect(t.width).toBe(160);
-        expect(t.height).toBe(600);
+        expect(t.width).toBe(1080);
+        expect(t.height).toBe(1080);
         const variant = JSON.parse(t.variantSnapshot);
         expect(variant.elements.length).toBe(5); // bg, gold-line, headline, divider, body
     });
