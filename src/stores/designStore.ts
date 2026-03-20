@@ -16,8 +16,6 @@ import type { CreativeSet, BannerVariant, BannerPreset } from '@/schema/design.t
 import type { DesignElement } from '@/schema/elements.types';
 import { createDefaultConstraints } from '@/schema/elements.types';
 import { smartSizeElements } from '@/engine/smartSizing';
-import { runSmartSizingQA } from '@/engine/smartSizingQA';
-import { generateFixes } from '@/engine/smartSizingFixer';
 
 
 // ── State Shape ──
@@ -526,33 +524,9 @@ export const useDesignStore = create<DesignState>()(
                                     finalElements = adapted;
                                 }
 
-                                // Auto-QA sweep
-                                const targetWithAdapted: BannerVariant = { ...target, elements: finalElements };
-                                const qaIssues = runSmartSizingQA([targetWithAdapted]);
-                                if (qaIssues.length > 0) {
-                                    const fixes = generateFixes(qaIssues, [targetWithAdapted]);
-                                    if (fixes.length > 0) {
-                                        finalElements = finalElements.map((el) => {
-                                            const fix = fixes.find(f => f.elementId === el.id);
-                                            return fix ? { ...el, ...fix.patch } as DesignElement : el;
-                                        });
-                                        // ★ BUG 5: Capture plain values, NOT Immer proxies
-                                        pendingRefreshes.push({
-                                            variantId: target.id,
-                                            fixCount: fixes.length,
-                                        });
-                                    }
-                                }
-
-                                // Preserve overridden elements
-                                const overridden = new Set(target.overriddenElementIds);
-                                target.elements = finalElements.map((adaptedEl) => {
-                                    if (overridden.has(adaptedEl.id)) {
-                                        const existing = target.elements.find(e => e.id === adaptedEl.id);
-                                        return existing ?? adaptedEl;
-                                    }
-                                    return adaptedEl;
-                                });
+                                // ★ NO QA AUTO-FIX: trust template-proven scaling directly.
+                                // QA overlap detector was shrinking backgrounds.
+                                target.elements = finalElements;
                             }
                         }
 
@@ -593,7 +567,9 @@ export const useDesignStore = create<DesignState>()(
 
                         // ★ FIX: ALWAYS re-run smart sizing on plug connection.
                         // Plugging is a deliberate action — the user WANTS the layout to adapt.
-                        // Property-only merge is only for ongoing save propagation (replaceVariantElements).
+                        // ★ NO QA AUTO-FIX: template drops don't use QA — plugs shouldn't either.
+                        // The QA overlap detector was shrinking backgrounds because they overlap
+                        // with other elements at (0,0). Trust the template-proven scaling directly.
                         if (origin.elements.length > 0) {
                             console.log(`[designStore] connectPlug: calling smartSizeElements...`);
                             const adapted = smartSizeElements(
@@ -601,28 +577,7 @@ export const useDesignStore = create<DesignState>()(
                                 origin.preset.width, origin.preset.height,
                                 target.preset.width, target.preset.height,
                             );
-                            // Auto-QA sweep
-                            const targetWithAdapted: BannerVariant = { ...target, elements: adapted };
-                            const qaIssues = runSmartSizingQA([targetWithAdapted]);
-                            let finalElements = adapted;
-                            if (qaIssues.length > 0) {
-                                const fixes = generateFixes(qaIssues, [targetWithAdapted]);
-                                if (fixes.length > 0) {
-                                    finalElements = adapted.map((el) => {
-                                        const fix = fixes.find(f => f.elementId === el.id);
-                                        return fix ? { ...el, ...fix.patch } as DesignElement : el;
-                                    });
-                                }
-                            }
-                            // Preserve user overrides on specific elements
-                            const overridden = new Set(target.overriddenElementIds);
-                            target.elements = finalElements.map((adaptedEl) => {
-                                if (overridden.has(adaptedEl.id)) {
-                                    const existing = target.elements.find(e => e.id === adaptedEl.id);
-                                    return existing ?? adaptedEl;
-                                }
-                                return adaptedEl;
-                            });
+                            target.elements = adapted;
                         }
 
                         cs.updatedAt = new Date().toISOString();
