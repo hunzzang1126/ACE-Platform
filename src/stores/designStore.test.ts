@@ -450,3 +450,145 @@ describe('designStore — replaceVariantElements', () => {
         expect(updated.id).toBe(masterId);
     });
 });
+
+// ─────────────────────────────────────────────────
+// connectPlug — Smart Sizing Integration Tests
+// ─────────────────────────────────────────────────
+// ★ REGRESSION GUARD: QA auto-fixer was shrinking backgrounds after connectPlug.
+// Template-proven scaling: NO QA interference, direct assignment.
+
+describe('designStore — connectPlug Smart Sizing', () => {
+
+    it('★ REGRESSION: connectPlug sets elements on target variant via smartSizeElements', () => {
+        useDesignStore.getState().createCreativeSet('Plug Sizing', MASTER_PRESET);
+        const masterId = useDesignStore.getState().creativeSet!.masterVariantId;
+
+        // Add elements to master
+        const bg = makeTestRect('bg', '#1a0033');
+        bg.name = 'Background';
+        bg.constraints = {
+            horizontal: { anchor: 'left', offset: 0 },
+            vertical: { anchor: 'top', offset: 0 },
+            size: { widthMode: 'fixed', heightMode: 'fixed', width: 300, height: 250 },
+        };
+        useDesignStore.getState().replaceVariantElements(masterId, [bg]);
+
+        // Add a target variant and connect
+        useDesignStore.getState().addVariant(VARIANT_PRESET_A); // 728x90
+        const targetId = useDesignStore.getState().creativeSet!.variants[1]!.id;
+
+        useDesignStore.getState().connectPlug(masterId, targetId);
+
+        // Target should now have elements
+        const target = useDesignStore.getState().creativeSet!.variants.find(v => v.id === targetId)!;
+        expect(target.elements.length).toBeGreaterThan(0);
+    });
+
+    it('★ REGRESSION: BG fills 100% of target after connectPlug (no QA shrinkage)', () => {
+        useDesignStore.getState().createCreativeSet('BG Fill Test', MASTER_PRESET);
+        const masterId = useDesignStore.getState().creativeSet!.masterVariantId;
+
+        // Master: background + text (the overlap that triggered QA bug)
+        const bg = makeTestRect('bg', '#1a0033');
+        bg.name = 'Background';
+        bg.constraints = {
+            horizontal: { anchor: 'left', offset: 0 },
+            vertical: { anchor: 'top', offset: 0 },
+            size: { widthMode: 'fixed', heightMode: 'fixed', width: 300, height: 250 },
+        };
+        const otherShape = makeTestRect('rect2', '#FF0000');
+        otherShape.name = 'Rectangle #2';
+        otherShape.constraints = {
+            horizontal: { anchor: 'left', offset: 0 },
+            vertical: { anchor: 'top', offset: 0 },
+            size: { widthMode: 'fixed', heightMode: 'fixed', width: 2, height: 250 },
+        };
+        useDesignStore.getState().replaceVariantElements(masterId, [bg, otherShape]);
+
+        // Connect to 728x90
+        useDesignStore.getState().addVariant(VARIANT_PRESET_A);
+        const targetId = useDesignStore.getState().creativeSet!.variants[1]!.id;
+        useDesignStore.getState().connectPlug(masterId, targetId);
+
+        const target = useDesignStore.getState().creativeSet!.variants.find(v => v.id === targetId)!;
+        const bgElement = target.elements.find(e => e.name === 'Background')!;
+
+        // ★ THE BUG: QA auto-fixer used to shrink this to relative:0.35
+        // With the fix, BG must fill 100% of 728x90
+        expect(bgElement.constraints.size.width).toBe(728);
+        expect(bgElement.constraints.size.height).toBe(90);
+        expect(bgElement.constraints.horizontal.offset).toBe(0);
+        expect(bgElement.constraints.vertical.offset).toBe(0);
+    });
+
+    it('connectPlug scales text fontSize with geometric mean', () => {
+        useDesignStore.getState().createCreativeSet('Font Scale Test', MASTER_PRESET);
+        const masterId = useDesignStore.getState().creativeSet!.masterVariantId;
+
+        const textEl = {
+            id: 'txt-1',
+            type: 'text' as const,
+            name: 'Headline Title',
+            content: 'THE FUTURE',
+            fontFamily: 'Inter',
+            fontSize: 36,
+            fontWeight: 700,
+            fontStyle: 'normal' as const,
+            color: '#FFFFFF',
+            textAlign: 'center' as const,
+            lineHeight: 1.2,
+            letterSpacing: 0,
+            autoShrink: false,
+            visible: true,
+            locked: false,
+            opacity: 1,
+            zIndex: 1,
+            constraints: {
+                horizontal: { anchor: 'left' as const, offset: 20 },
+                vertical: { anchor: 'top' as const, offset: 50 },
+                size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width: 260, height: 60 },
+            },
+        };
+        useDesignStore.getState().replaceVariantElements(masterId, [textEl as any]);
+
+        // Connect to 728x90
+        useDesignStore.getState().addVariant(VARIANT_PRESET_A);
+        const targetId = useDesignStore.getState().creativeSet!.variants[1]!.id;
+        useDesignStore.getState().connectPlug(masterId, targetId);
+
+        const target = useDesignStore.getState().creativeSet!.variants.find(v => v.id === targetId)!;
+        const textResult = target.elements[0] as any;
+
+        // √(728/300 * 90/250) = √(2.427 * 0.36) = √0.874 = 0.935
+        // 36 * 0.935 = 33.65 → round = 34
+        expect(textResult.fontSize).toBe(34);
+    });
+
+    it('★ REGRESSION: disconnectPlug does NOT clear elements (preserves last state)', () => {
+        useDesignStore.getState().createCreativeSet('Disconnect Keep', MASTER_PRESET);
+        const masterId = useDesignStore.getState().creativeSet!.masterVariantId;
+
+        const bg = makeTestRect('bg', '#1a0033');
+        bg.name = 'Background';
+        bg.constraints = {
+            horizontal: { anchor: 'left', offset: 0 },
+            vertical: { anchor: 'top', offset: 0 },
+            size: { widthMode: 'fixed', heightMode: 'fixed', width: 300, height: 250 },
+        };
+        useDesignStore.getState().replaceVariantElements(masterId, [bg]);
+
+        useDesignStore.getState().addVariant(VARIANT_PRESET_A);
+        const targetId = useDesignStore.getState().creativeSet!.variants[1]!.id;
+
+        // Connect then disconnect
+        useDesignStore.getState().connectPlug(masterId, targetId);
+        const beforeDisconnect = useDesignStore.getState().creativeSet!.variants.find(v => v.id === targetId)!;
+        expect(beforeDisconnect.elements.length).toBeGreaterThan(0);
+
+        useDesignStore.getState().disconnectPlug(targetId);
+        const afterDisconnect = useDesignStore.getState().creativeSet!.variants.find(v => v.id === targetId)!;
+        // Elements should still be there (user may want to keep the layout)
+        expect(afterDisconnect.elements.length).toBeGreaterThan(0);
+    });
+});
+

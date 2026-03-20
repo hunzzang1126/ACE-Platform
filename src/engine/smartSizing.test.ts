@@ -294,3 +294,126 @@ describe('smartSizeElements — Role-Aware Smart Layout', () => {
         expect(result[0]).not.toBe(headline);
     });
 });
+
+// ── Template-Proven Plug Sizing (v3) ──────────────
+
+describe('smartSizeElements — Template-Proven Scaling (v3)', () => {
+
+    // ★ REGRESSION GUARD: Background must fill 100% for ALL size transitions.
+    // This was the root cause bug — QA auto-fixer was shrinking backgrounds.
+
+    it('★ REGRESSION: BG fills 100% for square → ultra-wide (300x250 → 728x90)', () => {
+        const bg = makeShape('bg', 0, 0, 300, 250, 'Background');
+        const result = smartSizeElements([bg], 300, 250, 728, 90);
+        const c = result[0]!.constraints;
+        expect(c.horizontal.offset).toBe(0);
+        expect(c.vertical.offset).toBe(0);
+        expect(c.size.width).toBe(728);
+        expect(c.size.height).toBe(90);
+    });
+
+    it('★ REGRESSION: BG fills 100% for square → ultra-tall (300x250 → 160x600)', () => {
+        const bg = makeShape('bg', 0, 0, 300, 250, 'Background');
+        const result = smartSizeElements([bg], 300, 250, 160, 600);
+        const c = result[0]!.constraints;
+        expect(c.size.width).toBe(160);
+        expect(c.size.height).toBe(600);
+    });
+
+    it('★ REGRESSION: BG fills 100% for square → landscape (1080x1080 → 1200x628)', () => {
+        const bg = makeShape('bg', 0, 0, 1080, 1080, 'ai_bg');
+        const result = smartSizeElements([bg], 1080, 1080, 1200, 628);
+        const c = result[0]!.constraints;
+        expect(c.size.width).toBe(1200);
+        expect(c.size.height).toBe(628);
+    });
+
+    it('★ REGRESSION: BG fills 100% for landscape → portrait (1200x628 → 1080x1920)', () => {
+        const bg = makeShape('bg', 0, 0, 1200, 628, 'Background');
+        const result = smartSizeElements([bg], 1200, 628, 1080, 1920);
+        const c = result[0]!.constraints;
+        expect(c.size.width).toBe(1080);
+        expect(c.size.height).toBe(1920);
+    });
+
+    it('BG detected by coverage heuristic (>60% area, unnamed shape)', () => {
+        // Shape named "Rectangle #1" covering full canvas → detected as background via coverage
+        const bigShape = makeShape('big', 0, 0, 300, 250, 'Rectangle #1');
+        const result = smartSizeElements([bigShape], 300, 250, 728, 90);
+        const c = result[0]!.constraints;
+        // Coverage = (300*250)/(300*250) = 1.0 > 0.6 → background → fills 100%
+        expect(c.size.width).toBe(728);
+        expect(c.size.height).toBe(90);
+    });
+
+    it('small shape NOT promoted to BG (coverage < 60%)', () => {
+        const smallShape = makeShape('btn', 100, 180, 100, 36, 'Rectangle #2');
+        const result = smartSizeElements([smallShape], 300, 250, 728, 90);
+        const c = result[0]!.constraints;
+        // Coverage = (100*36)/(300*250) = 0.048 < 0.6 → NOT background
+        // Should be proportionally scaled, not 728x90
+        expect(c.size.width).toBeLessThan(728);
+        expect(c.size.height).toBeLessThan(90);
+    });
+
+    // ★ Font scaling uses geometric mean √(scaleX * scaleY)
+
+    it('font scales with geometric mean √(scaleX * scaleY)', () => {
+        const text = makeText('t', 50, 100, 200, 40, 36, { name: 'Main Title' });
+        const result = smartSizeElements([text], 300, 250, 728, 90);
+        const resultText = result[0] as TextElement;
+        // scaleX=728/300=2.427, scaleY=90/250=0.36
+        // geometricMean = √(2.427 * 0.36) = √0.8736 = 0.935
+        // expectedFont = round(36 * 0.935) = round(33.65) = 34
+        expect(resultText.fontSize).toBe(34);
+    });
+
+    it('font never goes below MIN_FONT (8px)', () => {
+        const text = makeText('t', 50, 100, 200, 20, 10, { name: 'Tiny Caption' });
+        // Going to a much smaller canvas
+        const result = smartSizeElements([text], 1080, 1080, 160, 90);
+        const resultText = result[0] as TextElement;
+        expect(resultText.fontSize).toBeGreaterThanOrEqual(8);
+    });
+
+    // ★ Independent X/Y stretch fill (same as template drops)
+
+    it('positions scale independently on X and Y axes', () => {
+        const el = makeShape('deco', 150, 125, 60, 50, 'deco_star');
+        // Center of 300x250 → should map to center of 728x90
+        const result = smartSizeElements([el], 300, 250, 728, 90);
+        const c = result[0]!.constraints;
+        // scaleX = 728/300 = 2.427 → x = round(150 * 2.427) = 364
+        // scaleY = 90/250  = 0.36  → y = round(125 * 0.36)  = 45
+        expect(c.horizontal.offset).toBe(364);
+        expect(c.vertical.offset).toBe(45);
+    });
+
+    it('preserves gradient properties through sizing', () => {
+        const gradBg = {
+            ...makeShape('gbg', 0, 0, 300, 250, 'Background'),
+            gradientStart: '#1a0033',
+            gradientEnd: '#0d1b2a',
+            gradientAngle: 135,
+        } as ShapeElement;
+        const result = smartSizeElements([gradBg], 300, 250, 728, 90);
+        const r = result[0] as ShapeElement;
+        expect(r.gradientStart).toBe('#1a0033');
+        expect(r.gradientEnd).toBe('#0d1b2a');
+        expect(r.gradientAngle).toBe(135);
+        // And it fills 100%
+        expect(r.constraints.size.width).toBe(728);
+        expect(r.constraints.size.height).toBe(90);
+    });
+
+    it('preserves borderRadius scaled by geometric mean', () => {
+        const btn = makeShape('btn', 100, 200, 120, 40, 'deco_pill');
+        (btn as any).borderRadius = 20;
+        const result = smartSizeElements([btn], 300, 250, 728, 90);
+        const r = result[0] as any;
+        // geometricMean = √(2.427 * 0.36) = 0.935
+        // borderRadius = round(20 * 0.935) = round(18.7) = 19
+        expect(r.borderRadius).toBe(19);
+    });
+});
+
