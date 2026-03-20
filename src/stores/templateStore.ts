@@ -99,6 +99,9 @@ interface TemplateState {
 
     /** Fetch global overrides from Supabase and apply to templates */
     syncOverridesFromCloud: () => Promise<void>;
+
+    /** Reset ALL overrides (local + cloud) — reverts all templates to built-in defaults */
+    resetAllOverrides: () => Promise<void>;
 }
 
 function genId(): string {
@@ -281,6 +284,41 @@ export const useTemplateStore = create<TemplateState>()(
                     console.warn('[templateStore] Cloud sync failed (will use local):', e);
                 }
             },
+
+            resetAllOverrides: async () => {
+                // 1. Clear local overrides and revert templates to built-in defaults
+                const overrideIds = Object.keys(get().templateOverrides);
+                set(state => {
+                    state.templateOverrides = {};
+                    const builtInMap = new Map(BUILT_IN_TEMPLATES.map(t => [t.id, t]));
+                    for (const tmpl of state.templates) {
+                        const builtIn = builtInMap.get(tmpl.id);
+                        if (builtIn) {
+                            tmpl.variantSnapshot = builtIn.variantSnapshot;
+                            tmpl.width = builtIn.width;
+                            tmpl.height = builtIn.height;
+                            tmpl.updatedAt = new Date().toISOString();
+                        }
+                    }
+                });
+                console.log('[templateStore] Reset', overrideIds.length, 'local overrides');
+
+                // 2. Delete ALL from Supabase
+                for (const id of overrideIds) {
+                    await deleteTemplateOverride(id).catch(() => {});
+                }
+                // Also try to clear the entire table (in case there are cloud-only entries)
+                try {
+                    const { getSupabase } = await import('@/services/supabaseClient');
+                    const sb = getSupabase();
+                    if (sb) {
+                        await sb.from('template_overrides').delete().neq('template_id', '__never__');
+                        console.log('[templateStore] Cleared ALL cloud overrides');
+                    }
+                } catch { /* ok */ }
+
+                console.log('[templateStore] Full reset complete — all templates reverted to defaults');
+            },
         })),
         {
             name: 'ace-templates',
@@ -320,3 +358,8 @@ export const useTemplateStore = create<TemplateState>()(
         },
     ),
 );
+
+// ★ Expose reset helper on window for console access
+if (typeof window !== 'undefined') {
+    (window as any).__aceResetTemplates = () => useTemplateStore.getState().resetAllOverrides();
+}
