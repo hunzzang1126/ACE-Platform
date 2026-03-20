@@ -1,11 +1,11 @@
 // ─────────────────────────────────────────────────
 // smartSizing — Regression Tests
 // ─────────────────────────────────────────────────
-// Proportional scaling is the core of the plug system.
+// ★ v2: Tests cover both role-aware smart layout and proportional fallback.
 import { describe, it, expect } from 'vitest';
 import { classifyRatio, smartSizeElements, LAYOUT_ZONES } from './smartSizing';
 import type { ShapeElement, TextElement } from '@/schema/elements.types';
-import { createDefaultConstraints } from '@/schema/elements.types';
+import type { LayoutRole } from '@/schema/layoutRoles';
 import { resolveConstraints } from '@/schema/constraints.types';
 
 // ── classifyRatio ──────────────────────────────────
@@ -93,55 +93,58 @@ describe('LAYOUT_ZONES — Zone Data Integrity (used by AI services)', () => {
     });
 });
 
-// ── smartSizeElements — Proportional Scaling ──────
+// ── Fixtures ──────────────────────────────────────
 
-describe('smartSizeElements — Proportional Scaling', () => {
-    function makeShape(id: string, x: number, y: number, w: number, h: number): ShapeElement {
-        return {
-            id,
-            name: `Shape ${id}`,
-            type: 'shape',
-            shapeType: 'rectangle',
-            fill: '#FF0000',
-            visible: true,
-            locked: false,
-            opacity: 1,
-            zIndex: 0,
-            constraints: {
-                horizontal: { anchor: 'left', offset: x },
-                vertical: { anchor: 'top', offset: y },
-                size: { widthMode: 'fixed', heightMode: 'fixed', width: w, height: h },
-            },
-        } as ShapeElement;
-    }
+function makeShape(id: string, x: number, y: number, w: number, h: number, name?: string): ShapeElement {
+    return {
+        id,
+        name: name ?? `Shape ${id}`,
+        type: 'shape',
+        shapeType: 'rectangle',
+        fill: '#FF0000',
+        visible: true,
+        locked: false,
+        opacity: 1,
+        zIndex: 0,
+        constraints: {
+            horizontal: { anchor: 'left', offset: x },
+            vertical: { anchor: 'top', offset: y },
+            size: { widthMode: 'fixed', heightMode: 'fixed', width: w, height: h },
+        },
+    } as ShapeElement;
+}
 
-    function makeText(id: string, x: number, y: number, w: number, h: number, fontSize: number): TextElement {
-        return {
-            id,
-            name: `Text ${id}`,
-            type: 'text',
-            content: 'Hello',
-            fontFamily: 'Inter',
-            fontSize,
-            fontWeight: 400,
-            fontStyle: 'normal' as const,
-            color: '#000000',
-            textAlign: 'left' as const,
-            lineHeight: 1.2,
-            letterSpacing: 0,
-            autoShrink: false,
-            visible: true,
-            locked: false,
-            opacity: 1,
-            zIndex: 1,
-            constraints: {
-                horizontal: { anchor: 'left', offset: x },
-                vertical: { anchor: 'top', offset: y },
-                size: { widthMode: 'fixed', heightMode: 'fixed', width: w, height: h },
-            },
-        } as TextElement;
-    }
+function makeText(id: string, x: number, y: number, w: number, h: number, fontSize: number, opts?: { role?: LayoutRole; name?: string }): TextElement {
+    return {
+        id,
+        name: opts?.name ?? `Text ${id}`,
+        type: 'text',
+        content: 'Hello',
+        fontFamily: 'Inter',
+        fontSize,
+        fontWeight: 400,
+        fontStyle: 'normal' as const,
+        color: '#000000',
+        textAlign: 'left' as const,
+        lineHeight: 1.2,
+        letterSpacing: 0,
+        autoShrink: false,
+        visible: true,
+        locked: false,
+        opacity: 1,
+        zIndex: 1,
+        role: opts?.role,
+        constraints: {
+            horizontal: { anchor: 'left', offset: x },
+            vertical: { anchor: 'top', offset: y },
+            size: { widthMode: 'fixed', heightMode: 'fixed', width: w, height: h },
+        },
+    } as TextElement;
+}
 
+// ── smartSizeElements — Basic / Backward Compat ──
+
+describe('smartSizeElements — Basic Operations', () => {
     it('returns same number of elements', () => {
         const origin = [makeShape('a', 10, 10, 100, 80), makeText('b', 20, 50, 200, 30, 24)];
         const result = smartSizeElements(origin, 300, 250, 600, 500);
@@ -169,54 +172,6 @@ describe('smartSizeElements — Proportional Scaling', () => {
         expect(result[0]).not.toBe(origin[0]);
     });
 
-    it('proportional position: element at 33% stays at 33%', () => {
-        // Shape at (100, 50) in 300x250 = (33.3%, 20%)
-        const origin = [makeShape('a', 100, 50, 60, 40)];
-        const result = smartSizeElements(origin, 300, 250, 600, 500);
-        const resolved = resolveConstraints(result[0]!.constraints, 600, 500);
-        // Expected: (200, 100) in 600x500 = still (33.3%, 20%)
-        expect(resolved.x).toBe(200);
-        expect(resolved.y).toBe(100);
-    });
-
-    it('proportional size: element covering 33% width stays at 33%', () => {
-        // Shape 100px wide in 300px canvas = 33.3% width
-        const origin = [makeShape('a', 0, 0, 100, 50)];
-        const result = smartSizeElements(origin, 300, 250, 900, 750);
-        const resolved = resolveConstraints(result[0]!.constraints, 900, 750);
-        // Expected: 300px wide in 900px canvas = still 33.3%
-        expect(resolved.width).toBe(300);
-        expect(resolved.height).toBe(150);
-    });
-
-    it('handles different aspect ratios (300x250 → 728x90)', () => {
-        const origin = [makeShape('a', 150, 125, 60, 50)]; // center
-        const result = smartSizeElements(origin, 300, 250, 728, 90);
-        const resolved = resolveConstraints(result[0]!.constraints, 728, 90);
-        // X: 150/300 * 728 = 364 (50% of width)
-        expect(resolved.x).toBe(364);
-        // Y: 125/250 * 90 = 45 (50% of height)
-        expect(resolved.y).toBe(45);
-    });
-
-    it('font size scales proportionally with minimum floor', () => {
-        const origin = [makeText('t', 10, 10, 200, 30, 24)];
-        // Scale to 2x → font should be ~2x = 48
-        const result2x = smartSizeElements(origin, 300, 250, 600, 500);
-        expect((result2x[0] as TextElement).fontSize).toBe(48);
-        // Scale to 0.25x → font should hit floor of 8
-        const resultTiny = smartSizeElements(origin, 300, 250, 75, 62);
-        expect((resultTiny[0] as TextElement).fontSize).toBe(8);
-    });
-
-    it('font size uses smaller scale factor to prevent overflow', () => {
-        // 300x250 → 728x90: scaleX=2.43, scaleY=0.36 → use 0.36
-        const origin = [makeText('t', 10, 10, 200, 30, 24)];
-        const result = smartSizeElements(origin, 300, 250, 728, 90);
-        // 24 * 0.36 = 8.64 → round to 9
-        expect((result[0] as TextElement).fontSize).toBe(9);
-    });
-
     it('generates valid constraints for all output elements', () => {
         const origin = [makeShape('a', 10, 20, 50, 60)];
         const result = smartSizeElements(origin, 300, 250, 160, 600);
@@ -228,12 +183,114 @@ describe('smartSizeElements — Proportional Scaling', () => {
         }
     });
 
-    it('minimum element size is 4px', () => {
-        // 1px element in 300px → scale to 30px (0.1x) → should be 4px floor
-        const origin = [makeShape('tiny', 0, 0, 1, 1)];
+    it('minimum element size is 4px (decoration fallback)', () => {
+        // Uses a name that won't match any role → decoration → proportional fallback
+        const origin = [makeShape('tiny', 0, 0, 1, 1, 'deco_tiny')];
         const result = smartSizeElements(origin, 300, 250, 30, 25);
         const resolved = resolveConstraints(result[0]!.constraints, 30, 25);
         expect(resolved.width).toBeGreaterThanOrEqual(4);
         expect(resolved.height).toBeGreaterThanOrEqual(4);
+    });
+});
+
+// ── smartSizeElements — Role-Aware Smart Layout ──
+
+describe('smartSizeElements — Role-Aware Smart Layout', () => {
+
+    it('background fills 100% of target canvas regardless of aspect ratio', () => {
+        // Background in 300x250 → should fill 728x90 completely
+        const bg = makeShape('bg', 0, 0, 300, 250, 'Background');
+        const result = smartSizeElements([bg], 300, 250, 728, 90);
+        const resolved = resolveConstraints(result[0]!.constraints, 728, 90);
+        // Background should use stretch width mode via smartLayout
+        // The constraints should make it cover the full canvas
+        expect(resolved.width).toBe(728);
+        expect(resolved.height).toBe(90);
+    });
+
+    it('background fills 100% when going to portrait (160x600)', () => {
+        const bg = makeShape('bg', 0, 0, 300, 250, 'Background');
+        const result = smartSizeElements([bg], 300, 250, 160, 600);
+        const resolved = resolveConstraints(result[0]!.constraints, 160, 600);
+        expect(resolved.width).toBe(160);
+        expect(resolved.height).toBe(600);
+    });
+
+    it('300x250 → 728x90: headline gets readable font size (not squished to 9px)', () => {
+        const headline = makeText('h', 50, 50, 200, 40, 24, { role: 'headline', name: 'Headline' });
+        const result = smartSizeElements([headline], 300, 250, 728, 90);
+        const resultText = result[0] as TextElement;
+        // Smart font size for headline in ultra-wide should be readable
+        // getSmartFontSize('headline', 728, 90) → scaledFontSize(24, 728, 90)
+        // minDim = min(728, 90) = 90 < 100 → 24 * 0.5 = 12, floor = max(8, 12) = 12
+        expect(resultText.fontSize).toBeGreaterThanOrEqual(10);
+        // Old proportional would give 24 * 0.36 = 9 — this should be better
+        expect(resultText.fontSize).toBeGreaterThan(9);
+    });
+
+    it('300x250 → 160x600: CTA positioned in lower part (portrait rules)', () => {
+        // CTA button element
+        const cta = {
+            id: 'cta',
+            name: 'CTA Button',
+            type: 'button' as const,
+            label: 'Learn More',
+            color: '#FFFFFF',
+            backgroundColor: '#FF0000',
+            borderRadius: 4,
+            fontSize: 14,
+            visible: true,
+            locked: false,
+            opacity: 1,
+            zIndex: 15,
+            role: 'cta' as LayoutRole,
+            constraints: {
+                horizontal: { anchor: 'left' as const, offset: 100 },
+                vertical: { anchor: 'top' as const, offset: 200 },
+                size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width: 100, height: 36 },
+            },
+        };
+        const result = smartSizeElements([cta as any], 300, 250, 160, 600);
+        const resolved = resolveConstraints(result[0]!.constraints, 160, 600);
+        // Portrait rule: CTA should be in the bottom third (y > 300 in 600px canvas)
+        expect(resolved.y).toBeGreaterThan(300);
+    });
+
+    it('elements with explicit role="headline" use smart constraints', () => {
+        const headline = makeText('h', 50, 50, 200, 40, 24, { role: 'headline', name: 'Headline' });
+        const result = smartSizeElements([headline], 300, 250, 160, 600);
+        const resolved = resolveConstraints(result[0]!.constraints, 160, 600);
+        // Portrait headline should be center-area, not proportionally squished
+        // Smart layout rule: center with vOffsetPct: -0.1
+        expect(resolved.width).toBeGreaterThan(100); // Should use ~85% of 160 = 136
+    });
+
+    it('decoration elements (no role) still use proportional fallback', () => {
+        // A small decoration shape with no role
+        const deco = makeShape('d', 100, 100, 20, 20, 'deco_star');
+        const result = smartSizeElements([deco], 300, 250, 600, 500);
+        const resolved = resolveConstraints(result[0]!.constraints, 600, 500);
+        // Proportional: center at (110/300 * 600, 110/250 * 500) = (220, 220)
+        // Size: 20 * min(2, 2) = 40
+        expect(resolved.width).toBe(40);
+        expect(resolved.height).toBe(40);
+    });
+
+    it('subline text detected by name gets smart layout', () => {
+        const sub = makeText('s', 50, 150, 200, 20, 14, { name: 'Description' });
+        const result = smartSizeElements([sub], 300, 250, 728, 90);
+        const resultText = result[0] as TextElement;
+        // Name 'Description' matches /desc/ → detected as 'subtext' → mapped to 'subline'
+        // Should use getSmartFontSize('subline', 728, 90) instead of 14 * 0.36 = 5
+        expect(resultText.fontSize).toBeGreaterThanOrEqual(8);
+    });
+
+    it('★ REGRESSION: same-size produces identical clone (no smart layout interference)', () => {
+        const headline = makeText('h', 50, 50, 200, 40, 24, { role: 'headline', name: 'Headline' });
+        const result = smartSizeElements([headline], 300, 250, 300, 250);
+        const resultText = result[0] as TextElement;
+        // Same size → deep clone, fontSize should be unchanged
+        expect(resultText.fontSize).toBe(24);
+        expect(result[0]).not.toBe(headline);
     });
 });
