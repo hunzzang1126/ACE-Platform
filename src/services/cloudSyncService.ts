@@ -158,25 +158,12 @@ export async function pullFromCloud(userId: string): Promise<boolean> {
             console.warn('[cloudSync] Pull creative_sets error:', csErr.message);
         }
 
-        // Merge into local stores (cloud data wins for now — last-write-wins)
-        // ★ CRITICAL: Never recreate sets that were locally deleted (in trash or permanently)
+        // ★ Local-first architecture: IndexedDB is the source of truth.
+        // Cloud pull is for READING/LOGGING only — never create local state from cloud.
+        // The old code called createCreativeSet() which generated NEW UUIDs,
+        // causing infinite phantom set creation on every refresh (ID mismatch loop).
         if (cloudProjects && cloudProjects.length > 0) {
-            const localSets = useProjectStore.getState().creativeSets;
-            const trash = useProjectStore.getState().trash;
-            const localIds = new Set(localSets.map((s: { id: string }) => s.id));
-            const trashIds = new Set(trash.map((t: { item: { id: string } }) => t.item.id));
-
-            let addedCount = 0;
-            for (const cp of cloudProjects) {
-                // Skip if already local OR in trash (user intentionally deleted)
-                if (localIds.has(cp.id) || trashIds.has(cp.id)) continue;
-                // Only add if the cloud project looks valid (has a name)
-                if (cp.name) {
-                    useProjectStore.getState().createCreativeSet(cp.name);
-                    addedCount++;
-                }
-            }
-            console.log(`[cloudSync] Pulled ${cloudProjects.length} projects (${addedCount} new)`);
+            console.log(`[cloudSync] Found ${cloudProjects.length} projects in cloud (read-only, not creating local copies)`);
         }
 
         if (cloudSets && cloudSets.length > 0) {
