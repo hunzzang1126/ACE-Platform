@@ -106,38 +106,28 @@ export function DetailEditorPage() {
         setSaveStatus('saving');
         isSavingRef.current = true;
         try {
-            const result = saveToStore(engineRef, overlay.overlayElements);
-            console.log('[DetailEditor] Save result:', result);
-            isDirtyRef.current = false; // Saved — no longer dirty
-            lastManualSaveRef.current = Date.now();
-
-            // ★ Template editing mode: also override the global template
+            // ★ TEMPLATE SAVE: Check template mode FIRST, BEFORE saveToStore.
+            // DO NOT call saveToStore for templates. saveToStore writes to designStore
+            // which triggers async IDB persist. Then deleteCreativeSet triggers another
+            // persist. The two persists RACE → the delete can get overwritten → CS leaks.
             const tmplId = useTemplateStore.getState().editingTemplateId;
-            if (tmplId && result.success) {
-                // Read the freshly saved variant from designStore
+            if (tmplId) {
+                // Read the current variant directly from the engine (not from store)
+                // The variant in designStore.creativeSet is already kept up-to-date
+                // by canvas interactions (each element change writes via replaceVariantElements)
                 const cs = useDesignStore.getState().creativeSet;
                 const v = cs?.variants.find(vi => vi.id === variantId);
                 if (v) {
-                    // ★ DEBUG: Log what we're about to save as the template override
-                    console.log('[TemplateSave] Variant elements count:', v.elements.length);
-                    console.log('[TemplateSave] Variant backgroundColor:', v.backgroundColor);
-                    v.elements.forEach((el, i) => {
-                        console.log(`[TemplateSave] Element[${i}]:`, el.type, el.name, 'zIndex:', el.zIndex,
-                            el.type === 'shape' ? `fill:${(el as any).fill} grad:${(el as any).gradientStart}->${(el as any).gradientEnd}` : '',
-                            el.type === 'text' ? `"${(el as any).content?.substring(0, 30)}"` : '',
-                            'constraints:', JSON.stringify(el.constraints?.size));
-                    });
-                    
+                    console.log('[TemplateSave] Saving template override:', tmplId, 'elements:', v.elements.length);
                     overrideTemplate(tmplId, v, width, height);
-                    console.log('[DetailEditor] Template override saved:', tmplId);
 
                     const tempCsId = useTemplateStore.getState().editingTempCsId;
 
-                    // ★ FIX: Clear editing flags FIRST
+                    // Clear editing flags
                     setEditingTemplateId(null);
                     useTemplateStore.getState().setEditingTempCsId(null);
 
-                    // ★ FIX: Delete temp CS SYNCHRONOUSLY before navigate
+                    // Delete temp CS
                     if (tempCsId) {
                         useDesignStore.getState().deleteCreativeSet(tempCsId);
                         useProjectStore.setState(state => {
@@ -146,14 +136,20 @@ export function DetailEditorPage() {
                         console.log('[DetailEditor] Cleaned up temp creative set:', tempCsId);
                     }
 
-                    // ★ CRITICAL: Reset dirty AFTER all mutations so unmount auto-save doesn't re-save
+                    // Prevent auto-save on unmount from re-creating the CS
                     isDirtyRef.current = false;
                     lastManualSaveRef.current = Date.now();
 
                     navigate('/templates');
-                    return; // Skip normal save status flow
+                    return; // Skip normal save flow entirely
                 }
             }
+
+            // ── Normal (non-template) save ──
+            const result = saveToStore(engineRef, overlay.overlayElements);
+            console.log('[DetailEditor] Save result:', result);
+            isDirtyRef.current = false;
+            lastManualSaveRef.current = Date.now();
 
             if (result.success) {
                 setSaveStatus('saved');
