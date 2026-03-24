@@ -67,6 +67,33 @@ export function useCloudSync() {
                         allCreativeSets: merged.creativeSets,
                     });
                     console.log('[useCloudSync] Sync complete — stores updated');
+
+                    // ★ ONE-TIME ORPHAN PURGE: Clean up ghost projects in Supabase
+                    // left behind by the old double-ID bug (createCreativeSet + createCreativeSetProject).
+                    const purgeKey = `glid-cloud-orphan-purged-${userId}`;
+                    if (!localStorage.getItem(purgeKey)) {
+                        try {
+                            const { pullProjects, deleteProjectPermanently, deleteCreativeSetCloud } = await import('@/services/cloudSync');
+                            const cloudProjects = await pullProjects(userId);
+                            const mergedIds = new Set(merged.projects.map(p => p.id));
+                            const csIds = new Set(Object.keys(merged.creativeSets));
+                            let purged = 0;
+                            for (const cp of cloudProjects) {
+                                // If a cloud project doesn't exist in the merged result AND
+                                // has no corresponding creative set, it's an orphan.
+                                if (!mergedIds.has(cp.id) && !csIds.has(cp.id)) {
+                                    console.log('[useCloudSync] Purging orphan cloud project:', cp.id, cp.name);
+                                    await deleteProjectPermanently(cp.id);
+                                    await deleteCreativeSetCloud(cp.id);
+                                    purged++;
+                                }
+                            }
+                            if (purged > 0) console.log(`[useCloudSync] Purged ${purged} orphan(s) from Supabase`);
+                            localStorage.setItem(purgeKey, 'true');
+                        } catch (e) {
+                            console.warn('[useCloudSync] Orphan purge failed:', e);
+                        }
+                    }
                 }
             } catch (e) {
                 console.warn('[useCloudSync] Sync failed:', e);
