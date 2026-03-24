@@ -157,6 +157,7 @@ export async function deleteProjectPermanently(projectId: string): Promise<void>
 
 /**
  * Push a creative set's full data to Supabase as JSONB.
+ * Uses select→update/insert to avoid 409 conflict with RLS.
  */
 export async function pushCreativeSet(
     userId: string,
@@ -165,7 +166,7 @@ export async function pushCreativeSet(
     const sb = getSupabase();
     if (!sb) return;
 
-    const { error } = await sb.from('creative_sets').upsert({
+    const row = {
         id: cs.id,
         project_id: cs.id, // 1:1 mapping for now
         user_id: userId,
@@ -173,9 +174,27 @@ export async function pushCreativeSet(
         version: 1,
         created_at: cs.createdAt,
         updated_at: cs.updatedAt,
-    }, { onConflict: 'id' });
+    };
 
-    if (error) console.warn('[cloudSync] pushCreativeSet error:', error.message);
+    // Check if row exists, then update or insert
+    const { data: existing } = await sb
+        .from('creative_sets')
+        .select('id')
+        .eq('id', cs.id)
+        .maybeSingle();
+
+    if (existing) {
+        const { error } = await sb
+            .from('creative_sets')
+            .update({ data: cs, updated_at: cs.updatedAt, version: 1 })
+            .eq('id', cs.id);
+        if (error) console.warn('[cloudSync] pushCreativeSet update error:', error.message);
+    } else {
+        const { error } = await sb
+            .from('creative_sets')
+            .insert(row);
+        if (error) console.warn('[cloudSync] pushCreativeSet insert error:', error.message);
+    }
 }
 
 /** Push creative set with debounce */
