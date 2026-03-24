@@ -287,6 +287,54 @@ export async function executeToolCall(
                 }
             }
 
+            // ── Replace Background Image (Skill) ─────
+            case 'replace_background_image': {
+                if (!engine?.add_image) return { success: false, message: 'Canvas engine not available' };
+                const prompt = str('prompt');
+                if (!prompt) return { success: false, message: 'No prompt provided for background image' };
+                const style = str('style', 'photography') as 'realistic' | 'illustration' | 'abstract' | 'minimal' | 'photography';
+                const canvasW = engine.canvas_width?.() ?? engine.get_canvas_size?.()?.width ?? 300;
+                const canvasH = engine.canvas_height?.() ?? engine.get_canvas_size?.()?.height ?? 250;
+
+                // Step 1: Find and delete existing background
+                try {
+                    const allNodes = JSON.parse(engine.get_all_nodes?.() ?? '[]');
+                    for (const node of allNodes) {
+                        const name = (node.name ?? node.label ?? '').toLowerCase();
+                        if (name.includes('background') || name.includes('ai_background') || name.includes('bg')) {
+                            try { engine.delete_node?.(node.id); } catch { /* ok */ }
+                        }
+                    }
+                } catch { /* no existing bg to delete */ }
+
+                // Step 2: Generate new image at canvas size
+                try {
+                    const genResult = await generateImage({
+                        prompt: `${prompt}. Background image for premium advertisement. No text, no logos, no watermarks, no UI elements. Cinematic lighting, room for text overlay.`,
+                        width: canvasW,
+                        height: canvasH,
+                        model: 'imagen',
+                        style,
+                        negativePrompt: 'text, logos, watermark, low quality, blurry, distorted, jpeg artifacts, noise, pixelated',
+                    });
+                    if (!genResult.success || !genResult.imageUrl) {
+                        return { success: false, message: `Image generation failed: ${genResult.message}` };
+                    }
+
+                    // Step 3: Place new background at z-index 0
+                    const nodeId = await engine.add_image(0, 0, genResult.imageUrl, canvasW, canvasH, 'ai_background');
+                    if (engine.send_to_back) engine.send_to_back(nodeId);
+
+                    return {
+                        success: true,
+                        message: `Background replaced (${canvasW}x${canvasH}) via ${genResult.model}${genResult.isFallback ? ' (gradient fallback)' : ''}`,
+                        nodeId,
+                    };
+                } catch (err) {
+                    return { success: false, message: `Background replacement failed: ${err}` };
+                }
+            }
+
             // ── Canvas Modification (Atomic) ─────────
             // ★ FIX 3: These tools were referenced in system prompts but never implemented.
             // Without them, "rearrange" requests silently fail — AI generates tool calls

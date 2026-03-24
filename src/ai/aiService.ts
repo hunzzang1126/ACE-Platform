@@ -94,6 +94,8 @@ interface ClaudeResponse {
     model: string;
     stop_reason: 'end_turn' | 'tool_use' | 'max_tokens' | 'stop_sequence';
     usage: { input_tokens: number; output_tokens: number };
+    /** Extended thinking reasoning (if enabled) */
+    reasoning?: string;
 }
 
 // ── AI Service ───────────────────────────────────
@@ -287,6 +289,12 @@ export class AiService {
             if (!response) {
                 progress.onError('No response from Claude');
                 return;
+            }
+
+            // ★ Extended Thinking: Show reasoning before tool execution
+            if (response.reasoning) {
+                progress.onThinking(response.reasoning);
+                await nextFrame();
             }
 
             // Extract text and tool_use blocks
@@ -544,12 +552,22 @@ export class AiService {
             },
         })) : undefined;
 
-        const body = {
+        // ★ Extended Thinking — let Claude reason deeply before acting
+        // Uses OpenRouter's thinking parameter for Claude Sonnet 4+
+        const isClaudeThinking = model.includes('claude') && (
+            model.includes('sonnet-4') || model.includes('opus-4')
+        );
+
+        const body: Record<string, unknown> = {
             model,
-            max_tokens: 2048,
+            max_tokens: 8192,
             messages: openAiMessages,
             tools: openAiTools,
         };
+
+        if (isClaudeThinking) {
+            body.thinking = { type: 'enabled', budget_tokens: 4096 };
+        }
 
         console.log(`[AiService] callClaude → ${apiUrl} (model: ${model}, msgs: ${openAiMessages.length})`);
 
@@ -601,6 +619,9 @@ export class AiService {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const usage = data.usage as any ?? { input_tokens: 0, output_tokens: 0 };
 
+                // ★ Extract extended thinking reasoning
+                const reasoning = msg.reasoning ?? msg.thinking ?? null;
+
                 const result: ClaudeResponse = {
                     id: data.id as string ?? '',
                     type: 'message',
@@ -609,9 +630,10 @@ export class AiService {
                     model: data.model as string ?? model,
                     stop_reason: stopReason as ClaudeResponse['stop_reason'],
                     usage: { input_tokens: usage.prompt_tokens ?? 0, output_tokens: usage.completion_tokens ?? 0 },
+                    reasoning: typeof reasoning === 'string' ? reasoning : undefined,
                 };
 
-                console.log(`[AiService] OpenRouter response: stop=${result.stop_reason}, blocks=${result.content.length}, usage=${result.usage.input_tokens}in/${result.usage.output_tokens}out`);
+                console.log(`[AiService] OpenRouter response: stop=${result.stop_reason}, blocks=${result.content.length}, thinking=${result.reasoning ? result.reasoning.length + 'chars' : 'off'}, usage=${result.usage.input_tokens}in/${result.usage.output_tokens}out`);
                 return result;
             }
 

@@ -14,7 +14,7 @@ import { ALL_TOOLS } from './agentTools';
  * Chat message with tool execution history.
  */
 export interface AgentMessage {
-    role: 'user' | 'assistant' | 'system' | 'action';
+    role: 'user' | 'assistant' | 'system' | 'action' | 'thinking';
     content: string;
     timestamp: number;
     /** AI phases visible in live progress */

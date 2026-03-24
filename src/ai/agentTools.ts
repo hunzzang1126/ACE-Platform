@@ -576,6 +576,25 @@ const add_image_layer: ToolDefinition = {
     category: 'create',
 };
 
+const replace_background_image: ToolDefinition = {
+    name: 'replace_background_image',
+    description: 'Replace the current background image with a new AI-generated one. Deletes the existing background, generates a new image matching the exact canvas size, and places it at z-index 0. Use when user says "change the background", "different image", "replace the photo", "new background", or "try another image". Does NOT touch text, shapes, or other design elements.',
+    parameters: {
+        type: 'object',
+        properties: {
+            prompt: { type: 'string', description: 'Description of the new background image. Be specific about mood, lighting, and composition.' },
+            style: {
+                type: 'string',
+                description: 'Visual style',
+                enum: ['realistic', 'illustration', 'abstract', 'minimal', 'photography'],
+                default: 'photography',
+            },
+        },
+        required: ['prompt'],
+    },
+    category: 'create',
+};
+
 // ── Full Design Pipeline (Meta-Tool) ──────────────
 
 const generate_full_design: ToolDefinition = {
@@ -613,7 +632,7 @@ const CANVAS_TOOLS: ToolDefinition[] = [
     // Compound
     create_layout, animate_all, analyze_scene, render_banner,
     // Image Generation (Atomic)
-    generate_image, set_canvas_background, add_image_layer,
+    generate_image, set_canvas_background, add_image_layer, replace_background_image,
     // Full Design Pipeline
     generate_full_design,
 ];

@@ -794,7 +794,20 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
 
         await serviceRef.current.chat(msg, engine, {
             onCanvasScan: () => updateCard('thinking', 'running', 'Scanning canvas'),
-            onThinking: (t: string) => updateCard('thinking', 'running', t || 'Thinking...'),
+            onThinking: (t: string) => {
+                // Short status → update card; long reasoning → show as thinking message
+                if (t.length > 100) {
+                    // ★ Extended thinking content — show as collapsible reasoning
+                    updateCard('thinking', 'done', 'Reasoning complete');
+                    setMessages(prev => [...prev, {
+                        role: 'thinking' as AgentMessage['role'],
+                        content: t,
+                        timestamp: Date.now(),
+                    }]);
+                } else {
+                    updateCard('thinking', 'running', t || 'Thinking...');
+                }
+            },
             onPlan: (steps: string[]) => {
                 updateCard('thinking', 'done');
                 steps.forEach((s, i) => addCard(`step-${i}`, s, 'pending'));

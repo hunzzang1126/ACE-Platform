@@ -223,6 +223,9 @@ export function GlobalAiPanel() {
                             if (m.role === 'action' && m.actionCard) {
                                 return <ActionCardInline key={`action-${m.actionCard.id}-${i}`} card={m.actionCard} />;
                             }
+                            if (m.role === 'thinking') {
+                                return <ThinkingCard key={`thinking-${i}`} content={m.content} />;
+                            }
                             // assistant
                             return (
                                 <div key={i} style={assistantStyle}>
@@ -393,6 +396,59 @@ function ActionCardInline({ card }: { card: ActionCardData }) {
                     overflowY: 'auto',
                 }}>
                     {card.expandedDetail}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ── Thinking Card (Extended Thinking Visibility) ──
+
+function ThinkingCard({ content }: { content: string }) {
+    const [expanded, setExpanded] = useState(false);
+    // Estimate thinking duration from content length (~200 chars/sec thinking speed)
+    const estimatedSec = Math.max(1, Math.round(content.length / 200));
+
+    return (
+        <div
+            onClick={() => setExpanded(!expanded)}
+            style={{
+                margin: '3px 10px',
+                padding: '6px 10px',
+                background: expanded ? 'rgba(139,92,246,0.04)' : 'rgba(139,92,246,0.03)',
+                border: '1px solid rgba(139,92,246,0.12)',
+                borderRadius: 8,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+            }}
+        >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{
+                    width: 14, height: 14, borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #8b5cf6, #a78bfa)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 8, color: '#fff', fontWeight: 700, flexShrink: 0,
+                }}>T</span>
+                <span style={{ fontSize: 11, color: '#7c3aed', fontWeight: 500 }}>
+                    Thought for {estimatedSec}s
+                </span>
+                <span style={{
+                    fontSize: 10, color: '#a78bfa', marginLeft: 'auto',
+                    transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: 'transform 0.2s ease',
+                }}>&#9660;</span>
+            </div>
+            {expanded && (
+                <div style={{
+                    marginTop: 8, paddingTop: 8,
+                    borderTop: '1px solid rgba(139,92,246,0.1)',
+                    fontSize: 11, lineHeight: 1.6,
+                    color: '#6b7280',
+                    fontFamily: 'JetBrains Mono, Menlo, monospace',
+                    whiteSpace: 'pre-wrap',
+                    maxHeight: 300, overflowY: 'auto',
+                }}>
+                    {content}
                 </div>
             )}
         </div>
