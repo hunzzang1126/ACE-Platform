@@ -135,17 +135,26 @@ export function DashboardPage() {
             return;
         }
         const defaultPreset = BANNER_PRESETS[0]!;
+        // ★ ARCHITECTURAL FIX: Use ONE ID for both stores.
+        // Previously: createCreativeSet → id-A, createCreativeSetProject → id-B,
+        // then patched B→A. Cloud sync subscriber saw B as new, pushed to Supabase.
+        // Race: trashProject(B) might not complete before next syncOnLogin pull.
+        // Result: both A and B exist in cloud → phantom CS on refresh.
         const csId = createCreativeSet('Untitled Creative Set', defaultPreset);
-        createCreativeSetProject('Untitled Creative Set');
+        const now = new Date().toISOString();
         useProjectStore.setState((state) => {
-            const last = state.creativeSets[state.creativeSets.length - 1];
-            if (last) {
-                state.creativeSets = state.creativeSets.filter(s => s.id !== last.id);
-                state.creativeSets.push({ ...last, id: csId });
-            }
+            state.creativeSets.push({
+                id: csId,
+                name: 'Untitled Creative Set',
+                folderId: state.currentFolderId ?? undefined,
+                variantCount: 1,
+                createdAt: now,
+                updatedAt: now,
+                createdBy: displayName || 'User',
+            });
         });
         navigate('/editor');
-    }, [createCreativeSetProject, createCreativeSet, navigate, canCreateSet]);
+    }, [createCreativeSet, navigate, canCreateSet, displayName]);
 
     const handleOpenSet = useCallback((id: string) => {
         const opened = openCreativeSet(id);
