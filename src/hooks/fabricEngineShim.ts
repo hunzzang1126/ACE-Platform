@@ -500,15 +500,23 @@ export function createEngineShim(
         },
 
         // ★ FONT-AWARE REFRESH: Recalculate ALL text bounding boxes after fonts load.
-        // Fabric Textbox auto-calculates height from font metrics at creation time.
-        // If the web font (Inter) hasn't loaded yet, Fabric uses a fallback → wrong height
-        // → setCoords() caches wrong bounding box → text is visible but NOT clickable.
-        // This method forces Fabric to recalculate using the now-loaded real font.
+        // Also dumps diagnostic info to help debug click issues.
         refreshTextCoords: () => {
             let refreshed = 0;
             for (const obj of userObjects()) {
+                // ★ DIAGNOSTIC: Log all object properties to find click-blocking issues
+                const bounds = obj.getBoundingRect();
+                console.log(`[fabricEngine] DIAG: "${(obj as any).__glidName}" type=${obj.type}`,
+                    `sel=${obj.selectable} evt=${obj.evented}`,
+                    `lockX=${(obj as any).lockMovementX} lockY=${(obj as any).lockMovementY}`,
+                    `vis=${obj.visible} opacity=${obj.opacity}`,
+                    `pos=(${Math.round(obj.left ?? 0)},${Math.round(obj.top ?? 0)})`,
+                    `size=(${Math.round(obj.width ?? 0)}x${Math.round(obj.height ?? 0)})`,
+                    `bounds=(${Math.round(bounds.left)},${Math.round(bounds.top)},${Math.round(bounds.width)}x${Math.round(bounds.height)})`,
+                    `zIdx=${(obj as any).__glidZIndex}`,
+                );
+
                 if (obj.type === 'textbox' || obj.type === 'text') {
-                    // Force Fabric to re-measure text with the loaded font
                     if (typeof (obj as any).initDimensions === 'function') {
                         (obj as any).initDimensions();
                     }
@@ -516,9 +524,13 @@ export function createEngineShim(
                     refreshed++;
                 }
             }
+            // Also force setCoords on ALL objects (not just text)
+            for (const obj of userObjects()) {
+                obj.setCoords();
+            }
             if (refreshed > 0) {
                 fc.renderAll();
-                console.log(`[fabricEngine] refreshTextCoords: refreshed ${refreshed} text objects`);
+                console.log(`[fabricEngine] refreshTextCoords: refreshed ${refreshed} text + all coords`);
             }
         },
 
