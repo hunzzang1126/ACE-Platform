@@ -75,20 +75,32 @@ export async function pushToCloud(userId: string): Promise<boolean> {
             }
         }
 
-        // Push current creative set
+        // Push current creative set (select→update/insert to avoid 409)
         if (creativeSet) {
-            const { error: csErr } = await sb
+            const now = new Date().toISOString();
+            const { data: existing } = await sb
                 .from('creative_sets')
-                .upsert({
-                    id: creativeSet.id,
-                    project_id: creativeSet.id, // project_id == creative set id for now
-                    user_id: userId,
-                    data: creativeSet,
-                    updated_at: new Date().toISOString(),
-                }, { onConflict: 'id' });
+                .select('id')
+                .eq('id', creativeSet.id)
+                .maybeSingle();
 
-            if (csErr) {
-                console.warn('[cloudSync] CreativeSet push error:', csErr.message);
+            if (existing) {
+                const { error: csErr } = await sb
+                    .from('creative_sets')
+                    .update({ data: creativeSet, updated_at: now })
+                    .eq('id', creativeSet.id);
+                if (csErr) console.warn('[cloudSync] CreativeSet update error:', csErr.message);
+            } else {
+                const { error: csErr } = await sb
+                    .from('creative_sets')
+                    .insert({
+                        id: creativeSet.id,
+                        project_id: creativeSet.id,
+                        user_id: userId,
+                        data: creativeSet,
+                        updated_at: now,
+                    });
+                if (csErr) console.warn('[cloudSync] CreativeSet insert error:', csErr.message);
             }
         }
 
@@ -147,17 +159,24 @@ export async function pullFromCloud(userId: string): Promise<boolean> {
         }
 
         // Merge into local stores (cloud data wins for now — last-write-wins)
+        // ★ CRITICAL: Never recreate sets that were locally deleted (in trash or permanently)
         if (cloudProjects && cloudProjects.length > 0) {
             const localSets = useProjectStore.getState().creativeSets;
+            const trash = useProjectStore.getState().trash;
             const localIds = new Set(localSets.map((s: { id: string }) => s.id));
+            const trashIds = new Set(trash.map((t: { item: { id: string } }) => t.item.id));
 
+            let addedCount = 0;
             for (const cp of cloudProjects) {
-                if (!localIds.has(cp.id)) {
-                    // New from cloud — create locally
+                // Skip if already local OR in trash (user intentionally deleted)
+                if (localIds.has(cp.id) || trashIds.has(cp.id)) continue;
+                // Only add if the cloud project looks valid (has a name)
+                if (cp.name) {
                     useProjectStore.getState().createCreativeSet(cp.name);
+                    addedCount++;
                 }
             }
-            console.log(`[cloudSync] Pulled ${cloudProjects.length} projects`);
+            console.log(`[cloudSync] Pulled ${cloudProjects.length} projects (${addedCount} new)`);
         }
 
         if (cloudSets && cloudSets.length > 0) {
