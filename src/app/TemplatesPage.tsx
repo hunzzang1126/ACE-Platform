@@ -42,7 +42,15 @@ export function TemplatesPage() {
             return;
         }
 
-        // Create a temporary creative set from the template
+        // ★ ARCHITECTURAL FIX: Do NOT call createCreativeSet().
+        // createCreativeSet() persists to allCreativeSets (IndexedDB), causing
+        // phantom CSs in the dashboard. Template editing should be IN-MEMORY ONLY.
+        // We construct a temp CS and set it directly on designStore.creativeSet
+        // WITHOUT touching allCreativeSets.
+        const tempCsId = `tmpl-temp-${tmpl.id}-${Date.now()}`;
+        const tempVariantId = `tmpl-var-${tmpl.id}-${Date.now()}`;
+        const now = new Date().toISOString();
+
         const preset: BannerPreset = {
             id: `tmpl-preset-${tmpl.id}`,
             name: `${tmpl.width}x${tmpl.height}`,
@@ -50,28 +58,40 @@ export function TemplatesPage() {
             height: tmpl.height,
             category: 'display',
         };
-        const csId = createCreativeSet(`[Template] ${tmpl.name}`, preset);
-        const cs = useDesignStore.getState().creativeSet;
-        if (!cs || cs.variants.length === 0) return;
 
-        const targetVariantId = cs.variants[0]!.id;
+        const tempVariant: BannerVariant = {
+            id: tempVariantId,
+            preset,
+            elements: variant.elements ?? [],
+            backgroundColor: variant.backgroundColor || '#ffffff',
+            overriddenElementIds: [],
+            syncLocked: false,
+        };
 
-        // Copy template elements into the variant
-        useDesignStore.setState(state => {
-            const v = state.creativeSet?.variants.find(v => v.id === targetVariantId);
-            if (v) {
-                v.elements = variant.elements ?? [];
-                v.backgroundColor = variant.backgroundColor || '#ffffff';
-            }
+        const tempCS = {
+            id: tempCsId,
+            name: `[Template] ${tmpl.name}`,
+            masterVariantId: tempVariantId,
+            variants: [tempVariant],
+            plugConnections: {},
+            brand: { primaryColor: '#000000', secondaryColor: '#FFFFFF', fontFamily: 'Inter' },
+            createdAt: now,
+            updatedAt: now,
+        };
+
+        // Set ONLY creativeSet — NOT allCreativeSets. In-memory only.
+        useDesignStore.setState({
+            creativeSet: tempCS as any,
+            activeCreativeSetId: tempCsId,
         });
 
-        // Set editing flags so save knows to update the template and clean up
+        // Set editing flags so save knows to update the template
         setEditingTemplateId(tmpl.id);
-        useTemplateStore.getState().setEditingTempCsId(csId);
+        // No editingTempCsId needed — there's nothing to clean up
 
         // Navigate to the canvas editor
-        navigate(`/editor/detail/${targetVariantId}`);
-    }, [createCreativeSet, setEditingTemplateId, navigate]);
+        navigate(`/editor/detail/${tempVariantId}`);
+    }, [setEditingTemplateId, navigate]);
 
     const adminMode = isAdmin();
 

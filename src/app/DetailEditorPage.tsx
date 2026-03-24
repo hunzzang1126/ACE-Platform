@@ -31,6 +31,7 @@ export function DetailEditorPage() {
     const { variantId } = useParams<{ variantId: string }>();
 
     const creativeSet = useDesignStore((s) => s.creativeSet);
+    // ★ createCreativeSet removed — template editing uses in-memory CS
     const setLayer = useEditorStore((s) => s.setLayer);
     const setActiveVariant = useEditorStore((s) => s.setActiveVariant);
 
@@ -112,36 +113,25 @@ export function DetailEditorPage() {
             // persist. The two persists RACE → the delete can get overwritten → CS leaks.
             const tmplId = useTemplateStore.getState().editingTemplateId;
             if (tmplId) {
-                // Read the current variant directly from the engine (not from store)
-                // The variant in designStore.creativeSet is already kept up-to-date
-                // by canvas interactions (each element change writes via replaceVariantElements)
+                // ★ ARCHITECTURAL FIX: Template CS is in-memory only (not in allCreativeSets).
+                // Just read variant, override template, clear flags, navigate away.
+                // No CS deletion needed — the in-memory CS evaporates when creativeSet changes.
                 const cs = useDesignStore.getState().creativeSet;
                 const v = cs?.variants.find(vi => vi.id === variantId);
                 if (v) {
                     console.log('[TemplateSave] Saving template override:', tmplId, 'elements:', v.elements.length);
                     overrideTemplate(tmplId, v, width, height);
 
-                    const tempCsId = useTemplateStore.getState().editingTempCsId;
-
-                    // Clear editing flags
+                    // Clear editing flags (no CS to delete — it was never persisted)
                     setEditingTemplateId(null);
                     useTemplateStore.getState().setEditingTempCsId(null);
 
-                    // Delete temp CS
-                    if (tempCsId) {
-                        useDesignStore.getState().deleteCreativeSet(tempCsId);
-                        useProjectStore.setState(state => {
-                            state.creativeSets = state.creativeSets.filter(s => s.id !== tempCsId);
-                        });
-                        console.log('[DetailEditor] Cleaned up temp creative set:', tempCsId);
-                    }
-
-                    // Prevent auto-save on unmount from re-creating the CS
+                    // Prevent auto-save on unmount
                     isDirtyRef.current = false;
                     lastManualSaveRef.current = Date.now();
 
                     navigate('/templates');
-                    return; // Skip normal save flow entirely
+                    return;
                 }
             }
 
@@ -431,18 +421,10 @@ export function DetailEditorPage() {
                     <span>EDITING TEMPLATE — Save to update the global template</span>
                     <button
                         onClick={() => {
-                            // Capture temp CS ID before clearing
-                            // ★ FIX: Synchronous cleanup (same as save handler)
-                            const tempCsId = useTemplateStore.getState().editingTempCsId;
+                            // ★ ARCHITECTURAL FIX: No CS to delete — it was in-memory only.
+                            // Just clear editing flags and navigate away.
                             setEditingTemplateId(null);
                             useTemplateStore.getState().setEditingTempCsId(null);
-                            if (tempCsId) {
-                                useDesignStore.getState().deleteCreativeSet(tempCsId);
-                                useProjectStore.setState(state => {
-                                    state.creativeSets = state.creativeSets.filter(s => s.id !== tempCsId);
-                                });
-                            }
-                            // ★ CRITICAL: Prevent auto-save from re-creating the temp CS
                             isDirtyRef.current = false;
                             navigate('/templates');
                         }}
