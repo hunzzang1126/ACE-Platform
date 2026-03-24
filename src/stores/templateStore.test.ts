@@ -309,3 +309,70 @@ describe('useTemplateStore — Template Overrides', () => {
         expect(typeof useTemplateStore.getState().syncOverridesFromCloud).toBe('function');
     });
 });
+
+// ─────────────────────────────────────────────────
+// Regression Guards — Template Editing Cleanup
+// ─────────────────────────────────────────────────
+describe('useTemplateStore — Editing Cleanup Regression Guards', () => {
+    beforeEach(() => {
+        useTemplateStore.setState({
+            templates: [...BUILT_IN_TEMPLATES],
+            templateOverrides: {},
+            editingTemplateId: null,
+            editingTempCsId: null,
+        });
+    });
+
+    it('★ REGRESSION: setEditingTempCsId stores and clears correctly', () => {
+        useTemplateStore.getState().setEditingTempCsId('temp-cs-123');
+        expect(useTemplateStore.getState().editingTempCsId).toBe('temp-cs-123');
+
+        useTemplateStore.getState().setEditingTempCsId(null);
+        expect(useTemplateStore.getState().editingTempCsId).toBeNull();
+    });
+
+    it('★ REGRESSION: editing flags are independent from each other', () => {
+        useTemplateStore.getState().setEditingTemplateId('tmpl-1');
+        useTemplateStore.getState().setEditingTempCsId('cs-1');
+
+        // Clearing template ID should NOT affect temp CS ID
+        useTemplateStore.getState().setEditingTemplateId(null);
+        expect(useTemplateStore.getState().editingTempCsId).toBe('cs-1');
+
+        // And vice versa
+        useTemplateStore.getState().setEditingTemplateId('tmpl-2');
+        useTemplateStore.getState().setEditingTempCsId(null);
+        expect(useTemplateStore.getState().editingTemplateId).toBe('tmpl-2');
+    });
+
+    it('★ REGRESSION: overrideTemplate clears editingTemplateId', () => {
+        const templateId = BUILT_IN_TEMPLATES[0].id;
+        useTemplateStore.getState().setEditingTemplateId(templateId);
+        useTemplateStore.getState().setEditingTempCsId('temp-cs-456');
+
+        useTemplateStore.getState().overrideTemplate(templateId, {
+            ...mockVariant,
+            backgroundColor: '#999999',
+        });
+
+        // overrideTemplate clears editingTemplateId (store responsibility)
+        expect(useTemplateStore.getState().editingTemplateId).toBeNull();
+        // editingTempCsId is cleared by the CALLER (DetailEditorPage), not the store
+        expect(useTemplateStore.getState().editingTempCsId).toBe('temp-cs-456');
+    });
+
+    it('★ REGRESSION: cleanup must be synchronous — not deferred', () => {
+        // This test validates the principle: editing flags must be clearable
+        // synchronously before any navigation or state persist happens
+        useTemplateStore.getState().setEditingTemplateId('tmpl-x');
+        useTemplateStore.getState().setEditingTempCsId('cs-x');
+
+        // Synchronous clear (this is what the fix enforces)
+        useTemplateStore.getState().setEditingTemplateId(null);
+        useTemplateStore.getState().setEditingTempCsId(null);
+
+        // Immediately after, both should be null (no deferred behavior)
+        expect(useTemplateStore.getState().editingTemplateId).toBeNull();
+        expect(useTemplateStore.getState().editingTempCsId).toBeNull();
+    });
+});

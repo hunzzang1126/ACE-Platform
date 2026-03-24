@@ -117,5 +117,47 @@ describe('contextRouter', () => {
             expect(prompt).toContain('Canvas Editor');
             expect(prompt).toContain('generate_full_design');
         });
+
+        it('includes SKILL ROUTING section in canvas editor prompt', () => {
+            const ctx = buildContext('/editor/detail/x');
+            const prompt = buildContextSystemPrompt(ctx);
+            expect(prompt).toContain('SKILL ROUTING');
+        });
+
+        it('★ REGRESSION: skill routing mentions replace_background_image', () => {
+            const ctx = buildContext('/editor/detail/x');
+            const prompt = buildContextSystemPrompt(ctx);
+            expect(prompt).toContain('replace_background_image');
+        });
+
+        it('★ REGRESSION: skill routing differentiates bg replacement from full design', () => {
+            const ctx = buildContext('/editor/detail/x');
+            const prompt = buildContextSystemPrompt(ctx);
+            // Both tools must be mentioned with different trigger phrases
+            expect(prompt).toContain('replace_background_image');
+            expect(prompt).toContain('generate_full_design');
+            expect(prompt).toContain('change/replace/swap background');
+            expect(prompt).toContain('design/create from scratch');
+        });
+
+        it('includes IMAGE GENERATION RULES in canvas editor prompt', () => {
+            const ctx = buildContext('/editor/detail/x');
+            const prompt = buildContextSystemPrompt(ctx);
+            expect(prompt).toContain('IMAGE GENERATION RULES');
+            expect(prompt).toContain('canvas size');
+        });
+
+        it('includes text-only advice option in skill routing', () => {
+            const ctx = buildContext('/editor/detail/x');
+            const prompt = buildContextSystemPrompt(ctx);
+            expect(prompt).toContain('Questions or advice');
+            expect(prompt).toContain('text response only');
+        });
+
+        it('includes batch/translate option in skill routing', () => {
+            const ctx = buildContext('/editor/detail/x');
+            const prompt = buildContextSystemPrompt(ctx);
+            expect(prompt).toContain('translate all/batch modify');
+        });
     });
 });
