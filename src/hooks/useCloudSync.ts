@@ -58,40 +58,13 @@ export function useCloudSync() {
                 }
 
                 if (merged) {
-                    // ★ ORPHAN PURGE v3: Clean up ghost data in Supabase.
-                    // MUST run BEFORE applying merged data to stores.
-                    // Uses PRE-MERGE local state as the source of truth.
-                    // Cloud projects/CSs that don't exist locally = orphans from
-                    // the old double-ID bug or previously deleted items.
-                    try {
-                        const { pullAllProjectsRaw, deleteProjectPermanently, deleteCreativeSetCloud } = await import('@/services/cloudSync');
-                        const cloudProjects = await pullAllProjectsRaw(userId);
-                        const localProjectIds = new Set(localProjects.map(p => p.id));
-                        const localCsIds = new Set(Object.keys(localCS));
-                        let purged = 0;
-                        for (const cp of cloudProjects) {
-                            // Ghost = exists in cloud but NOT in local projects AND NOT in local creative sets
-                            if (!localProjectIds.has(cp.id) && !localCsIds.has(cp.id)) {
-                                console.log('[useCloudSync] Purging orphan:', cp.id, cp.name);
-                                await deleteProjectPermanently(cp.id);
-                                await deleteCreativeSetCloud(cp.id);
-                                purged++;
-                            }
-                        }
-                        if (purged > 0) {
-                            // Also remove orphans from merged data so they don't re-enter stores
-                            merged.projects = merged.projects.filter(p => localProjectIds.has(p.id) || localCsIds.has(p.id));
-                            const validIds = new Set(merged.projects.map(p => p.id));
-                            for (const key of Object.keys(merged.creativeSets)) {
-                                if (!validIds.has(key) && !localCsIds.has(key)) {
-                                    delete merged.creativeSets[key];
-                                }
-                            }
-                            console.log(`[useCloudSync] Purged ${purged} orphan(s) from Supabase`);
-                        }
-                    } catch (e) {
-                        console.warn('[useCloudSync] Orphan purge failed:', e);
-                    }
+                    // ★ ORPHAN PURGE REMOVED — was causing real data loss.
+                    // The purge read localProjects/localCS from Zustand stores,
+                    // but on page refresh, IDB hydration hasn't completed yet,
+                    // so local state is EMPTY → every cloud project looked like
+                    // an orphan → all real projects got deleted.
+                    // TODO: Implement safe orphan cleanup after confirming
+                    // Zustand hydration is complete (use onRehydrateStorage callback).
 
                     // Apply merged data to stores
                     useProjectStore.setState({
