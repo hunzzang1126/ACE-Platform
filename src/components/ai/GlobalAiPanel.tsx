@@ -226,6 +226,15 @@ export function GlobalAiPanel() {
                             if (m.role === 'thinking') {
                                 return <ThinkingCard key={`thinking-${i}`} content={m.content} />;
                             }
+                            if (m.role === 'image_gallery' && m.imageGallery) {
+                                return (
+                                    <ImageGalleryCard
+                                        key={`gallery-${i}`}
+                                        images={m.imageGallery.images}
+                                        onSelect={(url) => agent.applyGalleryImage(url, m.imageGallery!.canvasW, m.imageGallery!.canvasH)}
+                                    />
+                                );
+                            }
                             // assistant
                             return (
                                 <div key={i} style={assistantStyle}>
@@ -449,6 +458,98 @@ function ThinkingCard({ content }: { content: string }) {
                     maxHeight: 300, overflowY: 'auto',
                 }}>
                     {content}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ── Image Gallery Card (Background Selection) ──
+
+function ImageGalleryCard({
+    images,
+    onSelect,
+}: {
+    images: Array<{ id: string; url: string; prompt: string }>;
+    onSelect: (url: string) => void;
+}) {
+    const [selectedId, setSelectedId] = useState<string | null>(null);
+    const [applying, setApplying] = useState(false);
+
+    const handleSelect = async (img: { id: string; url: string }) => {
+        if (applying) return;
+        setApplying(true);
+        setSelectedId(img.id);
+        try {
+            onSelect(img.url);
+        } finally {
+            setTimeout(() => setApplying(false), 1000);
+        }
+    };
+
+    return (
+        <div style={{
+            margin: '6px 10px', padding: '8px',
+            background: 'rgba(255,255,255,0.6)',
+            border: '1px solid rgba(139,92,246,0.12)',
+            borderRadius: 10,
+        }}>
+            <div style={{ fontSize: 11, color: '#7c3aed', fontWeight: 500, marginBottom: 6 }}>
+                Choose a background
+            </div>
+            <div style={{
+                display: 'flex', gap: 6, overflowX: 'auto',
+                paddingBottom: 4,
+            }}>
+                {images.map(img => (
+                    <div
+                        key={img.id}
+                        onClick={() => handleSelect(img)}
+                        style={{
+                            position: 'relative', flexShrink: 0,
+                            width: 110, height: 80,
+                            borderRadius: 8, overflow: 'hidden',
+                            border: selectedId === img.id
+                                ? '2px solid #8b5cf6'
+                                : '2px solid transparent',
+                            cursor: applying ? 'wait' : 'pointer',
+                            transition: 'all 0.2s ease',
+                            opacity: applying && selectedId !== img.id ? 0.5 : 1,
+                        }}
+                    >
+                        <img
+                            src={img.url}
+                            alt={img.prompt}
+                            style={{
+                                width: '100%', height: '100%',
+                                objectFit: 'cover',
+                            }}
+                        />
+                        {/* Hover overlay */}
+                        <div style={{
+                            position: 'absolute', inset: 0,
+                            background: selectedId === img.id
+                                ? 'rgba(139,92,246,0.3)'
+                                : 'rgba(0,0,0,0)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            transition: 'background 0.2s ease',
+                        }}>
+                            {selectedId === img.id && (
+                                <span style={{
+                                    fontSize: 10, fontWeight: 600,
+                                    color: '#fff', background: 'rgba(139,92,246,0.8)',
+                                    padding: '2px 8px', borderRadius: 4,
+                                }}>
+                                    {applying ? 'Applying...' : 'Applied'}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                ))}
+            </div>
+            {images[0]?.prompt && (
+                <div style={{ fontSize: 9, color: '#94a3b8', marginTop: 4, lineHeight: 1.3 }}>
+                    {images[0].prompt.slice(0, 60)}...
                 </div>
             )}
         </div>

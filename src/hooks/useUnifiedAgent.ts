@@ -910,6 +910,28 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         setState(INITIAL_STATE);
     }, []);
 
+    /** Apply a gallery image as the canvas background */
+    const applyGalleryImage = useCallback((imageUrl: string, canvasW: number, canvasH: number) => {
+        const engine = engineRef.current;
+        if (!engine?.add_image) return;
+
+        // Delete existing backgrounds
+        try {
+            const allNodes = JSON.parse(engine.get_all_nodes?.() ?? '[]');
+            for (const node of allNodes) {
+                const name = (node.name ?? node.label ?? '').toLowerCase();
+                if (name.includes('background') || name.includes('ai_background') || name.includes('bg')) {
+                    try { engine.delete_node?.(node.id); } catch { /* ok */ }
+                }
+            }
+        } catch { /* */ }
+
+        // Add new background
+        engine.add_image(0, 0, imageUrl, canvasW, canvasH, 'ai_background').then((nodeId: number) => {
+            if (engine.send_to_back) engine.send_to_back(nodeId);
+        });
+    }, []);
+
     return {
         messages,
         state,
@@ -918,6 +940,7 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         send,
         setEngine,
         clearChat,
+        applyGalleryImage,
         engineRef,
     };
 }

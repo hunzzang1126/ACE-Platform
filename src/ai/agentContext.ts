@@ -14,7 +14,7 @@ import { ALL_TOOLS } from './agentTools';
  * Chat message with tool execution history.
  */
 export interface AgentMessage {
-    role: 'user' | 'assistant' | 'system' | 'action' | 'thinking';
+    role: 'user' | 'assistant' | 'system' | 'action' | 'thinking' | 'image_gallery';
     content: string;
     timestamp: number;
     /** AI phases visible in live progress */
@@ -29,6 +29,12 @@ export interface AgentMessage {
         detail?: string;
         reasoning?: string;
         expandedDetail?: string;
+    };
+    /** Image gallery data — only when role === 'image_gallery' */
+    imageGallery?: {
+        images: Array<{ id: string; url: string; prompt: string }>;
+        canvasW: number;
+        canvasH: number;
     };
 }
 
