@@ -364,9 +364,17 @@ export function useCanvasSync(
                 }
 
                 // ★ FIX: Background elements must be non-selectable to avoid stealing clicks
+                // Triple detection: role, name, OR size coverage (bulletproof)
                 const elName = (el.name ?? '').toLowerCase();
-                if (el.role === 'background' || elName.includes('background') || elName.includes('ai_background') || elName.includes('bg_')) {
-                    try { engine.send_to_back?.(nodeId); } catch { /* ok */ }
+                const isBackground = el.role === 'background'
+                    || elName.includes('background') || elName.includes('ai_background') || elName.includes('bg_')
+                    || ((el.zIndex === 0 || el.zIndex === undefined) && w >= canvasW * 0.85 && h >= canvasH * 0.85);
+                if (isBackground) {
+                    try {
+                        engine.send_to_back?.(nodeId);
+                        // Also explicitly set non-selectable (some shim paths miss this)
+                        engine.set_non_selectable?.(nodeId);
+                    } catch { /* ok */ }
                 }
 
                 restoredShapes++;

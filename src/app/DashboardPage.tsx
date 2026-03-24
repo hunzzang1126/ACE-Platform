@@ -82,12 +82,16 @@ export function DashboardPage() {
             useProjectStore.setState((state) => {
                 const existingIds = new Set(state.creativeSets.map(s => s.id));
                 for (const cs of allCS) {
+                    // ★ REGRESSION GUARD: Skip temp template editing creative sets
+                    if (cs.name.startsWith('[Template]')) continue;
                     if (existingIds.has(cs.id) || trashIds.has(cs.id)) continue;
                     state.creativeSets.push({
                         id: cs.id, name: cs.name, variantCount: cs.variants.length,
                         createdAt: cs.createdAt, updatedAt: cs.updatedAt, createdBy: displayName || 'User',
                     });
                 }
+                // ★ Also remove any stale [Template] entries that leaked previously
+                state.creativeSets = state.creativeSets.filter(s => !s.name.startsWith('[Template]'));
                 for (const cs of allCS) {
                     const existing = state.creativeSets.find(s => s.id === cs.id);
                     if (existing) {

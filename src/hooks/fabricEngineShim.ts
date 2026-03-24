@@ -663,6 +663,13 @@ export function createEngineShim(
                 syncState();
             }
         },
+        set_non_selectable: (id: number): void => {
+            const obj = findById(id);
+            if (obj) {
+                obj.set({ selectable: false, evented: false } as any);
+                fc.renderAll();
+            }
+        },
         remove_element: (id: number): void => {
             const obj = findById(id);
             if (obj) { fc.remove(obj); fc.renderAll(); }
