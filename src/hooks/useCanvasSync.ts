@@ -363,6 +363,12 @@ export function useCanvasSync(
                     try { engine.set_locked?.(nodeId, true); } catch { /* ok */ }
                 }
 
+                // ★ FIX: Background elements must be non-selectable to avoid stealing clicks
+                const elName = (el.name ?? '').toLowerCase();
+                if (el.role === 'background' || elName.includes('background') || elName.includes('ai_background') || elName.includes('bg_')) {
+                    try { engine.send_to_back?.(nodeId); } catch { /* ok */ }
+                }
+
                 restoredShapes++;
 
                 if (el.animation && el.animation.preset !== 'none') {

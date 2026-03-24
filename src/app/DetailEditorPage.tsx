@@ -133,21 +133,21 @@ export function DetailEditorPage() {
 
                     const tempCsId = useTemplateStore.getState().editingTempCsId;
 
-                    // ★ Clear editing flags and navigate FIRST (before deleting CS)
+                    // ★ FIX: Clear editing flags FIRST
                     setEditingTemplateId(null);
                     useTemplateStore.getState().setEditingTempCsId(null);
-                    navigate('/templates');
 
-                    // ★ Delete temp CS AFTER navigation (editor unmounted by then)
+                    // ★ FIX: Delete temp CS SYNCHRONOUSLY before navigate
+                    // (setTimeout raced with Zustand persist → CS survived in localStorage)
                     if (tempCsId) {
-                        setTimeout(() => {
-                            useDesignStore.getState().deleteCreativeSet(tempCsId);
-                            useProjectStore.setState(state => {
-                                state.creativeSets = state.creativeSets.filter(s => s.id !== tempCsId);
-                            });
-                            console.log('[DetailEditor] Cleaned up temp creative set:', tempCsId);
-                        }, 500);
+                        useDesignStore.getState().deleteCreativeSet(tempCsId);
+                        useProjectStore.setState(state => {
+                            state.creativeSets = state.creativeSets.filter(s => s.id !== tempCsId);
+                        });
+                        console.log('[DetailEditor] Cleaned up temp creative set:', tempCsId);
                     }
+
+                    navigate('/templates');
                     return; // Skip normal save status flow
                 }
             }
@@ -424,20 +424,17 @@ export function DetailEditorPage() {
                     <button
                         onClick={() => {
                             // Capture temp CS ID before clearing
+                            // ★ FIX: Synchronous cleanup (same as save handler)
                             const tempCsId = useTemplateStore.getState().editingTempCsId;
-                            // Navigate first, then clean up after editor unmounts
                             setEditingTemplateId(null);
                             useTemplateStore.getState().setEditingTempCsId(null);
-                            navigate('/templates');
-                            // Delayed cleanup
                             if (tempCsId) {
-                                setTimeout(() => {
-                                    useDesignStore.getState().deleteCreativeSet(tempCsId);
-                                    useProjectStore.setState(state => {
-                                        state.creativeSets = state.creativeSets.filter(s => s.id !== tempCsId);
-                                    });
-                                }, 500);
+                                useDesignStore.getState().deleteCreativeSet(tempCsId);
+                                useProjectStore.setState(state => {
+                                    state.creativeSets = state.creativeSets.filter(s => s.id !== tempCsId);
+                                });
                             }
+                            navigate('/templates');
                         }}
                         style={{
                             background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff',

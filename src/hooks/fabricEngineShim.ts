@@ -652,6 +652,17 @@ export function createEngineShim(
                 syncState();
             }
         },
+        send_to_back: (id: number): void => {
+            const obj = findById(id);
+            if (obj) {
+                fc.sendObjectToBack(obj);
+                (obj as any).__glidZIndex = 0;
+                // ★ Background elements should NOT intercept clicks
+                obj.set({ selectable: false, evented: false } as any);
+                fc.renderAll();
+                syncState();
+            }
+        },
         remove_element: (id: number): void => {
             const obj = findById(id);
             if (obj) { fc.remove(obj); fc.renderAll(); }
