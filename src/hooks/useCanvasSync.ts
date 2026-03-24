@@ -318,7 +318,13 @@ export function useCanvasSync(
         const pendingImageLoads: (() => Promise<void>)[] = [];
         const pendingVideoLoads: Promise<void>[] = [];
 
-        for (const el of variant.elements) {
+        // ★ CRITICAL: Sort elements by zIndex before restoring.
+        // Fabric.js uses insertion order for stacking — last added = on top = receives clicks first.
+        // Without sorting, a background (zIndex 0) saved AFTER text (zIndex 2) in the array
+        // would be added last, sit on top, and steal all clicks.
+        const sortedElements = [...variant.elements].sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
+
+        for (const el of sortedElements) {
             if (el.type === 'shape') {
                 const shape = el as ShapeElement;
                 const { x, y, w, h } = constraintsToAbsolute(shape.constraints, canvasW, canvasH);
@@ -361,21 +367,6 @@ export function useCanvasSync(
                 }
                 if (el.locked) {
                     try { engine.set_locked?.(nodeId, true); } catch { /* ok */ }
-                }
-
-                // ★ FIX: Background elements must be non-selectable to avoid stealing clicks
-                // Triple detection: role, name, OR size coverage (bulletproof)
-                const elName = (el.name ?? '').toLowerCase();
-                const isBackground = el.role === 'background'
-                    || elName.includes('background') || elName.includes('ai_background') || elName.includes('bg_')
-                    || ((el.zIndex === 0 || el.zIndex === undefined) && w >= canvasW * 0.85 && h >= canvasH * 0.85);
-                if (isBackground) {
-                    console.log(`[useCanvasSync] ★ Background detected: "${el.name}" (role=${el.role}, zIndex=${el.zIndex}, size=${w}x${h} vs canvas=${canvasW}x${canvasH}) → send_to_back + set_non_selectable`);
-                    try {
-                        engine.send_to_back?.(nodeId);
-                        // Also explicitly set non-selectable (some shim paths miss this)
-                        engine.set_non_selectable?.(nodeId);
-                    } catch (e) { console.warn('[useCanvasSync] send_to_back failed:', e); }
                 }
 
                 restoredShapes++;

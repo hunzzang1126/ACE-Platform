@@ -657,38 +657,8 @@ export function createEngineShim(
             if (obj) {
                 fc.sendObjectToBack(obj);
                 (obj as any).__glidZIndex = 0;
-                // ★ NUCLEAR: Make background completely invisible to hit-testing
-                obj.set({
-                    selectable: false,
-                    evented: false,
-                    hasControls: false,
-                    hasBorders: false,
-                    lockMovementX: true,
-                    lockMovementY: true,
-                    hoverCursor: 'default',
-                } as any);
-                // Override containsPoint so Fabric's hit-test NEVER matches this object
-                (obj as any).containsPoint = () => false;
-                console.log(`[FabricShim] send_to_back: id=${id}, obj type=${obj.type}, evented=${obj.evented}, selectable=${obj.selectable}`);
                 fc.renderAll();
                 syncState();
-            }
-        },
-        set_non_selectable: (id: number): void => {
-            const obj = findById(id);
-            if (obj) {
-                obj.set({
-                    selectable: false,
-                    evented: false,
-                    hasControls: false,
-                    hasBorders: false,
-                    lockMovementX: true,
-                    lockMovementY: true,
-                    hoverCursor: 'default',
-                } as any);
-                (obj as any).containsPoint = () => false;
-                console.log(`[FabricShim] set_non_selectable: id=${id}, obj type=${obj.type}`);
-                fc.renderAll();
             }
         },
         remove_element: (id: number): void => {
