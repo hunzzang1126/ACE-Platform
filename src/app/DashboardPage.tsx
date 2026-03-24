@@ -83,6 +83,10 @@ export function DashboardPage() {
                 const existingIds = new Set(state.creativeSets.map(s => s.id));
                 for (const cs of allCS) {
                     if (existingIds.has(cs.id) || trashIds.has(cs.id)) continue;
+                    // ★ REGRESSION GUARD: Skip temp template-editing creative sets.
+                    // Admin template editing creates CSs named "[Template] X" that are
+                    // cleaned up on save/cancel. They must NEVER sync to the dashboard.
+                    if (cs.name.startsWith('[Template]')) continue;
                     state.creativeSets.push({
                         id: cs.id, name: cs.name, variantCount: cs.variants.length,
                         createdAt: cs.createdAt, updatedAt: cs.updatedAt, createdBy: displayName || 'User',

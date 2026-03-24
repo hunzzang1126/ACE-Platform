@@ -291,6 +291,29 @@ export const useTemplateStore = create<TemplateState>()(
                 state.editingTemplateId = null;
                 state.editingTempCsId = null;
 
+                // ★ REGRESSION GUARD: Clean up orphaned template creative sets.
+                // If the app crashed or refreshed mid-template-edit, temp CSs named
+                // "[Template] X" may be left behind in designStore/projectStore.
+                // Deferred to avoid blocking rehydration and cross-store deadlock.
+                setTimeout(() => {
+                    try {
+                        const { useDesignStore } = require('@/stores/designStore');
+                        const { useProjectStore } = require('@/stores/projectStore');
+                        const allCS = useDesignStore.getState().getAllCreativeSets();
+                        for (const cs of allCS) {
+                            if (cs.name.startsWith('[Template]')) {
+                                console.log('[templateStore] Cleaning up orphaned template CS:', cs.id, cs.name);
+                                useDesignStore.getState().deleteCreativeSet(cs.id);
+                                useProjectStore.setState((s: any) => {
+                                    s.creativeSets = s.creativeSets.filter((x: any) => x.id !== cs.id);
+                                });
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('[templateStore] Orphan cleanup failed:', e);
+                    }
+                }, 1000);
+
                 // ★ Refresh built-in templates with latest code definitions
                 const userTemplates = state.templates.filter(t => !t.isBuiltIn);
                 const builtInIds = new Set(BUILT_IN_TEMPLATES.map(t => t.id));

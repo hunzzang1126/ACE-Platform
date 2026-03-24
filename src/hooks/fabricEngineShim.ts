@@ -367,6 +367,10 @@ export function createEngineShim(
             (tb as any).__glidZIndex = userObjects().length;
             patchAceProps(tb);
             fc.add(tb);
+            // ★ REGRESSION GUARD: Update bounding rect for hit-testing AFTER add.
+            // Without setCoords(), Fabric's click target area may not match the
+            // auto-calculated Textbox height (especially for large multi-line text).
+            tb.setCoords();
             fc.renderAll();
             syncState();
             return id;
