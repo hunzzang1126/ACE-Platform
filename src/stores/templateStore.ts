@@ -203,7 +203,17 @@ export const useTemplateStore = create<TemplateState>()(
             },
 
             overrideTemplate: (id, variant, width, height) => {
-                const snapshot = JSON.stringify(variant);
+                // ★ CRITICAL: Strip locked state from ALL elements before saving.
+                // Templates should always be fully editable. If admin accidentally
+                // locks elements during editing, the lock MUST NOT persist into the
+                // template override. Otherwise all future users get locked elements.
+                const cleanVariant = {
+                    ...variant,
+                    elements: [...variant.elements]
+                        .map(el => ({ ...el, locked: false })) // ★ Force-unlock: template overrides may have stale locked state
+                        .sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0)),
+                };
+                const snapshot = JSON.stringify(cleanVariant);
                 // ★ Save locally first (immediate)
                 set(state => {
                     state.templateOverrides[id] = snapshot;

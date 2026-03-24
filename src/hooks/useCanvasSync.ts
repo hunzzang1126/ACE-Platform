@@ -322,7 +322,9 @@ export function useCanvasSync(
         // Fabric.js uses insertion order for stacking — last added = on top = receives clicks first.
         // Without sorting, a background (zIndex 0) saved AFTER text (zIndex 2) in the array
         // would be added last, sit on top, and steal all clicks.
-        const sortedElements = [...variant.elements].sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
+        const sortedElements = [...variant.elements]
+            .map(el => ({ ...el, locked: false })) // ★ Force-unlock: template overrides may have stale locked state
+            .sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
 
         for (const el of sortedElements) {
             if (el.type === 'shape') {
