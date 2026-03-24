@@ -333,10 +333,11 @@ export function useFabricCanvas(
                 } else {
                     // ★ Scroll-to-pan: trackpad two-finger or mouse scroll = pan canvas
                     // deltaX = horizontal pan, deltaY = vertical pan
+                    // 0.4x dampening for smooth, controlled panning
                     e.preventDefault(); e.stopPropagation();
                     const vpt = fc.viewportTransform!;
-                    vpt[4] -= e.deltaX;
-                    vpt[5] -= e.deltaY;
+                    vpt[4] -= e.deltaX * 0.4;
+                    vpt[5] -= e.deltaY * 0.4;
                     fc.setViewportTransform(vpt);
                     fc.renderAll();
                 }
