@@ -158,6 +158,7 @@ export async function deleteProjectPermanently(projectId: string): Promise<void>
 /**
  * Push a creative set's full data to Supabase as JSONB.
  * Uses select→update/insert to avoid 409 conflict with RLS.
+ * ★ Ensures parent project row exists first (FK constraint).
  */
 export async function pushCreativeSet(
     userId: string,
@@ -165,6 +166,16 @@ export async function pushCreativeSet(
 ): Promise<void> {
     const sb = getSupabase();
     if (!sb) return;
+
+    // ★ FK safety: ensure parent project row exists before creative_set insert
+    await sb.from('projects').upsert({
+        id: cs.id,
+        user_id: userId,
+        name: cs.name,
+        variant_count: cs.variants?.length ?? 1,
+        created_at: cs.createdAt,
+        updated_at: cs.updatedAt,
+    }, { onConflict: 'id' });
 
     const row = {
         id: cs.id,
