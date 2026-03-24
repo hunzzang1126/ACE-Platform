@@ -295,10 +295,12 @@ export const useTemplateStore = create<TemplateState>()(
                 // If the app crashed or refreshed mid-template-edit, temp CSs named
                 // "[Template] X" may be left behind in designStore/projectStore.
                 // Deferred to avoid blocking rehydration and cross-store deadlock.
-                setTimeout(() => {
+                // ★ REGRESSION GUARD: Use dynamic import() — NOT require().
+                // Vite/ESM has no require(). require() causes ReferenceError crash.
+                setTimeout(async () => {
                     try {
-                        const { useDesignStore } = require('@/stores/designStore');
-                        const { useProjectStore } = require('@/stores/projectStore');
+                        const { useDesignStore } = await import('@/stores/designStore');
+                        const { useProjectStore } = await import('@/stores/projectStore');
                         const allCS = useDesignStore.getState().getAllCreativeSets();
                         for (const cs of allCS) {
                             if (cs.name.startsWith('[Template]')) {

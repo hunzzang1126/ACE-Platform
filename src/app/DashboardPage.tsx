@@ -80,6 +80,10 @@ export function DashboardPage() {
             const trash = useProjectStore.getState().trash;
             const trashIds = new Set(trash.map(t => t.item.id));
             useProjectStore.setState((state) => {
+                // ★ REGRESSION GUARD: Purge any existing [Template] CSs from prior sessions.
+                // The earlier filter only blocks NEW additions — this removes stale ones.
+                state.creativeSets = state.creativeSets.filter(cs => !cs.name.startsWith('[Template]'));
+
                 const existingIds = new Set(state.creativeSets.map(s => s.id));
                 for (const cs of allCS) {
                     if (existingIds.has(cs.id) || trashIds.has(cs.id)) continue;

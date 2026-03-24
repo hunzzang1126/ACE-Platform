@@ -493,6 +493,11 @@ export function createEngineShim(
                 (a, b) => ((a as any).__glidZIndex ?? 0) - ((b as any).__glidZIndex ?? 0)
             );
             objs.forEach((o, i) => fc.moveObjectTo(o, i + 1)); // +1: artboard at 0
+            // ★ REGRESSION GUARD: moveObjectTo() does NOT update bounding rects.
+            // Without setCoords(), click hit-testing uses stale bounding boxes,
+            // causing elements (like Bold Dark headline) to be visually on top
+            // but unclickable because Fabric's findTarget() misses them.
+            objs.forEach(o => o.setCoords());
             fc.renderAll();
             syncState();
         },
