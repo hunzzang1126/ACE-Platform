@@ -376,3 +376,125 @@ describe('useTemplateStore — Editing Cleanup Regression Guards', () => {
         expect(useTemplateStore.getState().editingTempCsId).toBeNull();
     });
 });
+
+// ─────────────────────────────────────────────────
+// ★ REGRESSION: Locked State Stripping Tests
+// Ensures admin can't accidentally save locked elements into templates
+// ─────────────────────────────────────────────────
+describe('useTemplateStore — Locked State Stripping', () => {
+    beforeEach(() => {
+        useTemplateStore.setState({
+            templates: [...BUILT_IN_TEMPLATES],
+            templateOverrides: {},
+            editingTemplateId: null,
+            editingTempCsId: null,
+        });
+    });
+
+    it('★ REGRESSION: overrideTemplate strips locked:true from all elements', () => {
+        const templateId = BUILT_IN_TEMPLATES[0].id;
+        const variantWithLocked: BannerVariant = {
+            id: 'v-locked',
+            preset: { id: 'p1', name: '1080x1080', width: 1080, height: 1080, category: 'social' },
+            elements: [
+                {
+                    id: 'bg', name: 'Background', type: 'shape', shapeType: 'rectangle',
+                    constraints: { horizontal: { anchor: 'left', offset: 0 }, vertical: { anchor: 'top', offset: 0 }, size: { widthMode: 'fixed', heightMode: 'fixed', width: 1080, height: 1080 }, rotation: 0 },
+                    opacity: 1, visible: true, locked: true, zIndex: 0, fill: '#000',
+                } as any,
+                {
+                    id: 'hl', name: 'Headline', type: 'text',
+                    constraints: { horizontal: { anchor: 'left', offset: 80 }, vertical: { anchor: 'top', offset: 280 }, size: { widthMode: 'fixed', heightMode: 'fixed', width: 920, height: 300 }, rotation: 0 },
+                    opacity: 1, visible: true, locked: true, zIndex: 2,
+                    content: 'Test', fontSize: 110, fontWeight: 800, color: '#fff',
+                } as any,
+            ],
+            backgroundColor: '#0a0e1a',
+            overriddenElementIds: [],
+            syncLocked: false,
+        };
+
+        useTemplateStore.getState().overrideTemplate(templateId, variantWithLocked);
+
+        const snapshot = useTemplateStore.getState().templateOverrides[templateId];
+        const parsed = JSON.parse(snapshot);
+        // ALL elements must have locked: false after save
+        for (const el of parsed.elements) {
+            expect(el.locked).toBe(false);
+        }
+    });
+
+    it('★ REGRESSION: overrideTemplate preserves other properties when stripping locked', () => {
+        const templateId = BUILT_IN_TEMPLATES[0].id;
+        const variant: BannerVariant = {
+            id: 'v-props',
+            preset: { id: 'p1', name: '1080x1080', width: 1080, height: 1080, category: 'social' },
+            elements: [
+                {
+                    id: 'el1', name: 'Text Element', type: 'text',
+                    constraints: { horizontal: { anchor: 'left', offset: 50 }, vertical: { anchor: 'top', offset: 100 }, size: { widthMode: 'fixed', heightMode: 'fixed', width: 400, height: 80 }, rotation: 0 },
+                    opacity: 0.8, visible: false, locked: true, zIndex: 3,
+                    content: 'Important', fontSize: 48, fontWeight: 600, color: '#ff0000',
+                } as any,
+            ],
+            backgroundColor: '#ffffff',
+            overriddenElementIds: [],
+            syncLocked: false,
+        };
+
+        useTemplateStore.getState().overrideTemplate(templateId, variant);
+
+        const snapshot = useTemplateStore.getState().templateOverrides[templateId];
+        const parsed = JSON.parse(snapshot);
+        const el = parsed.elements[0];
+        // locked stripped
+        expect(el.locked).toBe(false);
+        // All other properties preserved
+        expect(el.name).toBe('Text Element');
+        expect(el.opacity).toBe(0.8);
+        expect(el.visible).toBe(false);
+        expect(el.zIndex).toBe(3);
+        expect(el.content).toBe('Important');
+        expect(el.fontSize).toBe(48);
+        expect(el.color).toBe('#ff0000');
+    });
+
+    it('★ REGRESSION: overrideTemplate handles empty elements array', () => {
+        const templateId = BUILT_IN_TEMPLATES[0].id;
+        const variant: BannerVariant = {
+            id: 'v-empty',
+            preset: { id: 'p1', name: '1080x1080', width: 1080, height: 1080, category: 'social' },
+            elements: [],
+            backgroundColor: '#000',
+            overriddenElementIds: [],
+            syncLocked: false,
+        };
+
+        useTemplateStore.getState().overrideTemplate(templateId, variant);
+        const snapshot = useTemplateStore.getState().templateOverrides[templateId];
+        const parsed = JSON.parse(snapshot);
+        expect(parsed.elements).toEqual([]);
+    });
+
+    it('★ REGRESSION: overrideTemplate does not mutate the input variant', () => {
+        const templateId = BUILT_IN_TEMPLATES[0].id;
+        const variant: BannerVariant = {
+            id: 'v-immutable',
+            preset: { id: 'p1', name: '1080x1080', width: 1080, height: 1080, category: 'social' },
+            elements: [
+                {
+                    id: 'el1', name: 'BG', type: 'shape',
+                    constraints: { horizontal: { anchor: 'left', offset: 0 }, vertical: { anchor: 'top', offset: 0 }, size: { widthMode: 'fixed', heightMode: 'fixed', width: 100, height: 100 }, rotation: 0 },
+                    opacity: 1, visible: true, locked: true, zIndex: 0, fill: '#000',
+                } as any,
+            ],
+            backgroundColor: '#000',
+            overriddenElementIds: [],
+            syncLocked: false,
+        };
+
+        useTemplateStore.getState().overrideTemplate(templateId, variant);
+        // Original variant must NOT be mutated
+        expect(variant.elements[0].locked).toBe(true);
+    });
+});
