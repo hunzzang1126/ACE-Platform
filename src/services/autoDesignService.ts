@@ -396,21 +396,18 @@ ${hasImages ? `   - Move image(s) [${imageNames}] to hero position: x=${imgX}, y
 2. ADDITIONS (you MUST add these — no exceptions):
    a) BACKGROUND: full-canvas rect (x=0, y=0, w=${canvasW}, h=${canvasH}) with a strong brand color
       → name: "background", place this FIRST (lowest zIndex)
-${hasImagesOnCanvas ? `   b) OVERLAY: semi-transparent dark rect over image area for text contrast
-      → x=${isLandscape ? 0 : 0}, y=${isLandscape ? 0 : Math.round(canvasH * 0.48)}, w=${isLandscape ? Math.round(canvasW * 0.55) : canvasW}, h=${isLandscape ? canvasH : Math.round(canvasH * 0.52)}
-      → r=0, g=0, b=0, a=0.45, name: "overlay"` : ''}
-   c) HEADLINE: bold text centered in text zone
+   b) HEADLINE: bold text centered in text zone
       → x=${textAreaX}, y=${textAreaY}, w=${textAreaW}
       → font_size=${hlFontSize}, font_weight="800", text_align="${isLandscape ? 'left' : 'center'}"
       → color_hex="#FFFFFF", name: "headline"
-   d) SUBHEADLINE: supporting text below headline
+   c) SUBHEADLINE: supporting text below headline
       → x=${textAreaX}, y=${subY}, w=${textAreaW}
       → font_size=${subFontSize}, font_weight="500", text_align="${isLandscape ? 'left' : 'center'}"
       → color_hex="#E0E0E0", name: "subheadline"
-   e) CTA BUTTON: rounded rect button
+   d) CTA BUTTON: rounded rect button
       → x=${ctaFinalX}, y=${ctaFinalY}, w=${ctaW}, h=${ctaH}, radius=8
       → bright contrasting accent color (NOT same as background), name: "cta_button"
-   f) CTA LABEL: text centered on CTA button
+   e) CTA LABEL: text centered on CTA button
       → x=${ctaFinalX}, y=${ctaFinalY + Math.round((ctaH - ctaFontSize) / 2)}, w=${ctaW}
       → font_size=${ctaFontSize}, font_weight="700", text_align="center"
       → color_hex="#FFFFFF", name: "cta_label"
@@ -420,7 +417,7 @@ STRICT RULES:
 - Background and CTA must have STRONGLY CONTRASTING colors (e.g. dark navy bg + orange CTA)
 - ALL elements must be within canvas bounds: x: 0–${canvasW}, y: 0–${canvasH}
 - Minimum ${pad}px padding from canvas edges for text
-- Additions array order matters — background must be FIRST, then overlay, then text on top
+- Additions array order matters — background must be FIRST, then text on top
 - The image element zIndex is already managed — do not try to reorder it via patches
 
 Return ONLY the rearrange_banner tool call.`;

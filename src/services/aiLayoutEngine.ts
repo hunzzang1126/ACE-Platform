@@ -96,17 +96,8 @@ export function buildLayoutFromSpec(
                 a: 0.2,
             });
             break;
+        // ★ 'overlay' removed — templates handle dark overlays directly
         case 'overlay':
-            elements.push({
-                type: 'rect',
-                name: 'text_overlay',
-                x: 0,
-                y: Math.round(canvasH * 0.5),
-                w: canvasW,
-                h: Math.round(canvasH * 0.5),
-                r: 0, g: 0, b: 0, a: 0.5,
-            });
-            break;
         case 'diagonal': {
             // Bold angular accent — two offset bars creating depth
             const dw = Math.round(canvasW * 0.15);
