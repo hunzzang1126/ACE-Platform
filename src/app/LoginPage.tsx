@@ -13,11 +13,24 @@ type Mode = 'signin' | 'signup';
 export function LoginPage() {
     const navigate = useNavigate();
     const { signInWithEmail, signUpWithEmail, signInWithGoogle, signInWithGitHub, isLoading, error } = useAuthStore();
+    const user = useAuthStore((s) => s.user);
 
     const [mode, setMode] = useState<Mode>('signin');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [name, setName] = useState('');
+
+    // ★ If already logged in, redirect to dashboard
+    useEffect(() => {
+        if (user) {
+            navigate('/dashboard', { replace: true });
+        }
+    }, [user, navigate]);
+
+    // ★ Replace history entry to prevent back-button access to protected pages
+    useEffect(() => {
+        window.history.replaceState(null, '', '/login');
+    }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
