@@ -138,7 +138,6 @@ export function DetailEditorPage() {
                     useTemplateStore.getState().setEditingTempCsId(null);
 
                     // ★ FIX: Delete temp CS SYNCHRONOUSLY before navigate
-                    // (setTimeout raced with Zustand persist → CS survived in localStorage)
                     if (tempCsId) {
                         useDesignStore.getState().deleteCreativeSet(tempCsId);
                         useProjectStore.setState(state => {
@@ -146,6 +145,10 @@ export function DetailEditorPage() {
                         });
                         console.log('[DetailEditor] Cleaned up temp creative set:', tempCsId);
                     }
+
+                    // ★ CRITICAL: Reset dirty AFTER all mutations so unmount auto-save doesn't re-save
+                    isDirtyRef.current = false;
+                    lastManualSaveRef.current = Date.now();
 
                     navigate('/templates');
                     return; // Skip normal save status flow
@@ -318,13 +321,22 @@ export function DetailEditorPage() {
     // Auto-save when leaving the page (only if dirty)
     useEffect(() => {
         return () => {
+            // ★ CRITICAL: NEVER auto-save when editing a template.
+            // Template editing creates a temp CS that gets cleaned up on save/cancel.
+            // Auto-saving here would re-persist the temp CS that was just deleted.
+            const tmplId = useTemplateStore.getState().editingTemplateId;
+            const tempCsId = useTemplateStore.getState().editingTempCsId;
+            if (tmplId || tempCsId) {
+                console.log('[DetailEditor] Auto-save skipped — template editing mode');
+                return;
+            }
+
             if (!isDirtyRef.current) {
                 console.log('[DetailEditor] Auto-save skipped — no changes made');
                 return;
             }
 
             // ★ REGRESSION GUARD: If user manually saved recently, skip auto-save.
-            // This prevents the stale-data overwrite that causes preview bugs.
             const timeSinceManualSave = Date.now() - lastManualSaveRef.current;
             if (timeSinceManualSave < 5000) {
                 console.log('[DetailEditor] Auto-save skipped — manual save was recent (' + timeSinceManualSave + 'ms ago)');
@@ -434,6 +446,8 @@ export function DetailEditorPage() {
                                     state.creativeSets = state.creativeSets.filter(s => s.id !== tempCsId);
                                 });
                             }
+                            // ★ CRITICAL: Prevent auto-save from re-creating the temp CS
+                            isDirtyRef.current = false;
                             navigate('/templates');
                         }}
                         style={{

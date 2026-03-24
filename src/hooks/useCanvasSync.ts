@@ -370,11 +370,12 @@ export function useCanvasSync(
                     || elName.includes('background') || elName.includes('ai_background') || elName.includes('bg_')
                     || ((el.zIndex === 0 || el.zIndex === undefined) && w >= canvasW * 0.85 && h >= canvasH * 0.85);
                 if (isBackground) {
+                    console.log(`[useCanvasSync] ★ Background detected: "${el.name}" (role=${el.role}, zIndex=${el.zIndex}, size=${w}x${h} vs canvas=${canvasW}x${canvasH}) → send_to_back + set_non_selectable`);
                     try {
                         engine.send_to_back?.(nodeId);
                         // Also explicitly set non-selectable (some shim paths miss this)
                         engine.set_non_selectable?.(nodeId);
-                    } catch { /* ok */ }
+                    } catch (e) { console.warn('[useCanvasSync] send_to_back failed:', e); }
                 }
 
                 restoredShapes++;
