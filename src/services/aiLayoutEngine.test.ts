@@ -153,12 +153,13 @@ describe('aiLayoutEngine — buildLayoutFromSpec', () => {
             expect(accent?.type).toBe('ellipse');
         });
 
-        it('adds overlay for overlay accent', () => {
+        it('adds diagonal accent for overlay strategy', () => {
             const spec = makeSpec({ accentStrategy: 'overlay' });
             const elements = buildLayoutFromSpec(spec, DEFAULT_CONTENT, DEFAULT_PALETTE, W, H);
-            const overlay = elements.find(e => e.name === 'text_overlay');
-            expect(overlay).toBeDefined();
-            expect(overlay?.a).toBe(0.5);
+            const diagonal = elements.find(e => e.name === 'accent_diagonal');
+            expect(diagonal).toBeDefined();
+            const divider = elements.find(e => e.name === 'accent_divider');
+            expect(divider).toBeDefined();
         });
 
         it('adds no accent for "none" strategy', () => {

@@ -179,3 +179,100 @@ describe('resolveFontWeight — keyword and numeric conversion', () => {
     it('null → 400', () => expect(resolveFontWeight(null)).toBe(400));
     it('empty string → 400', () => expect(resolveFontWeight('')).toBe(400));
 });
+
+// ── Save-Cycle Fidelity Tests ─────────────────────
+// ★ REGRESSION GUARD: Tests matching quality-standards.md rule G:
+// absoluteToConstraints → constraintsToAbsolute must produce the same visual position.
+// This is the SINGLE SOURCE OF TRUTH constraint — any drift here = rendering desync.
+
+describe('Save-Cycle Fidelity — constraintsToAbsolute(absoluteToConstraints())', () => {
+    // Helper: verify x,y,w,h survive a round-trip through constraints
+    function roundTrip(x: number, y: number, w: number, h: number, cw: number, ch: number) {
+        const constraints = absoluteToConstraints(x, y, w, h, cw, ch);
+        return constraintsToAbsolute(constraints, cw, ch);
+    }
+
+    it('1080x1080: small element at top-left', () => {
+        const r = roundTrip(20, 30, 200, 100, 1080, 1080);
+        expect(r.x).toBeCloseTo(20, 0);
+        expect(r.y).toBeCloseTo(30, 0);
+        expect(r.w).toBeCloseTo(200, 0);
+        expect(r.h).toBeCloseTo(100, 0);
+    });
+
+    it('1080x1080: element at center', () => {
+        const r = roundTrip(440, 440, 200, 200, 1080, 1080);
+        expect(r.x).toBeCloseTo(440, 0);
+        expect(r.y).toBeCloseTo(440, 0);
+    });
+
+    it('1080x1080: narrow accent bar at left edge', () => {
+        const r = roundTrip(0, 0, 8, 1080, 1080, 1080);
+        expect(r.x).toBeCloseTo(0, 0);
+        expect(r.y).toBeCloseTo(0, 0);
+        expect(r.w).toBeCloseTo(8, 0);
+        expect(r.h).toBeCloseTo(1080, 0);
+    });
+
+    it('300x250: headline at typical position', () => {
+        const r = roundTrip(16, 24, 268, 60, 300, 250);
+        expect(r.x).toBeCloseTo(16, 0);
+        expect(r.y).toBeCloseTo(24, 0);
+        expect(r.w).toBeCloseTo(268, 0);
+        expect(r.h).toBeCloseTo(60, 0);
+    });
+
+    it('970x250: wide banner element', () => {
+        const r = roundTrip(50, 50, 870, 150, 970, 250);
+        expect(r.x).toBeCloseTo(50, 0);
+        expect(r.y).toBeCloseTo(50, 0);
+        expect(r.w).toBeCloseTo(870, 0);
+        expect(r.h).toBeCloseTo(150, 0);
+    });
+
+    it('160x600: skyscraper element', () => {
+        const r = roundTrip(10, 20, 140, 40, 160, 600);
+        expect(r.x).toBeCloseTo(10, 0);
+        expect(r.y).toBeCloseTo(20, 0);
+        expect(r.w).toBeCloseTo(140, 0);
+        expect(r.h).toBeCloseTo(40, 0);
+    });
+
+    it('zero position (origin) element', () => {
+        const r = roundTrip(0, 0, 100, 50, 300, 250);
+        expect(r.x).toBeCloseTo(0, 0);
+        expect(r.y).toBeCloseTo(0, 0);
+    });
+
+    it('element touching right/bottom edge', () => {
+        const r = roundTrip(200, 200, 100, 50, 300, 250);
+        expect(r.x).toBeCloseTo(200, 0);
+        expect(r.y).toBeCloseTo(200, 0);
+        expect(r.w).toBeCloseTo(100, 0);
+        expect(r.h).toBeCloseTo(50, 0);
+    });
+
+    it('1px element survives round-trip', () => {
+        const r = roundTrip(540, 540, 1, 1, 1080, 1080);
+        expect(r.w).toBeCloseTo(1, 0);
+        expect(r.h).toBeCloseTo(1, 0);
+    });
+
+    it('★ REGRESSION: Bold Dark template positions survive save-cycle', () => {
+        // Simulates the exact Bold Dark template element positions
+        const bg = roundTrip(0, 0, 1080, 1080, 1080, 1080); // Background
+        expect(bg.x).toBeCloseTo(0, 0);
+        expect(bg.w).toBeCloseTo(1080, 0);
+
+        const bar = roundTrip(0, 0, 8, 1080, 1080, 1080); // Accent bar
+        expect(bar.w).toBeCloseTo(8, 0);
+
+        const hl = roundTrip(80, 176, 920, 273, 1080, 1080); // Headline
+        expect(hl.x).toBeCloseTo(80, 0);
+        expect(hl.y).toBeCloseTo(176, 0);
+
+        const body = roundTrip(80, 497, 700, 89, 1080, 1080); // Body
+        expect(Math.abs(body.x - 80)).toBeLessThanOrEqual(2); // ±2px acceptable
+        expect(Math.abs(body.y - 497)).toBeLessThanOrEqual(2); // ±2px acceptable
+    });
+});
