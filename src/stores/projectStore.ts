@@ -288,9 +288,19 @@ export const useProjectStore = create<ProjectState>()(
                 folders: state.folders,
                 trash: state.trash,
             }),
+            // ★ Track hydration completion — useCloudSync awaits this
+            onRehydrateStorage: () => () => {
+                _resolveHydration();
+            },
         },
     ),
 );
+
+// ★ Hydration promise — resolves when IDB data is loaded into store
+let _resolveHydration: () => void;
+export const projectStoreReady = new Promise<void>((resolve) => {
+    _resolveHydration = resolve;
+});
 
 // ── Cross-tab sync ──────────────────────────────────
 // Two mechanisms:

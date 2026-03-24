@@ -43,6 +43,13 @@ export function useCloudSync() {
         const run = async () => {
             setIsSyncing(true);
             try {
+                // ★ Wait for IDB hydration before reading store state.
+                // Without this, stores are empty (defaults) → sync merges
+                // cloud data into empty local → IDB hydrates → duplicates.
+                const { projectStoreReady } = await import('@/stores/projectStore');
+                const { designStoreReady } = await import('@/stores/designStore');
+                await Promise.all([projectStoreReady, designStoreReady]);
+
                 const localProjects = useProjectStore.getState().creativeSets;
                 const localFolders = useProjectStore.getState().folders;
                 const localCS = useDesignStore.getState().allCreativeSets;

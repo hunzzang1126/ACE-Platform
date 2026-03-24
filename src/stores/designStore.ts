@@ -642,7 +642,7 @@ export const useDesignStore = create<DesignState>()(
                 }),
                 // On rehydration, restore creativeSet + migrate old data to plug model
                 onRehydrateStorage: () => (state) => {
-                    if (!state) return;
+                    if (!state) { _resolveDesignHydration(); return; }
                     // ★ Auto-migrate: add plugConnections to old creative sets
                     for (const cs of Object.values(state.allCreativeSets)) {
                         if (!cs.plugConnections) {
@@ -658,11 +658,18 @@ export const useDesignStore = create<DesignState>()(
                     if (state.activeCreativeSetId) {
                         state.creativeSet = state.allCreativeSets[state.activeCreativeSetId] ?? null;
                     }
+                    _resolveDesignHydration();
                 },
             },
         ),
     ),
 );
+
+// ★ Hydration promise — resolves when IDB data is loaded into store
+let _resolveDesignHydration: () => void;
+export const designStoreReady = new Promise<void>((resolve) => {
+    _resolveDesignHydration = resolve;
+});
 
 // ── Cross-tab sync ──────────────────────────────────
 // ★ REGRESSION GUARD: Always use plain-object setState() here (never immer callback).
