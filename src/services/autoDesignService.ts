@@ -568,6 +568,45 @@ function extractUserText(prompt: string): Partial<GeneratedContent> {
 }
 
 /**
+ * ★ Sanitize AI-generated content — catches garbage output
+ */
+function sanitizeContent(c: GeneratedContent): GeneratedContent {
+    // Known-bad patterns: font names, field placeholders, CSS terms
+    const JUNK = /^(inter|roboto|arial|helvetica|text|subtext|subheadline|headline|cta|button|click here|lorem|font|label|tag)$/i;
+    const FONT_NAMES = /^(inter|roboto|montserrat|poppins|arial|helvetica|georgia|verdana|garamond|lato|opensans|raleway|playfair|outfit|nunito)$/i;
+
+    // Title Case helper
+    const toTitleCase = (s: string) =>
+        s.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase());
+
+    // Fix headline: must be Title Case, not junk
+    let headline = c.headline?.trim() || 'Get Started Today';
+    if (JUNK.test(headline)) headline = 'Get Started Today';
+    // Auto-Title-Case if all lowercase
+    if (headline === headline.toLowerCase() && headline.length > 0) {
+        headline = toTitleCase(headline);
+    }
+
+    // Fix CTA: must not be a font name or junk
+    let cta = c.cta?.trim() || 'Shop Now';
+    if (FONT_NAMES.test(cta) || JUNK.test(cta)) cta = 'Shop Now';
+    // Title Case CTA
+    if (cta === cta.toLowerCase() && cta.length > 0) {
+        cta = toTitleCase(cta);
+    }
+
+    // Fix subheadline: must not be junk placeholder
+    let subheadline = c.subheadline?.trim() || '';
+    if (JUNK.test(subheadline)) subheadline = '';
+
+    // Fix tag: must not be junk
+    let tag = c.tag?.trim() || '';
+    if (JUNK.test(tag)) tag = '';
+
+    return { headline, subheadline, cta, tag };
+}
+
+/**
  * Lightweight AI call — generates ONLY content text.
  * Positions come from the template, not from the AI.
  * Response: { headline, subheadline, cta, tag }
@@ -586,12 +625,12 @@ export async function callTemplateContent(
 
     // If user provided ALL fields, skip AI generation entirely
     if (userProvided.headline && userProvided.cta) {
-        return {
+        return sanitizeContent({
             headline: userProvided.headline,
             subheadline: userProvided.subheadline || '',
             cta: userProvided.cta,
             tag: userProvided.tag || '',
-        };
+        });
     }
 
     // Build content prompt with hints about pre-filled fields
@@ -628,21 +667,21 @@ export async function callTemplateContent(
 
     try {
         const parsed = JSON.parse(raw) as GeneratedContent;
-        return {
+        return sanitizeContent({
             // ★ User-provided values ALWAYS override AI-generated ones
             headline: userProvided.headline || parsed.headline || 'Get Started Today',
-            subheadline: userProvided.subheadline ?? parsed.subheadline ?? 'Professional solutions for your business.',
-            cta: userProvided.cta || parsed.cta || 'Learn More',
+            subheadline: userProvided.subheadline ?? parsed.subheadline ?? '',
+            cta: userProvided.cta || parsed.cta || 'Shop Now',
             tag: userProvided.tag || parsed.tag || '',
-        };
+        });
     } catch {
         // Fallback: use user text or defaults
-        return {
+        return sanitizeContent({
             headline: userProvided.headline || 'Get Started Today',
-            subheadline: userProvided.subheadline || 'Professional solutions for your business.',
-            cta: userProvided.cta || 'Learn More',
+            subheadline: userProvided.subheadline || '',
+            cta: userProvided.cta || 'Shop Now',
             tag: userProvided.tag || '',
-        };
+        });
     }
 }
 

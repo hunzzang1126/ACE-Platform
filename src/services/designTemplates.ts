@@ -787,14 +787,27 @@ Return EXACTLY this JSON structure with your generated copy as the values:
 }
 
 FIELD RULES:
-- headline: ${headlineLimit}. Must be bold, punchy, memorable. No period at end.
-- subheadline: ${subLimit}. Supports the headline with additional context. Set to "" if headline is self-explanatory or canvas is small.
-- cta: 1-3 word call-to-action verb phrase. Examples: "Learn More", "Shop Now", "Get Started", "Try Free".
-- tag: 1-2 word label like "NEW", "SALE", "LIMITED", "2026". Set to "" if no natural category fits.
+- headline: ${headlineLimit}. MUST be Title Case (capitalize first letter of each word). Bold, punchy, memorable. No period at end.
+  GOOD: "Discover Premium Wellness", "Transform Your Health Today", "Pure Natural Ingredients"
+  BAD: "about health products" (too generic, lowercase), "text" (not real copy)
+- subheadline: ${subLimit}. Sentence case. Supports the headline with descriptive marketing copy. Set to "" if headline is self-explanatory or canvas is small.
+  GOOD: "Clinically proven formulas for your daily routine", "Free shipping on orders over $50"
+  BAD: "text" (placeholder), "subheadline" (field name), "" when there's room for good copy
+- cta: 1-3 word call-to-action verb phrase. Title Case.
+  GOOD: "Shop Now", "Learn More", "Get Started", "Try Free", "Explore", "Book Now", "Discover"
+  BAD: "Inter" (font name!), "Click Here" (generic), "Button" (not copy)
+- tag: 1-2 word label, usually uppercase. Examples: "NEW", "SALE", "LIMITED", "PREMIUM", "2026". Set to "" if no natural category fits.
+  GOOD: "NEW ARRIVAL", "BEST SELLER", "LIMITED EDITION"
+  BAD: "text" (placeholder), "tag" (field name)
+
+ABSOLUTE PROHIBITIONS:
+- NEVER output font names (Inter, Roboto, etc.) as copy text
+- NEVER output field names (headline, subheadline, cta, tag) as copy text
+- NEVER output CSS properties, layout terms, or technical terms as copy text
+- NEVER output placeholder text like "text", "lorem ipsum", "your text here"
+- ALL output must be real, human-readable advertising copy that relates to the brief
 
 CRITICAL:
-- Write REAL ad copy relevant to the brief. Do NOT output placeholder text, field descriptions, or technical terms.
-- The values must be actual advertising text a human would read.
-- Do NOT put font names, CSS properties, or layout instructions in the copy.
+- Write REAL ad copy relevant to the brief. The consumer will read this text.
 - Return ONLY the JSON object. No explanation, no markdown fences.`;
 }
