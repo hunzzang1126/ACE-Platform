@@ -206,12 +206,12 @@ export async function executeToolCall(
                 let result: ImageGenResult;
                 try {
                     result = await generateImage({
-                        prompt: `${prompt}. No text, no logos, no watermarks. Professional quality.`,
+                        prompt: `${prompt}. No text, no logos, no watermarks. Professional quality, premium composition.`,
                         width: canvasW,
                         height: canvasH,
-                        model: 'flux', // routes to NANO Banana 2.0
+                        model: 'imagen', // ★ Use image_quality for better output
                         style,
-                        negativePrompt: 'text, logos, watermark, low quality, blurry',
+                        negativePrompt: 'text, logos, watermark, low quality, blurry, jpeg artifacts, noise, pixelated',
                     });
                 } catch (err) {
                     return { success: false, message: `Image generation failed: ${err}` };
@@ -239,12 +239,12 @@ export async function executeToolCall(
                     // ★ Self-contained: generate + place in one step
                     try {
                         const genResult = await generateImage({
-                            prompt: `${prompt}. No text, no logos, no watermarks. Professional quality.`,
+                            prompt: `${prompt}. No text, no logos, no watermarks. Professional quality, premium composition.`,
                             width: canvasW,
                             height: canvasH,
-                            model: 'flux',
+                            model: 'imagen', // ★ Use image_quality for better output
                             style: 'photography',
-                            negativePrompt: 'text, logos, watermark, low quality, blurry',
+                            negativePrompt: 'text, logos, watermark, low quality, blurry, jpeg artifacts, noise, pixelated',
                         });
                         if (!genResult.success || !genResult.imageUrl) {
                             return { success: false, message: `Image generation failed: ${genResult.message}` };

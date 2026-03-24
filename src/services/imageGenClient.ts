@@ -105,21 +105,21 @@ function buildEnhancedPrompt(request: ImageGenRequest): string {
 
     if (request.style) {
         const styleMap: Record<string, string> = {
-            'realistic': 'photorealistic, high resolution, detailed textures',
-            'illustration': 'digital illustration, clean vector style, vibrant',
-            'abstract': 'abstract art, geometric shapes, modern composition',
-            'minimal': 'minimalist design, clean, white space, simple',
-            'photography': 'professional photography, studio lighting, sharp focus',
+            'realistic': 'photorealistic, ultra high resolution, detailed textures, shot on Canon EOS R5, RAW, 8K',
+            'illustration': 'digital illustration, clean vector style, vibrant colors, behance trending, dribbble quality',
+            'abstract': 'abstract art, geometric shapes, modern composition, award-winning design, museum quality',
+            'minimal': 'minimalist design, clean negative space, refined, premium aesthetic, Apple-style',
+            'photography': 'professional DSLR photography, f/2.8 shallow depth of field, golden hour cinematic lighting, 8K sharp focus',
         };
         parts.push(styleMap[request.style] ?? '');
     }
 
     if (request.colorConstraint && request.colorConstraint.length > 0) {
-        parts.push(`Color palette: ${request.colorConstraint.join(', ')}`);
+        parts.push(`Dominant color palette: ${request.colorConstraint.join(', ')}`);
     }
 
-    // Banner-specific quality boosters
-    parts.push('high quality, professional, clean composition');
+    // Professional quality boosters
+    parts.push('masterpiece quality, award-winning composition, ultra detailed, premium advertisement');
 
     return parts.filter(Boolean).join('. ');
 }
@@ -387,22 +387,29 @@ export async function generateBackgroundImage(
     accentColors: string[],
     signal?: AbortSignal,
 ): Promise<ImageGenResult> {
-    // Enhance the prompt for background-suitable output
+    // ★ Generate at 2x resolution for small canvases to ensure sharp output
+    // Small banners (300x250) → generate at 600x500 → browser downscales for crisp result
+    const scale = (canvasW < 512 || canvasH < 512) ? 2 : 1;
+    const genW = canvasW * scale;
+    const genH = canvasH * scale;
+
+    // Enhanced prompt for premium background quality
     const enhancedBgPrompt = [
         bgPrompt,
-        'Background image for advertisement. No text, no logos, no watermarks.',
-        'Dark and moody with room for text overlay.',
-        'Professional quality, high resolution.',
+        'Background image for premium advertisement.',
+        'No text, no logos, no watermarks, no UI elements.',
+        'Cinematic lighting, rich tonal range, room for text overlay.',
+        'Ultra high resolution, magazine-quality, 8K detail.',
     ].join('. ');
 
     return generateImage({
         prompt: enhancedBgPrompt,
-        width: canvasW,
-        height: canvasH,
-        model: 'flux', // routes to image_fast = NANO Banana 2.0
+        width: genW,
+        height: genH,
+        model: 'imagen', // ★ Use image_quality (Gemini 3 Pro) for better output
         colorConstraint: accentColors,
         style: 'photography',
-        negativePrompt: 'text, logos, watermark, low quality, blurry, distorted',
+        negativePrompt: 'text, logos, watermark, low quality, blurry, distorted, jpeg artifacts, noise, compression, amateur, stock photo watermark, pixelated, oversaturated',
     }, signal);
 }
 
