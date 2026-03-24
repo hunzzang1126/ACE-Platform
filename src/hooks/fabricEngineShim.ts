@@ -494,12 +494,32 @@ export function createEngineShim(
             );
             objs.forEach((o, i) => fc.moveObjectTo(o, i + 1)); // +1: artboard at 0
             // ★ REGRESSION GUARD: moveObjectTo() does NOT update bounding rects.
-            // Without setCoords(), click hit-testing uses stale bounding boxes,
-            // causing elements (like Bold Dark headline) to be visually on top
-            // but unclickable because Fabric's findTarget() misses them.
             objs.forEach(o => o.setCoords());
             fc.renderAll();
             syncState();
+        },
+
+        // ★ FONT-AWARE REFRESH: Recalculate ALL text bounding boxes after fonts load.
+        // Fabric Textbox auto-calculates height from font metrics at creation time.
+        // If the web font (Inter) hasn't loaded yet, Fabric uses a fallback → wrong height
+        // → setCoords() caches wrong bounding box → text is visible but NOT clickable.
+        // This method forces Fabric to recalculate using the now-loaded real font.
+        refreshTextCoords: () => {
+            let refreshed = 0;
+            for (const obj of userObjects()) {
+                if (obj.type === 'textbox' || obj.type === 'text') {
+                    // Force Fabric to re-measure text with the loaded font
+                    if (typeof (obj as any).initDimensions === 'function') {
+                        (obj as any).initDimensions();
+                    }
+                    obj.setCoords();
+                    refreshed++;
+                }
+            }
+            if (refreshed > 0) {
+                fc.renderAll();
+                console.log(`[fabricEngine] refreshTextCoords: refreshed ${refreshed} text objects`);
+            }
         },
 
         // ★ Set custom CSS styles on Fabric objects matching a name pattern.

@@ -556,6 +556,20 @@ export function useCanvasSync(
             engine.reorder_by_z_index();
         }
 
+        // ★ FONT-AWARE BOUNDING BOX REFRESH:
+        // Fabric Textbox auto-calculates height from font metrics.
+        // If web fonts (Inter, etc.) haven't finished loading yet when add_text runs,
+        // Fabric uses the fallback font → wrong height → wrong bounding box → 
+        // setCoords() caches wrong hit area → text is VISIBLE but NOT CLICKABLE.
+        // Fix: wait for all fonts to load, then recalculate text dimensions + coords.
+        if (typeof document !== 'undefined' && document.fonts?.ready) {
+            document.fonts.ready.then(() => {
+                if (typeof engine.refreshTextCoords === 'function') {
+                    engine.refreshTextCoords();
+                }
+            });
+        }
+
         console.log(`[useCanvasSync] Legacy restored ${restoredShapes} shapes, ${overlayElements.length} overlays`);
         return { restoredShapes, overlayElements };
     }, [variantId, canvasW, canvasH]);
