@@ -248,6 +248,11 @@ export const useProjectStore = create<ProjectState>()(
                 });
                 // 3) Broadcast to other tabs
                 _broadcastSync();
+                // 4) ★ Clean up Supabase (fire-and-forget)
+                import('@/services/cloudSync').then(({ deleteProjectPermanently, deleteCreativeSetCloud }) => {
+                    deleteProjectPermanently(id).catch(() => {});
+                    deleteCreativeSetCloud(id).catch(() => {});
+                }).catch(() => {});
             },
 
             emptyTrash: () => {
@@ -264,6 +269,13 @@ export const useProjectStore = create<ProjectState>()(
                 });
                 // 4) Broadcast to other tabs
                 _broadcastSync();
+                // 5) ★ Clean up Supabase for ALL trashed items (fire-and-forget)
+                import('@/services/cloudSync').then(({ deleteProjectPermanently, deleteCreativeSetCloud }) => {
+                    for (const t of currentTrash) {
+                        deleteProjectPermanently(t.item.id).catch(() => {});
+                        deleteCreativeSetCloud(t.item.id).catch(() => {});
+                    }
+                }).catch(() => {});
             },
         })),
         {
