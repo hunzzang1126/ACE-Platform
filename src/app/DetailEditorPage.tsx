@@ -113,9 +113,12 @@ export function DetailEditorPage() {
             // persist. The two persists RACE → the delete can get overwritten → CS leaks.
             const tmplId = useTemplateStore.getState().editingTemplateId;
             if (tmplId) {
-                // ★ ARCHITECTURAL FIX: Template CS is in-memory only (not in allCreativeSets).
-                // Just read variant, override template, clear flags, navigate away.
-                // No CS deletion needed — the in-memory CS evaporates when creativeSet changes.
+                // ★ CRITICAL: Flush canvas state to designStore FIRST.
+                // Without this, shape resizes (scaleX/scaleY in Fabric) are NOT
+                // written to designStore elements, so overrideTemplate reads stale data.
+                saveToStore(engineRef, overlay.overlayElements);
+
+                // Now read the updated variant with all canvas changes applied
                 const cs = useDesignStore.getState().creativeSet;
                 const v = cs?.variants.find(vi => vi.id === variantId);
                 if (v) {
