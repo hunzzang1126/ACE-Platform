@@ -18,6 +18,7 @@ import { getAspectCategory, type AspectCategory } from '@/schema/layoutRoles';
 import { loadUserPrefs, prefsToPromptSection } from '@/stores/userPrefs';
 import { buildDesignSystemPrompt } from '@/ai/prompts/bannerDesignPrompt';
 import { paletteToPromptSection, type BrandPalette } from '@/engine/brandPalette';
+import { loadMemory, memoryToPromptSection, type AiMemory } from '@/services/aiMemoryService';
 
 // ── Types ──
 
@@ -76,6 +77,24 @@ export interface BrandProfile {
 
 const ACTION_HISTORY_MAX = 10;
 let actionHistory: string[] = [];
+
+// ── Cached AI Memory (loaded async, used sync in prompt building) ──
+let cachedMemory: AiMemory | null = null;
+
+/** Load memory async and cache it. Call once at session start or after auth. */
+export async function refreshMemoryCache(): Promise<void> {
+    try {
+        cachedMemory = await loadMemory();
+    } catch { /* ok — will use empty */ }
+}
+
+/** Get the cached memory (non-blocking). */
+export function getCachedMemory(): AiMemory | null {
+    return cachedMemory;
+}
+
+// Kick off initial load
+refreshMemoryCache();
 
 export function pushAction(action: string): void {
     actionHistory.push(action);
@@ -245,6 +264,14 @@ export function contextToPromptSection(ctx: SmartContext): string {
     if (prefs.stats.totalDesigns > 0) {
         lines.push('');
         lines.push(prefsToPromptSection(prefs));
+    }
+
+    // ── AI Persistent Memory ──
+    if (cachedMemory) {
+        const memSection = memoryToPromptSection(cachedMemory);
+        if (memSection) {
+            lines.push(memSection);
+        }
     }
 
     // ── Design System Guidelines ──
