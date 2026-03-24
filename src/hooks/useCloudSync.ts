@@ -64,8 +64,8 @@ export function useCloudSync() {
                     // Cloud projects/CSs that don't exist locally = orphans from
                     // the old double-ID bug or previously deleted items.
                     try {
-                        const { pullProjects, deleteProjectPermanently, deleteCreativeSetCloud } = await import('@/services/cloudSync');
-                        const cloudProjects = await pullProjects(userId);
+                        const { pullAllProjectsRaw, deleteProjectPermanently, deleteCreativeSetCloud } = await import('@/services/cloudSync');
+                        const cloudProjects = await pullAllProjectsRaw(userId);
                         const localProjectIds = new Set(localProjects.map(p => p.id));
                         const localCsIds = new Set(Object.keys(localCS));
                         let purged = 0;

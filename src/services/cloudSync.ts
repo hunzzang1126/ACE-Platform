@@ -117,6 +117,27 @@ export async function pullProjects(userId: string): Promise<CreativeSetSummary[]
     }));
 }
 
+/**
+ * Pull ALL projects for a user INCLUDING soft-deleted ones.
+ * Used exclusively by the orphan purge to find ghost rows.
+ */
+export async function pullAllProjectsRaw(userId: string): Promise<{ id: string; name: string }[]> {
+    const sb = getSupabase();
+    if (!sb) return [];
+
+    const { data, error } = await sb
+        .from('projects')
+        .select('id, name')
+        .eq('user_id', userId);
+
+    if (error || !data) {
+        console.warn('[cloudSync] pullAllProjectsRaw error:', error?.message);
+        return [];
+    }
+
+    return data as { id: string; name: string }[];
+}
+
 /** Soft-delete a project (move to trash in cloud) */
 export async function trashProject(projectId: string): Promise<void> {
     const sb = getSupabase();
