@@ -85,7 +85,7 @@ export async function loadMemory(): Promise<AiMemory> {
             .from('ai_memory')
             .select('preferences, design_history, conversation_summary')
             .eq('user_id', user.id)
-            .single();
+            .maybeSingle();
 
         if (error || !data) {
             console.info('[AiMemory] No cloud memory found, using local');
