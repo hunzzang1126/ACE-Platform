@@ -330,6 +330,15 @@ export function useFabricCanvas(
                     vpt[5] = screenCY - artboardCenterY * newZoom;
                     fc.setViewportTransform(vpt);
                     fc.renderAll();
+                } else {
+                    // ★ Scroll-to-pan: trackpad two-finger or mouse scroll = pan canvas
+                    // deltaX = horizontal pan, deltaY = vertical pan
+                    e.preventDefault(); e.stopPropagation();
+                    const vpt = fc.viewportTransform!;
+                    vpt[4] -= e.deltaX;
+                    vpt[5] -= e.deltaY;
+                    fc.setViewportTransform(vpt);
+                    fc.renderAll();
                 }
             });
 
