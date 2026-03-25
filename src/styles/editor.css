@@ -1567,12 +1567,12 @@
 }
 
 .bp-layer-row:hover {
-    background: rgba(0, 0, 0, 0.03);
+    background: rgba(74, 158, 255, 0.06);
 }
 
 .bp-layer-row.selected {
-    background: rgba(74, 158, 255, 0.1);
-    border-left-color: #4a9eff;
+    background: rgba(74, 158, 255, 0.15);
+    border-left-color: #2B7FFF;
 }
 
 .bp-layer-icon {
@@ -1584,7 +1584,7 @@
 }
 
 .bp-layer-row.selected .bp-layer-icon {
-    color: #4a9eff;
+    color: #2B7FFF;
 }
 
 .bp-layer-name {
@@ -1597,7 +1597,8 @@
 }
 
 .bp-layer-row.selected .bp-layer-name {
-    color: var(--text-primary);
+    color: #e6edf3;
+    font-weight: 500;
 }
 
 .bp-layer-delete {
