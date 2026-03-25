@@ -10,7 +10,7 @@ import type { Engine, ExecutionResult } from './executorHelpers';
 import { generateImage } from '@/services/imageGenClient';
 import type { ImageGenResult } from '@/services/imageGenClient';
 import { rgbToHex, makeNodeInfo } from './executorHelpers';
-import { pushLastTouched } from './smartContextBuilder';
+import { pushLastTouched, pushAiChange } from './smartContextBuilder';
 import {
     executeAddText,
     executeSetAnimPreset,
@@ -32,6 +32,31 @@ function trackTouch(result: ExecutionResult, toolName: string, params: Record<st
     const node = trackedNodes.find(n => n.id === nodeId);
     const name = node?.label ?? String(params.name ?? `element #${nodeId}`);
     pushLastTouched(name, nodeId, toolName);
+
+    // ★ Auto-log AI change for follow-up context ("undo that", "keep going")
+    const summary = _buildChangeSummary(toolName, params);
+    pushAiChange({ tool: toolName, elementName: name, summary, timestamp: Date.now() });
+}
+
+/** Build a concise summary of what a tool call changed */
+function _buildChangeSummary(toolName: string, params: Record<string, unknown>): string {
+    const p = params;
+    switch (toolName) {
+        case 'set_position': return `position → (${p.x}, ${p.y})`;
+        case 'set_size': return `size → ${p.w}x${p.h}`;
+        case 'set_font_size': return `fontSize → ${p.size}`;
+        case 'set_fill_hex': return `fill → ${p.hex}`;
+        case 'set_color': return `color → ${p.hex ?? p.color}`;
+        case 'set_text': return `text → "${String(p.text ?? '').slice(0, 30)}"`;
+        case 'set_opacity': return `opacity → ${p.opacity}`;
+        case 'set_rotation': return `rotation → ${p.angle}deg`;
+        case 'set_z_index': return `z-index → ${p.z}`;
+        case 'set_animation': return `animation → ${p.preset}`;
+        case 'set_custom_style': return `custom style applied`;
+        case 'remove_node': return `removed`;
+        case 'clone_node': return `cloned`;
+        default: return `${toolName}(${Object.entries(p).map(([k, v]) => `${k}=${String(v).slice(0, 20)}`).join(', ').slice(0, 60)})`;
+    }
 }
 
 /**

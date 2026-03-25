@@ -19,6 +19,7 @@ import { loadUserPrefs, prefsToPromptSection } from '@/stores/userPrefs';
 import { buildDesignSystemPrompt } from '@/ai/prompts/bannerDesignPrompt';
 import { paletteToPromptSection, type BrandPalette } from '@/engine/brandPalette';
 import { loadMemory, memoryToPromptSection, type AiMemory } from '@/services/aiMemoryService';
+import { initActionTracker } from '@/ai/actionTracker';
 
 // ── Types ──
 
@@ -55,6 +56,15 @@ export interface SmartContext {
 
     /** Recent user actions for conversational continuity */
     recentActions?: string[];
+
+    /** Currently selected element (from user's last click/selection) */
+    currentSelection?: {
+        name: string;
+        id: number;
+        type: string;
+        /** Seconds since selection */
+        age: number;
+    };
 }
 
 export interface ElementSummary {
@@ -95,6 +105,7 @@ export function getCachedMemory(): AiMemory | null {
 
 // Kick off initial load
 refreshMemoryCache();
+initActionTracker();
 
 export function pushAction(action: string): void {
     actionHistory.push(action);
@@ -131,6 +142,33 @@ export function getLastTouched() {
 
 export function clearLastTouched(): void {
     lastTouched = [];
+}
+
+// ── AI Change Log (tracks what AI modified for undo/follow-up) ──
+
+export interface AiChangeRecord {
+    tool: string;
+    elementName: string;
+    summary: string; // e.g. "fontSize 24→32"
+    timestamp: number;
+}
+
+const AI_CHANGE_LOG_MAX = 15;
+let aiChangeLog: AiChangeRecord[] = [];
+
+export function pushAiChange(record: AiChangeRecord): void {
+    aiChangeLog.push(record);
+    if (aiChangeLog.length > AI_CHANGE_LOG_MAX) {
+        aiChangeLog = aiChangeLog.slice(-AI_CHANGE_LOG_MAX);
+    }
+}
+
+export function getAiChangeLog(): AiChangeRecord[] {
+    return [...aiChangeLog];
+}
+
+export function clearAiChangeLog(): void {
+    aiChangeLog = [];
 }
 
 // ── Main Builder ──
@@ -249,6 +287,14 @@ export function contextToPromptSection(ctx: SmartContext): string {
         }
     }
 
+    // ── Currently Selected Element ──
+    if (ctx.currentSelection) {
+        const sel = ctx.currentSelection;
+        lines.push(`\n### Currently Selected Element`);
+        lines.push(`"${sel.name}" (id=${sel.id}, ${sel.type}) — selected ${sel.age}s ago`);
+        lines.push(`*(When user says "this", "the selected one" → they mean this element)*`);
+    }
+
     // ── Last Touched Elements (pronoun resolution) ──
     const touched = getLastTouched();
     if (touched.length > 0) {
@@ -256,6 +302,16 @@ export function contextToPromptSection(ctx: SmartContext): string {
         lines.push(`*(When the user says "it", "that", "the last one", they mean the most recent item below)*`);
         for (const t of touched) {
             lines.push(`- "${t.name}" (id=${t.id}): ${t.action}`);
+        }
+    }
+
+    // ── AI Change Log (what AI did recently) ──
+    const changes = getAiChangeLog();
+    if (changes.length > 0) {
+        lines.push(`\n### AI Change Log (your recent changes)`);
+        lines.push(`*(Use this to support "undo that", "keep going", "do the same to X")*`);
+        for (const c of changes.slice(-8)) {
+            lines.push(`- ${c.tool}: ${c.elementName} — ${c.summary}`);
         }
     }
 
