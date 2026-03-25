@@ -82,6 +82,8 @@ interface DesignState {
     connectPlug: (originId: string, targetId: string) => void;
     /** Disconnect target — becomes independent */
     disconnectPlug: (targetId: string) => void;
+    /** Re-run smartSizing on ALL plugged variants (retroactive rule update) */
+    resyncAllPluggedVariants: () => void;
     /** Get the origin variant for a given target (or undefined if independent/origin) */
     getOriginForVariant: (variantId: string) => string | undefined;
     /** Get all targets plugged into a given origin */
@@ -592,6 +594,34 @@ export const useDesignStore = create<DesignState>()(
                         delete cs.plugConnections[targetId];
                         cs.updatedAt = new Date().toISOString();
                         state.creativeSet = cs;
+                    });
+                },
+
+                // ★ Re-sync ALL plugged variants with current smartSizing rules.
+                // Call this when smartLayout rules change or to fix stale layouts.
+                resyncAllPluggedVariants: () => {
+                    set((state) => {
+                        const cs = getActiveCS(state);
+                        if (!cs?.plugConnections) return;
+                        const connections = cs.plugConnections;
+                        let synced = 0;
+                        for (const [targetId, originId] of Object.entries(connections)) {
+                            const origin = cs.variants.find(v => v.id === originId);
+                            const target = cs.variants.find(v => v.id === targetId);
+                            if (!origin || !target || origin.elements.length === 0) continue;
+                            const adapted = smartSizeElements(
+                                origin.elements,
+                                origin.preset.width, origin.preset.height,
+                                target.preset.width, target.preset.height,
+                            );
+                            target.elements = adapted;
+                            synced++;
+                        }
+                        if (synced > 0) {
+                            cs.updatedAt = new Date().toISOString();
+                            state.creativeSet = cs;
+                            console.log(`[designStore] resyncAllPluggedVariants: re-synced ${synced} variants`);
+                        }
                     });
                 },
 
