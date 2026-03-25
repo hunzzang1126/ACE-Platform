@@ -674,11 +674,18 @@ export const designStoreReady = new Promise<void>((resolve) => {
 // ── Cross-tab sync ──────────────────────────────────
 // ★ REGRESSION GUARD: Always use plain-object setState() here (never immer callback).
 // setState() called outside React render context doesn't go through immer middleware.
+//
+// ★ FIX (v0.0.0.211): Old code read from localStorage.getItem('glid-design-store')
+// but persist middleware writes to IndexedDB, so localStorage was ALWAYS EMPTY.
+// StorageEvent never fired either (IDB writes don't trigger storage events).
+// New approach: subscribe() to Zustand state changes → serialize → BroadcastChannel.
+
+let _designChannel: BroadcastChannel | null = null;
+let _isBroadcasting = false; // guard against echo loops
 
 function _applyDesignSync(raw: string) {
     try {
-        const parsed = JSON.parse(raw) as { state?: Partial<Pick<DesignState, 'allCreativeSets' | 'activeCreativeSetId'>> };
-        const data = parsed?.state;
+        const data = JSON.parse(raw) as Partial<Pick<DesignState, 'allCreativeSets' | 'activeCreativeSetId'>>;
         if (!data) return;
         const patch: Partial<DesignState> = {};
         if (data.allCreativeSets !== undefined) patch.allCreativeSets = data.allCreativeSets;
@@ -689,28 +696,15 @@ function _applyDesignSync(raw: string) {
                 : null;
         }
         if (Object.keys(patch).length > 0) {
+            _isBroadcasting = true; // prevent echo
             useDesignStore.setState(patch);
+            _isBroadcasting = false;
         }
     } catch { /* malformed JSON */ }
 }
 
-function _broadcastDesignSync() {
-    try {
-        const raw = localStorage.getItem('glid-design-store');
-        if (raw && _designChannel) _designChannel.postMessage(raw);
-    } catch { /* ok */ }
-}
-
-let _designChannel: BroadcastChannel | null = null;
-
 if (typeof window !== 'undefined') {
-    // 1. StorageEvent (fires in OTHER tabs only)
-    window.addEventListener('storage', (e) => {
-        if (e.key !== 'glid-design-store' || !e.newValue) return;
-        _applyDesignSync(e.newValue);
-    });
-
-    // 2. BroadcastChannel (fires in ALL other same-origin tabs instantly)
+    // ★ Set up BroadcastChannel for cross-tab sync
     try {
         _designChannel = new BroadcastChannel('glid-design-sync');
         _designChannel.onmessage = (e) => {
@@ -719,8 +713,24 @@ if (typeof window !== 'undefined') {
             }
         };
     } catch { /* BroadcastChannel not supported */ }
+
+    // ★ Subscribe to state changes → broadcast to other tabs
+    // This replaces the old _broadcastDesignSync() that was never called
+    // and the StorageEvent that never fired (IDB doesn't trigger it).
+    useDesignStore.subscribe((state) => {
+        if (_isBroadcasting || !_designChannel) return;
+        try {
+            const payload = JSON.stringify({
+                allCreativeSets: state.allCreativeSets,
+                activeCreativeSetId: state.activeCreativeSetId,
+            });
+            _designChannel.postMessage(payload);
+        } catch { /* ok — serialization or channel error */ }
+    });
 }
 
-// Export for use by actions that need to notify other tabs
-export { _broadcastDesignSync };
+// Export for backward compatibility (no longer needed to call manually)
+export function _broadcastDesignSync() {
+    // No-op — subscribe-based broadcast handles this automatically
+}
 

@@ -247,7 +247,7 @@ export const useProjectStore = create<ProjectState>()(
                     state.trash = state.trash.filter((t) => t.item.id !== id);
                 });
                 // 3) Broadcast to other tabs
-                _broadcastSync();
+                // ★ Cross-tab sync is now handled by subscribe() — no manual broadcast needed
                 // 4) ★ Clean up Supabase (fire-and-forget)
                 import('@/services/cloudSync').then(({ deleteProjectPermanently, deleteCreativeSetCloud }) => {
                     deleteProjectPermanently(id).catch(() => {});
@@ -268,7 +268,7 @@ export const useProjectStore = create<ProjectState>()(
                     state.trash = [];
                 });
                 // 4) Broadcast to other tabs
-                _broadcastSync();
+                // ★ Cross-tab sync is now handled by subscribe() — no manual broadcast needed
                 // 5) ★ Clean up Supabase for ALL trashed items (fire-and-forget)
                 import('@/services/cloudSync').then(({ deleteProjectPermanently, deleteCreativeSetCloud }) => {
                     for (const t of currentTrash) {
@@ -303,50 +303,34 @@ export const projectStoreReady = new Promise<void>((resolve) => {
 });
 
 // ── Cross-tab sync ──────────────────────────────────
-// Two mechanisms:
-// 1. StorageEvent: fires when ANOTHER tab writes localStorage (NOT the writing tab)
-// 2. BroadcastChannel: fires in ALL other tabs instantly (more reliable)
+// ★ FIX (v0.0.0.211): Old code read from localStorage.getItem('glid-project-store')
+// but persist middleware writes to IndexedDB, so localStorage was ALWAYS EMPTY.
+// StorageEvent never fired either (IDB writes don't trigger storage events).
+// New approach: subscribe() to Zustand state changes → serialize → BroadcastChannel.
 //
 // ★ REGRESSION GUARD: Always use plain-object setState() here (never immer callback).
-// setState() called outside React render context doesn't go through immer middleware.
+
+let _channel: BroadcastChannel | null = null;
+let _isBroadcasting = false; // guard against echo loops
 
 function _applyExternalSync(raw: string) {
     try {
-        const parsed = JSON.parse(raw) as { state?: Partial<Pick<ProjectState, 'creativeSets' | 'folders' | 'trash'>> };
-        const data = parsed?.state;
+        const data = JSON.parse(raw) as Partial<Pick<ProjectState, 'creativeSets' | 'folders' | 'trash'>>;
         if (!data) return;
         const patch: Partial<ProjectState> = {};
         if (data.creativeSets !== undefined) patch.creativeSets = data.creativeSets;
         if (data.folders !== undefined) patch.folders = data.folders;
         if (data.trash !== undefined) patch.trash = data.trash;
         if (Object.keys(patch).length > 0) {
+            _isBroadcasting = true;
             useProjectStore.setState(patch);
+            _isBroadcasting = false;
         }
     } catch { /* malformed JSON */ }
 }
 
-// Helper: broadcast current state to other tabs
-function _broadcastSync() {
-    try {
-        const raw = localStorage.getItem('glid-project-store');
-        if (raw && _channel) _channel.postMessage(raw);
-    } catch { /* ok */ }
-}
-
-let _channel: BroadcastChannel | null = null;
-
 if (typeof window !== 'undefined') {
-    // 1. StorageEvent (fires in OTHER tabs)
-    window.addEventListener('storage', (e) => {
-        if (e.key !== 'glid-project-store') return;
-        if (!e.newValue) {
-            useProjectStore.setState({ creativeSets: [], folders: [], trash: [] });
-            return;
-        }
-        _applyExternalSync(e.newValue);
-    });
-
-    // 2. BroadcastChannel (fires in ALL other same-origin tabs, instantly)
+    // ★ Set up BroadcastChannel for cross-tab sync
     try {
         _channel = new BroadcastChannel('glid-project-sync');
         _channel.onmessage = (e) => {
@@ -354,5 +338,19 @@ if (typeof window !== 'undefined') {
                 _applyExternalSync(e.data);
             }
         };
-    } catch { /* BroadcastChannel not supported — fall back to StorageEvent only */ }
+    } catch { /* BroadcastChannel not supported */ }
+
+    // ★ Subscribe to state changes → broadcast to other tabs
+    useProjectStore.subscribe((state) => {
+        if (_isBroadcasting || !_channel) return;
+        try {
+            const payload = JSON.stringify({
+                creativeSets: state.creativeSets,
+                folders: state.folders,
+                trash: state.trash,
+            });
+            _channel.postMessage(payload);
+        } catch { /* ok */ }
+    });
 }
+
