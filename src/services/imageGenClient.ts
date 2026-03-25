@@ -85,10 +85,18 @@ export async function generateImage(
     try {
         return await callImageGenApi(request, model, signal);
     } catch (err) {
-        console.warn('[ImageGen] API call failed, using fallback:', err);
-        const fallback = generateFallbackImage(request);
-        fallback.message = `API failed (${err instanceof Error ? err.message : 'unknown'}), using gradient fallback`;
-        return fallback;
+        console.warn(`[ImageGen] ${model} failed, trying fallback model:`, err);
+
+        // ★ Try the other model before falling back to gradient
+        const fallbackModel = model === 'imagen' ? 'flux' : 'imagen';
+        try {
+            return await callImageGenApi(request, fallbackModel as 'flux' | 'imagen', signal);
+        } catch (err2) {
+            console.warn(`[ImageGen] ${fallbackModel} also failed, using gradient fallback:`, err2);
+            const fallback = generateFallbackImage(request);
+            fallback.message = `Both models failed, using gradient fallback`;
+            return fallback;
+        }
     }
 }
 
@@ -185,6 +193,8 @@ async function callImageGenApi(
     const imageUrl = extractImageUrl(data);
 
     if (!imageUrl) {
+        // ★ Debug: log full response structure so we can diagnose
+        console.error('[ImageGen] FAILED to extract image from response. Full response:', JSON.stringify(data).slice(0, 2000));
         throw new Error('No image data in API response');
     }
 
@@ -256,17 +266,37 @@ function extractImageUrl(response: Record<string, unknown>): string | null {
         if (content.length > 1000 && !content.includes(' ')) {
             return `data:image/png;base64,${content}`;
         }
+        // ★ Gemini may return a URL to a hosted image
+        if (content.startsWith('http') && (content.includes('.png') || content.includes('.jpg') || content.includes('.webp') || content.includes('image'))) {
+            return content;
+        }
         return null;
     }
 
-    // Array content — look for image_url blocks
+    // Array content — look for various image block formats
     if (Array.isArray(content)) {
         for (const block of content) {
+            // Standard: { type: 'image_url', image_url: { url } }
             if (block.type === 'image_url' && block.image_url?.url) {
                 return block.image_url.url as string;
             }
+            // Anthropic/Claude: { type: 'image', source: { data, media_type } }
             if (block.type === 'image' && block.source?.data) {
                 return `data:${block.source.media_type ?? 'image/png'};base64,${block.source.data}`;
+            }
+            // ★ Gemini inline_data in content array: { inline_data: { data, mime_type } }
+            if (block.inline_data?.data) {
+                return `data:${block.inline_data.mime_type ?? 'image/png'};base64,${block.inline_data.data}`;
+            }
+            // ★ Direct base64 string in array
+            if (typeof block === 'string' && block.startsWith('data:image')) {
+                return block;
+            }
+            // ★ URL block: { type: 'text', text: 'https://...' } (rare but possible)
+            if (block.type === 'text' && typeof block.text === 'string') {
+                const t = block.text.trim();
+                if (t.startsWith('data:image')) return t;
+                if (t.length > 1000 && !t.includes(' ')) return `data:image/png;base64,${t}`;
             }
         }
     }
