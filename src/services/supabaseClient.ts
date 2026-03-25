@@ -197,15 +197,21 @@ export async function markOnboardingComplete(
     if (!sb) return;
 
     try {
-        await sb
+        const { error, count } = await sb
             .from('user_roles')
             .update({
                 has_completed_onboarding: true,
                 preferred_language: preferredLanguage,
             })
             .eq('user_id', userId);
+
+        if (error) {
+            console.error('[markOnboardingComplete] Supabase update ERROR:', error.message, error.details, error.hint);
+        } else {
+            console.log('[markOnboardingComplete] Success for userId:', userId, 'rows affected:', count);
+        }
     } catch (e) {
-        console.warn('[markOnboardingComplete] Supabase update failed:', e);
+        console.error('[markOnboardingComplete] Supabase update EXCEPTION:', e);
     }
 }
 
