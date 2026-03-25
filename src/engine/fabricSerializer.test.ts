@@ -184,9 +184,9 @@ describe('fabricJsonToElements', () => {
         if (result[0].type === 'shape') {
             const size = result[0].constraints.size;
             expect(size.width).toBe(200);
-            // Height 300 >= 250*0.98 so absoluteToConstraints produces relative height
-            expect(size.heightMode).toBe('relative');
-            expect(size.height).toBe(1);
+            // ★ v0.0.0.208 fix: absoluteToConstraints uses actual ratio (300/250=1.2)
+            // instead of hardcoded 1.0 — prevents image distortion on save/restore
+            expect(size.height).toBe(1.2);
         }
     });
 

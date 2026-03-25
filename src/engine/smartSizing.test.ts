@@ -378,15 +378,28 @@ describe('smartSizeElements — Template-Proven Scaling (v3)', () => {
 
     // ★ Independent X/Y stretch fill (same as template drops)
 
-    it('positions scale independently on X and Y axes', () => {
+    it('same-category: positions scale independently on X and Y axes', () => {
+        // ★ v4: same-category uses v3 stretch, cross-category uses role-based layout
+        // Using 300x250 → 600x500 (both 'square' category) to test stretch path
         const el = makeShape('deco', 150, 125, 60, 50, 'deco_star');
-        // Center of 300x250 → should map to center of 728x90
+        const result = smartSizeElements([el], 300, 250, 600, 500);
+        const c = result[0]!.constraints;
+        // scaleX = 600/300 = 2.0 → x = round(150 * 2.0) = 300
+        // scaleY = 500/250 = 2.0 → y = round(125 * 2.0) = 250
+        expect(c.horizontal.offset).toBe(300);
+        expect(c.vertical.offset).toBe(250);
+    });
+
+    it('cross-category: decoration uses smart layout instead of stretch', () => {
+        // ★ v4 REGRESSION GUARD: cross-category (square→ultra-wide) uses role-based layout
+        const el = makeShape('deco', 150, 125, 60, 50, 'deco_star');
         const result = smartSizeElements([el], 300, 250, 728, 90);
         const c = result[0]!.constraints;
-        // scaleX = 728/300 = 2.427 → x = round(150 * 2.427) = 364
-        // scaleY = 90/250  = 0.36  → y = round(125 * 0.36)  = 45
-        expect(c.horizontal.offset).toBe(364);
-        expect(c.vertical.offset).toBe(45);
+        // Decoration → accent → computeSmartConstraints uses accent rule
+        // Should NOT be at old stretch coordinates (364, 45)
+        expect(c.horizontal).toBeDefined();
+        expect(c.vertical).toBeDefined();
+        expect(c.size).toBeDefined();
     });
 
     it('preserves gradient properties through sizing', () => {

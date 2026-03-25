@@ -58,12 +58,14 @@ export function detectElementRole(
     const name = element.name.toLowerCase();
 
     // Name-based detection (highest priority)
-    if (name.match(/bg|background/)) return 'background';
-    if (name.match(/cta|button|shop|buy|learn|sign|start/)) return 'cta';
-    if (name.match(/logo|brand/)) return 'logo';
-    if (name.match(/head|title|main.*text/)) return 'headline';
-    if (name.match(/sub|desc|body|caption/)) return 'subtext';
-    if (name.match(/hero|banner.*img|photo/)) return 'image';
+    // ★ REGRESSION GUARD: Use word boundaries (\b) to prevent false positives.
+    // Without \b, /cta/ matches inside "rec[cta]ngle" → misdetects shape as CTA.
+    if (name.match(/\b(bg|background)\b/)) return 'background';
+    if (name.match(/\b(cta|button|shop|buy|learn|sign up|start|get started)\b/)) return 'cta';
+    if (name.match(/\b(logo|brand)\b/)) return 'logo';
+    if (name.match(/\b(head|title|headline)\b|main.*text/)) return 'headline';
+    if (name.match(/\b(sub|desc|body|caption)\b/)) return 'subtext';
+    if (name.match(/\b(hero|photo)\b|banner.*img/)) return 'image';
 
     // Type + size heuristic
     if (element.type === 'shape') {
@@ -186,26 +188,46 @@ export const LAYOUT_ZONES: Record<SizeCategory, LayoutMap> = {
     },
 };
 
-// ── Smart Sizing (Template-Proven Strategy) ─────────
-// ★ v3: Same approach as applyVariantToCanvas() in SidebarTemplateTab.tsx
+// ── Role bridge: ElementRole → LayoutRole ────────
+import type { LayoutRole } from '@/schema/layoutRoles';
+import { getAspectCategory } from '@/schema/layoutRoles';
+import { computeSmartConstraints, getSmartFontSize } from './smartLayout';
+
+const ELEMENT_TO_LAYOUT_ROLE: Record<ElementRole, LayoutRole> = {
+    background: 'background',
+    headline: 'headline',
+    subtext: 'subline',
+    cta: 'cta',
+    logo: 'logo',
+    image: 'hero',
+    decoration: 'accent',
+};
+
+function toLayoutRole(elementRole: ElementRole, el: DesignElement): LayoutRole {
+    // If element already has a LayoutRole assigned, prefer it
+    if (el.role) return el.role;
+    return ELEMENT_TO_LAYOUT_ROLE[elementRole] ?? 'accent';
+}
+
+// ── Smart Sizing (v4: Semantic Resizing) ─────────
+// ★ v4: TWO-STRATEGY APPROACH
+// Same-category (e.g. landscape→landscape): v3 stretch fill (works perfectly)
+// Cross-category (e.g. square→ultra-wide): role-based repositioning via computeSmartConstraints
+// This is the core upgrade of Sprint 3: elements understand their ROLE and get placed
+// in semantically correct positions for each aspect ratio category.
 
 const MIN_FONT = 8; // minimum font size in px
+const MIN_CTA_HEIGHT = 44; // minimum CTA touch target
 
 /**
  * Apply smart sizing from origin elements → target variant.
  * Returns new array of elements adapted for the target size.
  *
- * ★ TEMPLATE-PROVEN STRATEGY (v3):
- * Uses the EXACT same scaling technique as applyVariantToCanvas() in
- * SidebarTemplateTab.tsx — this is what makes template drops into
- * any size (1080×1080 → 728×90) look perfect.
- *
- * Key: Independent X/Y scaling (stretch fill) + geometric mean for fonts.
- * - Position/size: scaleX for horizontal, scaleY for vertical (fills canvas)
- * - Font/radius:   √(scaleX × scaleY) (balanced geometric mean)
- * - Background:    always 100% coverage
- *
- * No role dependency — works with any design regardless of which elements exist.
+ * ★ v4: SEMANTIC RESIZING
+ * - Same category: v3 independent X/Y stretch fill + geometric mean fonts
+ * - Cross category: role-based layout repositioning via smartLayout engine
+ *   Each element is placed in its semantically correct zone for the target
+ *   aspect ratio (headline→center, CTA→right for ultra-wide, etc.)
  */
 export function smartSizeElements(
     originElements: DesignElement[],
@@ -219,20 +241,23 @@ export function smartSizeElements(
         return JSON.parse(JSON.stringify(originElements));
     }
 
-    console.log(`[smartSizing] ★ Running: ${originW}x${originH} → ${targetW}x${targetH}, ${originElements.length} elements`);
+    const originCategory = getAspectCategory(originW, originH);
+    const targetCategory = getAspectCategory(targetW, targetH);
+    const isCrossCategory = originCategory !== targetCategory;
 
-    // ★ Independent X/Y scaling — template FILLS entire canvas (like painting a wall)
+    console.log(`[smartSizing] ★ v4 Running: ${originW}x${originH} (${originCategory}) → ${targetW}x${targetH} (${targetCategory}), ${originElements.length} elements, cross=${isCrossCategory}`);
+
+    // ★ v3 scales — always computed for same-category path and fallback
     const scaleX = targetW / originW;
     const scaleY = targetH / originH;
-    // ★ Geometric mean keeps fonts/radii visually balanced across both axes
     const scaleFontRadius = Math.sqrt(scaleX * scaleY);
 
     return originElements.map((el) => {
-        // ★ Use constraintsToAbsolute — SINGLE SOURCE OF TRUTH per quality standards
         const abs = constraintsToAbsolute(el.constraints, originW, originH);
         const role = detectElementRole(el, originW, originH);
+        const layoutRole = toLayoutRole(role, el);
 
-        console.log(`[smartSizing]   el="${el.name}" type=${el.type} role=${role} origin=(${abs.x},${abs.y},${abs.w}x${abs.h})`);
+        console.log(`[smartSizing]   el="${el.name}" type=${el.type} role=${role}→${layoutRole} cross=${isCrossCategory}`);
 
         // ── Background: always fill 100% of target canvas ──
         if (role === 'background') {
@@ -249,41 +274,156 @@ export function smartSizeElements(
             } as DesignElement;
         }
 
-        // ── All other elements: independent X/Y stretch fill ──
-        // Same technique as template drops — stretches to fill canvas
-        const newX = Math.round(abs.x * scaleX);
-        const newY = Math.round(abs.y * scaleY);
-        const newW = Math.max(4, Math.round(abs.w * scaleX));
-        const newH = Math.max(4, Math.round(abs.h * scaleY));
-        console.log(`[smartSizing]     → scaled=(${newX},${newY},${newW}x${newH})`);
-
-        const newConstraints: ElementConstraints = {
-            horizontal: { anchor: 'left' as const, offset: newX },
-            vertical: { anchor: 'top' as const, offset: newY },
-            size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width: newW, height: newH },
-            rotation: el.constraints.rotation,
-        };
-
-        // ★ Font + border radius: geometric mean (balanced across both axes)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const fontPatch: Record<string, unknown> = {};
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if ((el.type === 'text' || el.type === 'button') && (el as any).fontSize) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            fontPatch.fontSize = Math.max(MIN_FONT, Math.round((el as any).fontSize * scaleFontRadius));
-        }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if ((el as any).borderRadius) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            fontPatch.borderRadius = Math.round((el as any).borderRadius * scaleFontRadius);
+        // ── Cross-category: role-based repositioning ──
+        if (isCrossCategory) {
+            return applyCrossCategoryLayout(el, abs, role, layoutRole, targetW, targetH, scaleFontRadius);
         }
 
-        return {
-            ...JSON.parse(JSON.stringify(el)),
-            constraints: newConstraints,
-            ...fontPatch,
-        } as DesignElement;
+        // ── Same-category: v3 uniform stretch ──
+        return applySameCategoryStretch(el, abs, scaleX, scaleY, scaleFontRadius, targetW, targetH);
     });
+}
+
+/**
+ * Cross-category path: uses computeSmartConstraints for role-based placement.
+ */
+function applyCrossCategoryLayout(
+    el: DesignElement,
+    abs: { x: number; y: number; w: number; h: number },
+    role: ElementRole,
+    layoutRole: LayoutRole,
+    targetW: number,
+    targetH: number,
+    scaleFontRadius: number,
+): DesignElement {
+    // Use the smart layout engine for positioning
+    const baseFontSize = (el as { fontSize?: number }).fontSize;
+    const smartConstraints = computeSmartConstraints({
+        role: layoutRole,
+        canvasW: targetW,
+        canvasH: targetH,
+        elWidth: abs.w,
+        elHeight: abs.h,
+        fontSize: baseFontSize,
+    });
+
+    // ★ Font size: use smart layout engine's recommended size
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fontPatch: Record<string, unknown> = {};
+    if ((el.type === 'text' || el.type === 'button') && baseFontSize) {
+        const smartFontSize = getSmartFontSize(layoutRole, targetW, targetH);
+        // Use the larger of geometric-mean and smart-font to avoid tiny text
+        fontPatch.fontSize = Math.max(MIN_FONT, Math.round(Math.max(smartFontSize, baseFontSize * scaleFontRadius)));
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if ((el as any).borderRadius) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        fontPatch.borderRadius = Math.round((el as any).borderRadius * scaleFontRadius);
+    }
+
+    // ★ CTA minimum height guarantee (44px touch target)
+    if (role === 'cta') {
+        const resolvedH = smartConstraints.size.heightMode === 'relative'
+            ? targetH * smartConstraints.size.height
+            : smartConstraints.size.height;
+        if (resolvedH < MIN_CTA_HEIGHT) {
+            smartConstraints.size = {
+                ...smartConstraints.size,
+                heightMode: 'fixed' as const,
+                height: MIN_CTA_HEIGHT,
+            };
+        }
+    }
+
+    // ★ Logo: preserve aspect ratio
+    if (role === 'logo' && abs.w > 0 && abs.h > 0) {
+        const logoAspect = abs.w / abs.h;
+        const targetLogoW = smartConstraints.size.widthMode === 'relative'
+            ? targetW * smartConstraints.size.width
+            : smartConstraints.size.width;
+        const targetLogoH = Math.round(targetLogoW / logoAspect);
+        smartConstraints.size = {
+            widthMode: 'fixed' as const,
+            heightMode: 'fixed' as const,
+            width: Math.round(targetLogoW),
+            height: Math.max(24, targetLogoH), // minimum 24px
+        };
+    }
+
+    // ★ Image (hero): preserve aspect ratio, use zone dimensions
+    if (role === 'image' && abs.w > 0 && abs.h > 0) {
+        const imgAspect = abs.w / abs.h;
+        const zoneW = smartConstraints.size.widthMode === 'relative'
+            ? targetW * smartConstraints.size.width
+            : smartConstraints.size.width;
+        const zoneH = smartConstraints.size.heightMode === 'relative'
+            ? targetH * smartConstraints.size.height
+            : smartConstraints.size.height;
+        // Fit-contain within zone
+        const fitW = Math.min(zoneW, zoneH * imgAspect);
+        const fitH = fitW / imgAspect;
+        smartConstraints.size = {
+            widthMode: 'fixed' as const,
+            heightMode: 'fixed' as const,
+            width: Math.round(fitW),
+            height: Math.round(fitH),
+        };
+    }
+
+    console.log(`[smartSizing]     → CROSS: ${layoutRole} placed via smartLayout (${targetW}x${targetH})`);
+
+    return {
+        ...JSON.parse(JSON.stringify(el)),
+        constraints: smartConstraints,
+        ...fontPatch,
+    } as DesignElement;
+}
+
+/**
+ * Same-category path: v3 uniform stretch (template-proven).
+ */
+function applySameCategoryStretch(
+    el: DesignElement,
+    abs: { x: number; y: number; w: number; h: number },
+    scaleX: number,
+    scaleY: number,
+    scaleFontRadius: number,
+    _targetW: number,
+    _targetH: number,
+): DesignElement {
+    const newX = Math.round(abs.x * scaleX);
+    const newY = Math.round(abs.y * scaleY);
+    const newW = Math.max(4, Math.round(abs.w * scaleX));
+    const newH = Math.max(4, Math.round(abs.h * scaleY));
+
+    const newConstraints: ElementConstraints = {
+        horizontal: { anchor: 'left' as const, offset: newX },
+        vertical: { anchor: 'top' as const, offset: newY },
+        size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width: newW, height: newH },
+        rotation: el.constraints.rotation,
+    };
+
+    // ★ Font + border radius: geometric mean
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fontPatch: Record<string, unknown> = {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if ((el.type === 'text' || el.type === 'button') && (el as any).fontSize) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        fontPatch.fontSize = Math.max(MIN_FONT, Math.round((el as any).fontSize * scaleFontRadius));
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if ((el as any).borderRadius) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        fontPatch.borderRadius = Math.round((el as any).borderRadius * scaleFontRadius);
+    }
+
+    console.log(`[smartSizing]     → SAME: stretch (${newX},${newY},${newW}x${newH})`);
+
+    return {
+        ...JSON.parse(JSON.stringify(el)),
+        constraints: newConstraints,
+        ...fontPatch,
+    } as DesignElement;
 }
 
 
