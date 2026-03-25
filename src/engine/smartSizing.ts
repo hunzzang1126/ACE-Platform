@@ -75,7 +75,13 @@ export function detectElementRole(
         return 'decoration';
     }
     if (element.type === 'button') return 'cta';
-    if (element.type === 'image') return 'image';
+    // ★ Large images covering >60% of canvas = background (e.g. AI-generated gradient images)
+    if (element.type === 'image') {
+        const resolved = resolveConstraints(element.constraints, masterW, masterH);
+        const coverage = (resolved.width * resolved.height) / (masterW * masterH);
+        if (coverage > 0.6) return 'background';
+        return 'image';
+    }
     if (element.type === 'text') {
         const fontSize = (element as { fontSize?: number }).fontSize ?? 16;
         if (fontSize >= 24) return 'headline';
@@ -260,12 +266,36 @@ export function smartSizeElements(
 
         console.log(`[smartSizing]   el="${el.name}" type=${el.type} role=${role}→${layoutRole} cross=${isCrossCategory}`);
 
-        // ── Background: always fill 100% of target canvas ──
+        // ── Background: fill target canvas ──
+        // Shapes (solid/gradient): exact target dims (no distortion)
+        // Images: cover-style (maintain aspect ratio, fill canvas, crop overflow)
         if (role === 'background') {
+            let bgW = targetW;
+            let bgH = targetH;
+            let bgX = 0;
+            let bgY = 0;
+
+            if (el.type === 'image' && abs.w > 0 && abs.h > 0) {
+                // ★ Cover-style: scale to fill while maintaining aspect ratio
+                const imgAspect = abs.w / abs.h;
+                const canvasAspect = targetW / targetH;
+                if (imgAspect > canvasAspect) {
+                    // Image is wider → scale by height, crop sides
+                    bgH = targetH;
+                    bgW = Math.round(targetH * imgAspect);
+                    bgX = -Math.round((bgW - targetW) / 2);
+                } else {
+                    // Image is taller → scale by width, crop top/bottom
+                    bgW = targetW;
+                    bgH = Math.round(targetW / imgAspect);
+                    bgY = -Math.round((bgH - targetH) / 2);
+                }
+            }
+
             const newConstraints: ElementConstraints = {
-                horizontal: { anchor: 'left' as const, offset: 0 },
-                vertical: { anchor: 'top' as const, offset: 0 },
-                size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width: targetW, height: targetH },
+                horizontal: { anchor: 'left' as const, offset: bgX },
+                vertical: { anchor: 'top' as const, offset: bgY },
+                size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width: bgW, height: bgH },
                 rotation: el.constraints.rotation,
             };
             return {
