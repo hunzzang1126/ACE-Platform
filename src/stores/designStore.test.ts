@@ -521,7 +521,7 @@ describe('designStore — connectPlug Smart Sizing', () => {
         expect(bgElement.constraints.vertical.offset).toBe(0);
     });
 
-    it('connectPlug scales text fontSize with geometric mean', () => {
+    it('connectPlug scales text fontSize via smart arrange for cross-category', () => {
         useDesignStore.getState().createCreativeSet('Font Scale Test', MASTER_PRESET);
         const masterId = useDesignStore.getState().creativeSet!.masterVariantId;
 
@@ -559,9 +559,9 @@ describe('designStore — connectPlug Smart Sizing', () => {
         const target = useDesignStore.getState().creativeSet!.variants.find(v => v.id === targetId)!;
         const textResult = target.elements[0] as any;
 
-        // √(728/300 * 90/250) = √(2.427 * 0.36) = √0.874 = 0.935
-        // 36 * 0.935 = 33.65 → round = 34
-        expect(textResult.fontSize).toBe(34);
+        // v7: "Headline Title" → headline role → ultra-wide zone → font clamped
+        // zoneH=45, heightFactor=0.45, maxFont=20, scaledFont=20, *maxFontScale(0.6) = 12
+        expect(textResult.fontSize).toBe(12);
     });
 
     it('★ REGRESSION: disconnectPlug does NOT clear elements (preserves last state)', () => {
