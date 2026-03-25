@@ -252,10 +252,9 @@ export function smartSizeElements(
     const scaleY = targetH / originH;
     const scaleFontRadius = Math.sqrt(scaleX * scaleY);
 
-    console.log(`[smartSizing] ★ v7 Running: ${originW}x${originH} → ${targetW}x${targetH}, ${originElements.length} elements, scaleX=${scaleX.toFixed(2)} scaleY=${scaleY.toFixed(2)}`);
+    console.log(`[smartSizing] ★ v6 Running: ${originW}x${originH} → ${targetW}x${targetH}, ${originElements.length} elements, scaleX=${scaleX.toFixed(2)} scaleY=${scaleY.toFixed(2)}`);
 
-    // Step 1: Proportional stretch (v6 — proven reliable for shapes/images)
-    const stretched = originElements.map((el) => {
+    return originElements.map((el) => {
         const abs = constraintsToAbsolute(el.constraints, originW, originH);
         const role = detectElementRole(el, originW, originH);
 
@@ -295,115 +294,6 @@ export function smartSizeElements(
 
         // ── All other elements: v3 proportional stretch ──
         return applySameCategoryStretch(el, abs, scaleX, scaleY, scaleFontRadius, targetW, targetH);
-    });
-
-    // Step 2: Smart Arrange — fix text overlap for cross-category resizing
-    const srcCat = classifyRatio(originW, originH);
-    const tgtCat = classifyRatio(targetW, targetH);
-
-    if (srcCat !== tgtCat && (tgtCat === 'ultra-wide' || tgtCat === 'ultra-tall' || tgtCat === 'wide')) {
-        console.log(`[smartSizing] ★ Cross-category ${srcCat} → ${tgtCat}: running postResizeArrange`);
-        return postResizeArrange(stretched, originW, originH, targetW, targetH, tgtCat);
-    }
-
-    return stretched;
-}
-
-// ── Post-Resize Smart Arrange ───────────────────
-// Fixes text overlap after proportional stretch by rearranging
-// text elements (headline, subtext, CTA) into non-overlapping zones.
-// Only runs for cross-category resizing where overlap is likely.
-
-function postResizeArrange(
-    elements: DesignElement[],
-    originW: number,
-    originH: number,
-    targetW: number,
-    targetH: number,
-    targetCat: SizeCategory,
-): DesignElement[] {
-    const zones = LAYOUT_ZONES[targetCat];
-    const padding = Math.round(targetH * 0.05); // 5% padding
-
-    return elements.map((el) => {
-        const role = detectElementRole(el, originW, originH);
-
-        // Skip backgrounds and decorations — proportional stretch is fine
-        if (role === 'background' || role === 'decoration') return el;
-
-        const zone = zones[role];
-        if (!zone) return el;
-
-        // Calculate absolute zone position
-        const zoneX = Math.round(zone.x * targetW);
-        const zoneY = Math.round(zone.y * targetH);
-        const zoneW = Math.round(zone.w * targetW);
-        const zoneH = Math.round(zone.h * targetH);
-
-        // ── Font clamping for text elements ──
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const fontPatch: Record<string, unknown> = {};
-        if (el.type === 'text' || el.type === 'button') {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const currentFontSize = (el as any).fontSize ?? 16;
-            // Clamp font: max = zone height * 0.7 (leave room for padding)
-            // For ultra-wide, further constrain to zone height * 0.45 (multiple lines)
-            const heightFactor = targetCat === 'ultra-wide' ? 0.45 : 0.6;
-            const maxFont = Math.floor(zoneH * heightFactor);
-            const scaledFont = Math.max(MIN_FONT, Math.min(currentFontSize, maxFont));
-            fontPatch.fontSize = Math.max(MIN_FONT, Math.round(scaledFont * zone.maxFontScale));
-
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            if ((el as any).borderRadius) {
-                const geoScale = Math.sqrt((targetW / originW) * (targetH / originH));
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                fontPatch.borderRadius = Math.round((el as any).borderRadius * geoScale);
-            }
-        }
-
-        // ── Logo: preserve aspect ratio within zone ──
-        let finalW = zoneW;
-        let finalH = zoneH;
-        if (role === 'logo' || role === 'image') {
-            const abs = constraintsToAbsolute(el.constraints, targetW, targetH);
-            if (abs.w > 0 && abs.h > 0) {
-                const aspect = abs.w / abs.h;
-                // Fit within zone, maintain aspect
-                if (zoneW / zoneH > aspect) {
-                    finalH = zoneH;
-                    finalW = Math.round(zoneH * aspect);
-                } else {
-                    finalW = zoneW;
-                    finalH = Math.round(zoneW / aspect);
-                }
-            }
-        }
-
-        // ── CTA minimum touch target ──
-        if (role === 'cta') {
-            finalH = Math.max(MIN_CTA_HEIGHT, finalH);
-            // Center CTA vertically within zone
-        }
-
-        const newConstraints: ElementConstraints = {
-            horizontal: { anchor: 'left' as const, offset: zoneX },
-            vertical: { anchor: 'top' as const, offset: zoneY },
-            size: {
-                widthMode: 'fixed' as const,
-                heightMode: 'fixed' as const,
-                width: Math.max(4, finalW),
-                height: Math.max(4, finalH),
-            },
-            rotation: el.constraints.rotation,
-        };
-
-        console.log(`[smartSizing]     → ARRANGE: ${role} → zone(${zoneX},${zoneY},${finalW}x${finalH}) font=${(fontPatch.fontSize as number) ?? '—'}`);
-
-        return {
-            ...JSON.parse(JSON.stringify(el)),
-            constraints: newConstraints,
-            ...fontPatch,
-        } as DesignElement;
     });
 }
 

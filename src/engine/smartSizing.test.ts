@@ -358,13 +358,14 @@ describe('smartSizeElements — Template-Proven Scaling (v3)', () => {
 
     // ★ Font scaling uses geometric mean √(scaleX * scaleY)
 
-    it('v7: font clamped to fit zone in cross-category (300x250 → 728x90)', () => {
+    it('font scales with geometric mean √(scaleX * scaleY)', () => {
         const text = makeText('t', 50, 100, 200, 40, 36, { name: 'Main Title' });
         const result = smartSizeElements([text], 300, 250, 728, 90);
         const resultText = result[0] as TextElement;
-        // v7: "Main Title" → headline role → ultra-wide zone → font clamped to fit
-        // zoneH=45, heightFactor=0.45, maxFont=20, scaledFont=20, *maxFontScale(0.6) = 12
-        expect(resultText.fontSize).toBe(12);
+        // scaleX=728/300=2.427, scaleY=90/250=0.36
+        // geometricMean = √(2.427 * 0.36) = √0.8736 = 0.935
+        // expectedFont = round(36 * 0.935) = round(33.65) = 34
+        expect(resultText.fontSize).toBe(34);
     });
 
     it('font never goes below MIN_FONT (8px)', () => {
@@ -423,11 +424,9 @@ describe('smartSizeElements — Template-Proven Scaling (v3)', () => {
         (btn as any).borderRadius = 20;
         const result = smartSizeElements([btn], 300, 250, 728, 90);
         const r = result[0] as any;
-        // v7: cross-category (square→ultra-wide) → postResizeArrange zones
-        // borderRadius scaled by geometric mean inside zone handler
-        const geoScale = Math.sqrt((728/300) * (90/250));
-        const expectedBR = Math.round(20 * geoScale);
-        expect(r.borderRadius).toBe(expectedBR);
+        // geometricMean = √(2.427 * 0.36) = 0.935
+        // borderRadius = round(20 * 0.935) = round(18.7) = 19
+        expect(r.borderRadius).toBe(19);
     });
 });
 
