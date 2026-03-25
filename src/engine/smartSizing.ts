@@ -483,13 +483,39 @@ function applySameCategoryStretch(
     scaleX: number,
     scaleY: number,
     scaleFontRadius: number,
-    _targetW: number,
-    _targetH: number,
+    targetW: number,
+    targetH: number,
 ): DesignElement {
-    const newX = Math.round(abs.x * scaleX);
-    const newY = Math.round(abs.y * scaleY);
-    const newW = Math.max(4, Math.round(abs.w * scaleX));
-    const newH = Math.max(4, Math.round(abs.h * scaleY));
+    // ★ v7b: Content elements (text, image, video, button) use UNIFORM scale
+    // to preserve aspect ratio — never squished/stretched in one direction.
+    // Shapes/decorations keep independent X/Y stretch (they can distort).
+    const isContentElement = el.type === 'text' || el.type === 'image'
+        || el.type === 'video' || el.type === 'button';
+
+    let newX: number, newY: number, newW: number, newH: number;
+
+    if (isContentElement) {
+        // Uniform scale = min of both axes → fits inside target, no distortion
+        const uniformScale = Math.min(scaleX, scaleY);
+        newW = Math.max(4, Math.round(abs.w * uniformScale));
+        newH = Math.max(4, Math.round(abs.h * uniformScale));
+
+        // Position: map center of element proportionally, then offset by half size
+        const centerXRatio = (abs.x + abs.w / 2) / (targetW / scaleX); // 0~1 in original
+        const centerYRatio = (abs.y + abs.h / 2) / (targetH / scaleY); // 0~1 in original
+        newX = Math.round(centerXRatio * targetW - newW / 2);
+        newY = Math.round(centerYRatio * targetH - newH / 2);
+
+        console.log(`[smartSizing]     → UNIFORM: ${el.name} (${el.type}) scale=${uniformScale.toFixed(2)} (${newX},${newY},${newW}x${newH})`);
+    } else {
+        // Shapes/decorations: independent X/Y stretch (fills canvas like painting)
+        newX = Math.round(abs.x * scaleX);
+        newY = Math.round(abs.y * scaleY);
+        newW = Math.max(4, Math.round(abs.w * scaleX));
+        newH = Math.max(4, Math.round(abs.h * scaleY));
+
+        console.log(`[smartSizing]     → STRETCH: ${el.name} (${el.type}) (${newX},${newY},${newW}x${newH})`);
+    }
 
     const newConstraints: ElementConstraints = {
         horizontal: { anchor: 'left' as const, offset: newX },
@@ -511,8 +537,6 @@ function applySameCategoryStretch(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         fontPatch.borderRadius = Math.round((el as any).borderRadius * scaleFontRadius);
     }
-
-    console.log(`[smartSizing]     → SAME: stretch (${newX},${newY},${newW}x${newH})`);
 
     return {
         ...JSON.parse(JSON.stringify(el)),
