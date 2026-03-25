@@ -143,6 +143,25 @@ export const useAuthStore = create<AuthState>()(
                     return;
                 }
 
+                // ★ 7-day session expiry check
+                const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+                const LOGIN_TS_KEY = `ace_login_ts_${session.user.id}`;
+                const loginTs = localStorage.getItem(LOGIN_TS_KEY);
+
+                if (loginTs) {
+                    const age = Date.now() - parseInt(loginTs, 10);
+                    if (age > SESSION_MAX_AGE_MS) {
+                        console.log('[syncSession] Session expired (>7 days). Forcing re-login.');
+                        localStorage.removeItem(LOGIN_TS_KEY);
+                        await sb.auth.signOut();
+                        set({ user: null, session: null, role: null, isLoading: false });
+                        return;
+                    }
+                } else {
+                    // First load after login — record timestamp
+                    localStorage.setItem(LOGIN_TS_KEY, String(Date.now()));
+                }
+
                 const supaUser = session.user;
                 const user: User = {
                     id: supaUser.id,
