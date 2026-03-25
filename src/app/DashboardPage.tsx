@@ -46,7 +46,7 @@ export function DashboardPage() {
     const openCreativeSet = useDesignStore((s) => s.openCreativeSet);
 
     // ★ Plan enforcement
-    const { canCreateSet, remainingSets, planName, remainingAI, limits, isStarter, isAdmin, aiUsagePercent, usage } = usePlanLimits();
+    const { canCreateSet, remainingSets, planName, remainingTokens, limits, isStarter, isAdmin, aiUsagePercent } = usePlanLimits();
     const allSetsCount = useDesignStore(s => Object.keys(s.allCreativeSets).length);
     const [upgradeModal, setUpgradeModal] = useState<{ open: boolean; reason: UpgradeReason }>({
         open: false, reason: 'creative_set_limit',
@@ -235,7 +235,7 @@ export function DashboardPage() {
                                     }} />
                                 </div>
                                 <span style={{ color: aiUsagePercent > 80 ? '#ef4444' : '#e2e8f0', fontWeight: 600, fontSize: 12 }}>
-                                    {remainingAI} left
+                                    {remainingTokens >= 1_000_000 ? `${(remainingTokens / 1_000_000).toFixed(1)}M` : `${Math.round(remainingTokens / 1000)}K`} left
                                 </span>
                             </div>
                             {remainingSets >= 0 && (

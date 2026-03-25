@@ -36,7 +36,7 @@ describe('modelRouter', () => {
         const fast = getModelId('image_fast');
         const quality = getModelId('image_quality');
         expect(fast).not.toBe(quality);
-        expect(fast).toContain('gemini'); // NANO Banana 2.0
+        expect(fast).toContain('flux'); // FLUX.2 Pro — native width/height
         expect(quality).toContain('gemini'); // Gemini 3 Pro Image
     });
 
