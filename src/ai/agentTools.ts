@@ -624,6 +624,26 @@ const generate_full_design: ToolDefinition = {
     category: 'compound',
 };
 
+const generate_campaign: ToolDefinition = {
+    name: 'generate_campaign',
+    description: 'Generate a complete campaign with coordinated creatives across multiple formats (Instagram, Facebook, Twitter, Display, etc.) from a single prompt. Creates matching designs that share a visual identity but are optimized for each format. Use when user says "create a campaign", "make social media ads", or "generate all formats".',
+    parameters: {
+        type: 'object',
+        properties: {
+            prompt: { type: 'string', description: 'Campaign brief describing what to create (e.g. "Black Friday sale, 40% off premium shoes")' },
+            pack: {
+                type: 'string',
+                description: 'Format pack to use',
+                enum: ['social-starter', 'full-social', 'display-pack', 'full-funnel'],
+                default: 'social-starter',
+            },
+            name: { type: 'string', description: 'Optional custom campaign name' },
+        },
+        required: ['prompt'],
+    },
+    category: 'compound',
+};
+
 // Build canvas tools first (these take priority)
 const CANVAS_TOOLS: ToolDefinition[] = [
     // Create
@@ -651,6 +671,8 @@ const CANVAS_TOOLS: ToolDefinition[] = [
     remove_background,
     // Full Design Pipeline
     generate_full_design,
+    // Campaign
+    generate_campaign,
 ];
 
 // Deduplicate: canvas tools take priority, skip dashboard tools with same name

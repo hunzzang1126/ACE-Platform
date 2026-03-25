@@ -469,6 +469,12 @@ export async function executeToolCall(
                 return { success: false, message: 'generate_full_design must be handled by the agent orchestrator. This tool is intercepted at a higher level.' };
             }
 
+            case 'generate_campaign': {
+                // Campaign generation is handled at a higher level (like generate_full_design)
+                // The agent orchestrator intercepts this and calls campaignGenerator.generateCampaign()
+                return { success: false, message: 'generate_campaign must be handled by the agent orchestrator. This tool is intercepted at a higher level.' };
+            }
+
             default:
                 return { success: false, message: `Unknown tool: ${toolName}` };
         }
