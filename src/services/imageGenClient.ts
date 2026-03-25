@@ -173,46 +173,65 @@ async function callImageGenApi(
 
     console.log(`[ImageGen] Calling ${modelId} — "${enhancedPrompt.slice(0, 80)}..."`);
 
-    const res = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body),
-        signal,
-    });
+    // ★ 30-second timeout — prevents infinite hang if model doesn't respond
+    const TIMEOUT_MS = 30_000;
+    const timeoutController = new AbortController();
+    const timeoutId = setTimeout(() => {
+        console.warn(`[ImageGen] ${modelId} timed out after ${TIMEOUT_MS / 1000}s`);
+        timeoutController.abort();
+    }, TIMEOUT_MS);
 
-    if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(`OpenRouter image gen failed (${res.status}): ${errText.slice(0, 200)}`);
+    // Combine external signal with timeout signal
+    const combinedSignal = signal
+        ? AbortSignal.any([signal, timeoutController.signal])
+        : timeoutController.signal;
+
+    try {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(body),
+            signal: combinedSignal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!res.ok) {
+            const errText = await res.text();
+            throw new Error(`OpenRouter image gen failed (${res.status}): ${errText.slice(0, 200)}`);
+        }
+
+        const data = await res.json() as Record<string, unknown>;
+
+        // Extract image from response
+        // OpenRouter returns images in the choices[0].message.content field
+        // as base64 data URLs or as image_url objects
+        const imageUrl = extractImageUrl(data);
+
+        if (!imageUrl) {
+            // ★ Debug: log full response structure so we can diagnose
+            console.error('[ImageGen] FAILED to extract image from response. Full response:', JSON.stringify(data).slice(0, 2000));
+            throw new Error('No image data in API response');
+        }
+
+        // ★ Post-process: resize to exact requested dimensions
+        // Gemini models return arbitrary sizes — force match canvas
+        const resizedUrl = await resizeImageToTarget(
+            imageUrl,
+            request.width,
+            request.height,
+        );
+
+        return {
+            success: true,
+            imageUrl: resizedUrl,
+            model,
+            isFallback: false,
+            message: `Generated ${request.width}x${request.height} image via ${model === 'flux' ? 'Flux Schnell' : 'Imagen 3'}`,
+        };
+    } finally {
+        clearTimeout(timeoutId);
     }
-
-    const data = await res.json() as Record<string, unknown>;
-
-    // Extract image from response
-    // OpenRouter returns images in the choices[0].message.content field
-    // as base64 data URLs or as image_url objects
-    const imageUrl = extractImageUrl(data);
-
-    if (!imageUrl) {
-        // ★ Debug: log full response structure so we can diagnose
-        console.error('[ImageGen] FAILED to extract image from response. Full response:', JSON.stringify(data).slice(0, 2000));
-        throw new Error('No image data in API response');
-    }
-
-    // ★ Post-process: resize to exact requested dimensions
-    // Gemini models return arbitrary sizes — force match canvas
-    const resizedUrl = await resizeImageToTarget(
-        imageUrl,
-        request.width,
-        request.height,
-    );
-
-    return {
-        success: true,
-        imageUrl: resizedUrl,
-        model,
-        isFallback: false,
-        message: `Generated ${request.width}x${request.height} image via ${model === 'flux' ? 'Flux Schnell' : 'Imagen 3'}`,
-    };
 }
 
 /**
