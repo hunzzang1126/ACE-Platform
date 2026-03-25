@@ -294,15 +294,7 @@ export function BannerPreviewGrid({ variants, visibleIds, masterVariantId, onRun
     const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
     const gridContainerRef = useRef<HTMLDivElement>(null);
     const plugConnections = useDesignStore(s => s.creativeSet?.plugConnections) ?? {};
-    const resyncAllPluggedVariants = useDesignStore(s => s.resyncAllPluggedVariants);
-
-    // ★ Auto-resync plugged variants on mount — applies latest smartSizing rules
-    useEffect(() => {
-        if (Object.keys(plugConnections).length > 0) {
-            console.log('[BannerPreviewGrid] Auto-resyncing plugged variants on mount...');
-            resyncAllPluggedVariants();
-        }
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps — intentionally mount-only
+    // ★ REMOVED: auto-resync on mount was overwriting user edits to plugged child variants
 
     // ── Free-form card positions (variant.id → {x, y}) — persisted in store ──
     const storedPositionsRaw = useDesignStore(s => s.creativeSet?.cardPositions);
