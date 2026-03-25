@@ -595,6 +595,20 @@ const replace_background_image: ToolDefinition = {
     category: 'create',
 };
 
+const remove_background: ToolDefinition = {
+    name: 'remove_background',
+    description: 'Remove the background from an image element, making it transparent. Uses client-side AI (WASM, no API cost). Find the image by name or node_id. Use when user says "remove background", "cut out", "make transparent", "isolate the subject".',
+    parameters: {
+        type: 'object',
+        properties: {
+            node_id: { type: 'number', description: 'Node ID of the image element to process' },
+            element_name: { type: 'string', description: 'Name of the image element (alternative to node_id). If both provided, node_id takes priority.' },
+        },
+        required: [],
+    },
+    category: 'effects',
+};
+
 // ── Full Design Pipeline (Meta-Tool) ──────────────
 
 const generate_full_design: ToolDefinition = {
@@ -633,6 +647,8 @@ const CANVAS_TOOLS: ToolDefinition[] = [
     create_layout, animate_all, analyze_scene, render_banner,
     // Image Generation (Atomic)
     generate_image, set_canvas_background, add_image_layer, replace_background_image,
+    // Image Processing
+    remove_background,
     // Full Design Pipeline
     generate_full_design,
 ];
