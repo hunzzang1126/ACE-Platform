@@ -198,9 +198,17 @@ async function callImageGenApi(
         throw new Error('No image data in API response');
     }
 
+    // ★ Post-process: resize to exact requested dimensions
+    // Gemini models return arbitrary sizes — force match canvas
+    const resizedUrl = await resizeImageToTarget(
+        imageUrl,
+        request.width,
+        request.height,
+    );
+
     return {
         success: true,
-        imageUrl,
+        imageUrl: resizedUrl,
         model,
         isFallback: false,
         message: `Generated ${request.width}x${request.height} image via ${model === 'flux' ? 'Flux Schnell' : 'Imagen 3'}`,
@@ -302,6 +310,68 @@ function extractImageUrl(response: Record<string, unknown>): string | null {
     }
 
     return null;
+}
+
+/**
+ * Resize an image data URL to exact target dimensions.
+ * Uses object-fit:cover logic (center crop) to fill without stretching.
+ * ★ Gemini models return arbitrary sizes — this guarantees correct output.
+ */
+async function resizeImageToTarget(
+    imageUrl: string,
+    targetW: number,
+    targetH: number,
+): Promise<string> {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+
+        img.onload = () => {
+            // If already correct size, skip processing
+            if (img.naturalWidth === targetW && img.naturalHeight === targetH) {
+                resolve(imageUrl);
+                return;
+            }
+
+            console.log(`[ImageGen] Resizing ${img.naturalWidth}x${img.naturalHeight} → ${targetW}x${targetH}`);
+
+            const canvas = document.createElement('canvas');
+            canvas.width = targetW;
+            canvas.height = targetH;
+            const ctx = canvas.getContext('2d');
+
+            if (!ctx) {
+                resolve(imageUrl); // Can't resize, return original
+                return;
+            }
+
+            // Object-fit: cover — scale up to fill, center crop overflow
+            const srcAspect = img.naturalWidth / img.naturalHeight;
+            const dstAspect = targetW / targetH;
+
+            let sx = 0, sy = 0, sw = img.naturalWidth, sh = img.naturalHeight;
+
+            if (srcAspect > dstAspect) {
+                // Source is wider — crop sides
+                sw = img.naturalHeight * dstAspect;
+                sx = (img.naturalWidth - sw) / 2;
+            } else {
+                // Source is taller — crop top/bottom
+                sh = img.naturalWidth / dstAspect;
+                sy = (img.naturalHeight - sh) / 2;
+            }
+
+            ctx.drawImage(img, sx, sy, sw, sh, 0, 0, targetW, targetH);
+            resolve(canvas.toDataURL('image/png'));
+        };
+
+        img.onerror = () => {
+            console.warn('[ImageGen] Could not load image for resizing');
+            resolve(imageUrl); // Return original on error
+        };
+
+        img.src = imageUrl;
+    });
 }
 
 /**
