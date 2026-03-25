@@ -20,8 +20,10 @@ import { ExportPanel } from '@/components/editor/ExportPanel';
 import { CanvasRuler } from '@/components/editor/CanvasRuler';
 import { KeyframeInspector } from '@/components/editor/KeyframeInspector';
 import { BrandCompliancePanel } from '@/components/editor/BrandCompliancePanel';
+import { DesignScorePanel, DesignScoreBadge } from '@/components/panels/DesignScorePanel';
 import { AuthModal } from '@/components/editor/AuthModal';
 import { useFabricCanvas } from '@/hooks/useFabricCanvas';
+import { useDesignScore } from '@/hooks/useDesignScore';
 import { useOverlayElements } from '@/hooks/useOverlayElements';
 import { useCanvasSync } from '@/hooks/useCanvasSync';
 import { exportToHtml5, exportToImage, downloadExport } from '@/engine/html5Exporter';
@@ -46,6 +48,8 @@ export function DetailEditorPage() {
     const toggleExportPanel = useUIStore(s => s.toggleExportPanel);
     const toggleKeyframeInspector = useUIStore(s => s.toggleKeyframeInspector);
     const toggleBrandCompliance = useUIStore(s => s.toggleBrandCompliance);
+    const designScoreOpen = useUIStore(s => s.designScoreOpen);
+    const toggleDesignScore = useUIStore(s => s.toggleDesignScore);
     const toggleAuthModal = useUIStore(s => s.toggleAuthModal);
 
     // ── Template editing mode (admin) ──
@@ -85,7 +89,10 @@ export function DetailEditorPage() {
     // ── Overlay elements (text + images) ──
     const overlay = useOverlayElements(width, height);
 
-    // ── Canvas ↔ Store sync ──
+    // ── AI Creative Director: real-time design scoring ──
+    const { score: designScore } = useDesignScore(state.nodes, width, height);
+
+    // ── Canvas <--> Store sync ──
     const { saveToStore, saveFromCachedNodes, restoreFromStore } = useCanvasSync(variantId, width, height);
 
     // Prevent double-restore (React strict mode)
@@ -467,6 +474,11 @@ export function DetailEditorPage() {
                         : saveStatus === 'saved' ? (editingTemplateId ? 'Template Updated' : 'Done: Saved')
                             : (editingTemplateId ? 'Save Template' : 'Save')}
                 </button>
+                {/* Design Score Badge — always visible */}
+                <DesignScoreBadge
+                    total={designScore.total}
+                    onClick={toggleDesignScore}
+                />
             </EditorTopBar>
             <div className="ed-body">
                 <EditorSidebar
@@ -515,6 +527,13 @@ export function DetailEditorPage() {
                         onExportJPG={handleExportJPG}
                         onExportGIF={() => handleExportGIF()}
                         onClose={toggleExportPanel}
+                    />
+                )}
+                {/* Design Score Panel — AI Creative Director */}
+                {designScoreOpen && (
+                    <DesignScorePanel
+                        score={designScore}
+                        onClose={toggleDesignScore}
                     />
                 )}
             </div>

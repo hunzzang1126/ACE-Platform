@@ -15,6 +15,7 @@ interface UIState {
     canvasRulerVisible: boolean;
     authModalOpen: boolean;
     keyframeInspectorOpen: boolean;
+    designScoreOpen: boolean;
     /** Canva-style sidebar — which panel tab is open (null = collapsed) */
     activeSidebarTab: string | null;
     /** Inline panel opened from context toolbar (Effects/Animate/Position) */
@@ -32,6 +33,7 @@ interface UIState {
     toggleCanvasRuler: () => void;
     toggleAuthModal: () => void;
     toggleKeyframeInspector: () => void;
+    toggleDesignScore: () => void;
     toggleSidebarTab: (tab: string) => void;
     setInlinePanel: (panel: 'effects' | 'animate' | 'position' | null) => void;
     showNotification: (message: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
@@ -49,6 +51,7 @@ export const useUIStore = create<UIState>()((set) => ({
     canvasRulerVisible: false,
     authModalOpen: false,
     keyframeInspectorOpen: false,
+    designScoreOpen: false,
     activeSidebarTab: null,
     activeInlinePanel: null,
     notification: null,
@@ -63,6 +66,7 @@ export const useUIStore = create<UIState>()((set) => ({
     toggleCanvasRuler: () => set((s) => ({ canvasRulerVisible: !s.canvasRulerVisible })),
     toggleAuthModal: () => set((s) => ({ authModalOpen: !s.authModalOpen })),
     toggleKeyframeInspector: () => set((s) => ({ keyframeInspectorOpen: !s.keyframeInspectorOpen })),
+    toggleDesignScore: () => set((s) => ({ designScoreOpen: !s.designScoreOpen })),
     toggleSidebarTab: (tab: string) => set((s) => ({
         activeSidebarTab: s.activeSidebarTab === tab ? null : tab,
         activeInlinePanel: null, // close inline panel when switching tabs
