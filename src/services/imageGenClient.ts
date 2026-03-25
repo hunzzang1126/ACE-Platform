@@ -85,18 +85,11 @@ export async function generateImage(
     try {
         return await callImageGenApi(request, model, signal);
     } catch (err) {
-        console.warn(`[ImageGen] ${model} failed, trying fallback model:`, err);
-
-        // ★ Try the other model before falling back to gradient
-        const fallbackModel = model === 'imagen' ? 'flux' : 'imagen';
-        try {
-            return await callImageGenApi(request, fallbackModel as 'flux' | 'imagen', signal);
-        } catch (err2) {
-            console.warn(`[ImageGen] ${fallbackModel} also failed, using gradient fallback:`, err2);
-            const fallback = generateFallbackImage(request);
-            fallback.message = `Both models failed, using gradient fallback`;
-            return fallback;
-        }
+        // ★ ONE attempt only. Fail → gradient immediately. No retry = no extra cost.
+        console.warn(`[ImageGen] ${model} failed — using gradient fallback:`, err);
+        const fallback = generateFallbackImage(request);
+        fallback.message = `Image API failed, using gradient fallback`;
+        return fallback;
     }
 }
 
