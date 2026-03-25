@@ -54,18 +54,29 @@ export function usePlanLimits() {
         if (!sb) return;
 
         (async () => {
-            const { data } = await sb
-                .from('usage_tracking')
-                .select('ai_tokens_used')
-                .eq('user_id', user.id)
-                .eq('month', month)
-                .maybeSingle();
+            try {
+                const { data, error } = await sb
+                    .from('usage_tracking')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .eq('month', month)
+                    .maybeSingle();
 
-            if (data) {
-                setUsage(prev => ({
-                    ...prev,
-                    aiTokensUsed: data.ai_tokens_used ?? 0,
-                }));
+                if (error) {
+                    console.warn('[usePlanLimits] usage_tracking query failed:', error.message);
+                    return;
+                }
+
+                if (data) {
+                    // Accept either column name: ai_tokens_used or tokens_used
+                    const tokens = data.ai_tokens_used ?? data.tokens_used ?? 0;
+                    setUsage(prev => ({
+                        ...prev,
+                        aiTokensUsed: tokens,
+                    }));
+                }
+            } catch (e) {
+                console.warn('[usePlanLimits] usage_tracking query exception:', e);
             }
         })();
     }, [user?.id, allSetsCount]);
