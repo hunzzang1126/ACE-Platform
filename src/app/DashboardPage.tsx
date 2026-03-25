@@ -234,7 +234,7 @@ export function DashboardPage() {
                                 }} />
                             </div>
                             <span style={{ color: aiUsagePercent > 80 ? '#ef4444' : '#1a1a2e', fontWeight: 600, fontSize: 12 }}>
-                                {remainingTokens >= 1_000_000 ? `${(remainingTokens / 1_000_000).toFixed(1)}M` : `${Math.round(remainingTokens / 1000)}K`} left
+                                {remainingTokens >= 10_000 ? `${(remainingTokens / 1000).toFixed(0)}K` : remainingTokens} left
                             </span>
                         </div>
                     )}

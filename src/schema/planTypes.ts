@@ -41,7 +41,7 @@ export interface PlanInfo {
 export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
     starter: {
         maxCreativeSets: 3,
-        aiTokensPerMonth: 200_000, // ~50 basic requests via Haiku
+        aiTokensPerMonth: 50, // 50 AI generations/month
         aiModel: 'anthropic/claude-3.5-haiku',
         maxVariantsPerSet: 3,
         allowedExports: ['png'],
@@ -50,7 +50,7 @@ export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
     },
     pro: {
         maxCreativeSets: -1,
-        aiTokensPerMonth: 2_000_000, // ~500 requests via Sonnet 4
+        aiTokensPerMonth: 500, // 500 AI generations/month
         aiModel: 'anthropic/claude-sonnet-4',
         maxVariantsPerSet: -1,
         allowedExports: ['png', 'jpg', 'html5'],
@@ -59,7 +59,7 @@ export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
     },
     enterprise: {
         maxCreativeSets: -1,
-        aiTokensPerMonth: 10_000_000,
+        aiTokensPerMonth: 5_000, // 5000 AI generations/month
         aiModel: 'anthropic/claude-sonnet-4',
         maxVariantsPerSet: -1,
         allowedExports: ['png', 'jpg', 'html5', 'gif', 'mp4', 'js_bundle'],

@@ -68,11 +68,10 @@ export function usePlanLimits() {
                 }
 
                 if (data) {
-                    // Accept either column name: ai_tokens_used or tokens_used
-                    const tokens = data.ai_tokens_used ?? data.tokens_used ?? 0;
+                    const used = data.ai_generations_used ?? 0;
                     setUsage(prev => ({
                         ...prev,
-                        aiTokensUsed: tokens,
+                        aiTokensUsed: used,
                     }));
                 }
             } catch (e) {
@@ -119,9 +118,9 @@ export function usePlanLimits() {
         const sb = getSupabase();
         if (sb && user?.id) {
             try {
-                await sb.rpc('increment_ai_token_usage', {
+                await sb.rpc('increment_ai_usage', {
                     p_user_id: user.id,
-                    p_tokens: tokenCount,
+                    p_count: tokenCount,
                 });
             } catch (err) {
                 console.error('[usePlanLimits] Failed to record AI token usage:', err);
