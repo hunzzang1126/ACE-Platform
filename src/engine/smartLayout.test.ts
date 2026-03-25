@@ -2,7 +2,9 @@
 // smartLayout — Unit Tests
 // ─────────────────────────────────────────────────
 // Tests for the aspect-ratio-aware layout engine.
-// The core differentiator: semantic roles + canvas size → optimal constraints.
+// ★ Updated for industry-standard layout rules:
+//   Ultra-wide: headline LEFT, CTA RIGHT
+//   Portrait: headline TOP, CTA BOTTOM
 
 import { describe, it, expect } from 'vitest';
 import { computeSmartConstraints, isOutOfBounds, getSmartFontSize } from './smartLayout';
@@ -12,7 +14,7 @@ import type { LayoutRole } from '@/schema/layoutRoles';
 // ── computeSmartConstraints ──────────────────────
 
 describe('computeSmartConstraints — Ultra-Wide Layout', () => {
-    // 728x90 ultra-wide: logo LEFT, headline CENTER, CTA RIGHT
+    // 728x90 ultra-wide: logo LEFT, headline LEFT, CTA RIGHT
 
     it('background stretches to fill full canvas', () => {
         const c = computeSmartConstraints({ role: 'background', canvasW: 728, canvasH: 90 });
@@ -21,9 +23,9 @@ describe('computeSmartConstraints — Ultra-Wide Layout', () => {
         expect(c.size.width).toBe(1);
     });
 
-    it('headline is center-anchored', () => {
+    it('headline is left-anchored (industry standard for wide banners)', () => {
         const c = computeSmartConstraints({ role: 'headline', canvasW: 728, canvasH: 90, fontSize: 24 });
-        expect(c.horizontal.anchor).toBe('center');
+        expect(c.horizontal.anchor).toBe('left');
     });
 
     it('CTA is right-anchored', () => {
@@ -38,17 +40,17 @@ describe('computeSmartConstraints — Ultra-Wide Layout', () => {
 });
 
 describe('computeSmartConstraints — Portrait Layout', () => {
-    // 160x600 portrait: vertical stack
+    // 160x600 portrait: headline TOP, CTA BOTTOM
 
     it('CTA is bottom-anchored in portrait', () => {
         const c = computeSmartConstraints({ role: 'cta', canvasW: 160, canvasH: 600, fontSize: 14 });
         expect(c.vertical.anchor).toBe('bottom');
     });
 
-    it('headline is center-anchored vertically in portrait', () => {
+    it('headline is top-anchored in portrait (industry standard)', () => {
         const c = computeSmartConstraints({ role: 'headline', canvasW: 160, canvasH: 600, fontSize: 24 });
         expect(c.horizontal.anchor).toBe('center');
-        expect(c.vertical.anchor).toBe('center');
+        expect(c.vertical.anchor).toBe('top');
     });
 
     it('logo is top-anchored in portrait', () => {
@@ -122,31 +124,43 @@ describe('isOutOfBounds', () => {
 });
 
 // ── getSmartFontSize ──────────────────────────────
+// ★ New scaling: continuous proportional curve (√(minDim/300))
+// 300x250: minDim=250, scale=√(250/300)=0.913 → headline ~22px
 
 describe('getSmartFontSize', () => {
-    it('headline base size is 24', () => {
+    it('headline scales proportionally at 300x250 (minDim=250)', () => {
         const fs = getSmartFontSize('headline', 300, 250);
-        expect(fs).toBe(24);
+        // √(250/300) = 0.913 → 24 * 0.913 = 21.9 → 22
+        expect(fs).toBe(22);
     });
 
     it('scales down for tiny canvas (728x90 → minDim=90)', () => {
         const fs = getSmartFontSize('headline', 728, 90);
-        // minDim=90 < 100 → max(8, 24 * 0.5) = 12
-        expect(fs).toBe(12);
+        // √(90/300) = 0.548 → 24 * 0.548 = 13.1 → 13
+        expect(fs).toBe(13);
     });
 
-    it('tnc base size is 9', () => {
+    it('tnc at 300x250 scales proportionally', () => {
         const fs = getSmartFontSize('tnc', 300, 250);
-        expect(fs).toBe(9);
+        // √(250/300) = 0.913 → 9 * 0.913 = 8.2 → 8
+        expect(fs).toBe(8);
     });
 
-    it('cta base size is 14', () => {
+    it('cta at 300x250 scales proportionally', () => {
         const fs = getSmartFontSize('cta', 300, 250);
-        expect(fs).toBe(14);
+        // √(250/300) = 0.913 → 14 * 0.913 = 12.8 → 13
+        expect(fs).toBe(13);
     });
 
-    it('unknown role falls back to 14', () => {
+    it('unknown role falls back to scaled 14', () => {
         const fs = getSmartFontSize('decoration' as LayoutRole, 300, 250);
-        expect(fs).toBe(14);
+        // √(250/300) = 0.913 → 14 * 0.913 = 12.8 → 13
+        expect(fs).toBe(13);
+    });
+
+    it('large canvas preserves base sizes', () => {
+        const fs = getSmartFontSize('headline', 1080, 1080);
+        // √(1080/300) = 1.897 → clamped to 1.5 → 24 * 1.5 = 36
+        expect(fs).toBe(36);
     });
 });

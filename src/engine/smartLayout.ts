@@ -1,14 +1,11 @@
 // ─────────────────────────────────────────────────
 // Smart Layout Engine — Aspect-Ratio-Aware Element Positioning
 // ─────────────────────────────────────────────────
-// The core differentiator of Glid: given an element's semantic role
-// and a target canvas size, compute the optimal constraints.
-//
-// Layout patterns:
-//   ULTRA-WIDE (970×250, 728×90): horizontal flow — logo LEFT, headline CENTER, CTA RIGHT
-//   LANDSCAPE  (300×250, 336×280): vertical stack — centered, standard hierarchy
-//   SQUARE     (250×250):          compact vertical stack
-//   PORTRAIT   (160×600, 120×600): tall vertical — logo TOP, headline MULTI-LINE, CTA BOTTOM
+// Industry-standard layout rules:
+//   ULTRA-WIDE (970×250, 728×90): HORIZONTAL — logo+headline LEFT, message CENTER, CTA RIGHT
+//   LANDSCAPE  (300×250, 336×280): VERTICAL STACK — headline top-center, message mid, CTA bottom
+//   SQUARE     (250×250, 1080×1080): CENTERED STACK — headline top, message center, CTA bottom
+//   PORTRAIT   (160×600, 120×600): VERTICAL — headline TOP, message CENTER, CTA BOTTOM
 // ─────────────────────────────────────────────────
 
 import type { ElementConstraints } from '@/schema/constraints.types';
@@ -18,19 +15,14 @@ import { getAspectCategory } from '@/schema/layoutRoles';
 
 /**
  * Extra props needed for smart constraint computation.
- * These come from the element being positioned.
  */
 export interface SmartLayoutInput {
     role: LayoutRole;
     canvasW: number;
     canvasH: number;
-    /** Element's current/desired width (px) — used for fixed-size elements */
     elWidth?: number;
-    /** Element's current/desired height (px) */
     elHeight?: number;
-    /** Font size (for text/button elements) */
     fontSize?: number;
-    /** Number of text lines to allocate vertical space for */
     lineCount?: number;
 }
 
@@ -40,12 +32,17 @@ function clamp(val: number, min: number, max: number): number {
     return Math.max(min, Math.min(max, val));
 }
 
-/** Compute a reasonable font size given canvas dimensions */
+/**
+ * Scale font size proportionally to canvas dimensions.
+ * Uses the smaller dimension as the scaling reference.
+ * ★ Fixed: old version used stepwise multipliers (0.5, 0.7).
+ *   New version uses a continuous curve relative to 300px reference.
+ */
 function scaledFontSize(base: number, canvasW: number, canvasH: number): number {
     const minDim = Math.min(canvasW, canvasH);
-    if (minDim < 100) return Math.max(8, base * 0.5);
-    if (minDim < 200) return Math.max(9, base * 0.7);
-    return base;
+    // Scale proportionally: at 300px → 1.0x, at 50px → ~0.4x, at 600px → ~1.3x
+    const scale = clamp(Math.pow(minDim / 300, 0.5), 0.35, 1.5);
+    return Math.max(8, Math.round(base * scale));
 }
 
 /** Compute text element height given font size and line count */
@@ -66,64 +63,78 @@ interface PositionRule {
     maxLines?: number;      // forced line count for text reflow
 }
 
-// ── ULTRA-WIDE: logo LEFT — headline CENTER — CTA RIGHT ──
+// ─────────────────────────────────────────────────
+// ★ ULTRA-WIDE (970×250, 728×90, 320×50):
+//   HORIZONTAL FLOW — logo+headline LEFT, message CENTER, CTA RIGHT
+//   This is the global standard for leaderboard/billboard banners.
+// ─────────────────────────────────────────────────
 
 const ULTRA_WIDE_RULES: Partial<Record<LayoutRole, PositionRule>> = {
     background: { hAnchor: 'stretch', hOffsetPct: 0, vAnchor: 'top', vOffsetPct: 0, widthPct: 1, heightPct: 1 },
-    accent: { hAnchor: 'stretch', hOffsetPct: 0, vAnchor: 'top', vOffsetPct: 0, widthPct: 1, heightPct: 0.14 },
-    logo: { hAnchor: 'left', hOffsetPct: 0.03, vAnchor: 'center', vOffsetPct: 0, widthPct: 0.15, heightPct: 0 },
-    headline: { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'center', vOffsetPct: -0.08, widthPct: 0.45, heightPct: 0, fontScale: 0.9, maxLines: 1 },
-    subline: { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'center', vOffsetPct: 0.12, widthPct: 0.4, heightPct: 0, fontScale: 0.85 },
-    detail: { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'center', vOffsetPct: 0.25, widthPct: 0.35, heightPct: 0, fontScale: 0.8 },
-    cta: { hAnchor: 'right', hOffsetPct: 0.04, vAnchor: 'center', vOffsetPct: 0, widthPct: 0.18, heightPct: 0 },
-    tnc: { hAnchor: 'right', hOffsetPct: 0.03, vAnchor: 'bottom', vOffsetPct: 0.04, widthPct: 0.25, heightPct: 0, fontScale: 0.6 },
-    hero: { hAnchor: 'left', hOffsetPct: 0.02, vAnchor: 'center', vOffsetPct: 0, widthPct: 0.3, heightPct: 0.85 },
-    badge: { hAnchor: 'right', hOffsetPct: 0.02, vAnchor: 'top', vOffsetPct: 0.05, widthPct: 0.1, heightPct: 0 },
+    accent:     { hAnchor: 'stretch', hOffsetPct: 0, vAnchor: 'top', vOffsetPct: 0, widthPct: 1, heightPct: 0.14 },
+    logo:       { hAnchor: 'left', hOffsetPct: 0.02, vAnchor: 'center', vOffsetPct: 0, widthPct: 0.12, heightPct: 0 },
+    headline:   { hAnchor: 'left', hOffsetPct: 0.16, vAnchor: 'center', vOffsetPct: -0.06, widthPct: 0.32, heightPct: 0, fontScale: 0.85, maxLines: 1 },
+    subline:    { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'center', vOffsetPct: 0.06, widthPct: 0.35, heightPct: 0, fontScale: 0.7 },
+    detail:     { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'center', vOffsetPct: 0.18, widthPct: 0.30, heightPct: 0, fontScale: 0.6 },
+    cta:        { hAnchor: 'right', hOffsetPct: 0.03, vAnchor: 'center', vOffsetPct: 0, widthPct: 0.16, heightPct: 0 },
+    tnc:        { hAnchor: 'right', hOffsetPct: 0.02, vAnchor: 'bottom', vOffsetPct: 0.03, widthPct: 0.20, heightPct: 0, fontScale: 0.5 },
+    hero:       { hAnchor: 'left', hOffsetPct: 0.01, vAnchor: 'center', vOffsetPct: 0, widthPct: 0.25, heightPct: 0.9 },
+    badge:      { hAnchor: 'right', hOffsetPct: 0.01, vAnchor: 'top', vOffsetPct: 0.04, widthPct: 0.08, heightPct: 0 },
 };
 
-// ── LANDSCAPE: standard vertical stack, centered ──
+// ─────────────────────────────────────────────────
+// ★ LANDSCAPE (300×250, 336×280):
+//   VERTICAL STACK — headline near top, message middle, CTA bottom
+// ─────────────────────────────────────────────────
 
 const LANDSCAPE_RULES: Partial<Record<LayoutRole, PositionRule>> = {
     background: { hAnchor: 'stretch', hOffsetPct: 0, vAnchor: 'top', vOffsetPct: 0, widthPct: 1, heightPct: 1 },
-    accent: { hAnchor: 'stretch', hOffsetPct: 0, vAnchor: 'top', vOffsetPct: 0, widthPct: 1, heightPct: 0.12 },
-    logo: { hAnchor: 'left', hOffsetPct: 0.04, vAnchor: 'top', vOffsetPct: 0.04, widthPct: 0.25, heightPct: 0 },
-    headline: { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'top', vOffsetPct: 0.18, widthPct: 0.85, heightPct: 0, maxLines: 2 },
-    subline: { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'top', vOffsetPct: 0.38, widthPct: 0.8, heightPct: 0, fontScale: 0.85 },
-    detail: { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'top', vOffsetPct: 0.52, widthPct: 0.75, heightPct: 0, fontScale: 0.8 },
-    cta: { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'bottom', vOffsetPct: 0.14, widthPct: 0.55, heightPct: 0 },
-    tnc: { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'bottom', vOffsetPct: 0.03, widthPct: 0.8, heightPct: 0, fontScale: 0.65 },
-    hero: { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'center', vOffsetPct: 0, widthPct: 0.9, heightPct: 0.5 },
-    badge: { hAnchor: 'right', hOffsetPct: 0.03, vAnchor: 'top', vOffsetPct: 0.03, widthPct: 0.15, heightPct: 0 },
+    accent:     { hAnchor: 'stretch', hOffsetPct: 0, vAnchor: 'top', vOffsetPct: 0, widthPct: 1, heightPct: 0.10 },
+    logo:       { hAnchor: 'left', hOffsetPct: 0.04, vAnchor: 'top', vOffsetPct: 0.04, widthPct: 0.22, heightPct: 0 },
+    headline:   { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'top', vOffsetPct: 0.15, widthPct: 0.85, heightPct: 0, maxLines: 2 },
+    subline:    { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'top', vOffsetPct: 0.42, widthPct: 0.80, heightPct: 0, fontScale: 0.85 },
+    detail:     { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'top', vOffsetPct: 0.55, widthPct: 0.75, heightPct: 0, fontScale: 0.75 },
+    cta:        { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'bottom', vOffsetPct: 0.12, widthPct: 0.55, heightPct: 0 },
+    tnc:        { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'bottom', vOffsetPct: 0.02, widthPct: 0.80, heightPct: 0, fontScale: 0.60 },
+    hero:       { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'center', vOffsetPct: 0, widthPct: 0.90, heightPct: 0.45 },
+    badge:      { hAnchor: 'right', hOffsetPct: 0.03, vAnchor: 'top', vOffsetPct: 0.03, widthPct: 0.14, heightPct: 0 },
 };
 
-// ── SQUARE: compact vertical stack ──
+// ─────────────────────────────────────────────────
+// ★ SQUARE (250×250, 1080×1080):
+//   CENTERED STACK — compact, everything center-aligned
+// ─────────────────────────────────────────────────
 
 const SQUARE_RULES: Partial<Record<LayoutRole, PositionRule>> = {
     background: { hAnchor: 'stretch', hOffsetPct: 0, vAnchor: 'top', vOffsetPct: 0, widthPct: 1, heightPct: 1 },
-    accent: { hAnchor: 'stretch', hOffsetPct: 0, vAnchor: 'top', vOffsetPct: 0, widthPct: 1, heightPct: 0.1 },
-    logo: { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'top', vOffsetPct: 0.05, widthPct: 0.3, heightPct: 0 },
-    headline: { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'top', vOffsetPct: 0.2, widthPct: 0.85, heightPct: 0, maxLines: 2 },
-    subline: { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'top', vOffsetPct: 0.42, widthPct: 0.8, heightPct: 0, fontScale: 0.85 },
-    detail: { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'center', vOffsetPct: 0.1, widthPct: 0.75, heightPct: 0, fontScale: 0.8 },
-    cta: { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'bottom', vOffsetPct: 0.14, widthPct: 0.6, heightPct: 0 },
-    tnc: { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'bottom', vOffsetPct: 0.03, widthPct: 0.85, heightPct: 0, fontScale: 0.65 },
-    hero: { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'center', vOffsetPct: -0.05, widthPct: 0.9, heightPct: 0.45 },
-    badge: { hAnchor: 'right', hOffsetPct: 0.03, vAnchor: 'top', vOffsetPct: 0.03, widthPct: 0.18, heightPct: 0 },
+    accent:     { hAnchor: 'stretch', hOffsetPct: 0, vAnchor: 'top', vOffsetPct: 0, widthPct: 1, heightPct: 0.08 },
+    logo:       { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'top', vOffsetPct: 0.04, widthPct: 0.28, heightPct: 0 },
+    headline:   { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'top', vOffsetPct: 0.18, widthPct: 0.85, heightPct: 0, maxLines: 2 },
+    subline:    { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'top', vOffsetPct: 0.42, widthPct: 0.80, heightPct: 0, fontScale: 0.85 },
+    detail:     { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'center', vOffsetPct: 0.08, widthPct: 0.75, heightPct: 0, fontScale: 0.75 },
+    cta:        { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'bottom', vOffsetPct: 0.12, widthPct: 0.55, heightPct: 0 },
+    tnc:        { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'bottom', vOffsetPct: 0.02, widthPct: 0.85, heightPct: 0, fontScale: 0.60 },
+    hero:       { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'center', vOffsetPct: -0.05, widthPct: 0.90, heightPct: 0.42 },
+    badge:      { hAnchor: 'right', hOffsetPct: 0.03, vAnchor: 'top', vOffsetPct: 0.03, widthPct: 0.16, heightPct: 0 },
 };
 
-// ── PORTRAIT: logo TOP — headline MULTI-LINE CENTER — CTA BOTTOM ──
+// ─────────────────────────────────────────────────
+// ★ PORTRAIT (160×600, 120×600, 300×600):
+//   VERTICAL — headline TOP, message CENTER, CTA BOTTOM
+//   All elements center-aligned horizontally for clean reading flow.
+// ─────────────────────────────────────────────────
 
 const PORTRAIT_RULES: Partial<Record<LayoutRole, PositionRule>> = {
     background: { hAnchor: 'stretch', hOffsetPct: 0, vAnchor: 'top', vOffsetPct: 0, widthPct: 1, heightPct: 1 },
-    accent: { hAnchor: 'stretch', hOffsetPct: 0, vAnchor: 'top', vOffsetPct: 0, widthPct: 1, heightPct: 0.05 },
-    logo: { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'top', vOffsetPct: 0.04, widthPct: 0.5, heightPct: 0 },
-    headline: { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'center', vOffsetPct: -0.1, widthPct: 0.85, heightPct: 0, fontScale: 0.8, maxLines: 3 },
-    subline: { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'center', vOffsetPct: 0.08, widthPct: 0.8, heightPct: 0, fontScale: 0.75 },
-    detail: { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'center', vOffsetPct: 0.18, widthPct: 0.75, heightPct: 0, fontScale: 0.7 },
-    cta: { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'bottom', vOffsetPct: 0.1, widthPct: 0.7, heightPct: 0 },
-    tnc: { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'bottom', vOffsetPct: 0.02, widthPct: 0.85, heightPct: 0, fontScale: 0.6 },
-    hero: { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'top', vOffsetPct: 0.1, widthPct: 0.9, heightPct: 0.3 },
-    badge: { hAnchor: 'right', hOffsetPct: 0.05, vAnchor: 'top', vOffsetPct: 0.03, widthPct: 0.25, heightPct: 0 },
+    accent:     { hAnchor: 'stretch', hOffsetPct: 0, vAnchor: 'top', vOffsetPct: 0, widthPct: 1, heightPct: 0.04 },
+    logo:       { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'top', vOffsetPct: 0.03, widthPct: 0.50, heightPct: 0 },
+    headline:   { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'top', vOffsetPct: 0.12, widthPct: 0.88, heightPct: 0, fontScale: 0.75, maxLines: 3 },
+    subline:    { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'top', vOffsetPct: 0.35, widthPct: 0.85, heightPct: 0, fontScale: 0.65 },
+    detail:     { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'center', vOffsetPct: 0, widthPct: 0.82, heightPct: 0, fontScale: 0.60 },
+    cta:        { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'bottom', vOffsetPct: 0.12, widthPct: 0.70, heightPct: 0 },
+    tnc:        { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'bottom', vOffsetPct: 0.03, widthPct: 0.85, heightPct: 0, fontScale: 0.50 },
+    hero:       { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'top', vOffsetPct: 0.08, widthPct: 0.92, heightPct: 0.25 },
+    badge:      { hAnchor: 'center', hOffsetPct: 0, vAnchor: 'top', vOffsetPct: 0.02, widthPct: 0.30, heightPct: 0 },
 };
 
 const RULES_BY_CATEGORY: Record<AspectCategory, Partial<Record<LayoutRole, PositionRule>>> = {
@@ -139,10 +150,9 @@ const RULES_BY_CATEGORY: Record<AspectCategory, Partial<Record<LayoutRole, Posit
  * Compute optimal constraints for an element based on its semantic role
  * and the target canvas size.
  *
- * This is the core of Glid Smart Sizing — it knows that:
- * - Ultra-wide: logo LEFT, headline CENTER, CTA RIGHT
- * - Portrait:   logo TOP, headline MULTI-LINE CENTER, CTA BOTTOM
- * - Landscape:  standard vertical stack
+ * ★ Industry-standard layout patterns:
+ * - Ultra-wide: logo+headline LEFT, message CENTER, CTA RIGHT
+ * - Portrait:   headline TOP, message CENTER, CTA BOTTOM
  */
 export function computeSmartConstraints(input: SmartLayoutInput): ElementConstraints {
     const { role, canvasW, canvasH, fontSize: baseFontSize } = input;
@@ -237,16 +247,15 @@ export function isOutOfBounds(
     canvasW: number,
     canvasH: number,
 ): boolean {
-    // Use the already-imported resolveConstraints to get actual coordinates
     const resolved = resolveConstraints(constraints, canvasW, canvasH);
     return resolved.x + resolved.width < 0 || resolved.y + resolved.height < 0 || resolved.x > canvasW || resolved.y > canvasH;
 }
 
 /**
  * Get the recommended font size for a given role in a canvas.
+ * ★ Fixed: uses continuous scaling instead of stepwise multipliers.
  */
 export function getSmartFontSize(role: LayoutRole, canvasW: number, canvasH: number): number {
-    const minDim = Math.min(canvasW, canvasH);
     const baseSizes: Partial<Record<LayoutRole, number>> = {
         headline: 24,
         subline: 16,
