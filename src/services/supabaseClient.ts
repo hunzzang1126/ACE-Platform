@@ -197,31 +197,17 @@ export async function markOnboardingComplete(
     if (!sb) return;
 
     try {
-        // ★ .select() forces PostgREST to return updated rows — detects RLS silent blocking
-        const { data, error } = await sb
-            .from('user_roles')
-            .update({
-                has_completed_onboarding: true,
-                preferred_language: preferredLanguage,
-            })
-            .eq('user_id', userId)
-            .select('user_id, has_completed_onboarding, preferred_language');
+        // ★ Uses SECURITY DEFINER RPC to bypass RLS safely
+        // The function only updates the calling user's own row
+        const { error } = await sb.rpc('complete_onboarding', {
+            p_language: preferredLanguage,
+        });
 
         if (error) {
-            console.error('[markOnboardingComplete] Supabase ERROR:', error.message, error.details, error.hint);
-            return;
+            console.error('[markOnboardingComplete] RPC ERROR:', error.message, error.details, error.hint);
+        } else {
+            console.log('[markOnboardingComplete] SUCCESS via RPC for userId:', userId);
         }
-
-        if (!data || data.length === 0) {
-            console.error(
-                '[markOnboardingComplete] RLS BLOCKED — update succeeded but 0 rows returned.',
-                'You need to add an UPDATE policy on user_roles:',
-                'CREATE POLICY "Users can update own onboarding" ON user_roles FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);',
-            );
-            return;
-        }
-
-        console.log('[markOnboardingComplete] SUCCESS — updated row:', data[0]);
     } catch (e) {
         console.error('[markOnboardingComplete] EXCEPTION:', e);
     }
