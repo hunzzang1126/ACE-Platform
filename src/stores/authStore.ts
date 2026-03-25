@@ -191,6 +191,25 @@ export const useAuthStore = create<AuthState>()(
                 const role = await fetchUserRole(supaUser.id);
                 console.log('[syncSession] Role result:', role);
 
+                // ★ Sync onboarding status from Supabase → localStorage
+                // This ensures cache-clear doesn't re-trigger onboarding
+                try {
+                    const { fetchOnboardingStatus } = await import('@/services/supabaseClient');
+                    const { loadUserPrefs, saveUserPrefs } = await import('@/stores/userPrefs');
+                    const sbStatus = await fetchOnboardingStatus(supaUser.id);
+                    if (sbStatus?.hasCompletedOnboarding) {
+                        const prefs = loadUserPrefs(supaUser.id);
+                        if (!prefs.hasCompletedOnboarding) {
+                            prefs.hasCompletedOnboarding = true;
+                            prefs.preferredLanguage = sbStatus.preferredLanguage as typeof prefs.preferredLanguage;
+                            saveUserPrefs(prefs, supaUser.id);
+                            console.log('[syncSession] Synced onboarding status from Supabase → localStorage');
+                        }
+                    }
+                } catch (e) {
+                    console.warn('[syncSession] Onboarding sync failed:', e);
+                }
+
                 set({
                     user,
                     session: {
