@@ -234,7 +234,7 @@ export async function executeToolCall(
                         prompt: `${prompt}. No text, no logos, no watermarks. Professional quality, premium composition.`,
                         width: canvasW,
                         height: canvasH,
-                        model: 'imagen', // ★ Use image_quality for better output
+                        model: 'flux', // ★ FLUX.2 Pro: native width/height support
                         style,
                         negativePrompt: 'text, logos, watermark, low quality, blurry, jpeg artifacts, noise, pixelated',
                     });
@@ -267,7 +267,7 @@ export async function executeToolCall(
                             prompt: `${prompt}. No text, no logos, no watermarks. Professional quality, premium composition.`,
                             width: canvasW,
                             height: canvasH,
-                            model: 'imagen', // ★ Use image_quality for better output
+                            model: 'flux', // ★ FLUX.2 Pro: native width/height support
                             style: 'photography',
                             negativePrompt: 'text, logos, watermark, low quality, blurry, jpeg artifacts, noise, pixelated',
                         });

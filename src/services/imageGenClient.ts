@@ -525,7 +525,7 @@ export async function generateBackgroundImage(
         prompt: enhancedBgPrompt,
         width: genW,
         height: genH,
-        model: 'imagen', // ★ Use image_quality (Gemini 3 Pro) for better output
+        model: 'flux', // ★ FLUX.2 Pro: native width/height support for correct sizing
         colorConstraint: accentColors,
         style: 'photography',
         negativePrompt: 'text, logos, watermark, low quality, blurry, distorted, jpeg artifacts, noise, compression, amateur, stock photo watermark, pixelated, oversaturated',

@@ -85,13 +85,13 @@ const MODEL_CONFIGS: Record<AceModelRole, ModelConfig> = {
         costPer1MOutput: 15.00,
     },
     image_fast: {
-        // NANO Banana 2.0 — Gemini 2.5 Flash Image
-        id: 'google/gemini-2.5-flash-image',
-        name: 'NANO Banana 2.0',
+        // FLUX.2 Pro — native width/height support, fast, reliable
+        id: 'black-forest-labs/flux.2-pro',
+        name: 'FLUX.2 Pro',
         maxTokens: 0,
         supportsVision: false,
         supportsTools: false,
-        costPer1MInput: 0.0000003,
+        costPer1MInput: 0.000003,
         costPer1MOutput: 0,
     },
     image_quality: {
