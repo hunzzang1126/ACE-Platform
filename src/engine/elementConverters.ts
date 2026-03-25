@@ -76,12 +76,15 @@ export function absoluteToConstraints(
     }
 
     // Size constraint — relative for full-canvas, fixed otherwise
+    // ★ REGRESSION GUARD: Use actual w/canvasW ratio, NOT hardcoded 1.0.
+    // Without this, an image stretched to 378px on a 300px canvas saves as
+    // relative:1.0, restoring as 300px instead of 378px → visible width shrink.
     if (coversWidth && coversHeight) {
-        size = { widthMode: 'relative', heightMode: 'relative', width: 1, height: 1 };
+        size = { widthMode: 'relative', heightMode: 'relative', width: w / canvasW, height: h / canvasH };
     } else if (coversWidth) {
-        size = { widthMode: 'relative', heightMode: 'fixed', width: 1, height: Math.round(h) };
+        size = { widthMode: 'relative', heightMode: 'fixed', width: w / canvasW, height: Math.round(h) };
     } else if (coversHeight) {
-        size = { widthMode: 'fixed', heightMode: 'relative', width: Math.round(w), height: 1 };
+        size = { widthMode: 'fixed', heightMode: 'relative', width: Math.round(w), height: h / canvasH };
     } else {
         size = { widthMode: 'fixed', heightMode: 'fixed', width: Math.round(w), height: Math.round(h) };
     }

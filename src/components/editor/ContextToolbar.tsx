@@ -8,12 +8,13 @@
 //   - Common: Position, Effects, Animate
 // ─────────────────────────────────────────────────
 
-import { useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { IcAlignLeft, IcAlignCenterH, IcAlignRight } from '@/components/ui/Icons';
 import { ColorPicker } from '@/components/ui/ColorPicker';
 import { useUIStore } from '@/stores/uiStore';
 import type { EngineNode, CanvasEngineActions } from '@/hooks/canvasTypes';
 import type { OverlayElement } from '@/hooks/useOverlayElements';
+import { removeBackgroundFromUrl, blobToDataUrl } from '@/services/backgroundRemovalService';
 
 // ── Font options ──
 const FONT_FAMILIES = [
@@ -316,10 +317,61 @@ export function ContextToolbar({
                         onChange={handleColorChange}
                     />
                 )}
+                {selectedNode.type === 'image' && selectedNode.src && (
+                    <RemoveBgToolbarBtn
+                        nodeId={selectedNode.id}
+                        imageSrc={selectedNode.src}
+                        actions={actions}
+                    />
+                )}
                 <InlineButtons />
             </div>
         );
     }
 
     return null;
+}
+
+// ── Remove Background button for toolbar ──
+function RemoveBgToolbarBtn({ nodeId, imageSrc, actions }: { nodeId: number; imageSrc: string; actions: CanvasEngineActions }) {
+    const [loading, setLoading] = useState(false);
+
+    const handleRemoveBg = async () => {
+        if (loading) return;
+        setLoading(true);
+        try {
+            const resultBlob = await removeBackgroundFromUrl(imageSrc);
+            const dataUrl = await blobToDataUrl(resultBlob);
+            await actions.replaceImageSrc(nodeId, dataUrl);
+        } catch (err) {
+            console.error('[RemoveBG] Failed:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <button
+            className="ctx-btn ctx-label-btn"
+            onClick={handleRemoveBg}
+            disabled={loading}
+            title="Remove image background (AI)"
+            style={{
+                color: loading ? '#a5b4fc' : '#818cf8',
+                fontWeight: 600,
+                cursor: loading ? 'wait' : 'pointer',
+            }}
+        >
+            {loading ? (
+                <>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite', marginRight: 4 }}>
+                        <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                    </svg>
+                    Removing...
+                </>
+            ) : (
+                'Remove BG'
+            )}
+        </button>
+    );
 }

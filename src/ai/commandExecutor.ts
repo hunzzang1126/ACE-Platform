@@ -475,6 +475,42 @@ export async function executeToolCall(
                 return { success: false, message: 'generate_campaign must be handled by the agent orchestrator. This tool is intercepted at a higher level.' };
             }
 
+            // ── Background Removal (WASM) ─────
+            case 'remove_background': {
+                if (!engine?.replace_image_src) return { success: false, message: 'Canvas engine not available (missing replaceImageSrc)' };
+                const nodeId = params.node_id != null ? num('node_id') : undefined;
+                const elementName = str('element_name');
+
+                // Find the target image node
+                let targetNode: { id: number; src?: string; type: string; name?: string } | undefined;
+                const nodesRaw = engine.get_all_nodes?.();
+                if (nodesRaw) {
+                    const allNodes = JSON.parse(nodesRaw) as Array<{ id: number; src?: string; type: string; name?: string }>;
+                    if (nodeId != null) {
+                        targetNode = allNodes.find(n => n.id === nodeId);
+                    } else if (elementName) {
+                        targetNode = allNodes.find(n => n.name?.toLowerCase().includes(elementName.toLowerCase()) && n.type === 'image');
+                    } else {
+                        // Find first image node
+                        targetNode = allNodes.find(n => n.type === 'image');
+                    }
+                }
+
+                if (!targetNode) return { success: false, message: `Image node not found (node_id=${nodeId}, name=${elementName})` };
+                if (targetNode.type !== 'image') return { success: false, message: `Node ${targetNode.id} is not an image (type: ${targetNode.type})` };
+                if (!targetNode.src) return { success: false, message: `Image node ${targetNode.id} has no source URL` };
+
+                try {
+                    const { removeBackgroundFromUrl, blobToDataUrl } = await import('@/services/backgroundRemovalService');
+                    const resultBlob = await removeBackgroundFromUrl(targetNode.src);
+                    const dataUrl = await blobToDataUrl(resultBlob);
+                    await engine.replace_image_src(targetNode.id, dataUrl);
+                    return { success: true, message: `Background removed from "${targetNode.name ?? targetNode.id}"`, nodeId: targetNode.id };
+                } catch (err) {
+                    return { success: false, message: `Background removal failed: ${err}` };
+                }
+            }
+
             default:
                 return { success: false, message: `Unknown tool: ${toolName}` };
         }
