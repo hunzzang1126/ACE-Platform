@@ -278,6 +278,7 @@ export class AiService {
 
         let rounds = 0;
         let finished = false;
+        const allToolRecords: ToolCallRecord[] = []; // Accumulate across all rounds
 
         await nextFrame();
 
@@ -380,6 +381,9 @@ export class AiService {
                     });
                 }
 
+                // Accumulate for final message
+                allToolRecords.push(...toolRecords);
+
                 // Send tool results back as a user message
                 messages.push({
                     role: 'user',
@@ -421,6 +425,7 @@ export class AiService {
                     role: 'assistant',
                     content,
                     timestamp: Date.now(),
+                    toolCalls: allToolRecords.length > 0 ? allToolRecords : undefined,
                 };
                 this.context.addMessage(assistantMsg);
                 progress.onComplete(assistantMsg);

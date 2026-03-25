@@ -1,10 +1,7 @@
-// ─────────────────────────────────────────────────
-// MessageBubble — Premium chat bubbles
-// ─────────────────────────────────────────────────
-
 import { useState, useRef, useEffect, type CSSProperties } from 'react';
 import type { AgentMessage } from '../../ai/agentContext';
 import type { Suggestion } from '../../ai/suggestions';
+import { promoteToSkill } from '../../ai/skillRegistry';
 
 // ── Message Bubble ──
 
@@ -19,6 +16,11 @@ export function MessageBubble({ message }: { message: AgentMessage }) {
         );
     }
 
+    // Check if this message involved a successful dynamic action
+    const dynamicAction = message.toolCalls?.find(
+        tc => tc.name === 'execute_dynamic_action' && tc.result?.success
+    );
+
     return (
         <div className="ai-bubble ai-bubble-ai">
             <div className="ai-bubble-avatar">
@@ -26,6 +28,12 @@ export function MessageBubble({ message }: { message: AgentMessage }) {
             </div>
             <div className="ai-bubble-body">
                 <TypewriterText text={message.content} speed={12} />
+                {dynamicAction && (
+                    <SkillLearnButton
+                        code={String((dynamicAction.input as Record<string, unknown>)?.code ?? '')}
+                        description={message.content.slice(0, 100)}
+                    />
+                )}
             </div>
         </div>
     );
@@ -81,6 +89,75 @@ export function SuggestionCard({ suggestion, onAction }: { suggestion: Suggestio
             {suggestion.action && (
                 <span className="ai-suggestion-action">{suggestion.action.label}</span>
             )}
+        </button>
+    );
+}
+
+// ── Skill Learn Button (thumbs-up for dynamic actions) ──
+
+function SkillLearnButton({ code, description }: { code: string; description: string }) {
+    const [saved, setSaved] = useState(false);
+    const [saving, setSaving] = useState(false);
+
+    const handleSave = async () => {
+        if (saved || saving) return;
+        setSaving(true);
+
+        // Auto-generate a name from the description
+        const autoName = description
+            .replace(/[^\w\s]/g, '')
+            .split(/\s+/)
+            .slice(0, 4)
+            .join(' ')
+            .trim() || 'Custom Action';
+
+        try {
+            await promoteToSkill(
+                autoName,
+                description,
+                `User validated this pattern with thumbs-up`,
+                [description.slice(0, 60)],
+                code,
+            );
+            setSaved(true);
+        } catch {
+            /* ok */
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <button
+            className="ai-skill-learn-btn"
+            onClick={handleSave}
+            disabled={saved || saving}
+            title={saved ? 'Saved as reusable skill' : 'Save this as a reusable skill'}
+            style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                marginTop: 8,
+                padding: '4px 10px',
+                fontSize: 11,
+                color: saved ? '#10b981' : '#94a3b8',
+                background: saved ? 'rgba(16,185,129,0.08)' : 'rgba(148,163,184,0.06)',
+                border: `1px solid ${saved ? 'rgba(16,185,129,0.2)' : 'rgba(148,163,184,0.1)'}`,
+                borderRadius: 6,
+                cursor: saved ? 'default' : 'pointer',
+                transition: 'all 0.2s ease',
+            }}
+        >
+            {saved ? (
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5">
+                    <path d="M20 6L9 17l-5-5" />
+                </svg>
+            ) : (
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14zM4 22H2V11h2" />
+                </svg>
+            )}
+            {saving ? 'Saving...' : saved ? 'Skill saved' : 'Save as skill'}
         </button>
     );
 }
