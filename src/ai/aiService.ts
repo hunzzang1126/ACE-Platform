@@ -29,8 +29,8 @@ export interface AiConfig {
 
 const DEFAULT_CONFIG: AiConfig = {
     endpoint: 'https://openrouter.ai/api',
-    model: 'anthropic/claude-3.5-haiku', // ★ 4x cheaper than Sonnet 4 ($0.80 vs $3.00/1M input)
-    maxToolRounds: 5, // ★ Was 30 — each round resends full prompt = massive cost. 5 is enough.
+    model: 'anthropic/claude-sonnet-4', // ★ Sonnet 4 — reliable, user preferred
+    maxToolRounds: 5, // ★ SAFETY: was 30 → 5. Prevents cost explosion from failed tool loops.
 };
 
 export function loadConfig(): AiConfig {
