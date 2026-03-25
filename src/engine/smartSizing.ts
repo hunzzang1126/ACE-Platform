@@ -252,9 +252,9 @@ export function smartSizeElements(
     const scaleY = targetH / originH;
     const scaleFontRadius = Math.sqrt(scaleX * scaleY);
 
-    console.log(`[smartSizing] ★ v6 Running: ${originW}x${originH} → ${targetW}x${targetH}, ${originElements.length} elements, scaleX=${scaleX.toFixed(2)} scaleY=${scaleY.toFixed(2)}`);
+    console.log(`[smartSizing] ★ v7b Running: ${originW}x${originH} → ${targetW}x${targetH}, ${originElements.length} elements, scaleX=${scaleX.toFixed(2)} scaleY=${scaleY.toFixed(2)}`);
 
-    return originElements.map((el) => {
+    const stretched = originElements.map((el) => {
         const abs = constraintsToAbsolute(el.constraints, originW, originH);
         const role = detectElementRole(el, originW, originH);
 
@@ -295,6 +295,88 @@ export function smartSizeElements(
         // ── All other elements: v3 proportional stretch ──
         return applySameCategoryStretch(el, abs, scaleX, scaleY, scaleFontRadius, targetW, targetH);
     });
+
+    // ★ v7b: Post-stretch corrections (Polotno/Celtra approach)
+    return postStretchTextFit(stretched, targetW, targetH, scaleX);
+}
+
+// ── v7b: Post-Stretch Text Fit + Canvas Clamp + Left-Anchor Reflow ──
+//
+// After proportional stretch, text boxes can be too short for their font.
+// Example: 300x250 → 728x90
+//   boxH = 40 * 0.36 = 14px, fontSize = 24 * √(2.43*0.36) = 22px
+//   22px font in 14px box = overflow → overlaps next element
+//
+// Fix 1: Shrink fontSize until it fits the box (Celtra "shrink-to-fit")
+// Fix 2: Clamp elements inside canvas bounds
+// Fix 3: Left-anchor text reflow — expand text box width rightward for wrapping
+
+function postStretchTextFit(
+    elements: DesignElement[],
+    targetW: number,
+    targetH: number,
+    scaleX: number,
+): DesignElement[] {
+    const MARGIN = 4;
+
+    for (const el of elements) {
+        const isText = el.type === 'text' || el.type === 'button';
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const textEl = el as any;
+        const c = el.constraints;
+
+        // Get absolute position from constraints
+        const x = c.horizontal.offset;
+        const y = c.vertical.offset;
+        const w = c.size.width;
+        const h = c.size.height;
+
+        if (isText && textEl.fontSize) {
+            const lineH = textEl.lineHeight || 1.2;
+
+            // ── Fix 1: Shrink-to-fit (font must fit in box) ──
+            // Single line height = fontSize * lineHeight
+            // If even one line doesn't fit, shrink font
+            if (textEl.fontSize * lineH > h && h > 0) {
+                const fittedFont = Math.floor(h / lineH);
+                textEl.fontSize = Math.max(MIN_FONT, fittedFont);
+                console.log(`[smartSizing] v7b shrink-to-fit: ${el.name} font → ${textEl.fontSize}px (boxH=${h})`);
+            }
+
+            // ── Fix 3: Left-anchor text reflow ──
+            // Text keeps its left X position (proportionally scaled).
+            // Width expands rightward to use available horizontal space.
+            // This lets text wrap into more lines naturally instead of overflowing.
+            const rightEdge = x + w;
+            const availableRight = targetW - MARGIN;
+            if (rightEdge < availableRight && scaleX > 1.2) {
+                // Canvas got wider — expand text box right to use space
+                const newW = Math.round(availableRight - x);
+                c.size = { ...c.size, width: Math.max(w, newW) };
+                console.log(`[smartSizing] v7b reflow: ${el.name} width ${w} → ${newW} (left-anchor at x=${x})`);
+            }
+        }
+
+        // ── Fix 2: Canvas boundary clamping ──
+        // Push elements inside canvas if they overflow
+        const curW = c.size.width;
+        const curH = c.size.height;
+
+        if (x + curW > targetW) {
+            c.horizontal = { anchor: 'left' as const, offset: Math.max(MARGIN, targetW - curW - MARGIN) };
+        }
+        if (x < 0) {
+            c.horizontal = { anchor: 'left' as const, offset: MARGIN };
+        }
+        if (y + curH > targetH) {
+            c.vertical = { anchor: 'top' as const, offset: Math.max(MARGIN, targetH - curH - MARGIN) };
+        }
+        if (y < 0) {
+            c.vertical = { anchor: 'top' as const, offset: MARGIN };
+        }
+    }
+
+    return elements;
 }
 
 /**

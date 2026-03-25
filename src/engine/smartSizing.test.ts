@@ -358,14 +358,14 @@ describe('smartSizeElements — Template-Proven Scaling (v3)', () => {
 
     // ★ Font scaling uses geometric mean √(scaleX * scaleY)
 
-    it('font scales with geometric mean √(scaleX * scaleY)', () => {
+    it('v7b: font shrinks to fit box in cross-ratio resize', () => {
         const text = makeText('t', 50, 100, 200, 40, 36, { name: 'Main Title' });
         const result = smartSizeElements([text], 300, 250, 728, 90);
         const resultText = result[0] as TextElement;
-        // scaleX=728/300=2.427, scaleY=90/250=0.36
-        // geometricMean = √(2.427 * 0.36) = √0.8736 = 0.935
-        // expectedFont = round(36 * 0.935) = round(33.65) = 34
-        expect(resultText.fontSize).toBe(34);
+        // v7b: proportional stretch → boxH = 40 * 0.36 = 14px
+        // geometric mean fontSize = 34, but 34 * 1.2 lineH = 41 > 14
+        // shrink-to-fit: floor(14 / 1.2) = 11, clamped to max(8, 11) = 11
+        expect(resultText.fontSize).toBe(11);
     });
 
     it('font never goes below MIN_FONT (8px)', () => {

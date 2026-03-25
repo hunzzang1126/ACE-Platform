@@ -521,7 +521,7 @@ describe('designStore — connectPlug Smart Sizing', () => {
         expect(bgElement.constraints.vertical.offset).toBe(0);
     });
 
-    it('connectPlug scales text fontSize with geometric mean', () => {
+    it('connectPlug: v7b font shrinks-to-fit box in cross-ratio resize', () => {
         useDesignStore.getState().createCreativeSet('Font Scale Test', MASTER_PRESET);
         const masterId = useDesignStore.getState().creativeSet!.masterVariantId;
 
@@ -559,9 +559,9 @@ describe('designStore — connectPlug Smart Sizing', () => {
         const target = useDesignStore.getState().creativeSet!.variants.find(v => v.id === targetId)!;
         const textResult = target.elements[0] as any;
 
-        // √(728/300 * 90/250) = √(2.427 * 0.36) = √0.874 = 0.935
-        // 36 * 0.935 = 33.65 → round = 34
-        expect(textResult.fontSize).toBe(34);
+        // v7b: boxH = 60 * 0.36 = 22px, fontSize geometric = 34
+        // 34 * 1.2 = 41 > 22 → shrink-to-fit: floor(22/1.2) = 18
+        expect(textResult.fontSize).toBe(18);
     });
 
     it('★ REGRESSION: disconnectPlug does NOT clear elements (preserves last state)', () => {
