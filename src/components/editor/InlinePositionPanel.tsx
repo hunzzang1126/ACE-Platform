@@ -7,6 +7,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import type { CanvasEngineActions, EngineNode } from '@/hooks/canvasTypes';
+import { removeBackgroundFromUrl, blobToDataUrl } from '@/services/backgroundRemovalService';
 
 interface Props {
     selectedNode: EngineNode | null;
@@ -157,8 +158,79 @@ export function InlinePositionPanel({ selectedNode, actions, onClose }: Props) {
                         </div>
                     </div>
                 </div>
+
+                {/* Remove Background — image nodes only */}
+                {selectedNode.type === 'image' && selectedNode.src && (
+                    <RemoveBgInline
+                        nodeId={selectedNode.id}
+                        imageSrc={selectedNode.src}
+                        actions={actions}
+                    />
+                )}
             </div>
         </div>
+    );
+}
+
+// ── Remove Background inline button (image nodes only) ──
+function RemoveBgInline({ nodeId, imageSrc, actions }: { nodeId: number; imageSrc: string; actions: CanvasEngineActions }) {
+    const [loading, setLoading] = useState(false);
+    const [progress, setProgress] = useState(0);
+
+    const handleRemoveBg = async () => {
+        if (loading) return;
+        setLoading(true);
+        setProgress(0);
+        try {
+            const resultBlob = await removeBackgroundFromUrl(imageSrc, (p) => setProgress(p));
+            const dataUrl = await blobToDataUrl(resultBlob);
+            await actions.replaceImageSrc(nodeId, dataUrl);
+        } catch (err) {
+            console.error('[RemoveBG] Failed:', err);
+        } finally {
+            setLoading(false);
+            setProgress(0);
+        }
+    };
+
+    return (
+        <>
+            <div className="inline-divider" />
+            <p className="sidebar-section-label">Image</p>
+            <button
+                onClick={handleRemoveBg}
+                disabled={loading}
+                className="inline-arrange-btn"
+                style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    justifyContent: 'center',
+                    gap: 8,
+                    background: loading ? 'rgba(99,102,241,0.2)' : 'rgba(99,102,241,0.08)',
+                    border: '1px solid rgba(99,102,241,0.25)',
+                    color: loading ? '#a5b4fc' : '#818cf8',
+                    fontWeight: 600,
+                    cursor: loading ? 'wait' : 'pointer',
+                }}
+            >
+                {loading ? (
+                    <>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
+                            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                        </svg>
+                        Removing... {Math.round(progress * 100)}%
+                    </>
+                ) : (
+                    <>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M5 8l6 6" /><path d="M4 14l6-6 2-3" /><path d="M2 5h12" /><path d="M7 2h10" />
+                            <rect x="14" y="14" width="8" height="8" rx="2" strokeDasharray="3 2" />
+                        </svg>
+                        Remove Background
+                    </>
+                )}
+            </button>
+        </>
     );
 }
 

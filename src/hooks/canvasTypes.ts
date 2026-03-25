@@ -130,6 +130,8 @@ export interface CanvasEngineActions {
     redo: () => void;
     // Alignment to canvas
     alignToCanvas: (id: number, alignment: 'left' | 'center-h' | 'right' | 'top' | 'center-v' | 'bottom') => void;
+    // Image manipulation
+    replaceImageSrc: (id: number, newSrc: string) => Promise<void>;
     // Canvas dimensions (for alignment)
     canvasWidth: number;
     canvasHeight: number;

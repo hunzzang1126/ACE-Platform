@@ -902,6 +902,9 @@ export function useFabricCanvas(
             if (id) engineRef.current?.ungroup(id);
         },
         undo, redo, alignToCanvas,
+        replaceImageSrc: async (id: number, newSrc: string) => {
+            await engineRef.current?.replace_image_src(id, newSrc);
+        },
         canvasWidth: width, canvasHeight: height,
     };
 

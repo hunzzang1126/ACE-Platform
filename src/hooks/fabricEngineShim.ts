@@ -486,6 +486,29 @@ export function createEngineShim(
             return id;
         },
 
+        // ── Replace image source (for background removal, etc.) ──
+        replace_image_src: async (id: number, newSrc: string): Promise<void> => {
+            const obj = findById(id);
+            if (!obj || obj.type !== 'image') {
+                console.warn(`[EngineShim] replaceImageSrc: id=${id} not found or not an image`);
+                return;
+            }
+            try {
+                const isDataUrl = newSrc.startsWith('data:');
+                const imgOptions = isDataUrl ? {} : { crossOrigin: 'anonymous' as const };
+                const newImg = await FabricImage.fromURL(newSrc, imgOptions);
+                // Swap the internal element while preserving position/scale
+                (obj as any)._element = (newImg as any)._element;
+                (obj as any)._originalElement = (newImg as any)._originalElement;
+                obj.dirty = true;
+                fc.renderAll();
+                syncState();
+                console.log(`[EngineShim] Image source replaced: id=${id}`);
+            } catch (err) {
+                console.error('[EngineShim] replaceImageSrc failed:', err);
+            }
+        },
+
         // Utility: re-sort all Fabric objects by __glidZIndex.
         // Call after all async image loads to fix any ordering issues.
         reorder_by_z_index: () => {
