@@ -53,9 +53,10 @@ export function absoluteToConstraints(
 
     // Horizontal constraint — avoid 'stretch' anchor which can produce corrupt
     // marginLeft values after smartSizing propagation across different canvas sizes.
-    // Full-canvas elements use 'center' with offset 0 instead.
+    // ★ REGRESSION GUARD: Full-canvas elements use 'center' with ACTUAL offset
+    // (not 0). Forcing offset:0 lost the user's image placement on save cycle.
     if (coversWidth) {
-        horizontal = { anchor: 'center', offset: 0 };
+        horizontal = { anchor: 'center', offset: Math.round(centerX - canvasW / 2) };
     } else if (relCenterX > 0.35 && relCenterX < 0.65) {
         horizontal = { anchor: 'center', offset: Math.round(centerX - canvasW / 2) };
     } else if (relCenterX <= 0.35) {
@@ -65,8 +66,9 @@ export function absoluteToConstraints(
     }
 
     // Vertical constraint — same approach, no 'stretch' anchor
+    // ★ REGRESSION GUARD: Same fix as horizontal — preserve actual offset.
     if (coversHeight) {
-        vertical = { anchor: 'center', offset: 0 };
+        vertical = { anchor: 'center', offset: Math.round(centerY - canvasH / 2) };
     } else if (relCenterY > 0.35 && relCenterY < 0.65) {
         vertical = { anchor: 'center', offset: Math.round(centerY - canvasH / 2) };
     } else if (relCenterY <= 0.35) {
