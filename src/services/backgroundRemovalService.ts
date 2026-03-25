@@ -18,9 +18,20 @@ export async function removeBackground(
     onProgress?: (progress: number) => void,
 ): Promise<Blob> {
     // Dynamic import to avoid loading WASM on startup (~15MB)
-    const { removeBackground: removeBg } = await import('@imgly/background-removal');
+    let removeBg: typeof import('@imgly/background-removal')['removeBackground'];
+    try {
+        const mod = await import('@imgly/background-removal');
+        removeBg = mod.removeBackground;
+    } catch {
+        // ★ Stale chunk hash after Vercel redeploy — tell user to refresh
+        throw new Error(
+            'Background removal module failed to load. Please refresh the page (Cmd+Shift+R) and try again.',
+        );
+    }
 
     const result = await removeBg(imageBlob, {
+        // ★ Use unpkg CDN for WASM models to avoid Vercel static asset issues
+        publicPath: 'https://unpkg.com/@imgly/background-removal@1.7.0/dist/',
         progress: onProgress
             ? (key: string, current: number, total: number) => {
                   onProgress(total > 0 ? current / total : 0);
