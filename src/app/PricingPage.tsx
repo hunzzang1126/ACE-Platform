@@ -228,8 +228,15 @@ export default function PricingPage() {
                                     value={plan.limits.maxCreativeSets === -1 ? 'Unlimited' : `${plan.limits.maxCreativeSets}`}
                                 />
                                 <Feature
-                                    label="AI Generations"
-                                    value={`${plan.limits.aiGenerationsPerMonth.toLocaleString()}/mo`}
+                                    label="AI Token Budget"
+                                    value={plan.limits.aiTokensPerMonth >= Number.MAX_SAFE_INTEGER
+                                        ? 'Unlimited'
+                                        : `${(plan.limits.aiTokensPerMonth / 1_000_000).toFixed(1)}M/mo`}
+                                />
+                                <Feature
+                                    label="AI Model"
+                                    value={plan.limits.aiModel.includes('sonnet') ? 'Sonnet 4 (Premium)' : 'Haiku 3.5 (Fast)'}
+                                    highlight={plan.limits.aiModel.includes('sonnet')}
                                 />
                                 <Feature
                                     label="Size Variants"
@@ -243,11 +250,6 @@ export default function PricingPage() {
                                     label="Brand Cloud"
                                     value={plan.limits.brandCloudEnabled ? CHECK : DASH}
                                     highlight={plan.limits.brandCloudEnabled}
-                                />
-                                <Feature
-                                    label="AI Vision QA"
-                                    value={plan.limits.aiVisionQAEnabled ? CHECK : DASH}
-                                    highlight={plan.limits.aiVisionQAEnabled}
                                 />
                                 <Feature
                                     label="Team Members"

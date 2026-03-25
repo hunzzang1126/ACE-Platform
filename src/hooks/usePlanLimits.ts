@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────
-// usePlanLimits — Plan enforcement + usage tracking
+// usePlanLimits — Plan enforcement + token-based usage tracking
 // ─────────────────────────────────────────────────
-// Central hook for checking plan limits and recording usage.
+// Central hook for checking plan limits and recording AI token usage.
 // All feature gates should call this hook.
 // ─────────────────────────────────────────────────
 
@@ -34,7 +34,7 @@ export function usePlanLimits() {
 
     const [usage, setUsage] = useState<UsageData>({
         month: getCurrentMonth(),
-        aiGenerationsUsed: 0,
+        aiTokensUsed: 0,
         creativeSetsCount: 0,
     });
 
@@ -56,7 +56,7 @@ export function usePlanLimits() {
         (async () => {
             const { data } = await sb
                 .from('usage_tracking')
-                .select('ai_generations_used, exports_used')
+                .select('ai_tokens_used')
                 .eq('user_id', user.id)
                 .eq('month', month)
                 .maybeSingle();
@@ -64,7 +64,7 @@ export function usePlanLimits() {
             if (data) {
                 setUsage(prev => ({
                     ...prev,
-                    aiGenerationsUsed: data.ai_generations_used ?? 0,
+                    aiTokensUsed: data.ai_tokens_used ?? 0,
                 }));
             }
         })();
@@ -76,10 +76,10 @@ export function usePlanLimits() {
         return allSetsCount < limits.maxCreativeSets;
     }, [limits.maxCreativeSets, allSetsCount]);
 
-    // ── Check: can use AI generation? ──
+    // ── Check: can use AI? (token budget remaining) ──
     const canUseAI = useCallback((): boolean => {
-        return usage.aiGenerationsUsed < limits.aiGenerationsPerMonth;
-    }, [usage.aiGenerationsUsed, limits.aiGenerationsPerMonth]);
+        return usage.aiTokensUsed < limits.aiTokensPerMonth;
+    }, [usage.aiTokensUsed, limits.aiTokensPerMonth]);
 
     // ── Check: can export in this format? ──
     const canExportFormat = useCallback((format: ExportFormat): boolean => {
@@ -92,43 +92,43 @@ export function usePlanLimits() {
         return currentVariantCount < limits.maxVariantsPerSet;
     }, [limits.maxVariantsPerSet]);
 
-    // ── Record AI usage (increment counter) ──
-    const recordAIUsage = useCallback(async (count = 1): Promise<boolean> => {
-        if (usage.aiGenerationsUsed + count > limits.aiGenerationsPerMonth) {
+    // ── Record AI token usage (increment counter) ──
+    const recordAIUsage = useCallback(async (tokenCount: number): Promise<boolean> => {
+        if (usage.aiTokensUsed + tokenCount > limits.aiTokensPerMonth) {
             return false; // Would exceed limit
         }
 
         // Optimistic update
         setUsage(prev => ({
             ...prev,
-            aiGenerationsUsed: prev.aiGenerationsUsed + count,
+            aiTokensUsed: prev.aiTokensUsed + tokenCount,
         }));
 
         // Persist to Supabase
         const sb = getSupabase();
         if (sb && user?.id) {
             try {
-                await sb.rpc('increment_ai_usage', {
+                await sb.rpc('increment_ai_token_usage', {
                     p_user_id: user.id,
-                    p_count: count,
+                    p_tokens: tokenCount,
                 });
             } catch (err) {
-                console.error('[usePlanLimits] Failed to record AI usage:', err);
+                console.error('[usePlanLimits] Failed to record AI token usage:', err);
             }
         }
 
         return true;
-    }, [usage.aiGenerationsUsed, limits.aiGenerationsPerMonth, user?.id]);
+    }, [usage.aiTokensUsed, limits.aiTokensPerMonth, user?.id]);
 
-    // ── Remaining counts ──
-    const remainingAI = Math.max(0, limits.aiGenerationsPerMonth - usage.aiGenerationsUsed);
+    // ── Remaining token budget ──
+    const remainingTokens = Math.max(0, limits.aiTokensPerMonth - usage.aiTokensUsed);
     const remainingSets = isUnlimited(limits.maxCreativeSets)
         ? -1
         : Math.max(0, limits.maxCreativeSets - allSetsCount);
 
     // ── Usage percentage for progress bars ──
-    const aiUsagePercent = limits.aiGenerationsPerMonth > 0
-        ? Math.min(100, Math.round((usage.aiGenerationsUsed / limits.aiGenerationsPerMonth) * 100))
+    const aiUsagePercent = limits.aiTokensPerMonth > 0
+        ? Math.min(100, Math.round((usage.aiTokensUsed / limits.aiTokensPerMonth) * 100))
         : 0;
 
     return {
@@ -151,7 +151,7 @@ export function usePlanLimits() {
         recordAIUsage,
 
         // Computed
-        remainingAI,
+        remainingTokens,
         remainingSets,
         aiUsagePercent,
 

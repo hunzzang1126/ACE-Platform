@@ -12,8 +12,10 @@ export type ExportFormat = 'png' | 'jpg' | 'html5' | 'gif' | 'mp4' | 'js_bundle'
 export interface PlanLimits {
     /** Max creative sets allowed (-1 = unlimited) */
     maxCreativeSets: number;
-    /** Max AI generations per month */
-    aiGenerationsPerMonth: number;
+    /** Max AI tokens per month (input + output combined) */
+    aiTokensPerMonth: number;
+    /** OpenRouter model ID for AI agent */
+    aiModel: string;
     /** Max size variants per creative set (-1 = unlimited) */
     maxVariantsPerSet: number;
     /** Allowed export formats */
@@ -22,8 +24,6 @@ export interface PlanLimits {
     maxTeamMembers: number;
     /** Brand Cloud access */
     brandCloudEnabled: boolean;
-    /** AI Vision QA access */
-    aiVisionQAEnabled: boolean;
 }
 
 export interface PlanInfo {
@@ -41,40 +41,39 @@ export interface PlanInfo {
 export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
     starter: {
         maxCreativeSets: 3,
-        aiGenerationsPerMonth: 10,
+        aiTokensPerMonth: 200_000, // ~50 basic requests via Haiku
+        aiModel: 'anthropic/claude-3.5-haiku',
         maxVariantsPerSet: 3,
         allowedExports: ['png'],
         maxTeamMembers: 1,
         brandCloudEnabled: false,
-        aiVisionQAEnabled: false,
     },
     pro: {
         maxCreativeSets: -1,
-        aiGenerationsPerMonth: 1_000,
+        aiTokensPerMonth: 2_000_000, // ~500 requests via Sonnet 4
+        aiModel: 'anthropic/claude-sonnet-4',
         maxVariantsPerSet: -1,
         allowedExports: ['png', 'jpg', 'html5'],
         maxTeamMembers: 1,
         brandCloudEnabled: false,
-        aiVisionQAEnabled: true,
     },
     enterprise: {
         maxCreativeSets: -1,
-        aiGenerationsPerMonth: 5_000,
+        aiTokensPerMonth: 10_000_000,
+        aiModel: 'anthropic/claude-sonnet-4',
         maxVariantsPerSet: -1,
         allowedExports: ['png', 'jpg', 'html5', 'gif', 'mp4', 'js_bundle'],
         maxTeamMembers: -1,
         brandCloudEnabled: true,
-        aiVisionQAEnabled: true,
     },
-    // ★ Admin — truly unlimited, no restrictions whatsoever
     admin: {
         maxCreativeSets: -1,
-        aiGenerationsPerMonth: Number.MAX_SAFE_INTEGER,
+        aiTokensPerMonth: Number.MAX_SAFE_INTEGER,
+        aiModel: 'anthropic/claude-sonnet-4',
         maxVariantsPerSet: -1,
         allowedExports: ['png', 'jpg', 'html5', 'gif', 'mp4', 'js_bundle'],
         maxTeamMembers: -1,
         brandCloudEnabled: true,
-        aiVisionQAEnabled: true,
     },
 };
 
@@ -91,8 +90,8 @@ export const PLANS: PlanInfo[] = [
         tier: 'pro',
         name: 'Pro',
         tagline: 'For professional creators and teams',
-        priceMonthly: 49,
-        priceAnnual: 39, // ~20% discount
+        priceMonthly: 40,
+        priceAnnual: 32, // ~20% discount
         limits: PLAN_LIMITS.pro,
         popular: true,
     },
@@ -131,8 +130,8 @@ export function hasFeature(tier: PlanTier, feature: keyof PlanLimits): boolean {
 export interface UsageData {
     /** Current billing month (YYYY-MM) */
     month: string;
-    /** AI generations used this month */
-    aiGenerationsUsed: number;
+    /** AI tokens used this month (input + output combined) */
+    aiTokensUsed: number;
     /** Creative sets currently owned */
     creativeSetsCount: number;
 }
