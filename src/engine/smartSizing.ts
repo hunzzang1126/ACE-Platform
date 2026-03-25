@@ -229,11 +229,12 @@ const MIN_CTA_HEIGHT = 44; // minimum CTA touch target
  * Apply smart sizing from origin elements → target variant.
  * Returns new array of elements adapted for the target size.
  *
- * ★ v4: SEMANTIC RESIZING
- * - Same category: v3 independent X/Y stretch fill + geometric mean fonts
- * - Cross category: role-based layout repositioning via smartLayout engine
- *   Each element is placed in its semantically correct zone for the target
- *   aspect ratio (headline→center, CTA→right for ultra-wide, etc.)
+ * ★ v6: BACK TO BASICS — CONSTRAINT PROPORTIONAL SCALING
+ * All elements → v3 independent scaleX/scaleY stretch fill
+ * Fonts/radii → √(scaleX × scaleY) geometric mean
+ * Background shapes → 100% target canvas fill
+ * Background images → cover-style (maintain ratio, fill canvas, crop overflow)
+ * NO cross-category role-based repositioning (caused text overlap + invisible text)
  */
 export function smartSizeElements(
     originElements: DesignElement[],
@@ -247,45 +248,32 @@ export function smartSizeElements(
         return JSON.parse(JSON.stringify(originElements));
     }
 
-    const originCategory = getAspectCategory(originW, originH);
-    const targetCategory = getAspectCategory(targetW, targetH);
-    const isCrossCategory = originCategory !== targetCategory;
-
-    console.log(`[smartSizing] ★ v5 Running: ${originW}x${originH} (${originCategory}) → ${targetW}x${targetH} (${targetCategory}), ${originElements.length} elements, cross=${isCrossCategory}`);
-
-    // ★ v3 scales — always computed for same-category path and fallback
     const scaleX = targetW / originW;
     const scaleY = targetH / originH;
     const scaleFontRadius = Math.sqrt(scaleX * scaleY);
 
-    // ── Step 1: Place each element ──
-    const placed = originElements.map((el) => {
+    console.log(`[smartSizing] ★ v6 Running: ${originW}x${originH} → ${targetW}x${targetH}, ${originElements.length} elements, scaleX=${scaleX.toFixed(2)} scaleY=${scaleY.toFixed(2)}`);
+
+    return originElements.map((el) => {
         const abs = constraintsToAbsolute(el.constraints, originW, originH);
         const role = detectElementRole(el, originW, originH);
-        const layoutRole = toLayoutRole(role, el);
-
-        console.log(`[smartSizing]   el="${el.name}" type=${el.type} role=${role}→${layoutRole} cross=${isCrossCategory}`);
 
         // ── Background: fill target canvas ──
-        // Shapes (solid/gradient): exact target dims (no distortion)
-        // Images: cover-style (maintain aspect ratio, fill canvas, crop overflow)
         if (role === 'background') {
             let bgW = targetW;
             let bgH = targetH;
             let bgX = 0;
             let bgY = 0;
 
+            // ★ Image backgrounds: cover-style (maintain aspect ratio, crop overflow)
             if (el.type === 'image' && abs.w > 0 && abs.h > 0) {
-                // ★ Cover-style: scale to fill while maintaining aspect ratio
                 const imgAspect = abs.w / abs.h;
                 const canvasAspect = targetW / targetH;
                 if (imgAspect > canvasAspect) {
-                    // Image is wider → scale by height, crop sides
                     bgH = targetH;
                     bgW = Math.round(targetH * imgAspect);
                     bgX = -Math.round((bgW - targetW) / 2);
                 } else {
-                    // Image is taller → scale by width, crop top/bottom
                     bgW = targetW;
                     bgH = Math.round(targetW / imgAspect);
                     bgY = -Math.round((bgH - targetH) / 2);
@@ -304,100 +292,9 @@ export function smartSizeElements(
             } as DesignElement;
         }
 
-        // ── Cross-category: role-based repositioning ──
-        if (isCrossCategory) {
-            return applyCrossCategoryLayout(el, abs, role, layoutRole, targetW, targetH, scaleFontRadius);
-        }
-
-        // ── Same-category: v3 uniform stretch ──
+        // ── All other elements: v3 proportional stretch ──
         return applySameCategoryStretch(el, abs, scaleX, scaleY, scaleFontRadius, targetW, targetH);
     });
-
-    // ── Step 2: Collision avoidance — NO TEXT OVERLAP ──
-    return avoidOverlaps(placed, targetW, targetH);
-}
-
-/**
- * ★ Post-processing: resolve all element positions and fix overlaps.
- * Sorts non-background elements by Y position, then pushes any
- * overlapping elements downward. Guarantees zero text-on-text overlap.
- */
-function avoidOverlaps(elements: DesignElement[], canvasW: number, canvasH: number): DesignElement[] {
-    // Separate backgrounds from content
-    const backgrounds: DesignElement[] = [];
-    const content: DesignElement[] = [];
-    for (const el of elements) {
-        const resolved = constraintsToAbsolute(el.constraints, canvasW, canvasH);
-        const coversPct = (resolved.w * resolved.h) / (canvasW * canvasH);
-        if (el.type === 'shape' && coversPct > 0.5) {
-            backgrounds.push(el);
-        } else {
-            content.push(el);
-        }
-    }
-
-    if (content.length <= 1) return elements;
-
-    // Resolve positions and sort top-to-bottom
-    const withPos = content.map(el => ({
-        el,
-        pos: constraintsToAbsolute(el.constraints, canvasW, canvasH),
-    }));
-    withPos.sort((a, b) => a.pos.y - b.pos.y);
-
-    // ★ Push overlapping items down
-    const PADDING = 4;
-    for (let i = 1; i < withPos.length; i++) {
-        const prev = withPos[i - 1]!;
-        const curr = withPos[i]!;
-        const prevBottom = prev.pos.y + prev.pos.h;
-        if (curr.pos.y < prevBottom + PADDING) {
-            const newY = prevBottom + PADDING;
-            // Update constraint to fixed top offset
-            curr.el = { ...curr.el };
-            curr.el.constraints = {
-                ...curr.el.constraints,
-                vertical: { anchor: 'top' as const, offset: Math.round(newY) },
-            };
-            // Update pos for next iteration
-            curr.pos = { ...curr.pos, y: newY };
-            console.log(`[smartSizing] ★ OVERLAP FIX: "${curr.el.name}" shifted to y=${Math.round(newY)}`);
-        }
-    }
-
-    // ★ Clamp: if any element goes below canvas, scale everything down
-    const lastItem = withPos[withPos.length - 1]!;
-    const lastBottom = lastItem.pos.y + lastItem.pos.h;
-    if (lastBottom > canvasH) {
-        // Calculate how much we need to compress
-        const totalContentHeight = lastBottom - withPos[0]!.pos.y;
-        const availableHeight = canvasH - PADDING * 2;
-        if (totalContentHeight > 0 && availableHeight > 0) {
-            const compress = Math.min(1, availableHeight / totalContentHeight);
-            const startY = PADDING;
-            let currentY = startY;
-            for (const item of withPos) {
-                const newH = Math.max(8, Math.round(item.pos.h * compress));
-                item.el = { ...item.el };
-                item.el.constraints = {
-                    ...item.el.constraints,
-                    vertical: { anchor: 'top' as const, offset: Math.round(currentY) },
-                    size: { ...item.el.constraints.size, height: newH },
-                };
-                // Scale font if needed
-                if ((item.el.type === 'text' || item.el.type === 'button') && compress < 0.9) {
-                    const fontSize = (item.el as { fontSize?: number }).fontSize;
-                    if (fontSize) {
-                        (item.el as any).fontSize = Math.max(MIN_FONT, Math.round(fontSize * compress));
-                    }
-                }
-                currentY += newH + PADDING;
-                console.log(`[smartSizing] ★ COMPRESS: "${item.el.name}" y=${Math.round(currentY - newH - PADDING)} h=${newH}`);
-            }
-        }
-    }
-
-    return [...backgrounds, ...withPos.map(p => p.el)];
 }
 
 /**
