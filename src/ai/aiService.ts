@@ -492,7 +492,14 @@ export class AiService {
         tools: ReturnType<typeof toClaudeTools>,
         progress: LiveProgress,
     ): Promise<ClaudeResponse | null> {
-        const { model } = this.config;
+        // ★ Plan-based model routing: Free → Haiku, Pro → Sonnet 4
+        const { useAuthStore } = await import('@/stores/authStore');
+        const { PLAN_LIMITS } = await import('@/schema/planTypes');
+        const authState = useAuthStore.getState();
+        const userPlan = authState.user?.plan ?? 'starter';
+        const planModel = PLAN_LIMITS[userPlan]?.aiModel;
+        const model = planModel || this.config.model;
+        console.log(`[AiService] Plan: ${userPlan} → Model: ${model}`);
         const apiKey = getOpenRouterKey();
 
         // Use Vite dev proxy to bypass CORS
