@@ -14,6 +14,7 @@ import { Section, ScrubField, PropField, OpacitySlider } from '@/components/pane
 import { useSizingOverrideStore } from '@/stores/sizingOverrideStore';
 import { useEditorStore } from '@/stores/editorStore';
 import { useDesignStore } from '@/stores/designStore';
+import { removeBackgroundFromUrl, blobToDataUrl } from '@/services/backgroundRemovalService';
 import type { EngineNode, CanvasEngineActions } from '@/hooks/useCanvasEngine';
 import type { OverlayElement } from '@/hooks/useOverlayElements';
 
@@ -206,6 +207,11 @@ export function PropertyPanel({ nodes = [], selection = [], actions, selectedOve
                         <option value="fill">Fill</option>
                     </select>
                 </Section>
+
+                <RemoveBgButton
+                    imageSrc={selectedOverlay.src}
+                    onResult={(dataUrl) => onOverlayUpdate?.(selectedOverlay.id, { src: dataUrl })}
+                />
 
                 {/* Canvas Alignment */}
                 <Section label="Canvas Alignment">
@@ -414,6 +420,16 @@ export function PropertyPanel({ nodes = [], selection = [], actions, selectedOve
                     </Section>
                 )}
 
+                {/* Remove Background — image nodes only */}
+                {selectedNode.type === 'image' && (
+                    <RemoveBgButton
+                        imageSrc={(selectedNode as any).src || (selectedNode as any).image_url}
+                        onResult={(dataUrl) => {
+                            (actions as any).replaceImageSrc?.(selectedNode.id, dataUrl);
+                        }}
+                    />
+                )}
+
                 {/* Alignment */}
                 <Section label="Align to Canvas">
                     <div className="pp-align-row">
@@ -453,6 +469,78 @@ export function PropertyPanel({ nodes = [], selection = [], actions, selectedOve
     }
 
     return null;
+}
+
+// ── Remove Background button ──
+function RemoveBgButton({ imageSrc, onResult }: { imageSrc?: string; onResult: (dataUrl: string) => void }) {
+    const [loading, setLoading] = useState(false);
+    const [progress, setProgress] = useState(0);
+
+    if (!imageSrc) return null;
+
+    const handleRemoveBg = async () => {
+        if (loading) return;
+        setLoading(true);
+        setProgress(0);
+        try {
+            const resultBlob = await removeBackgroundFromUrl(imageSrc, (p) => setProgress(p));
+            const dataUrl = await blobToDataUrl(resultBlob);
+            onResult(dataUrl);
+        } catch (err) {
+            console.error('[RemoveBG] Failed:', err);
+        } finally {
+            setLoading(false);
+            setProgress(0);
+        }
+    };
+
+    return (
+        <Section label="Background">
+            <button
+                onClick={handleRemoveBg}
+                disabled={loading}
+                style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    background: loading ? 'rgba(99,102,241,0.2)' : 'rgba(99,102,241,0.12)',
+                    border: '1px solid rgba(99,102,241,0.3)',
+                    borderRadius: 6,
+                    color: loading ? '#a5b4fc' : '#818cf8',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: loading ? 'wait' : 'pointer',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                }}
+                onMouseEnter={(e) => {
+                    if (!loading) e.currentTarget.style.background = 'rgba(99,102,241,0.25)';
+                }}
+                onMouseLeave={(e) => {
+                    if (!loading) e.currentTarget.style.background = 'rgba(99,102,241,0.12)';
+                }}
+            >
+                {loading ? (
+                    <>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
+                            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                        </svg>
+                        Removing... {Math.round(progress * 100)}%
+                    </>
+                ) : (
+                    <>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M5 8l6 6" /><path d="M4 14l6-6 2-3" /><path d="M2 5h12" /><path d="M7 2h10" />
+                            <rect x="14" y="14" width="8" height="8" rx="2" strokeDasharray="3 2" />
+                        </svg>
+                        Remove Background
+                    </>
+                )}
+            </button>
+        </Section>
+    );
 }
 
 // ── Smart Sizing section — per-element override controls ──

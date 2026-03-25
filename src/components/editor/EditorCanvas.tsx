@@ -491,6 +491,7 @@ export function EditorCanvas({
                     hasSelection={state.selection.length > 0}
                     selectionCount={state.selection.length}
                     selectedIds={state.selection}
+                    nodes={state.nodes}
                     onClose={closeCtxMenu}
                 />
             )}

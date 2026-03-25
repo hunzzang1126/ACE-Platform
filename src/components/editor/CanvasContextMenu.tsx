@@ -1,8 +1,9 @@
 // ─────────────────────────────────────────────────
 // CanvasContextMenu — Right-click menu for canvas elements
 // ─────────────────────────────────────────────────
-import { useEffect, type CSSProperties } from 'react';
-import type { CanvasEngineActions } from '@/hooks/canvasTypes';
+import { useState, useEffect, type CSSProperties } from 'react';
+import type { CanvasEngineActions, EngineNode } from '@/hooks/canvasTypes';
+import { removeBackgroundFromUrl, blobToDataUrl } from '@/services/backgroundRemovalService';
 
 interface MenuItem {
     label: string;
@@ -20,6 +21,8 @@ interface Props {
     selectionCount: number;
     /** IDs of currently selected Fabric objects */
     selectedIds: number[];
+    /** Node list for type detection */
+    nodes?: EngineNode[];
     onClose: () => void;
 }
 
@@ -61,7 +64,9 @@ const dividerStyle: CSSProperties = {
     margin: '3px 0',
 };
 
-export function CanvasContextMenu({ x, y, actions, hasSelection, selectionCount, selectedIds, onClose }: Props) {
+export function CanvasContextMenu({ x, y, actions, hasSelection, selectionCount, selectedIds, nodes = [], onClose }: Props) {
+    const [bgRemovalLoading, setBgRemovalLoading] = useState(false);
+
     // Close on outside click or Escape
     useEffect(() => {
         const handleClick = () => onClose();
@@ -75,6 +80,8 @@ export function CanvasContextMenu({ x, y, actions, hasSelection, selectionCount,
     }, [onClose]);
 
     const firstId = selectedIds[0] ?? -1;
+    const selectedNode = nodes.find(n => n.id === firstId);
+    const isImageSelected = selectedNode?.type === 'image' && selectionCount === 1;
     const items: MenuItem[] = [];
 
     if (hasSelection) {
@@ -86,6 +93,32 @@ export function CanvasContextMenu({ x, y, actions, hasSelection, selectionCount,
             { label: 'Send Backward', shortcut: 'Cmd+[', action: () => { actions.sendBackward(firstId); onClose(); } },
             { label: 'Send to Back', shortcut: 'Cmd+Shift+[', action: () => { actions.sendToBack(firstId); onClose(); }, dividerAfter: true },
         );
+
+        // ── Remove Background (image nodes only) ──
+        if (isImageSelected && selectedNode) {
+            const imageSrc = (selectedNode as any).src || (selectedNode as any).image_url || '';
+            if (imageSrc) {
+                items.push({
+                    label: bgRemovalLoading ? 'Removing...' : 'Remove Background',
+                    action: async () => {
+                        if (bgRemovalLoading) return;
+                        setBgRemovalLoading(true);
+                        try {
+                            const resultBlob = await removeBackgroundFromUrl(imageSrc);
+                            const dataUrl = await blobToDataUrl(resultBlob);
+                            // Replace image source via engine
+                            (actions as any).replaceImageSrc?.(firstId, dataUrl);
+                        } catch (err) {
+                            console.error('[BG Removal] Failed:', err);
+                        } finally {
+                            setBgRemovalLoading(false);
+                            onClose();
+                        }
+                    },
+                    dividerAfter: true,
+                });
+            }
+        }
 
         if (selectionCount > 1) {
             items.push(
