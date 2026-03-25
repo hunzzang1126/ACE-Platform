@@ -489,26 +489,49 @@ function applySameCategoryStretch(
     // ★ v7b: Content elements (text, image, video, button) use UNIFORM scale
     // to preserve aspect ratio — never squished/stretched in one direction.
     // Shapes/decorations keep independent X/Y stretch (they can distort).
-    const isContentElement = el.type === 'text' || el.type === 'image'
-        || el.type === 'video' || el.type === 'button';
+    const isText = el.type === 'text' || el.type === 'button';
+    const isMedia = el.type === 'image' || el.type === 'video';
 
     let newX: number, newY: number, newW: number, newH: number;
+    const MARGIN = 4;
 
-    if (isContentElement) {
-        // Uniform scale = min of both axes → fits inside target, no distortion
+    if (isText) {
+        // ★ TEXT: Left-anchor reflow (Polotno style)
+        // Left X stays proportional → text anchored at its original relative position
+        // Width expands rightward to fill available canvas space → text reflows (wraps)
+        // Height uses uniform scale to preserve readability
+        // Font: geometric mean, then shrink-to-fit in postStretchTextFit
+        const uniformScale = Math.min(scaleX, scaleY);
+
+        newX = Math.round(abs.x * scaleX);             // Left anchor: proportional X
+        newY = Math.round(abs.y * scaleY);              // Y: proportional
+        newH = Math.max(4, Math.round(abs.h * uniformScale)); // Height: uniform (not squished)
+
+        // Width: fill from left anchor to right edge of canvas (minus margin)
+        const rightAvailable = targetW - newX - MARGIN;
+        const uniformW = Math.round(abs.w * uniformScale);
+        newW = Math.max(uniformW, rightAvailable);      // Expand right, never shrink below uniform
+
+        console.log(`[smartSizing]     → TEXT-REFLOW: ${el.name} leftX=${newX} width=${newW} (fills right) h=${newH}`);
+
+    } else if (isMedia) {
+        // ★ IMAGE/VIDEO: Uniform scale + center mapping (preserve aspect ratio)
         const uniformScale = Math.min(scaleX, scaleY);
         newW = Math.max(4, Math.round(abs.w * uniformScale));
         newH = Math.max(4, Math.round(abs.h * uniformScale));
 
-        // Position: map center of element proportionally, then offset by half size
-        const centerXRatio = (abs.x + abs.w / 2) / (targetW / scaleX); // 0~1 in original
-        const centerYRatio = (abs.y + abs.h / 2) / (targetH / scaleY); // 0~1 in original
+        // Position: center-of-element proportional mapping
+        const originW = targetW / scaleX;
+        const originH = targetH / scaleY;
+        const centerXRatio = (abs.x + abs.w / 2) / originW;
+        const centerYRatio = (abs.y + abs.h / 2) / originH;
         newX = Math.round(centerXRatio * targetW - newW / 2);
         newY = Math.round(centerYRatio * targetH - newH / 2);
 
-        console.log(`[smartSizing]     → UNIFORM: ${el.name} (${el.type}) scale=${uniformScale.toFixed(2)} (${newX},${newY},${newW}x${newH})`);
+        console.log(`[smartSizing]     → MEDIA-UNIFORM: ${el.name} scale=${uniformScale.toFixed(2)} (${newX},${newY},${newW}x${newH})`);
+
     } else {
-        // Shapes/decorations: independent X/Y stretch (fills canvas like painting)
+        // ★ SHAPES/DECORATIONS: Independent X/Y stretch (fills canvas area)
         newX = Math.round(abs.x * scaleX);
         newY = Math.round(abs.y * scaleY);
         newW = Math.max(4, Math.round(abs.w * scaleX));
