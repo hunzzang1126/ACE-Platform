@@ -29,7 +29,8 @@ RETURNS void AS $$
 BEGIN
     UPDATE public.user_roles
     SET has_completed_onboarding = true,
-        preferred_language = p_language
+        preferred_language = p_language,
+        updated_at = now()
     WHERE user_id = auth.uid();
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
