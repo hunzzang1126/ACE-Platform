@@ -138,12 +138,10 @@ async function callImageGenApi(
 
     // OpenRouter image gen uses the same chat/completions endpoint
     // with the image model ID — response contains image data
-    const isGemini = modelId.includes('gemini');
-
-    // Gemini doesn't accept width/height params — include in prompt instead
-    const promptWithSize = isGemini && request.width && request.height
-        ? `${enhancedPrompt}. Image dimensions: ${request.width}x${request.height} pixels, aspect ratio ${(request.width / request.height).toFixed(2)}.`
-        : enhancedPrompt;
+    // ★ FIX: OpenRouter rejects provider: { width, height } with 400.
+    // Include dimensions in the prompt for ALL models.
+    // Post-processing via resizeImageToTarget() ensures exact canvas fit.
+    const promptWithSize = `${enhancedPrompt}. Image dimensions: ${request.width}x${request.height} pixels, aspect ratio ${(request.width / request.height).toFixed(2)}.`;
 
     const body: Record<string, unknown> = {
         model: modelId,
@@ -152,14 +150,6 @@ async function callImageGenApi(
             content: promptWithSize,
         }],
     };
-
-    // Only Flux supports provider-level size params
-    if (!isGemini && request.width && request.height) {
-        body.provider = {
-            width: clampDimension(request.width),
-            height: clampDimension(request.height),
-        };
-    }
 
     const url = getOpenRouterUrl();
     const headers = getOpenRouterHeaders();
