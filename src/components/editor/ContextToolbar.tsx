@@ -2,13 +2,13 @@
 // ContextToolbar — Canva-style floating toolbar for selected elements
 // ─────────────────────────────────────────────────
 // Appears above the selected element. Shows context-aware controls:
-//   - Text: Font family, font size, B/I/U/S, color, alignment, effects
+//   - Text: Font family, font size, B/I/U/S, color, alignment, line-height, letter-spacing, effects
 //   - Shape: Fill color, border radius, opacity, effects
 //   - Image: Fit mode, opacity
 //   - Common: Position, Effects, Animate
 // ─────────────────────────────────────────────────
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { IcAlignLeft, IcAlignCenterH, IcAlignRight } from '@/components/ui/Icons';
 import { ColorPicker } from '@/components/ui/ColorPicker';
 import { useUIStore } from '@/stores/uiStore';
@@ -16,18 +16,61 @@ import type { EngineNode, CanvasEngineActions } from '@/hooks/canvasTypes';
 import type { OverlayElement } from '@/hooks/useOverlayElements';
 import { removeBackgroundFromUrl, blobToDataUrl } from '@/services/backgroundRemovalService';
 
-// ── Font options ──
+// ── Font options (Google Fonts loaded dynamically) ──
 const FONT_FAMILIES = [
+    // Sans-Serif
     'Inter, sans-serif',
     'Roboto, sans-serif',
-    'Outfit, sans-serif',
+    'Open Sans, sans-serif',
+    'Lato, sans-serif',
     'Poppins, sans-serif',
     'Montserrat, sans-serif',
-    'Arial, sans-serif',
+    'Outfit, sans-serif',
+    'Nunito, sans-serif',
+    'Raleway, sans-serif',
+    'Work Sans, sans-serif',
+    'DM Sans, sans-serif',
+    'Manrope, sans-serif',
+    'Plus Jakarta Sans, sans-serif',
+    'Space Grotesk, sans-serif',
+    'Sora, sans-serif',
+    'Figtree, sans-serif',
+    // Serif
+    'Playfair Display, serif',
+    'Merriweather, serif',
+    'Lora, serif',
     'Georgia, serif',
     'Times New Roman, serif',
+    // Display
+    'Oswald, sans-serif',
+    'Bebas Neue, sans-serif',
+    'Anton, sans-serif',
+    // Mono
+    'JetBrains Mono, monospace',
+    'Fira Code, monospace',
     'Courier New, monospace',
+    // System Fallbacks
+    'Arial, sans-serif',
+    'Helvetica, sans-serif',
 ];
+
+// ── Google Fonts dynamic loader ──
+const loadedFonts = new Set<string>();
+
+function ensureGoogleFont(family: string) {
+    const name = family.split(',')[0].trim();
+    // Skip system fonts
+    const systemFonts = ['Arial', 'Helvetica', 'Georgia', 'Times New Roman', 'Courier New'];
+    if (systemFonts.includes(name) || loadedFonts.has(name)) return;
+    loadedFonts.add(name);
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(name)}:wght@300;400;500;600;700;900&display=swap`;
+    document.head.appendChild(link);
+}
+
+// Preload all fonts on first import
+FONT_FAMILIES.forEach(f => ensureGoogleFont(f));
 
 interface Props {
     // Engine node selection
@@ -189,6 +232,38 @@ export function ContextToolbar({
                     </button>
                 ))}
 
+                <div className="ctx-divider" />
+
+                {/* Line Height */}
+                <div className="ctx-font-size" title="Line Height">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ opacity: 0.5, flexShrink: 0 }}>
+                        <path d="M21 10H3M21 14H3M12 3v18M8 7l4-4 4 4M8 17l4 4 4-4" />
+                    </svg>
+                    <input
+                        className="ctx-size-input"
+                        type="number"
+                        value={Number((selectedOverlay.lineHeight ?? 1.4).toFixed(1))}
+                        onChange={(e) => onOverlayUpdate?.(selectedOverlay.id, { lineHeight: Number(e.target.value) })}
+                        min={0.5} max={4} step={0.1}
+                        style={{ width: 36 }}
+                    />
+                </div>
+
+                {/* Letter Spacing */}
+                <div className="ctx-font-size" title="Letter Spacing">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ opacity: 0.5, flexShrink: 0 }}>
+                        <path d="M7 8h10M5 12H1M23 12h-4M7 16h10M11 4l-4 16M17 4l-4 16" />
+                    </svg>
+                    <input
+                        className="ctx-size-input"
+                        type="number"
+                        value={Number((selectedOverlay.letterSpacing ?? 0).toFixed(1))}
+                        onChange={(e) => onOverlayUpdate?.(selectedOverlay.id, { letterSpacing: Number(e.target.value) })}
+                        min={-5} max={20} step={0.5}
+                        style={{ width: 36 }}
+                    />
+                </div>
+
                 <InlineButtons />
             </div>
         );
@@ -301,6 +376,38 @@ export function ContextToolbar({
                             {align === 'right' && <IcAlignRight size={14} />}
                         </button>
                     ))}
+
+                    <div className="ctx-divider" />
+
+                    {/* Line Height */}
+                    <div className="ctx-font-size" title="Line Height">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ opacity: 0.5, flexShrink: 0 }}>
+                            <path d="M21 10H3M21 14H3M12 3v18M8 7l4-4 4 4M8 17l4 4 4-4" />
+                        </svg>
+                        <input
+                            className="ctx-size-input"
+                            type="number"
+                            value={Number((selectedNode.lineHeight ?? 1.4).toFixed(1))}
+                            onChange={(e) => actions.updateText?.(selectedNode.id, { lineHeight: Number(e.target.value) })}
+                            min={0.5} max={4} step={0.1}
+                            style={{ width: 36 }}
+                        />
+                    </div>
+
+                    {/* Letter Spacing */}
+                    <div className="ctx-font-size" title="Letter Spacing">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ opacity: 0.5, flexShrink: 0 }}>
+                            <path d="M7 8h10M5 12H1M23 12h-4M7 16h10M11 4l-4 16M17 4l-4 16" />
+                        </svg>
+                        <input
+                            className="ctx-size-input"
+                            type="number"
+                            value={Number((selectedNode.letterSpacing ?? 0).toFixed(1))}
+                            onChange={(e) => actions.updateText?.(selectedNode.id, { letterSpacing: Number(e.target.value) })}
+                            min={-10} max={40} step={0.5}
+                            style={{ width: 36 }}
+                        />
+                    </div>
 
                     <InlineButtons />
                 </div>

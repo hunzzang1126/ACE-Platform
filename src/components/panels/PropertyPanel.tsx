@@ -20,15 +20,40 @@ import type { OverlayElement } from '@/hooks/useOverlayElements';
 
 // ── Font options ──
 const FONT_FAMILIES = [
+    // Sans-Serif
     'Inter, sans-serif',
     'Roboto, sans-serif',
-    'Outfit, sans-serif',
+    'Open Sans, sans-serif',
+    'Lato, sans-serif',
     'Poppins, sans-serif',
     'Montserrat, sans-serif',
-    'Arial, sans-serif',
+    'Outfit, sans-serif',
+    'Nunito, sans-serif',
+    'Raleway, sans-serif',
+    'Work Sans, sans-serif',
+    'DM Sans, sans-serif',
+    'Manrope, sans-serif',
+    'Plus Jakarta Sans, sans-serif',
+    'Space Grotesk, sans-serif',
+    'Sora, sans-serif',
+    'Figtree, sans-serif',
+    // Serif
+    'Playfair Display, serif',
+    'Merriweather, serif',
+    'Lora, serif',
     'Georgia, serif',
     'Times New Roman, serif',
+    // Display
+    'Oswald, sans-serif',
+    'Bebas Neue, sans-serif',
+    'Anton, sans-serif',
+    // Mono
+    'JetBrains Mono, monospace',
+    'Fira Code, monospace',
     'Courier New, monospace',
+    // System Fallbacks
+    'Arial, sans-serif',
+    'Helvetica, sans-serif',
 ];
 
 const FONT_WEIGHTS = [
