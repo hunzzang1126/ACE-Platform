@@ -24,6 +24,8 @@ import ExportTestPage from './ExportTestPage';
 import AiTestPage from './AiTestPage';
 import PricingPage from './PricingPage';
 import { TemplatesPage } from './TemplatesPage';
+import { ActivityPage } from './ActivityPage';
+import { OAuthCallbackPage } from './OAuthCallbackPage';
 
 // Components
 import { GlobalAiPanel } from '../components/ai/GlobalAiPanel';
@@ -49,6 +51,8 @@ export default function App() {
                     <Route path="/auth/callback" element={<AuthCallback />} />
                     <Route path="/pending" element={<PendingPage />} />
                     <Route path="/pricing" element={<PricingPage />} />
+                    <Route path="/auth/callback/meta" element={<OAuthCallbackPage />} />
+                    <Route path="/auth/callback/google-ads" element={<OAuthCallbackPage />} />
                     <Route path="/onboarding" element={
                         <ProtectedRoute>
                             <OnboardingPage />
@@ -94,6 +98,11 @@ export default function App() {
                     <Route path="/trash" element={
                         <ProtectedRoute>
                             <TrashPage />
+                        </ProtectedRoute>
+                    } />
+                    <Route path="/activity" element={
+                        <ProtectedRoute>
+                            <ActivityPage />
                         </ProtectedRoute>
                     } />
 
