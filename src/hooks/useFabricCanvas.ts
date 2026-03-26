@@ -270,6 +270,23 @@ export function useFabricCanvas(
                     (obj as any).__glidZIndex = fc.getObjects().filter(o => !isArtboard(o) && !(o as any).__aceGuide).length;
                     patchAceProps(obj);
                 }
+                // ★ REGRESSION GUARD: Enforce Canva-style controls for ALL Textbox objects.
+                // This catches restored, AI-generated, and template-loaded text elements.
+                // Without this, restored Textboxes show 8 corner handles that don't work
+                // (object:scaling resets scaleY→1, making corners useless).
+                if (obj instanceof Textbox) {
+                    obj.setControlsVisibility({
+                        tl: false, tr: false, bl: false, br: false,
+                        mt: false, mb: false,
+                        ml: true, mr: true,
+                        mtr: false,
+                    });
+                    // Normalize any stale scaling from save/load
+                    if ((obj.scaleX ?? 1) !== 1 || (obj.scaleY ?? 1) !== 1) {
+                        const newWidth = (obj.width ?? 200) * (obj.scaleX ?? 1);
+                        obj.set({ width: Math.max(20, newWidth), scaleX: 1, scaleY: 1 });
+                    }
+                }
                 if (!skipHistory.current && !(obj as any)?.__aceGuide) pushUndo('Add element');
                 syncState();
             });
