@@ -1,10 +1,10 @@
 // ─────────────────────────────────────────────────
-// ResizeHandles — 8-directional resize handles for overlay elements
+// ResizeHandles — Canva/Polotno-style round handles for overlay elements
 // ─────────────────────────────────────────────────
 
 import type { OverlayElement } from '@/hooks/useOverlayElements';
 
-const HANDLE_SIZE = 8;
+const HANDLE_SIZE = 10;
 const HALF = HANDLE_SIZE / 2;
 
 export type HandleDir = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
@@ -34,9 +34,10 @@ export function ResizeHandles({ el, onResizeStart }: {
                         position: 'absolute',
                         width: HANDLE_SIZE,
                         height: HANDLE_SIZE,
-                        background: '#e6edf3',
-                        border: '1px solid #4a9eff',
-                        borderRadius: 2,
+                        background: '#FFFFFF',
+                        border: '1px solid #0D99FF',
+                        borderRadius: '50%',
+                        boxShadow: '0 0 3px rgba(0,0,0,0.2)',
                         cursor,
                         zIndex: 9999,
                         ...style,

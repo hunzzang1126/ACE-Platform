@@ -11,7 +11,18 @@
 // ─────────────────────────────────────────────────
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Canvas, Rect, Ellipse, Shadow, PencilBrush, Textbox, FabricImage, Line, type FabricObject } from 'fabric';
+import { Canvas, Rect, Ellipse, Shadow, PencilBrush, Textbox, FabricImage, Line, FabricObject } from 'fabric';
+
+// ★ Canva/Polotno-style: Global selection handle defaults
+// Applied to ALL Fabric objects (shapes, images, text)
+FabricObject.ownDefaults.cornerColor = '#FFFFFF';
+FabricObject.ownDefaults.cornerStrokeColor = '#0D99FF';
+FabricObject.ownDefaults.cornerSize = 10;
+FabricObject.ownDefaults.cornerStyle = 'circle';
+FabricObject.ownDefaults.transparentCorners = false;
+FabricObject.ownDefaults.borderColor = '#0D99FF';
+FabricObject.ownDefaults.borderScaleFactor = 1;
+FabricObject.ownDefaults.padding = 0;
 import { useEditorStore } from '@/stores/editorStore';
 import { useHistoryStore } from '@/stores/historyStore';
 import type { EngineNode, CanvasEngineState, CanvasEngineActions, UseCanvasEngineResult } from './canvasTypes';
@@ -186,8 +197,9 @@ export function useFabricCanvas(
                 controlsAboveOverlay: true,
             });
 
-            (fc as any).selectionColor = 'rgba(74, 158, 255, 0.08)';
-            (fc as any).selectionBorderColor = '#4a9eff';
+            // ★ Canva/Polotno-style selection area (drag-select rectangle)
+            (fc as any).selectionColor = 'rgba(13, 153, 255, 0.06)';
+            (fc as any).selectionBorderColor = '#0D99FF';
             (fc as any).selectionLineWidth = 1;
 
             // ★ Artboard: white background with shadow

@@ -991,14 +991,14 @@
 }
 
 .ed-element:hover {
-    outline: 1px solid rgba(61, 123, 244, 0.5);
+    outline: 1px solid rgba(13, 153, 255, 0.4);
 }
 
 .ed-element.selected {
-    outline: 2px solid var(--accent);
+    outline: 1px solid #0D99FF;
 }
 
-/* Selection handles */
+/* Selection handles — Canva/Polotno style */
 .ed-selection-box {
     position: absolute;
     inset: -1px;
@@ -1007,60 +1007,61 @@
 
 .ed-handle {
     position: absolute;
-    width: 8px;
-    height: 8px;
-    background: #fff;
-    border: 1.5px solid var(--accent);
-    border-radius: 1px;
+    width: 10px;
+    height: 10px;
+    background: #FFFFFF;
+    border: 1px solid #0D99FF;
+    border-radius: 50%;
+    box-shadow: 0 0 3px rgba(0, 0, 0, 0.2);
     pointer-events: auto;
     cursor: pointer;
 }
 
 .ed-handle.nw {
-    top: -4px;
-    left: -4px;
+    top: -5px;
+    left: -5px;
     cursor: nw-resize;
 }
 
 .ed-handle.ne {
-    top: -4px;
-    right: -4px;
+    top: -5px;
+    right: -5px;
     cursor: ne-resize;
 }
 
 .ed-handle.sw {
-    bottom: -4px;
-    left: -4px;
+    bottom: -5px;
+    left: -5px;
     cursor: sw-resize;
 }
 
 .ed-handle.se {
-    bottom: -4px;
-    right: -4px;
+    bottom: -5px;
+    right: -5px;
     cursor: se-resize;
 }
 
 .ed-handle.n {
-    top: -4px;
-    left: calc(50% - 4px);
+    top: -5px;
+    left: calc(50% - 5px);
     cursor: n-resize;
 }
 
 .ed-handle.s {
-    bottom: -4px;
-    left: calc(50% - 4px);
+    bottom: -5px;
+    left: calc(50% - 5px);
     cursor: s-resize;
 }
 
 .ed-handle.e {
-    top: calc(50% - 4px);
-    right: -4px;
+    top: calc(50% - 5px);
+    right: -5px;
     cursor: e-resize;
 }
 
 .ed-handle.w {
-    top: calc(50% - 4px);
-    left: -4px;
+    top: calc(50% - 5px);
+    left: -5px;
     cursor: w-resize;
 }
 
