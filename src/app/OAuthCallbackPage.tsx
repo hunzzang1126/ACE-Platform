@@ -44,6 +44,7 @@ export function OAuthCallbackPage() {
         }
 
         handler.then(account => {
+            console.log('[OAuth] Handler result:', account);
             if (account) {
                 setStatus('success');
                 setMessage(`Connected: ${account.accountName}`);
@@ -53,9 +54,10 @@ export function OAuthCallbackPage() {
                 setStatus('error');
                 setMessage('Failed to connect account. Please try again.');
             }
-        }).catch(() => {
+        }).catch((err) => {
+            console.error('[OAuth] Handler error:', err);
             setStatus('error');
-            setMessage('Connection failed. Please try again.');
+            setMessage(`Connection failed: ${err?.message || 'Unknown error'}`);
         });
     }, [searchParams, location.pathname, navigate]);
 

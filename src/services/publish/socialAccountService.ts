@@ -161,8 +161,11 @@ export async function handleGoogleAdsCallback(code: string): Promise<SocialAccou
         },
     });
 
+    console.log('[OAuth] Google Ads response data:', data);
+    console.log('[OAuth] Google Ads response error:', error);
+
     if (error || !data) {
-        console.error('[OAuth] Google Ads callback error:', error);
+        console.error('[OAuth] Google Ads callback error:', error, 'data:', data);
         return null;
     }
 
