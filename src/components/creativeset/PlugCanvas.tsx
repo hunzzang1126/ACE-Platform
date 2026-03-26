@@ -150,8 +150,20 @@ export function PlugCanvas({ variants, cardRefs, containerRef }: PlugCanvasProps
     }
 
     const container = containerRef.current;
-    const svgW = container ? container.scrollWidth : 0;
-    const svgH = container ? container.scrollHeight : 0;
+    // ★ FIX: Compute SVG size from actual port positions, not scrollWidth/Height.
+    // Cards with overflow:visible can extend beyond scroll boundaries,
+    // causing cables to be clipped if SVG doesn't cover them.
+    let svgW = container ? container.scrollWidth : 0;
+    let svgH = container ? container.scrollHeight : 0;
+    const PADDING = 100; // extra space for port circles + glow
+    for (const pos of Object.values(positions.origins)) {
+        svgW = Math.max(svgW, pos.x + PADDING);
+        svgH = Math.max(svgH, pos.y + PADDING);
+    }
+    for (const pos of Object.values(positions.targets)) {
+        svgW = Math.max(svgW, pos.x + PADDING);
+        svgH = Math.max(svgH, pos.y + PADDING);
+    }
 
     return (
         <>
