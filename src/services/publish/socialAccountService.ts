@@ -121,10 +121,12 @@ export async function handleMetaCallback(code: string): Promise<SocialAccount | 
     if (!user) return null;
 
     // Exchange code for token via Edge Function (keeps app secret server-side)
-    const { data, error } = await sb.functions.invoke('meta-oauth-callback', {
+    const { data, error } = await sb.functions.invoke('meta-oauth', {
         body: {
             code,
+            userId: user.id,
             redirectUri: `${window.location.origin}/auth/callback/meta`,
+            platform: 'instagram',
         },
     });
 
@@ -133,17 +135,15 @@ export async function handleMetaCallback(code: string): Promise<SocialAccount | 
         return null;
     }
 
-    return saveConnectedAccount({
+    // Edge Function already saved to DB — return the account info
+    return {
+        id: data.id,
         userId: user.id,
-        platform: 'instagram',
-        platformUserId: data.instagram_user_id,
-        accountName: data.instagram_username,
-        accountAvatar: data.profile_picture_url,
-        accessToken: data.access_token,
-        refreshToken: data.refresh_token,
-        tokenExpiresAt: data.token_expires_at,
-        scopes: data.scopes,
-    });
+        platform: data.platform || 'instagram',
+        platformUserId: data.platformUserId,
+        accountName: data.accountName,
+        connectedAt: new Date().toISOString(),
+    } as SocialAccount;
 }
 
 // ── Handle Google Ads OAuth callback ──
@@ -153,9 +153,10 @@ export async function handleGoogleAdsCallback(code: string): Promise<SocialAccou
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return null;
 
-    const { data, error } = await sb.functions.invoke('google-ads-oauth-callback', {
+    const { data, error } = await sb.functions.invoke('google-ads-oauth', {
         body: {
             code,
+            userId: user.id,
             redirectUri: `${window.location.origin}/auth/callback/google-ads`,
         },
     });
@@ -165,16 +166,15 @@ export async function handleGoogleAdsCallback(code: string): Promise<SocialAccou
         return null;
     }
 
-    return saveConnectedAccount({
+    // Edge Function already saved to DB — return the account info
+    return {
+        id: data.id,
         userId: user.id,
         platform: 'google_ads',
-        platformUserId: data.customer_id,
-        accountName: data.account_name || `Account ${data.customer_id}`,
-        accessToken: data.access_token,
-        refreshToken: data.refresh_token,
-        tokenExpiresAt: data.token_expires_at,
-        scopes: ['adwords'],
-    });
+        platformUserId: data.platformUserId,
+        accountName: data.accountName,
+        connectedAt: new Date().toISOString(),
+    } as SocialAccount;
 }
 
 // ── DB row → SocialAccount mapper ──
