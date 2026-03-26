@@ -5,15 +5,17 @@
 // storing tokens in Supabase, and token refresh.
 // ─────────────────────────────────────────────────
 
-import { supabase } from '@/services/supabaseClient';
+import { getSupabase } from '@/services/supabaseClient';
 import type { SocialAccount, PublishPlatform } from './publishTypes';
 
 // ── Fetch connected accounts ──
 export async function getConnectedAccounts(): Promise<SocialAccount[]> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const sb = getSupabase();
+    if (!sb) return [];
+    const { data: { user } } = await sb.auth.getUser();
     if (!user) return [];
 
-    const { data, error } = await supabase
+    const { data, error } = await sb
         .from('user_social_accounts')
         .select('*')
         .eq('user_id', user.id)
@@ -35,7 +37,9 @@ export async function getAccountForPlatform(platform: PublishPlatform): Promise<
 
 // ── Disconnect an account ──
 export async function disconnectAccount(accountId: string): Promise<boolean> {
-    const { error } = await supabase
+    const sb = getSupabase();
+    if (!sb) return false;
+    const { error } = await sb
         .from('user_social_accounts')
         .delete()
         .eq('id', accountId);
@@ -49,7 +53,9 @@ export async function disconnectAccount(accountId: string): Promise<boolean> {
 
 // ── Save account after OAuth ──
 export async function saveConnectedAccount(account: Omit<SocialAccount, 'id' | 'connectedAt'>): Promise<SocialAccount | null> {
-    const { data, error } = await supabase
+    const sb = getSupabase();
+    if (!sb) return null;
+    const { data, error } = await sb
         .from('user_social_accounts')
         .upsert({
             user_id: account.userId,
@@ -109,11 +115,13 @@ export function getGoogleAdsOAuthUrl(): string {
 
 // ── Handle Meta OAuth callback ──
 export async function handleMetaCallback(code: string): Promise<SocialAccount | null> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const sb = getSupabase();
+    if (!sb) return null;
+    const { data: { user } } = await sb.auth.getUser();
     if (!user) return null;
 
     // Exchange code for token via Edge Function (keeps app secret server-side)
-    const { data, error } = await supabase.functions.invoke('meta-oauth-callback', {
+    const { data, error } = await sb.functions.invoke('meta-oauth-callback', {
         body: {
             code,
             redirectUri: `${window.location.origin}/auth/callback/meta`,
@@ -125,7 +133,6 @@ export async function handleMetaCallback(code: string): Promise<SocialAccount | 
         return null;
     }
 
-    // Save the account
     return saveConnectedAccount({
         userId: user.id,
         platform: 'instagram',
@@ -141,10 +148,12 @@ export async function handleMetaCallback(code: string): Promise<SocialAccount | 
 
 // ── Handle Google Ads OAuth callback ──
 export async function handleGoogleAdsCallback(code: string): Promise<SocialAccount | null> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const sb = getSupabase();
+    if (!sb) return null;
+    const { data: { user } } = await sb.auth.getUser();
     if (!user) return null;
 
-    const { data, error } = await supabase.functions.invoke('google-ads-oauth-callback', {
+    const { data, error } = await sb.functions.invoke('google-ads-oauth-callback', {
         body: {
             code,
             redirectUri: `${window.location.origin}/auth/callback/google-ads`,

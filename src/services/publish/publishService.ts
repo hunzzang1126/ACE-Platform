@@ -2,15 +2,17 @@
 // Publish Service — orchestrates publishing to platforms
 // ─────────────────────────────────────────────────
 
-import { supabase } from '@/services/supabaseClient';
-import type { PublishPlatform, PublishRecord } from './publishTypes';
+import { getSupabase } from '@/services/supabaseClient';
+import type { PublishRecord } from './publishTypes';
 
 // ── Fetch publish history for a creative set ──
 export async function getPublishHistory(creativeSetId: string): Promise<PublishRecord[]> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const sb = getSupabase();
+    if (!sb) return [];
+    const { data: { user } } = await sb.auth.getUser();
     if (!user) return [];
 
-    const { data, error } = await supabase
+    const { data, error } = await sb
         .from('publish_history')
         .select('*')
         .eq('user_id', user.id)
@@ -27,10 +29,12 @@ export async function getPublishHistory(creativeSetId: string): Promise<PublishR
 
 // ── Fetch all recent publishes (for Activity tab) ──
 export async function getRecentPublishes(limit = 20): Promise<PublishRecord[]> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const sb = getSupabase();
+    if (!sb) return [];
+    const { data: { user } } = await sb.auth.getUser();
     if (!user) return [];
 
-    const { data, error } = await supabase
+    const { data, error } = await sb
         .from('publish_history')
         .select('*')
         .eq('user_id', user.id)
@@ -50,7 +54,7 @@ export async function publishVariant(params: {
     creativeSetId: string;
     variantId: string;
     variantLabel: string;
-    platform: PublishPlatform;
+    platform: 'instagram' | 'facebook' | 'google_ads';
     socialAccountId: string;
     imageDataUrl: string;
     width: number;
@@ -60,7 +64,9 @@ export async function publishVariant(params: {
     headlines?: string[];
     scheduledAt?: string;
 }): Promise<PublishRecord | null> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const sb = getSupabase();
+    if (!sb) return null;
+    const { data: { user } } = await sb.auth.getUser();
     if (!user) return null;
 
     // 1. Upload image to Supabase Storage (public bucket for Meta API)
@@ -71,7 +77,7 @@ export async function publishVariant(params: {
     }
 
     // 2. Create publish record (pending)
-    const { data: record, error: insertError } = await supabase
+    const { data: record, error: insertError } = await sb
         .from('publish_history')
         .insert({
             user_id: user.id,
@@ -100,7 +106,7 @@ export async function publishVariant(params: {
     // 3. If not scheduled, publish immediately via Edge Function
     if (!params.scheduledAt) {
         try {
-            const { data: result, error: fnError } = await supabase.functions.invoke(
+            const { data: result, error: fnError } = await sb.functions.invoke(
                 `publish-${params.platform}`, {
                     body: {
                         publishId: record.id,
@@ -116,7 +122,7 @@ export async function publishVariant(params: {
             if (fnError) throw fnError;
 
             // Update record with platform post ID
-            await supabase
+            await sb
                 .from('publish_history')
                 .update({
                     status: 'published',
@@ -128,7 +134,7 @@ export async function publishVariant(params: {
             return mapDbToRecord({ ...record, status: 'published', platform_post_id: result?.post_id });
         } catch (err) {
             console.error('[Publish] Edge function error:', err);
-            await supabase
+            await sb
                 .from('publish_history')
                 .update({
                     status: 'failed',
@@ -145,14 +151,16 @@ export async function publishVariant(params: {
 
 // ── Upload image to Supabase Storage ──
 async function uploadImageToStorage(dataUrl: string, userId: string, variantId: string): Promise<string | null> {
+    const sb = getSupabase();
+    if (!sb) return null;
+
     try {
         // Convert data URL to blob
         const response = await fetch(dataUrl);
         const blob = await response.blob();
-
         const fileName = `publish/${userId}/${variantId}_${Date.now()}.png`;
 
-        const { error } = await supabase.storage
+        const { error } = await sb.storage
             .from('creative-assets')
             .upload(fileName, blob, {
                 contentType: 'image/png',
@@ -165,7 +173,7 @@ async function uploadImageToStorage(dataUrl: string, userId: string, variantId: 
         }
 
         // Get public URL
-        const { data: urlData } = supabase.storage
+        const { data: urlData } = sb.storage
             .from('creative-assets')
             .getPublicUrl(fileName);
 
