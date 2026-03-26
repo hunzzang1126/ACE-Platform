@@ -185,11 +185,19 @@ export const useAuthStore = create<AuthState>()(
                         .maybeSingle();
                     if (sub?.plan) userPlan = sub.plan as PlanTier;
                 } catch { /* no subscription = starter */ }
-                user.plan = userPlan;
 
                 console.log('[syncSession] Fetching role for:', supaUser.id);
                 const role = await fetchUserRole(supaUser.id);
                 console.log('[syncSession] Role result:', role);
+
+                // ★ REGRESSION GUARD: Admin role MUST override plan to 'admin'
+                // Admin users may not have a subscriptions row, but they need
+                // full access (Sonnet 4 AI model, unlimited creative sets, etc.)
+                if (role === 'admin') {
+                    userPlan = 'admin';
+                    console.log('[syncSession] Admin role detected — overriding plan to admin');
+                }
+                user.plan = userPlan;
 
                 // ★ Sync onboarding status from Supabase → localStorage
                 // This ensures cache-clear doesn't re-trigger onboarding

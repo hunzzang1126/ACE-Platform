@@ -30,7 +30,7 @@ export interface AiConfig {
 const DEFAULT_CONFIG: AiConfig = {
     endpoint: 'https://openrouter.ai/api',
     model: 'anthropic/claude-sonnet-4',
-    maxToolRounds: 3, // ★ SAFETY: 1 failure = error. Minimum for multi-step design tasks.
+    maxToolRounds: 6, // ★ Increased from 3: complex designs need image gen + place + text + style + animate + reflect
 };
 
 export function loadConfig(): AiConfig {

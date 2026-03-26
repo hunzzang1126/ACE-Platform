@@ -209,10 +209,23 @@ export function executeProjectTool(
             const page = params.page as string;
             if (!navigate) return { success: false, message: 'Navigation not available.' };
 
+            // ★ REGRESSION GUARD: Block AI from navigating away from editor mid-design.
+            // The AI sometimes calls navigate_to('dashboard') after creating elements,
+            // which destroys the user's work-in-progress by leaving the editor page.
+            const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+            const isInEditor = currentPath.includes('/editor');
+
             if (page === 'dashboard') {
+                if (isInEditor) {
+                    console.warn('[navigate_to] Blocked: cannot navigate to dashboard while in editor. User will navigate manually.');
+                    return { success: false, message: 'Cannot navigate to dashboard during editor session. The user will navigate manually when ready.' };
+                }
                 navigate('/dashboard');
                 return { success: true, message: 'Navigated to Dashboard.' };
             } else if (page === 'editor') {
+                if (isInEditor) {
+                    return { success: true, message: 'Already in the editor.' };
+                }
                 navigate('/editor');
                 return { success: true, message: 'Navigated to Creative Set Editor.' };
             } else if (page === 'detail') {
