@@ -115,9 +115,16 @@ export async function executeToolCall(
                 const r1 = num('r1', 0.2), g1 = num('g1', 0.4), b1 = num('b1', 0.8), a1 = num('a1', 1.0);
                 const r2 = num('r2', 0.8), g2 = num('g2', 0.2), b2 = num('b2', 0.4), a2 = num('a2', 1.0);
                 const angle_deg = num('angle_deg', 45);
-                const id = engine.add_gradient_rect(x, y, w, h, r1, g1, b1, a1, r2, g2, b2, a2, angle_deg) as number;
+                // ★ REGRESSION GUARD: engine expects hex strings, NOT raw RGBA floats
+                const toHex = (rv: number, gv: number, bv: number) => {
+                    const clamp = (v: number) => Math.max(0, Math.min(255, Math.round(v * 255)));
+                    return `#${clamp(rv).toString(16).padStart(2, '0')}${clamp(gv).toString(16).padStart(2, '0')}${clamp(bv).toString(16).padStart(2, '0')}`;
+                };
+                const hex1 = toHex(r1, g1, b1);
+                const hex2 = toHex(r2, g2, b2);
+                const id = engine.add_gradient_rect(x, y, w, h, hex1, hex2, angle_deg) as number;
                 trackedNodes.push(makeNodeInfo(id, 'gradient_rect', x, y, w, h, 'gradient', a1));
-                return { success: true, message: `Gradient rect at (${x}, ${y}), angle ${angle_deg}°`, nodeId: id };
+                return { success: true, message: `Gradient rect at (${x}, ${y}), angle ${angle_deg}°, ${hex1} → ${hex2}`, nodeId: id };
             }
 
             // ── Style ────────────────────────────────

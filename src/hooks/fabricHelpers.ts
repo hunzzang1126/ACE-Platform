@@ -27,6 +27,8 @@ export function nextColor(): string {
 
 // ── Hex ↔ RGB helpers ──
 export function hexToRgb01(colorStr: string): [number, number, number] {
+    // ★ REGRESSION GUARD: protect against non-string values (e.g. numeric 0.9 from corrupted gradient data)
+    if (typeof colorStr !== 'string') return [0.5, 0.5, 0.5];
     if (colorStr.startsWith('rgba') || colorStr.startsWith('rgb')) {
         const m = colorStr.match(/rgba?\((\d+\.?\d*),\s*(\d+\.?\d*),\s*(\d+\.?\d*)/);
         if (m) return [parseFloat(m[1]!) / 255, parseFloat(m[2]!) / 255, parseFloat(m[3]!) / 255];
