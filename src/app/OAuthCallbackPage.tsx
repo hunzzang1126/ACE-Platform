@@ -48,16 +48,24 @@ export function OAuthCallbackPage() {
             if (account) {
                 setStatus('success');
                 setMessage(`Connected: ${account.accountName}`);
-                // Auto-close after 2s to return to settings
                 setTimeout(() => navigate('/dashboard'), 2000);
             } else {
                 setStatus('error');
-                setMessage('Failed to connect account. Please try again.');
+                setMessage('Failed to connect account. Check console for details.');
             }
-        }).catch((err) => {
+        }).catch(async (err) => {
             console.error('[OAuth] Handler error:', err);
+            // Try to extract the actual Edge Function error details
+            let detail = err?.message || 'Unknown error';
+            try {
+                const ctx = (err as any)?.context;
+                if (ctx && typeof ctx.json === 'function') {
+                    const body = await ctx.json();
+                    detail = body?.details || body?.error || detail;
+                }
+            } catch { /* ignore */ }
             setStatus('error');
-            setMessage(`Connection failed: ${err?.message || 'Unknown error'}`);
+            setMessage(`Error: ${detail}`);
         });
     }, [searchParams, location.pathname, navigate]);
 
