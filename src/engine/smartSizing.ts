@@ -250,22 +250,28 @@ export function smartSizeElements(
 
     const scaleX = targetW / originW;
     const scaleY = targetH / originH;
-    const scaleFontRadius = Math.sqrt(scaleX * scaleY);
+    // ★ v8: Polotno-style — ONE uniform scale for ALL non-bg elements
+    // This preserves gaps between elements proportionally.
+    const uniformScale = Math.min(scaleX, scaleY);
+    const scaleFontRadius = uniformScale; // Font scales same as elements
 
-    console.log(`[smartSizing] ★ v7b Running: ${originW}x${originH} → ${targetW}x${targetH}, ${originElements.length} elements, scaleX=${scaleX.toFixed(2)} scaleY=${scaleY.toFixed(2)}`);
+    console.log(`[smartSizing] ★ v8 Polotno-style: ${originW}x${originH} → ${targetW}x${targetH}, uniformScale=${uniformScale.toFixed(3)}, scaleX=${scaleX.toFixed(2)} scaleY=${scaleY.toFixed(2)}`);
 
-    const stretched = originElements.map((el) => {
+    // ── Step 1: Scale all non-bg elements uniformly ──
+    const result: DesignElement[] = [];
+    const contentElements: Array<{ el: DesignElement; x: number; y: number; w: number; h: number }> = [];
+
+    for (const el of originElements) {
         const abs = constraintsToAbsolute(el.constraints, originW, originH);
         const role = detectElementRole(el, originW, originH);
 
-        // ── Background: fill target canvas ──
+        // ── Background: fill target canvas 100% ──
         if (role === 'background') {
             let bgW = targetW;
             let bgH = targetH;
             let bgX = 0;
             let bgY = 0;
 
-            // ★ Image backgrounds: cover-style (maintain aspect ratio, crop overflow)
             if (el.type === 'image' && abs.w > 0 && abs.h > 0) {
                 const imgAspect = abs.w / abs.h;
                 const canvasAspect = targetW / targetH;
@@ -280,42 +286,91 @@ export function smartSizeElements(
                 }
             }
 
-            const newConstraints: ElementConstraints = {
-                horizontal: { anchor: 'left' as const, offset: bgX },
-                vertical: { anchor: 'top' as const, offset: bgY },
-                size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width: bgW, height: bgH },
-                rotation: el.constraints.rotation,
-            };
-            return {
+            const bgEl = {
                 ...JSON.parse(JSON.stringify(el)),
-                constraints: newConstraints,
+                constraints: {
+                    horizontal: { anchor: 'left' as const, offset: bgX },
+                    vertical: { anchor: 'top' as const, offset: bgY },
+                    size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width: bgW, height: bgH },
+                    rotation: el.constraints.rotation,
+                },
             } as DesignElement;
+            result.push(bgEl);
+            continue;
         }
 
-        // ── All other elements: v3 proportional stretch ──
-        return applySameCategoryStretch(el, abs, scaleX, scaleY, scaleFontRadius, targetW, targetH);
-    });
+        // ── Non-bg: uniform scale (position + size) ──
+        const newX = Math.round(abs.x * uniformScale);
+        const newY = Math.round(abs.y * uniformScale);
+        const newW = Math.max(4, Math.round(abs.w * uniformScale));
+        const newH = Math.max(4, Math.round(abs.h * uniformScale));
 
-    // ★ v7b: Post-stretch corrections (Polotno/Celtra approach)
-    return postStretchTextFit(stretched, targetW, targetH, scaleX);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const fontPatch: Record<string, unknown> = {};
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if ((el.type === 'text' || el.type === 'button') && (el as any).fontSize) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            fontPatch.fontSize = Math.max(MIN_FONT, Math.round((el as any).fontSize * scaleFontRadius));
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if ((el as any).borderRadius) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            fontPatch.borderRadius = Math.round((el as any).borderRadius * scaleFontRadius);
+        }
+
+        const scaled = {
+            ...JSON.parse(JSON.stringify(el)),
+            constraints: {
+                horizontal: { anchor: 'left' as const, offset: newX },
+                vertical: { anchor: 'top' as const, offset: newY },
+                size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width: newW, height: newH },
+                rotation: el.constraints.rotation,
+            },
+            ...fontPatch,
+        } as DesignElement;
+
+        contentElements.push({ el: scaled, x: newX, y: newY, w: newW, h: newH });
+        result.push(scaled);
+    }
+
+    // ── Step 2: Center the content group within the target canvas ──
+    if (contentElements.length > 0) {
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const { x, y, w, h } of contentElements) {
+            minX = Math.min(minX, x);
+            minY = Math.min(minY, y);
+            maxX = Math.max(maxX, x + w);
+            maxY = Math.max(maxY, y + h);
+        }
+        const contentW = maxX - minX;
+        const contentH = maxY - minY;
+
+        // Offset to center content group
+        const offsetX = Math.round((targetW - contentW) / 2 - minX);
+        const offsetY = Math.round((targetH - contentH) / 2 - minY);
+
+        if (offsetX !== 0 || offsetY !== 0) {
+            for (const { el } of contentElements) {
+                const c = el.constraints;
+                c.horizontal = { anchor: 'left' as const, offset: c.horizontal.offset + offsetX };
+                c.vertical = { anchor: 'top' as const, offset: c.vertical.offset + offsetY };
+            }
+            console.log(`[smartSizing] v8 centered: offset(${offsetX},${offsetY}), contentBounds(${contentW}x${contentH})`);
+        }
+    }
+
+    // ── Step 3: Post-processing — text shrink-to-fit + canvas clamp ──
+    return postStretchTextFit(result, targetW, targetH);
 }
 
-// ── v7b: Post-Stretch Text Fit + Canvas Clamp + Left-Anchor Reflow ──
-//
-// After proportional stretch, text boxes can be too short for their font.
-// Example: 300x250 → 728x90
-//   boxH = 40 * 0.36 = 14px, fontSize = 24 * √(2.43*0.36) = 22px
-//   22px font in 14px box = overflow → overlaps next element
-//
-// Fix 1: Shrink fontSize until it fits the box (Celtra "shrink-to-fit")
-// Fix 2: Clamp elements inside canvas bounds
-// Fix 3: Left-anchor text reflow — expand text box width rightward for wrapping
+// ── v8: Post-Stretch Text Fit + Canvas Clamp ──
+// After uniform scale + centering, text might still overflow its box.
+// Shrink font to fit, then clamp elements inside canvas.
 
 function postStretchTextFit(
     elements: DesignElement[],
     targetW: number,
     targetH: number,
-    scaleX: number,
 ): DesignElement[] {
     const MARGIN = 4;
 
@@ -325,40 +380,22 @@ function postStretchTextFit(
         const textEl = el as any;
         const c = el.constraints;
 
-        // Get absolute position from constraints
         const x = c.horizontal.offset;
         const y = c.vertical.offset;
-        const w = c.size.width;
         const h = c.size.height;
 
         if (isText && textEl.fontSize) {
             const lineH = textEl.lineHeight || 1.2;
 
-            // ── Fix 1: Shrink-to-fit (font must fit in box) ──
-            // Single line height = fontSize * lineHeight
-            // If even one line doesn't fit, shrink font
+            // Shrink-to-fit: font must fit in box
             if (textEl.fontSize * lineH > h && h > 0) {
                 const fittedFont = Math.floor(h / lineH);
                 textEl.fontSize = Math.max(MIN_FONT, fittedFont);
-                console.log(`[smartSizing] v7b shrink-to-fit: ${el.name} font → ${textEl.fontSize}px (boxH=${h})`);
-            }
-
-            // ── Fix 3: Left-anchor text reflow ──
-            // Text keeps its left X position (proportionally scaled).
-            // Width expands rightward to use available horizontal space.
-            // This lets text wrap into more lines naturally instead of overflowing.
-            const rightEdge = x + w;
-            const availableRight = targetW - MARGIN;
-            if (rightEdge < availableRight && scaleX > 1.2) {
-                // Canvas got wider — expand text box right to use space
-                const newW = Math.round(availableRight - x);
-                c.size = { ...c.size, width: Math.max(w, newW) };
-                console.log(`[smartSizing] v7b reflow: ${el.name} width ${w} → ${newW} (left-anchor at x=${x})`);
+                console.log(`[smartSizing] v8 shrink-to-fit: ${el.name} font → ${textEl.fontSize}px (boxH=${h})`);
             }
         }
 
-        // ── Fix 2: Canvas boundary clamping ──
-        // Push elements inside canvas if they overflow
+        // Canvas boundary clamping
         const curW = c.size.width;
         const curH = c.size.height;
 

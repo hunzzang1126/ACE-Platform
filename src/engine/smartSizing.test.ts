@@ -216,20 +216,17 @@ describe('smartSizeElements — Role-Aware Smart Layout', () => {
         expect(resolved.height).toBe(600);
     });
 
-    it('300x250 → 728x90: headline gets readable font size (not squished to 9px)', () => {
+    it('v8: 300x250 → 728x90: headline font uses uniform scale', () => {
         const headline = makeText('h', 50, 50, 200, 40, 24, { role: 'headline', name: 'Headline' });
         const result = smartSizeElements([headline], 300, 250, 728, 90);
         const resultText = result[0] as TextElement;
-        // Smart font size for headline in ultra-wide should be readable
-        // getSmartFontSize('headline', 728, 90) → scaledFontSize(24, 728, 90)
-        // minDim = min(728, 90) = 90 < 100 → 24 * 0.5 = 12, floor = max(8, 12) = 12
-        expect(resultText.fontSize).toBeGreaterThanOrEqual(10);
-        // Old proportional would give 24 * 0.36 = 9 — this should be better
-        expect(resultText.fontSize).toBeGreaterThan(9);
+        // v8: uniformScale = min(2.43, 0.36) = 0.36
+        // font = round(24 * 0.36) = round(8.64) = 9
+        // boxH = round(40 * 0.36) = 14, 9*1.2=10.8 < 14 → no shrink
+        expect(resultText.fontSize).toBe(9);
     });
 
-    it('300x250 → 160x600: CTA positioned in lower part (portrait rules)', () => {
-        // CTA button element
+    it('v8: 300x250 → 160x600: CTA centered in canvas', () => {
         const cta = {
             id: 'cta',
             name: 'CTA Button',
@@ -252,8 +249,10 @@ describe('smartSizeElements — Role-Aware Smart Layout', () => {
         };
         const result = smartSizeElements([cta as any], 300, 250, 160, 600);
         const resolved = resolveConstraints(result[0]!.constraints, 160, 600);
-        // Portrait rule: CTA should be in the bottom third (y > 300 in 600px canvas)
-        expect(resolved.y).toBeGreaterThan(300);
+        // v8: uniformScale = min(0.533, 2.4) = 0.533
+        // Scaled then centered within 160x600 canvas
+        expect(resolved.y).toBeGreaterThan(200);
+        expect(resolved.y).toBeLessThan(400);
     });
 
     it('elements with explicit role="headline" use smart constraints', () => {
@@ -378,16 +377,17 @@ describe('smartSizeElements — Template-Proven Scaling (v3)', () => {
 
     // ★ Independent X/Y stretch fill (same as template drops)
 
-    it('same-category: positions scale independently on X and Y axes', () => {
-        // ★ v4: same-category uses v3 stretch, cross-category uses role-based layout
-        // Using 300x250 → 600x500 (both 'square' category) to test stretch path
+    it('v8: uniform scale preserves element proportions and gaps', () => {
+        // v8: ALL non-bg elements use uniformScale = min(scaleX, scaleY)
+        // 300x250 → 600x500: uniformScale = min(2, 2) = 2
         const el = makeShape('deco', 150, 125, 60, 50, 'deco_star');
         const result = smartSizeElements([el], 300, 250, 600, 500);
         const c = result[0]!.constraints;
-        // scaleX = 600/300 = 2.0 → x = round(150 * 2.0) = 300
-        // scaleY = 500/250 = 2.0 → y = round(125 * 2.0) = 250
-        expect(c.horizontal.offset).toBe(300);
-        expect(c.vertical.offset).toBe(250);
+        // uniformScale=2 → x=300, y=250, w=120, h=100
+        // Center offset: (600-120)/2 - 300 = -60, (500-100)/2 - 250 = -50
+        // Final: x=240, y=200
+        expect(c.horizontal.offset).toBe(240);
+        expect(c.vertical.offset).toBe(200);
     });
 
     it('cross-category: decoration uses smart layout instead of stretch', () => {
@@ -419,14 +419,14 @@ describe('smartSizeElements — Template-Proven Scaling (v3)', () => {
         expect(r.constraints.size.height).toBe(90);
     });
 
-    it('preserves borderRadius scaled by geometric mean', () => {
+    it('v8: borderRadius scales with uniform scale', () => {
         const btn = makeShape('btn', 100, 200, 120, 40, 'deco_pill');
         (btn as any).borderRadius = 20;
         const result = smartSizeElements([btn], 300, 250, 728, 90);
         const r = result[0] as any;
-        // geometricMean = √(2.427 * 0.36) = 0.935
-        // borderRadius = round(20 * 0.935) = round(18.7) = 19
-        expect(r.borderRadius).toBe(19);
+        // v8: uniformScale = min(2.427, 0.36) = 0.36
+        // borderRadius = round(20 * 0.36) = round(7.2) = 7
+        expect(r.borderRadius).toBe(7);
     });
 });
 
