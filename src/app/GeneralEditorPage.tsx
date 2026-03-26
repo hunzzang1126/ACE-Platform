@@ -12,6 +12,7 @@ import { useSmartCheck } from '@/hooks/useSmartCheck';
 import type { BannerPreset } from '@/schema/design.types';
 import { v4 as uuid } from 'uuid';
 import type { DesignElement } from '@/schema/elements.types';
+import { PublishModal } from '@/components/publish/PublishModal';
 import '@/styles/visionqa.css';
 
 export function GeneralEditorPage() {
@@ -21,6 +22,7 @@ export function GeneralEditorPage() {
 
     // Modal state
     const [showAddSizeModal, setShowAddSizeModal] = useState(false);
+    const [showPublishModal, setShowPublishModal] = useState(false);
 
     // ── Preview playback state ──
     const [previewPlaying, setPreviewPlaying] = useState(false);
@@ -120,6 +122,7 @@ export function GeneralEditorPage() {
             <CreativeSetTopBar
                 setName={creativeSet.name}
                 variantCount={creativeSet.variants.length}
+                onPublish={() => setShowPublishModal(true)}
             />
             <div className="cs-body">
                 <SizeSidebar
@@ -158,6 +161,26 @@ export function GeneralEditorPage() {
                     existingPresetIds={existingPresetIds}
                     onAdd={handleAddSizes}
                     onClose={() => setShowAddSizeModal(false)}
+                />
+            )}
+
+            {/* Publish Modal */}
+            {showPublishModal && creativeSet && (
+                <PublishModal
+                    isOpen={showPublishModal}
+                    onClose={() => setShowPublishModal(false)}
+                    creativeSetId={creativeSet.id}
+                    variants={creativeSet.variants.map(v => ({
+                        id: v.id,
+                        label: v.preset.name || `${v.preset.width}x${v.preset.height}`,
+                        width: v.preset.width,
+                        height: v.preset.height,
+                    }))}
+                    onExportVariant={async (_variantId: string) => {
+                        // TODO: Wire to actual canvas export (renderVariantToCanvas)
+                        // For now return a placeholder — will connect to export engine
+                        return 'data:image/png;base64,placeholder';
+                    }}
                 />
             )}
 

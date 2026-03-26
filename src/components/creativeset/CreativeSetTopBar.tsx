@@ -6,9 +6,10 @@ import { useNavigate } from 'react-router-dom';
 interface Props {
     setName: string;
     variantCount: number;
+    onPublish?: () => void;
 }
 
-export function CreativeSetTopBar({ setName, variantCount }: Props) {
+export function CreativeSetTopBar({ setName, variantCount, onPublish }: Props) {
     const navigate = useNavigate();
 
     return (
@@ -39,6 +40,32 @@ export function CreativeSetTopBar({ setName, variantCount }: Props) {
                 <button className="cs-topbar-btn outline">
                     CONTENT & STYLING
                 </button>
+                {onPublish && (
+                    <button
+                        className="cs-topbar-btn"
+                        onClick={onPublish}
+                        style={{
+                            background: 'linear-gradient(135deg, #0d99ff, #0077cc)',
+                            color: '#fff',
+                            border: 'none',
+                            fontWeight: 600,
+                            padding: '6px 16px',
+                            borderRadius: 6,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            fontSize: 11,
+                            transition: 'opacity 0.2s',
+                        }}
+                    >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                            <line x1="12" y1="19" x2="12" y2="5" />
+                            <polyline points="5 12 12 5 19 12" />
+                        </svg>
+                        PUBLISH
+                    </button>
+                )}
                 <button className="cs-topbar-btn icon" onClick={() => navigate('/dashboard')} title="Close">x</button>
             </div>
         </header>
