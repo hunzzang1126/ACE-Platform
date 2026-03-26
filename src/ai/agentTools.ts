@@ -609,6 +609,19 @@ const remove_background: ToolDefinition = {
     category: 'effects',
 };
 
+const fill_to_page: ToolDefinition = {
+    name: 'fill_to_page',
+    description: 'Scale an image to FILL the entire canvas while maintaining original aspect ratio (like CSS object-fit: cover). Overflow is centered and cropped. NEVER stretches or distorts. Use as the FINAL step after adding any image to ensure it covers the full canvas. If no node_id given, auto-detects the background image.',
+    parameters: {
+        type: 'object',
+        properties: {
+            node_id: { type: 'number', description: 'Node ID of the image to fill. Omit to auto-detect background image.' },
+        },
+        required: [],
+    },
+    category: 'transform',
+};
+
 // ── Full Design Pipeline (Meta-Tool) ──────────────
 
 const generate_full_design: ToolDefinition = {
@@ -669,6 +682,8 @@ const CANVAS_TOOLS: ToolDefinition[] = [
     generate_image, set_canvas_background, add_image_layer, replace_background_image,
     // Image Processing
     remove_background,
+    // Image Fitting
+    fill_to_page,
     // Full Design Pipeline
     generate_full_design,
     // Campaign

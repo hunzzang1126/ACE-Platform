@@ -222,6 +222,22 @@ export async function executeToolCall(
             case 'analyze_scene': return { success: true, message: analyzeScene(trackedNodes) };
             case 'render_banner': return executeRenderBanner(engine, params, trackedNodes);
 
+            // ── Fill to Page (Cover) ────────────────────
+            case 'fill_to_page': {
+                const nodeId = params.node_id != null ? num('node_id') : undefined;
+                if (!engine?.fill_to_page) {
+                    return { success: false, message: 'fill_to_page not available on this engine' };
+                }
+                engine.fill_to_page(nodeId);
+                const canvasW = engine.canvas_width?.() ?? engine.get_canvas_size?.()?.width ?? 300;
+                const canvasH = engine.canvas_height?.() ?? engine.get_canvas_size?.()?.height ?? 250;
+                return {
+                    success: true,
+                    message: `Image filled to page (${canvasW}x${canvasH}) — aspect ratio preserved, overflow cropped from center`,
+                    nodeId: nodeId,
+                };
+            }
+
             // ── Image Generation (Atomic) ────────────
             case 'generate_image': {
                 const prompt = str('prompt', 'abstract background');

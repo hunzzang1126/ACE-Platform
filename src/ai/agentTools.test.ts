@@ -26,7 +26,7 @@ describe('agentTools', () => {
         });
 
         it('every tool has a category', () => {
-            const validCategories = ['create', 'modify', 'animate', 'animation', 'compound', 'selection', 'undo', 'dashboard', 'style', 'query', 'effects', 'scene'];
+            const validCategories = ['create', 'modify', 'animate', 'animation', 'compound', 'selection', 'undo', 'dashboard', 'style', 'query', 'effects', 'scene', 'transform'];
             for (const tool of ALL_TOOLS) {
                 expect(validCategories).toContain(tool.category);
             }

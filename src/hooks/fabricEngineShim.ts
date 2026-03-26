@@ -759,6 +759,47 @@ export function createEngineShim(
             obj.setCoords();
             fc.renderAll();
         },
+
+        // ★ Fill to Page: scale image to COVER the entire canvas while
+        // maintaining original aspect ratio. Overflow is centered (cropped edges).
+        // Like CSS object-fit: cover. NEVER stretches or distorts.
+        fill_to_page: (id?: number) => {
+            // Find image: by id, or auto-detect the topmost/only image
+            let obj: FabricObject | undefined;
+            if (id != null) {
+                obj = findById(id);
+            } else {
+                // Auto-find: prefer background, then first image
+                const images = userObjects().filter(o => o.type === 'image');
+                obj = images.find(o => ((o as any).__glidName ?? '').toLowerCase().includes('background'))
+                    ?? images[0];
+            }
+            if (!obj || obj.type !== 'image') {
+                console.warn('[fill_to_page] No image found');
+                return;
+            }
+
+            const natW = (obj as any).width ?? 1;
+            const natH = (obj as any).height ?? 1;
+
+            // Cover scale: use Math.max so the ENTIRE canvas is filled
+            const scale = Math.max(
+                artboardW / Math.max(natW, 1),
+                artboardH / Math.max(natH, 1),
+            );
+
+            // Center the overflow (crop from center)
+            const scaledW = natW * scale;
+            const scaledH = natH * scale;
+            const offsetX = (artboardW - scaledW) / 2;
+            const offsetY = (artboardH - scaledH) / 2;
+
+            obj.set({ scaleX: scale, scaleY: scale, left: offsetX, top: offsetY });
+            obj.setCoords();
+            fc.renderAll();
+            syncState();
+            console.log(`[fill_to_page] Image ${(obj as any).__glidId}: scale=${scale.toFixed(3)}, offset=(${offsetX.toFixed(1)}, ${offsetY.toFixed(1)})`);
+        },
         set_opacity: (id: number, v: number) => {
             const obj = findById(id);
             if (obj) { obj.set({ opacity: v }); fc.renderAll(); }

@@ -466,9 +466,15 @@ You have EXACTLY ONE chance to call tools. After your tool calls execute, you wi
 
 ### How to batch effectively:
 - **Multi-element design?** → Use \`render_banner\` with ALL elements in one call (shapes + text + animations)
-- **Need background image + elements?** → Call \`set_canvas_background\` AND \`render_banner\` in PARALLEL (same response)
+- **Need background image + elements?** → Call \`set_canvas_background\` AND \`render_banner\` AND \`fill_to_page\` in PARALLEL (same response)
 - **Modifying multiple elements?** → Call ALL \`set_position\`, \`set_size\`, \`set_color\` etc. in PARALLEL (same response)
 - **NEVER** call a tool, wait for result, then call another tool. Everything goes in ONE batch.
+
+### fill_to_page (MANDATORY for images)
+- After ANY image is placed on canvas (\`set_canvas_background\`, \`add_image_layer\`), ALWAYS call \`fill_to_page\` in the same batch.
+- \`fill_to_page\` scales the image to COVER the entire canvas while preserving aspect ratio. Overflow is center-cropped.
+- This saves API cost (generate at any resolution) and guarantees the image fills the canvas perfectly.
+- No node_id needed for backgrounds — it auto-detects.
 
 ### What to NEVER do:
 - Do NOT call \`navigate_to\` while in the editor — the user will navigate when ready
