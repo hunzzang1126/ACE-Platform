@@ -48,14 +48,21 @@ export function OAuthCallbackPage() {
             if (account) {
                 setStatus('success');
                 setMessage(`Connected: ${account.accountName}`);
-                setTimeout(() => navigate('/dashboard'), 2000);
+                // If opened as popup, notify parent and close
+                if (window.opener) {
+                    try {
+                        window.opener.postMessage({ type: 'OAUTH_SUCCESS', platform: account.platform, accountName: account.accountName }, '*');
+                    } catch { /* cross-origin */ }
+                    setTimeout(() => window.close(), 1500);
+                } else {
+                    setTimeout(() => navigate('/dashboard'), 2000);
+                }
             } else {
                 setStatus('error');
                 setMessage('Failed to connect account. Check console for details.');
             }
         }).catch(async (err) => {
             console.error('[OAuth] Handler error:', err);
-            // Try to extract the actual Edge Function error details
             let detail = err?.message || 'Unknown error';
             try {
                 const ctx = (err as any)?.context;
@@ -112,7 +119,13 @@ export function OAuthCallbackPage() {
                 </p>
                 {status === 'error' && (
                     <button
-                        onClick={() => navigate('/dashboard')}
+                        onClick={() => {
+                            if (window.opener) {
+                                window.close();
+                            } else {
+                                navigate('/dashboard');
+                            }
+                        }}
                         style={{
                             marginTop: 16, padding: '8px 20px', borderRadius: 8,
                             background: 'rgba(255,255,255,0.06)',
@@ -120,7 +133,7 @@ export function OAuthCallbackPage() {
                             color: '#c8c8cc', fontSize: 13, cursor: 'pointer',
                         }}
                     >
-                        Back to Dashboard
+                        {window.opener ? 'Close' : 'Back to Dashboard'}
                     </button>
                 )}
             </div>
