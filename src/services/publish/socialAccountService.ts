@@ -164,8 +164,23 @@ export async function handleGoogleAdsCallback(code: string): Promise<SocialAccou
     console.log('[OAuth] Google Ads response data:', data);
     console.log('[OAuth] Google Ads response error:', error);
 
-    if (error || !data) {
-        console.error('[OAuth] Google Ads callback error:', error, 'data:', data);
+    if (error) {
+        // Try to get the actual error details from the response
+        let details = error?.message || 'Unknown error';
+        try {
+            const ctx = (error as any)?.context;
+            if (ctx && typeof ctx.json === 'function') {
+                const body = await ctx.json();
+                details = body?.error || body?.details || details;
+                console.error('[OAuth] Edge Function error body:', body);
+            }
+        } catch { /* ignore */ }
+        console.error('[OAuth] Google Ads callback error:', details);
+        return null;
+    }
+
+    if (!data) {
+        console.error('[OAuth] Google Ads callback: no data returned');
         return null;
     }
 
