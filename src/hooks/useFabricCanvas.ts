@@ -249,19 +249,45 @@ export function useFabricCanvas(
                 syncState();
             });
 
-            // ★ Canva-style: Textbox width-only resize.
-            // When a Textbox is scaled (via ml/mr handles), convert scaleX→width
-            // and reset scaleX/scaleY to 1 so text reflows within the new width.
+            // ★ Text resize logic:
+            // - Side handles (ml/mr): Convert scaleX→width only, text reflows (Canva-style)
+            // - Corner handles (tl/tr/bl/br): Proportionally scale fontSize + dimensions
             fc.on('object:scaling', (opt) => {
                 const obj = opt.target;
                 if (!obj || !(obj instanceof Textbox)) return;
-                // Convert visual scale to actual width
-                const newWidth = (obj.width ?? 200) * (obj.scaleX ?? 1);
-                obj.set({
-                    width: Math.max(20, newWidth),
-                    scaleX: 1,
-                    scaleY: 1,
-                });
+                const corner = (obj as any).__corner;
+                const isCorner = corner && ['tl', 'tr', 'bl', 'br'].includes(corner);
+                if (isCorner) {
+                    // ★ Corner drag → proportional scale: change fontSize
+                    const uniformScale = Math.max(obj.scaleX ?? 1, obj.scaleY ?? 1);
+                    const origFontSize = (obj as any).__glidOrigFontSize ?? obj.fontSize ?? 18;
+                    if (!(obj as any).__glidOrigFontSize) {
+                        (obj as any).__glidOrigFontSize = obj.fontSize ?? 18;
+                    }
+                    const newFontSize = Math.max(6, Math.min(400, Math.round(origFontSize * uniformScale)));
+                    const newWidth = (obj.width ?? 200) * (obj.scaleX ?? 1);
+                    obj.set({
+                        fontSize: newFontSize,
+                        width: Math.max(20, newWidth),
+                        scaleX: 1,
+                        scaleY: 1,
+                    });
+                } else {
+                    // ★ Side handle (ml/mr) → width-only reflow
+                    const newWidth = (obj.width ?? 200) * (obj.scaleX ?? 1);
+                    obj.set({
+                        width: Math.max(20, newWidth),
+                        scaleX: 1,
+                        scaleY: 1,
+                    });
+                }
+            });
+            // Reset original font size ref after scaling ends
+            fc.on('object:modified', (opt) => {
+                const obj = opt.target;
+                if (obj && obj instanceof Textbox) {
+                    delete (obj as any).__glidOrigFontSize;
+                }
             });
             fc.on('object:added', (opt) => {
                 const obj = opt.target;
@@ -270,13 +296,11 @@ export function useFabricCanvas(
                     (obj as any).__glidZIndex = fc.getObjects().filter(o => !isArtboard(o) && !(o as any).__aceGuide).length;
                     patchAceProps(obj);
                 }
-                // ★ REGRESSION GUARD: Enforce Canva-style controls for ALL Textbox objects.
-                // This catches restored, AI-generated, and template-loaded text elements.
-                // Without this, restored Textboxes show 8 corner handles that don't work
-                // (object:scaling resets scaleY→1, making corners useless).
+                // ★ Enforce text handle visibility for ALL Textbox objects.
+                // Corners (tl/tr/bl/br) = proportional scale, sides (ml/mr) = width reflow.
                 if (obj instanceof Textbox) {
                     obj.setControlsVisibility({
-                        tl: false, tr: false, bl: false, br: false,
+                        tl: true, tr: true, bl: true, br: true,
                         mt: false, mb: false,
                         ml: true, mr: true,
                         mtr: false,
@@ -498,11 +522,9 @@ export function useFabricCanvas(
             lineHeight: opts?.lineHeight ?? 1.4,
             editable: true, splitByGrapheme: false,
         });
-        // ★ Canva-style: restrict Textbox to width-only resize.
-        // Only ml (middle-left) and mr (middle-right) handles are visible.
-        // Corner handles and mt/mb are disabled to prevent proportional scaling.
+        // ★ Text handles: corners for proportional scale, sides for width reflow.
         tb.setControlsVisibility({
-            tl: false, tr: false, bl: false, br: false,
+            tl: true, tr: true, bl: true, br: true,
             mt: false, mb: false,
             ml: true, mr: true,
             mtr: false, // no rotation for text
@@ -733,10 +755,10 @@ export function useFabricCanvas(
                 (obj as any).__glidId = nextId();
                 (obj as any).__glidZIndex = 0;
             }
-            // ★ Canva-style: ensure restored Textbox objects have width-only resize handles
+            // ★ Ensure restored Textbox objects have correct handles
             if (obj instanceof Textbox) {
                 obj.setControlsVisibility({
-                    tl: false, tr: false, bl: false, br: false,
+                    tl: true, tr: true, bl: true, br: true,
                     mt: false, mb: false,
                     ml: true, mr: true,
                     mtr: false,
