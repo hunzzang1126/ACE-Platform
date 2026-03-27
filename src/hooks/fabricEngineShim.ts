@@ -1,199 +1,26 @@
 // ─────────────────────────────────────────────────
-// fabricEngineShim — Engine compatibility layer
+// fabricEngineShim — Engine compatibility layer (orchestrator)
 // ─────────────────────────────────────────────────
 // Wraps Fabric.js canvas to expose an engine-compatible API.
-// Used by AI tool executors, auto-design, vision QA, etc.
-// Pure function — no React hooks.
+// Sub-modules: shimAnimation, shimTextEffects, shimCreators
 // ─────────────────────────────────────────────────
 
 import {
-    Canvas, Rect, Ellipse, Shadow, Textbox,
-    FabricImage, Gradient, Group, type FabricObject,
+    Canvas, Shadow, Group, type FabricObject,
 } from 'fabric';
-import { useAnimPresetStore } from './useAnimationPresets';
 import {
-    nextId, rgbToHex, isArtboard, fabricToEngineNode, patchAceProps, GLID_CUSTOM_PROPS,
+    nextId, rgbToHex, isArtboard, fabricToEngineNode, GLID_CUSTOM_PROPS,
+    patchAceProps,
 } from './fabricHelpers';
+import { createAnimationMethods } from './shimAnimation';
+import { createTextEffectMethods } from './shimTextEffects';
+import { createCreatorMethods } from './shimCreators';
+import type { ShimContext } from './shimTypes';
 
 /**
  * Create an engine-compatible shim wrapping a Fabric.js Canvas.
- * This provides the same API surface as the WASM engine so AI executors
- * and other services can work with either backend.
+ * Delegates to sub-modules for element creation, text effects, and animation.
  */
-
-// ── Text Effect CSS Application ──────────────────
-// Maps effect type → Fabric Shadow / stroke / paintFirst properties.
-// Uses ONLY Fabric-native APIs that serialize correctly.
-function applyTextEffectCSS(
-    obj: FabricObject,
-    effectType: string,
-    intensity: number,
-    color: string,
-    _fc: Canvas,
-): void {
-    const scale = intensity / 50; // 1.0 at intensity=50
-
-    // ★ Store original fill BEFORE any effect modifies it.
-    // This preserves the real text color for serialization (fabricToEngineNode reads __glidOriginalFill).
-    if (obj instanceof Textbox) {
-        const curFill = obj.fill;
-        // Only capture if we don't already have one stored, AND current fill isn't already from an effect
-        if (!(obj as any).__glidOriginalFill && typeof curFill === 'string' && curFill !== 'transparent') {
-            (obj as any).__glidOriginalFill = curFill;
-        }
-    }
-
-    // Clear ALL previous effect styles (prevents residual ghost effects)
-    obj.set({ shadow: undefined, stroke: undefined, strokeWidth: 0 } as any);
-    // ★ Clear custom styles used by neon/glitch multi-layer effects
-    delete (obj as any).__glidCustomStyles;
-    // ★ Force Fabric texture cache invalidation — without this, Fabric may
-    // re-use the cached bitmap of the old effect even after property reset.
-    obj.dirty = true;
-    if (obj instanceof Textbox) {
-        obj.set({ paintFirst: 'fill' } as any);
-        // ★ Restore original fill when switching effects (previous effect may have set fill='transparent')
-        if ((obj as any).__glidOriginalFill) {
-            obj.set({ fill: (obj as any).__glidOriginalFill });
-            if (effectType === 'none') {
-                delete (obj as any).__glidOriginalFill;
-            }
-        }
-    }
-
-    console.log(`[applyTextEffectCSS] effect=${effectType} scale=${scale} color=${color} isTextbox=${obj instanceof Textbox} fill=${(obj as any).fill}`);
-
-    switch (effectType) {
-        case 'drop':
-            obj.set({
-                shadow: new Shadow({
-                    color: color + 'cc',
-                    blur: 8 * scale,
-                    offsetX: 4 * scale,
-                    offsetY: 4 * scale,
-                }),
-            });
-            break;
-
-        case 'glow':
-            obj.set({
-                shadow: new Shadow({
-                    color: color + '80',
-                    blur: 20 * scale,
-                    offsetX: 0,
-                    offsetY: 0,
-                }),
-            });
-            break;
-
-        case 'echo':
-            obj.set({
-                shadow: new Shadow({
-                    color: color + '40',
-                    blur: 0,
-                    offsetX: 6 * scale,
-                    offsetY: 6 * scale,
-                }),
-            });
-            break;
-
-        case 'outline':
-            if (obj instanceof Textbox) {
-                obj.set({
-                    stroke: color,
-                    strokeWidth: Math.max(1, 2 * scale),
-                    paintFirst: 'stroke',
-                } as any);
-            }
-            break;
-
-        case 'splice':
-            // Splice: outer colored stroke + explicit fill creates split-tone effect
-            if (obj instanceof Textbox) {
-                obj.set({
-                    stroke: color,
-                    strokeWidth: Math.max(2, 3 * scale),
-                    paintFirst: 'stroke',
-                } as any);
-            }
-            break;
-
-        case 'neon': {
-            // Multi-layer neon glow
-            const layers = [
-                `0 0 ${Math.round(8 * scale)}px ${color}`,
-                `0 0 ${Math.round(20 * scale)}px ${color}80`,
-                `0 0 ${Math.round(40 * scale)}px ${color}40`,
-            ];
-            obj.set({
-                shadow: new Shadow({
-                    color: color,
-                    blur: 12 * scale,
-                    offsetX: 0,
-                    offsetY: 0,
-                }),
-            });
-            // Store multi-layer as custom style for CSS preview
-            (obj as any).__glidCustomStyles = {
-                textShadow: layers.join(', '),
-            };
-            break;
-        }
-
-        case 'glitch': {
-            // Glitch: red & cyan offset shadows
-            obj.set({
-                shadow: new Shadow({
-                    color: '#ff0000',
-                    blur: 0,
-                    offsetX: 3 * scale,
-                    offsetY: 0,
-                }),
-            });
-            // Store cyan layer as custom style
-            (obj as any).__glidCustomStyles = {
-                textShadow: `${Math.round(-3 * scale)}px 0 0 #00ffff, ${Math.round(3 * scale)}px 0 0 #ff0000`,
-            };
-            break;
-        }
-
-        case 'curve':
-            // Curve: visual only in canvas. Store the intent for CSS preview.
-            obj.set({
-                shadow: new Shadow({
-                    color: color + '30',
-                    blur: 4 * scale,
-                    offsetX: 0,
-                    offsetY: 2 * scale,
-                }),
-            });
-            break;
-
-        case '70s': {
-            // Retro 70s: thick colored outline + warm shadow
-            if (obj instanceof Textbox) {
-                obj.set({
-                    stroke: color,
-                    strokeWidth: Math.max(3, 5 * scale),
-                    paintFirst: 'stroke',
-                    shadow: new Shadow({
-                        color: '#ff8c0060',
-                        blur: 0,
-                        offsetX: 4 * scale,
-                        offsetY: 4 * scale,
-                    }),
-                } as any);
-            }
-            break;
-        }
-
-        case 'none':
-        default:
-            // Already cleared above
-            break;
-    }
-}
-
 export function createEngineShim(
     fc: Canvas,
     syncState: () => void,
@@ -203,32 +30,23 @@ export function createEngineShim(
     const findById = (id: number) => fc.getObjects().find((o) => (o as any).__glidId === id);
     const userObjects = () => fc.getObjects().filter(o => !isArtboard(o));
 
+    // Shared context for sub-modules
+    const ctx: ShimContext = { fc, syncState, findById, userObjects, artboardW, artboardH };
+
     return {
+        // ── Sub-module methods (spread) ──────────────────
+        ...createCreatorMethods(ctx),
+        ...createTextEffectMethods(ctx),
+        ...createAnimationMethods(fc, userObjects),
+
         // ── Query ────────────────────────────────────────
-        get_all_nodes: () => {
-            const nodes = userObjects().map(fabricToEngineNode);
-            return JSON.stringify(nodes);
-        },
-
-        // ★ FIX: Return actual artboard dimensions so AI pipeline
-        // can render at the correct canvas size (not default 300x250).
+        get_all_nodes: () => JSON.stringify(userObjects().map(fabricToEngineNode)),
         get_canvas_size: () => ({ width: artboardW, height: artboardH }),
-
-        // ★ SINGLE SOURCE OF TRUTH: Fabric-native serialization.
-        // Returns fc.toObject() with all Glid custom props included.
-        // This JSON is the canonical representation — no lossy conversion.
-        getCanvasJSON: (): string => {
-            return JSON.stringify(fc.toObject(GLID_CUSTOM_PROPS));
-        },
-
-        // ★ SINGLE SOURCE OF TRUTH: Fabric-native deserialization.
-        // Restores the canvas from a JSON string created by getCanvasJSON().
-        // Returns a Promise that resolves when all objects (including images) are loaded.
+        getCanvasJSON: (): string => JSON.stringify(fc.toObject(GLID_CUSTOM_PROPS)),
         loadCanvasJSON: async (jsonStr: string): Promise<void> => {
             await fc.loadFromJSON(jsonStr);
             fc.renderAll();
         },
-
         node_count: () => userObjects().length,
         get_selection: () => {
             const active = fc.getActiveObjects();
@@ -244,358 +62,64 @@ export function createEngineShim(
         rubber_band_rect: () => 'null',
         hit_test: () => JSON.stringify({ type: 'none' }),
 
-        // ── Create: shapes ───────────────────────────────
-        add_rect: (x: number, y: number, w: number, h: number, r: number, g: number, b: number, a: number, name?: string) => {
-            const id = nextId();
-            const rect = new Rect({
-                left: x, top: y, width: w, height: h,
-                fill: rgbToHex(r, g, b),
-                opacity: a,
-            });
-            (rect as any).__glidId = id;
-            (rect as any).__glidName = name || `Rectangle #${id}`;
-            (rect as any).__glidZIndex = userObjects().length;
-            patchAceProps(rect);
-            fc.add(rect);
-            fc.renderAll();
-            syncState();
-            return id;
-        },
-
-        add_rounded_rect: (x: number, y: number, w: number, h: number, r: number, g: number, b: number, a: number, radius: number, name?: string) => {
-            const id = nextId();
-            const rect = new Rect({
-                left: x, top: y, width: w, height: h,
-                fill: rgbToHex(r, g, b),
-                opacity: a,
-                rx: radius, ry: radius,
-            });
-            (rect as any).__glidId = id;
-            (rect as any).__glidName = name || `Rounded Rect #${id}`;
-            (rect as any).__glidZIndex = userObjects().length;
-            patchAceProps(rect);
-            fc.add(rect);
-            fc.renderAll();
-            syncState();
-            return id;
-        },
-
-        add_gradient_rect: (
-            x: number, y: number, w: number, h: number,
-            hex1: string, hex2: string,
-            angleDeg: number = 0,
-            radius: number = 0,
-            name?: string,
-        ) => {
-            const id = nextId();
-            const rad = (angleDeg * Math.PI) / 180;
-            const x1 = 0.5 - Math.sin(rad) * 0.5;
-            const y1 = 0.5 - Math.cos(rad) * 0.5;
-            const x2 = 0.5 + Math.sin(rad) * 0.5;
-            const y2 = 0.5 + Math.cos(rad) * 0.5;
-            const gradient = new Gradient({
-                type: 'linear',
-                coords: { x1: x1 * w, y1: y1 * h, x2: x2 * w, y2: y2 * h },
-                colorStops: [
-                    { offset: 0, color: hex1 },
-                    { offset: 1, color: hex2 },
-                ],
-                gradientUnits: 'pixels',
-            });
-            const rect = new Rect({
-                left: x, top: y, width: w, height: h,
-                fill: gradient,
-                rx: radius, ry: radius,
-            });
-            (rect as any).__glidId = id;
-            (rect as any).__glidName = name || `Gradient Rect #${id}`;
-            (rect as any).__glidZIndex = userObjects().length;
-            (rect as any).__glidGradientStart = hex1;
-            (rect as any).__glidGradientEnd = hex2;
-            (rect as any).__glidGradientAngle = angleDeg;
-            patchAceProps(rect);
-            fc.add(rect);
-            fc.renderAll();
-            syncState();
-            return id;
-        },
-
-        add_ellipse: (cx: number, cy: number, rx: number, ry: number, r: number, g: number, b: number, a: number) => {
-            const id = nextId();
-            const el = new Ellipse({
-                left: cx - rx, top: cy - ry,
-                rx, ry,
-                fill: rgbToHex(r, g, b),
-                opacity: a,
-            });
-            (el as any).__glidId = id;
-            (el as any).__glidZIndex = userObjects().length;
-            patchAceProps(el);
-            fc.add(el);
-            fc.renderAll();
-            return id;
-        },
-
-        // ── Create: text ─────────────────────────────────
-        add_text: (
-            x: number, y: number, content: string,
-            fontSize: number, fontFamily: string, fontWeight: string,
-            r: number, g: number, b: number, _a: number,
-            width: number, textAlign: string,
-            name?: string,
-            lineHeight?: number,
-            letterSpacing?: number,
-            fontStyle?: string,
-        ) => {
-            const id = nextId();
-            const tb = new Textbox(content || 'Text', {
-                left: x,
-                top: y,
-                width: width > 0 ? width : 200,
-                fontSize: fontSize || 18,
-                fontFamily: fontFamily || 'Inter, system-ui, sans-serif',
-                fontWeight: fontWeight || '400',
-                fontStyle: (fontStyle === 'italic' ? 'italic' : 'normal') as any,
-                fill: rgbToHex(r, g, b),
-                textAlign: (textAlign as any) || 'left',
-                lineHeight: lineHeight ?? 1.4,
-                charSpacing: (letterSpacing ?? 0) * 10,
-                editable: true,
-            });
-            (tb as any).__glidId = id;
-            (tb as any).__glidName = name || `Text #${id}`;
-            (tb as any).__glidZIndex = userObjects().length;
-            patchAceProps(tb);
-            fc.add(tb);
-            // ★ REGRESSION GUARD: Update bounding rect for hit-testing AFTER add.
-            // Without setCoords(), Fabric's click target area may not match the
-            // auto-calculated Textbox height (especially for large multi-line text).
-            tb.setCoords();
-            fc.renderAll();
-            syncState();
-            return id;
-        },
-
-        // ── Create: image (async) ────────────────────────
-        // ★ REGRESSION GUARD: fc.add() ALWAYS places objects at the TOP of the
-        // Fabric stack — regardless of __glidZIndex. When images load async
-        // (FabricImage.fromURL), all sync elements (shapes, text) are already
-        // added, so the image lands on top of everything after load.
-        // Fix: after fc.add(), immediately call fc.moveObjectTo(img, rank+1)
-        // where rank is this image's position in the __glidZIndex-sorted list.
-        // ★ REGRESSION GUARD: storedNatW/storedNatH preserve the SVG natural dimensions
-        // captured at first load time. SVGs without explicit width/height attributes may
-        // report naturalWidth/naturalHeight=0 on second load (browser varies).
-        // Using stored dims ensures scaleX/scaleY are computed consistently.
-        add_image: async (x: number, y: number, src: string, w?: number, h?: number, name?: string, zIndex?: number, storedNatW?: number, storedNatH?: number): Promise<number> => {
-            const id = nextId();
-            try {
-                const isDataUrl = src.startsWith('data:');
-                const isSvg = src.startsWith('data:image/svg') || (src.startsWith('http') && src.endsWith('.svg'));
-                const imgOptions = isDataUrl ? {} : { crossOrigin: 'anonymous' as const };
-                const img = await FabricImage.fromURL(src, imgOptions);
-
-                // ★ REGRESSION GUARD: SVGs with only viewBox (no width/height attributes)
-                // report naturalWidth/naturalHeight=0 from Fabric's internal Image element.
-                // We must resolve true dimensions by parsing the SVG viewBox directly.
-                // This guarantees consistent scaleX/scaleY between first-add and restore.
-                let resolvedNatW = (storedNatW && storedNatW > 0) ? storedNatW : (img.width ?? 0);
-                let resolvedNatH = (storedNatH && storedNatH > 0) ? storedNatH : (img.height ?? 0);
-
-                if (isSvg && (resolvedNatW === 0 || resolvedNatH === 0)) {
-                    // Parse SVG viewBox to get true dimensions
-                    try {
-                        const svgText = isSvg && isDataUrl
-                            ? atob(src.split(',')[1] ?? '') || decodeURIComponent(src.split(',')[1] ?? '')
-                            : '';
-                        const vbMatch = svgText.match(/viewBox=["']([^"']+)["']/);
-                        if (vbMatch && vbMatch[1]) {
-                            const parts = vbMatch[1].trim().split(/[,\s]+/).map(Number);
-                            if (parts.length >= 4 && (parts[2] ?? 0) > 0 && (parts[3] ?? 0) > 0) {
-                                resolvedNatW = resolvedNatW > 0 ? resolvedNatW : (parts[2] ?? 0);
-                                resolvedNatH = resolvedNatH > 0 ? resolvedNatH : (parts[3] ?? 0);
-                                console.log(`[EngineShim] SVG viewBox dimensions: ${resolvedNatW}x${resolvedNatH}`);
-                            }
-                        }
-                        // Also check explicit width/height attributes
-                        const wMatch = svgText.match(/\bwidth=["'](\d+(?:\.\d+)?)/);
-                        const hMatch = svgText.match(/\bheight=["'](\d+(?:\.\d+)?)/);
-                        if (wMatch && wMatch[1] && resolvedNatW === 0) resolvedNatW = parseFloat(wMatch[1]);
-                        if (hMatch && hMatch[1] && resolvedNatH === 0) resolvedNatH = parseFloat(hMatch[1]);
-                    } catch {
-                        // SVG parse failed — use default fallback
-                    }
-                }
-
-                // Final fallback: use 200x200 if everything else fails
-                const natW = resolvedNatW > 0 ? resolvedNatW : 200;
-                const natH = resolvedNatH > 0 ? resolvedNatH : 200;
-                console.log(`[EngineShim] add_image natW=${natW} natH=${natH} storedNatW=${storedNatW} img.width=${img.width} isSvg=${isSvg}`);
-
-                let targetW: number;
-                let targetH: number;
-                let scaleX: number;
-                let scaleY: number;
-
-                if (w != null && h != null) {
-                    // ★ Stretch to fill — use independent scaleX/scaleY (for backgrounds)
-                    targetW = w;
-                    targetH = h;
-                    scaleX = w / Math.max(natW, 1);
-                    scaleY = h / Math.max(natH, 1);
-                } else if (w != null) {
-                    targetW = w;
-                    targetH = natH * (targetW / Math.max(natW, 1));
-                    scaleX = scaleY = targetW / Math.max(natW, 1);
-                } else {
-                    targetW = Math.min(natW, artboardW * 0.7);
-                    targetH = natH * (targetW / Math.max(natW, 1));
-                    scaleX = scaleY = targetW / Math.max(natW, 1);
-                }
-
-                img.set({ left: x, top: y, scaleX, scaleY });
-                (img as any).__glidId = id;
-                (img as any).__glidName = name || `Image #${id}`;
-                const targetZIndex = zIndex ?? userObjects().length;
-                (img as any).__glidZIndex = targetZIndex;
-                patchAceProps(img);
-                fc.add(img);
-
-                // ★ Move to correct stack position IMMEDIATELY after fc.add().
-                // Artboard is always at Fabric index 0. User objects start at index 1.
-                // Sort all current user objects by __glidZIndex, find this image's rank,
-                // then move it to rank+1 (skipping artboard at 0).
-                const sortedByZ = userObjects().sort(
-                    (a, b) => ((a as any).__glidZIndex ?? 0) - ((b as any).__glidZIndex ?? 0)
-                );
-                const rank = sortedByZ.indexOf(img);
-                if (rank >= 0) {
-                    fc.moveObjectTo(img, rank + 1); // +1: artboard at index 0
-                }
-
-                // Auto-select only when user adds a NEW image (no saved zIndex)
-                if (zIndex === undefined) {
-                    fc.setActiveObject(img);
-                }
-                fc.renderAll();
-                syncState();
-                console.log(`[EngineShim] Image added: id=${id} name="${name}" zIndex=${targetZIndex} fabricIndex=${rank + 1}`);
-            } catch (err) {
-                console.error('[EngineShim] Failed to load image:', err);
-            }
-            return id;
-        },
-
-        // ── Replace image source (for background removal, etc.) ──
-        replace_image_src: async (id: number, newSrc: string): Promise<void> => {
-            const obj = findById(id);
-            if (!obj || obj.type !== 'image') {
-                console.warn(`[EngineShim] replaceImageSrc: id=${id} not found or not an image`);
-                return;
-            }
-            try {
-                const isDataUrl = newSrc.startsWith('data:');
-                const imgOptions = isDataUrl ? {} : { crossOrigin: 'anonymous' as const };
-                const newImg = await FabricImage.fromURL(newSrc, imgOptions);
-                // Swap the internal element while preserving position/scale
-                (obj as any)._element = (newImg as any)._element;
-                (obj as any)._originalElement = (newImg as any)._originalElement;
-                obj.dirty = true;
-                fc.renderAll();
-                syncState();
-                console.log(`[EngineShim] Image source replaced: id=${id}`);
-            } catch (err) {
-                console.error('[EngineShim] replaceImageSrc failed:', err);
-            }
-        },
-
-        // Utility: re-sort all Fabric objects by __glidZIndex.
-        // Call after all async image loads to fix any ordering issues.
+        // ── Z-Order ──────────────────────────────────────
         reorder_by_z_index: () => {
             const objs = userObjects().sort(
                 (a, b) => ((a as any).__glidZIndex ?? 0) - ((b as any).__glidZIndex ?? 0)
             );
-            objs.forEach((o, i) => fc.moveObjectTo(o, i + 1)); // +1: artboard at 0
-            // ★ FIX: Mark ALL objects dirty to force Fabric texture cache invalidation.
-            // Without this, Fabric reuses stale cached bitmaps after z-reorder,
-            // causing elements (like headlines) to be invisible under async-loaded images.
-            objs.forEach(o => {
-                o.dirty = true;
-                o.setCoords();
-            });
-            fc.renderAll();
-            syncState();
+            objs.forEach((o, i) => fc.moveObjectTo(o, i + 1));
+            objs.forEach(o => { o.dirty = true; o.setCoords(); });
+            fc.renderAll(); syncState();
+        },
+        syncZIndexFromStack: () => {
+            let idx = 0;
+            for (const obj of fc.getObjects()) {
+                if ((obj as any).__glidId != null) (obj as any).__glidZIndex = idx++;
+            }
+        },
+        set_z_index: (nodeId: number, zIndex: number) => {
+            const obj = findById(nodeId);
+            if (obj) (obj as any).__glidZIndex = zIndex;
+        },
+        set_z_index_and_reorder: (id: number, z: number) => {
+            const obj = findById(id);
+            if (!obj) return;
+            (obj as any).__glidZIndex = z;
+            const objs = userObjects().sort((a, b) => ((a as any).__glidZIndex ?? 0) - ((b as any).__glidZIndex ?? 0));
+            objs.forEach((o, i) => { fc.moveObjectTo(o, i + 1); });
+            objs.forEach(o => { o.dirty = true; o.setCoords(); });
+            fc.renderAll(); syncState();
         },
 
-        // ★ FONT-AWARE REFRESH: Recalculate ALL text bounding boxes after fonts load.
-        // Also dumps diagnostic info to help debug click issues.
+        // ── Utility ──────────────────────────────────────
         refreshTextCoords: () => {
             let refreshed = 0;
             for (const obj of userObjects()) {
-                // ★ DIAGNOSTIC: Log all object properties to find click-blocking issues
-                const bounds = obj.getBoundingRect();
-                console.log(`[fabricEngine] DIAG: "${(obj as any).__glidName}" type=${obj.type}`,
-                    `sel=${obj.selectable} evt=${obj.evented}`,
-                    `lockX=${(obj as any).lockMovementX} lockY=${(obj as any).lockMovementY}`,
-                    `vis=${obj.visible} opacity=${obj.opacity}`,
-                    `pos=(${Math.round(obj.left ?? 0)},${Math.round(obj.top ?? 0)})`,
-                    `size=(${Math.round(obj.width ?? 0)}x${Math.round(obj.height ?? 0)})`,
-                    `bounds=(${Math.round(bounds.left)},${Math.round(bounds.top)},${Math.round(bounds.width)}x${Math.round(bounds.height)})`,
-                    `zIdx=${(obj as any).__glidZIndex}`,
-                );
-
                 if (obj.type === 'textbox' || obj.type === 'text') {
-                    if (typeof (obj as any).initDimensions === 'function') {
-                        (obj as any).initDimensions();
-                    }
+                    if (typeof (obj as any).initDimensions === 'function') (obj as any).initDimensions();
                     obj.setCoords();
                     refreshed++;
                 }
             }
-            // Also force setCoords on ALL objects (not just text)
-            for (const obj of userObjects()) {
-                obj.setCoords();
-            }
-            if (refreshed > 0) {
-                fc.renderAll();
-                console.log(`[fabricEngine] refreshTextCoords: refreshed ${refreshed} text + all coords`);
-            }
+            for (const obj of userObjects()) obj.setCoords();
+            if (refreshed > 0) fc.renderAll();
         },
-
-        // ★ Set custom CSS styles on Fabric objects matching a name pattern.
-        // Stores as __glidCustomStyles for persistence through save/load cycle.
         setCustomStyles: (elementName: string, styles: Record<string, string>) => {
             const nameLower = elementName.toLowerCase();
             for (const obj of userObjects()) {
                 const objName = ((obj as any).__glidName ?? '').toLowerCase();
                 if (objName.includes(nameLower)) {
-                    const existing = (obj as any).__glidCustomStyles || {};
-                    (obj as any).__glidCustomStyles = { ...existing, ...styles };
+                    (obj as any).__glidCustomStyles = { ...((obj as any).__glidCustomStyles || {}), ...styles };
                 }
             }
             fc.renderAll();
         },
 
-        /** Sync __glidZIndex from actual stack order (call before save) */
-        syncZIndexFromStack: () => {
-            let idx = 0;
-            for (const obj of fc.getObjects()) {
-                if ((obj as any).__glidId != null) {
-                    (obj as any).__glidZIndex = idx++;
-                }
-            }
-        },
-
-        /** Set visibility on a Fabric object by engine ID */
+        // ── Visibility / Lock ────────────────────────────
         set_visible: (nodeId: number, visible: boolean) => {
             const obj = userObjects().find(o => (o as any).__glidId === nodeId);
-            if (obj) {
-                obj.visible = visible;
-                fc.renderAll();
-            }
+            if (obj) { obj.visible = visible; fc.renderAll(); }
         },
-
-        /** Set lock state on a Fabric object by engine ID */
         set_locked: (nodeId: number, locked: boolean) => {
             const obj = userObjects().find(o => (o as any).__glidId === nodeId);
             if (obj) {
@@ -608,14 +132,11 @@ export function createEngineShim(
                 fc.renderAll();
             }
         },
-
-        /** ★ Set __glidZIndex on a Fabric object for correct z-order sorting.
-         * Critical for restore: sync elements get sequential __glidZIndex from add order,
-         * but stored zIndex values must be applied to prevent collisions with async images. */
-        set_z_index: (nodeId: number, zIndex: number) => {
-            const obj = findById(nodeId);
-            if (obj) (obj as any).__glidZIndex = zIndex;
+        set_name: (id: number, name: string) => {
+            const obj = findById(id);
+            if (obj) { (obj as any).__glidName = name; syncState(); }
         },
+
         // ── Grouping ─────────────────────────────────────
         group_elements: (ids: number[], name?: string): number => {
             const objects = ids.map(findById).filter(Boolean) as FabricObject[];
@@ -627,13 +148,9 @@ export function createEngineShim(
             (group as any).__glidName = name || `Group #${gid}`;
             (group as any).__glidZIndex = userObjects().length;
             patchAceProps(group);
-            fc.add(group);
-            fc.setActiveObject(group);
-            fc.renderAll();
-            syncState();
+            fc.add(group); fc.setActiveObject(group); fc.renderAll(); syncState();
             return gid;
         },
-
         ungroup: (id: number) => {
             const obj = findById(id);
             if (!obj || !(obj instanceof Group)) return;
@@ -645,8 +162,7 @@ export function createEngineShim(
                 patchAceProps(item);
                 fc.add(item);
             });
-            fc.renderAll();
-            syncState();
+            fc.renderAll(); syncState();
         },
 
         // ── Selection ────────────────────────────────────
@@ -657,55 +173,36 @@ export function createEngineShim(
         toggle_select: (id: number) => {
             const obj = findById(id);
             if (!obj) return;
-            const active = fc.getActiveObjects();
-            if (active.includes(obj)) {
-                fc.discardActiveObject();
-            } else {
-                fc.setActiveObject(obj);
-            }
+            if (fc.getActiveObjects().includes(obj)) fc.discardActiveObject();
+            else fc.setActiveObject(obj);
             fc.renderAll();
         },
         deselect_all: () => { fc.discardActiveObject(); fc.renderAll(); },
-
-        // ── Scene management ─────────────────────────────
         delete_selected: () => {
-            const active = fc.getActiveObjects().filter(o => !isArtboard(o));
-            active.forEach((o) => fc.remove(o));
-            fc.discardActiveObject();
-            fc.renderAll();
+            fc.getActiveObjects().filter(o => !isArtboard(o)).forEach(o => fc.remove(o));
+            fc.discardActiveObject(); fc.renderAll();
         },
-        clear_scene: () => {
-            const toRemove = userObjects();
-            toRemove.forEach((o) => fc.remove(o));
-            fc.renderAll();
-        },
+        clear_scene: () => { userObjects().forEach(o => fc.remove(o)); fc.renderAll(); },
         clear() { this.clear_scene(); },
 
         // ── Screenshot ───────────────────────────────────
         get_screenshot: (): string => {
-            const artboard = fc.getObjects().find(isArtboard);
-            if (!artboard) return fc.toDataURL({ format: 'png', multiplier: 1 });
             const zoom = fc.getZoom();
             const vpt = fc.viewportTransform ?? [1, 0, 0, 1, 0, 0];
             return fc.toDataURL({
-                format: 'png',
-                multiplier: 1,
-                left: Math.round(vpt[4]),
-                top: Math.round(vpt[5]),
-                width: Math.round(artboardW * zoom),
-                height: Math.round(artboardH * zoom),
+                format: 'png', multiplier: 1,
+                left: Math.round(vpt[4]), top: Math.round(vpt[5]),
+                width: Math.round(artboardW * zoom), height: Math.round(artboardH * zoom),
             });
         },
 
         // ── Lookup ───────────────────────────────────────
         find_by_name: (name: string): number | null => {
-            const obj = userObjects().find((o) => (o as any).__glidName === name);
+            const obj = userObjects().find(o => (o as any).__glidName === name);
             return obj ? ((obj as any).__glidId as number) : null;
         },
         find_all_by_type: (type: string): number[] => {
-            return userObjects()
-                .filter((o) => fabricToEngineNode(o).type === type)
-                .map((o) => (o as any).__glidId as number);
+            return userObjects().filter(o => fabricToEngineNode(o).type === type).map(o => (o as any).__glidId as number);
         },
         get_element_bounds: (id: number): { x: number; y: number; w: number; h: number } | null => {
             const obj = findById(id);
@@ -719,24 +216,14 @@ export function createEngineShim(
             return (obj as any)._element?.src ?? '';
         },
 
-        // ── Mutations ────────────────────────────────────
+        // ── Property setters ─────────────────────────────
         send_to_front: (id: number): void => {
             const obj = findById(id);
-            if (obj) {
-                fc.bringObjectToFront(obj);
-                (obj as any).__glidZIndex = userObjects().length - 1;
-                fc.renderAll();
-                syncState();
-            }
+            if (obj) { fc.bringObjectToFront(obj); (obj as any).__glidZIndex = userObjects().length - 1; fc.renderAll(); syncState(); }
         },
         send_to_back: (id: number): void => {
             const obj = findById(id);
-            if (obj) {
-                fc.sendObjectToBack(obj);
-                (obj as any).__glidZIndex = 0;
-                fc.renderAll();
-                syncState();
-            }
+            if (obj) { fc.sendObjectToBack(obj); (obj as any).__glidZIndex = 0; fc.renderAll(); syncState(); }
         },
         remove_element: (id: number): void => {
             const obj = findById(id);
@@ -744,11 +231,7 @@ export function createEngineShim(
         },
         set_font_size: (id: number, size: number) => {
             const obj = findById(id);
-            if (obj && 'fontSize' in obj) {
-                obj.set({ fontSize: size } as any);
-                fc.renderAll();
-                syncState();
-            }
+            if (obj && 'fontSize' in obj) { obj.set({ fontSize: size } as any); fc.renderAll(); syncState(); }
         },
         set_fill_hex: (id: number, hex: string) => {
             const obj = findById(id);
@@ -769,49 +252,23 @@ export function createEngineShim(
             } else {
                 obj.set({ width: w, height: h, scaleX: 1, scaleY: 1 });
             }
-            obj.setCoords();
-            fc.renderAll();
+            obj.setCoords(); fc.renderAll();
         },
-
-        // ★ Fill to Page: scale image to COVER the entire canvas while
-        // maintaining original aspect ratio. Overflow is centered (cropped edges).
-        // Like CSS object-fit: cover. NEVER stretches or distorts.
         fill_to_page: (id?: number) => {
-            // Find image: by id, or auto-detect the topmost/only image
             let obj: FabricObject | undefined;
-            if (id != null) {
-                obj = findById(id);
-            } else {
-                // Auto-find: prefer background, then first image
+            if (id != null) obj = findById(id);
+            else {
                 const images = userObjects().filter(o => o.type === 'image');
-                obj = images.find(o => ((o as any).__glidName ?? '').toLowerCase().includes('background'))
-                    ?? images[0];
+                obj = images.find(o => ((o as any).__glidName ?? '').toLowerCase().includes('background')) ?? images[0];
             }
-            if (!obj || obj.type !== 'image') {
-                console.warn('[fill_to_page] No image found');
-                return;
-            }
-
+            if (!obj || obj.type !== 'image') return;
             const natW = (obj as any).width ?? 1;
             const natH = (obj as any).height ?? 1;
-
-            // Cover scale: use Math.max so the ENTIRE canvas is filled
-            const scale = Math.max(
-                artboardW / Math.max(natW, 1),
-                artboardH / Math.max(natH, 1),
-            );
-
-            // Center the overflow (crop from center)
-            const scaledW = natW * scale;
-            const scaledH = natH * scale;
-            const offsetX = (artboardW - scaledW) / 2;
-            const offsetY = (artboardH - scaledH) / 2;
-
+            const scale = Math.max(artboardW / Math.max(natW, 1), artboardH / Math.max(natH, 1));
+            const offsetX = (artboardW - natW * scale) / 2;
+            const offsetY = (artboardH - natH * scale) / 2;
             obj.set({ scaleX: scale, scaleY: scale, left: offsetX, top: offsetY });
-            obj.setCoords();
-            fc.renderAll();
-            syncState();
-            console.log(`[fill_to_page] Image ${(obj as any).__glidId}: scale=${scale.toFixed(3)}, offset=(${offsetX.toFixed(1)}, ${offsetY.toFixed(1)})`);
+            obj.setCoords(); fc.renderAll(); syncState();
         },
         set_opacity: (id: number, v: number) => {
             const obj = findById(id);
@@ -821,26 +278,8 @@ export function createEngineShim(
             const obj = findById(id);
             if (obj) { obj.set({ fill: rgbToHex(r, g, b) }); fc.renderAll(); }
         },
-        set_z_index_and_reorder: (id: number, z: number) => {
-            const obj = findById(id);
-            if (!obj) return;
-            (obj as any).__glidZIndex = z;
-            const objs = userObjects().sort((a, b) => ((a as any).__glidZIndex ?? 0) - ((b as any).__glidZIndex ?? 0));
-            objs.forEach((o, i) => { fc.moveObjectTo(o, i + 1); });
-            objs.forEach(o => { o.dirty = true; o.setCoords(); }); // ★ FIX: invalidate cache
-            fc.renderAll();
-            syncState();
-        },
 
-        /** Rename a node (updates __glidName for layer panel + save persistence) */
-        set_name: (id: number, name: string) => {
-            const obj = findById(id);
-            if (!obj) return;
-            (obj as any).__glidName = name;
-            syncState();
-        },
-
-        // ── Effects ──────────────────────────────────────
+        // ── Effects: shadow ──────────────────────────────
         set_shadow: (id: number, ox: number, oy: number, blur: number, r: number, g: number, b: number, a: number) => {
             const obj = findById(id);
             if (!obj) return;
@@ -857,54 +296,7 @@ export function createEngineShim(
             if (obj) { obj.set({ shadow: undefined }); fc.renderAll(); }
         },
 
-        // ── Text Effects (Canva-style) ──────────────────
-        // ★ SYNC ARCHITECTURE: Effect type/intensity/color stored as __glid* props
-        // on the Fabric object → serialized via GLID_CUSTOM_PROPS → persisted
-        // through save/load cycle. CSS is re-applied on canvas restore.
-        set_text_effect: (id: number, effectType: string, intensity: number, color: string) => {
-            const obj = findById(id);
-            if (!obj) {
-                console.warn(`[set_text_effect] findById(${id}) returned null — object not on canvas!`);
-                return;
-            }
-            console.log(`[set_text_effect] Found obj id=${id}, applying effect=${effectType}`);
-
-            // Store on object for persistence
-            (obj as any).__glidTextEffectType = effectType;
-            (obj as any).__glidTextEffectIntensity = intensity;
-            (obj as any).__glidTextEffectColor = color;
-
-            // Apply visual effect
-            applyTextEffectCSS(obj, effectType, intensity, color, fc);
-            fc.renderAll();
-            syncState();
-        },
-
-        remove_text_effect: (id: number) => {
-            const obj = findById(id);
-            if (!obj) return;
-
-            (obj as any).__glidTextEffectType = 'none';
-            (obj as any).__glidTextEffectIntensity = 0;
-            (obj as any).__glidTextEffectColor = '';
-
-            // ★ Restore original fill before clearing (effects like hollow set fill='transparent')
-            if ((obj as any).__glidOriginalFill && obj instanceof Textbox) {
-                obj.set({ fill: (obj as any).__glidOriginalFill });
-                delete (obj as any).__glidOriginalFill;
-            }
-            // Clear all effect-related styles
-            obj.set({ shadow: undefined, stroke: undefined, strokeWidth: 0 } as any);
-            delete (obj as any).__glidCustomStyles;
-            obj.dirty = true;
-            if (obj instanceof Textbox) {
-                obj.set({ paintFirst: 'fill' } as any);
-            }
-
-            fc.renderAll();
-            syncState();
-        },
-
+        // ── Stubs ────────────────────────────────────────
         set_blend_mode: () => { },
         set_brightness: () => { },
         set_contrast: () => { },
@@ -912,162 +304,6 @@ export function createEngineShim(
         set_hue_rotate: () => { },
         add_keyframe: () => { },
         clear_node_keyframes: () => { },
-
-        // ── Animation state machine ──────────────────────
-        _animState: {
-            playing: false,
-            time: 0,
-            duration: 5.0,
-            looping: false,
-            speed: 1.0,
-            startTs: 0,
-            startOffset: 0,
-            rafId: 0,
-        },
-
-        anim_play() {
-            const s = this._animState;
-            if (s.playing) return;
-            s.playing = true;
-            s.startTs = performance.now();
-            s.startOffset = s.time;
-
-            const objs = fc.getObjects().filter(o => !isArtboard(o));
-            for (const obj of objs) {
-                if (!(obj as any).__aceOrigPos) {
-                    (obj as any).__aceOrigPos = {
-                        left: obj.left ?? 0,
-                        top: obj.top ?? 0,
-                        opacity: obj.opacity ?? 1,
-                        scaleX: obj.scaleX ?? 1,
-                        scaleY: obj.scaleY ?? 1,
-                    };
-                }
-            }
-
-            const tick = () => {
-                if (!s.playing) return;
-                const elapsed = (performance.now() - s.startTs) / 1000 * s.speed;
-                s.time = s.startOffset + elapsed;
-                if (s.time >= s.duration) {
-                    if (s.looping) {
-                        s.time = s.time % s.duration;
-                        s.startTs = performance.now();
-                        s.startOffset = s.time;
-                    } else {
-                        s.time = s.duration;
-                        s.playing = false;
-                        this._restoreOriginalPositions();
-                        return;
-                    }
-                }
-                this._applyAnimationFrame(s.time);
-                s.rafId = requestAnimationFrame(tick);
-            };
-            s.rafId = requestAnimationFrame(tick);
-        },
-
-        _applyAnimationFrame(currentTime: number) {
-            const presets = useAnimPresetStore.getState().presets;
-            const objs = fc.getObjects().filter(o => !isArtboard(o));
-            let needsRender = false;
-
-            for (const obj of objs) {
-                const aceId = (obj as any).__glidId;
-                if (!aceId) continue;
-                const config = presets[String(aceId)];
-                if (!config || config.anim === 'none') continue;
-                const orig = (obj as any).__aceOrigPos;
-                if (!orig) continue;
-
-                const animStart = config.startTime ?? 0;
-                const animEnd = animStart + (config.animDuration ?? 0.3);
-                let progress: number;
-                if (currentTime <= animStart) progress = 0;
-                else if (currentTime >= animEnd) progress = 1;
-                else progress = (currentTime - animStart) / (animEnd - animStart);
-
-                const inv = 1 - progress;
-                const t = 1 - inv * inv * inv;
-
-                switch (config.anim) {
-                    case 'fade':
-                        obj.set({ opacity: t * orig.opacity });
-                        break;
-                    case 'slide-left':
-                        obj.set({ left: orig.left + (-300 * (1 - t)) });
-                        break;
-                    case 'slide-right':
-                        obj.set({ left: orig.left + (300 * (1 - t)) });
-                        break;
-                    case 'slide-up':
-                        obj.set({ top: orig.top + (-300 * (1 - t)) });
-                        break;
-                    case 'slide-down':
-                        obj.set({ top: orig.top + (300 * (1 - t)) });
-                        break;
-                    case 'scale':
-                        obj.set({ scaleX: orig.scaleX * t, scaleY: orig.scaleY * t });
-                        break;
-                    case 'ascend':
-                        obj.set({ top: orig.top + (200 * (1 - t)), opacity: t * orig.opacity });
-                        break;
-                    case 'descend':
-                        obj.set({ top: orig.top + (-200 * (1 - t)), opacity: t * orig.opacity });
-                        break;
-                }
-                needsRender = true;
-            }
-            if (needsRender) fc.renderAll();
-        },
-
-        _restoreOriginalPositions() {
-            const objs = fc.getObjects().filter(o => !isArtboard(o));
-            for (const obj of objs) {
-                const orig = (obj as any).__aceOrigPos;
-                if (orig) {
-                    obj.set({
-                        left: orig.left,
-                        top: orig.top,
-                        opacity: orig.opacity,
-                        scaleX: orig.scaleX,
-                        scaleY: orig.scaleY,
-                    });
-                    delete (obj as any).__aceOrigPos;
-                }
-            }
-            fc.renderAll();
-        },
-
-        anim_pause() {
-            this._animState.playing = false;
-            cancelAnimationFrame(this._animState.rafId);
-        },
-        anim_stop() {
-            this._animState.playing = false;
-            this._animState.time = 0;
-            cancelAnimationFrame(this._animState.rafId);
-            this._restoreOriginalPositions();
-        },
-        anim_seek(t: number) {
-            this._animState.time = Math.max(0, Math.min(t, this._animState.duration));
-            if (this._animState.playing) {
-                this._animState.startTs = performance.now();
-                this._animState.startOffset = this._animState.time;
-            }
-            this._applyAnimationFrame(this._animState.time);
-        },
-        anim_time(): number { return this._animState.time; },
-        anim_playing(): boolean { return this._animState.playing; },
-        anim_duration(): number { return this._animState.duration; },
-        anim_looping(): boolean { return this._animState.looping; },
-        set_duration(d: number) { this._animState.duration = d; },
-        set_looping(v: boolean) { this._animState.looping = v; },
-        anim_set_speed(s: number) { this._animState.speed = s; },
-        anim_toggle() {
-            if (this._animState.playing) this.anim_pause();
-            else this.anim_play();
-        },
 
         // ── Render / viewport ────────────────────────────
         render_frame: () => { fc.renderAll(); },
