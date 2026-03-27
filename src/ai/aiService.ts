@@ -364,14 +364,16 @@ export class AiService {
         tools: ReturnType<typeof toClaudeTools>,
         progress: LiveProgress,
     ): Promise<ClaudeResponse | null> {
-        // Plan-based model routing
+        // ★ FIX: User's UI selection is ALWAYS primary.
+        // Plan gating happens at the dropdown level (GlobalAiPanel), not here.
         const { useAuthStore } = await import('@/stores/authStore');
         const { PLAN_LIMITS } = await import('@/schema/planTypes');
         const authState = useAuthStore.getState();
         const userPlan = authState.user?.plan ?? 'starter';
-        const planModel = PLAN_LIMITS[userPlan]?.aiModel;
-        const model = planModel || this.config.model;
-        console.log(`[AiService] Plan: ${userPlan} → Model: ${model}`);
+        const planDefaults = PLAN_LIMITS[userPlan];
+        // this.config.model = user's explicit dropdown selection. Only fall back to plan default if empty.
+        const model = this.config.model || planDefaults?.defaultModel || 'anthropic/claude-3.5-haiku';
+        console.log(`[AiService] Plan: ${userPlan} → Model: ${model} (user-selected: ${this.config.model})`);
         const apiKey = getOpenRouterKey();
 
         const isLocalDev = typeof window !== 'undefined' && window.location.hostname === 'localhost';

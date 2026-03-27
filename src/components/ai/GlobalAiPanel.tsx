@@ -556,38 +556,77 @@ function ImageGalleryCard({
     );
 }
 
-// ── Model Dropdown (extracted for readability) ───
+// ── Model Dropdown (plan-gated) ──────────────────
 
-const MODEL_OPTIONS: Array<{ role: AceModelRole; label: string }> = [
-    { role: 'design', label: 'Claude Sonnet 4' },
-    { role: 'executor', label: 'Claude 3.5 Haiku (Fast)' },
+const MODEL_OPTIONS: Array<{ role: AceModelRole; label: string; minPlan: 'starter' | 'pro' }> = [
+    { role: 'design', label: 'Claude Sonnet 4', minPlan: 'pro' },
+    { role: 'executor', label: 'Claude 3.5 Haiku (Fast)', minPlan: 'starter' },
 ];
 
+const PLAN_RANK: Record<string, number> = { starter: 0, pro: 1, enterprise: 2, admin: 3 };
+
 function ModelDropdown({ selectedRole, onSelect }: { selectedRole: AceModelRole; onSelect: (role: AceModelRole) => void }) {
+    // Get user's plan for gating
+    const [userPlan, setUserPlan] = useState<string>('starter');
+    useEffect(() => {
+        import('@/stores/authStore').then(({ useAuthStore }) => {
+            const plan = useAuthStore.getState().user?.plan ?? 'starter';
+            setUserPlan(plan);
+        });
+    }, []);
+
+    const navigate = useNavigate();
+    const userRank = PLAN_RANK[userPlan] ?? 0;
+
     return (
         <div style={modelDropdownStyle}>
             {MODEL_OPTIONS.map(opt => {
                 const m = getModelForRole(opt.role);
                 const active = opt.role === selectedRole;
+                const requiredRank = PLAN_RANK[opt.minPlan] ?? 0;
+                const isLocked = userRank < requiredRank;
+
                 return (
                     <button
                         key={opt.role}
-                        onClick={() => onSelect(opt.role)}
+                        onClick={() => {
+                            if (isLocked) {
+                                // Navigate to pricing page
+                                navigate('/pricing');
+                            } else {
+                                onSelect(opt.role);
+                            }
+                        }}
                         style={{
                             ...modelOptionStyle,
                             background: active ? 'rgba(56,139,253,0.1)' : 'transparent',
                             borderLeft: active ? '2px solid #388bfd' : '2px solid transparent',
+                            opacity: isLocked ? 0.6 : 1,
                         }}
                     >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
                             <span style={{ fontSize: 12, color: active ? '#1e293b' : '#334155' }}>{opt.label}</span>
-                            {m.costPer1MInput > 0 && (
-                                <span style={{ fontSize: 10, color: '#64748b' }}>
-                                    ${m.costPer1MInput}/{m.costPer1MOutput}
-                                </span>
-                            )}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                {m.costPer1MInput > 0 && (
+                                    <span style={{ fontSize: 10, color: '#64748b' }}>
+                                        ${m.costPer1MInput}/{m.costPer1MOutput}
+                                    </span>
+                                )}
+                                {isLocked && (
+                                    <span style={{
+                                        fontSize: 9, fontWeight: 700, color: '#818cf8',
+                                        background: 'rgba(129,140,248,0.12)',
+                                        padding: '1px 6px', borderRadius: 4,
+                                        letterSpacing: '0.3px', textTransform: 'uppercase',
+                                    }}>
+                                        Pro
+                                    </span>
+                                )}
+                            </div>
                         </div>
-                        <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>{m.id}</div>
+                        <div style={{ fontSize: 10, color: isLocked ? '#94a3b8' : '#64748b', marginTop: 2 }}>
+                            {isLocked ? 'Upgrade to Pro to use this model' : m.id}
+                        </div>
                     </button>
                 );
             })}

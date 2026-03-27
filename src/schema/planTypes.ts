@@ -14,8 +14,10 @@ export interface PlanLimits {
     maxCreativeSets: number;
     /** Max AI tokens per month (input + output combined) */
     aiTokensPerMonth: number;
-    /** OpenRouter model ID for AI agent */
-    aiModel: string;
+    /** OpenRouter model IDs allowed for this plan */
+    allowedModels: string[];
+    /** Default model for new users on this plan */
+    defaultModel: string;
     /** Max size variants per creative set (-1 = unlimited) */
     maxVariantsPerSet: number;
     /** Allowed export formats */
@@ -42,7 +44,8 @@ export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
     starter: {
         maxCreativeSets: 3,
         aiTokensPerMonth: 50, // 50 AI generations/month
-        aiModel: 'anthropic/claude-3.5-haiku',
+        allowedModels: ['anthropic/claude-3.5-haiku'],
+        defaultModel: 'anthropic/claude-3.5-haiku',
         maxVariantsPerSet: 3,
         allowedExports: ['png'],
         maxTeamMembers: 1,
@@ -51,7 +54,8 @@ export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
     pro: {
         maxCreativeSets: -1,
         aiTokensPerMonth: 500, // 500 AI generations/month
-        aiModel: 'anthropic/claude-sonnet-4',
+        allowedModels: ['anthropic/claude-3.5-haiku', 'anthropic/claude-sonnet-4'],
+        defaultModel: 'anthropic/claude-sonnet-4',
         maxVariantsPerSet: -1,
         allowedExports: ['png', 'jpg', 'html5'],
         maxTeamMembers: 1,
@@ -60,7 +64,8 @@ export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
     enterprise: {
         maxCreativeSets: -1,
         aiTokensPerMonth: 5_000, // 5000 AI generations/month
-        aiModel: 'anthropic/claude-sonnet-4',
+        allowedModels: ['anthropic/claude-3.5-haiku', 'anthropic/claude-sonnet-4'],
+        defaultModel: 'anthropic/claude-sonnet-4',
         maxVariantsPerSet: -1,
         allowedExports: ['png', 'jpg', 'html5', 'gif', 'mp4', 'js_bundle'],
         maxTeamMembers: -1,
@@ -69,7 +74,8 @@ export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
     admin: {
         maxCreativeSets: -1,
         aiTokensPerMonth: Number.MAX_SAFE_INTEGER,
-        aiModel: 'anthropic/claude-sonnet-4',
+        allowedModels: ['anthropic/claude-3.5-haiku', 'anthropic/claude-sonnet-4'],
+        defaultModel: 'anthropic/claude-sonnet-4',
         maxVariantsPerSet: -1,
         allowedExports: ['png', 'jpg', 'html5', 'gif', 'mp4', 'js_bundle'],
         maxTeamMembers: -1,
