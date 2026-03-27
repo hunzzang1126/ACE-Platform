@@ -1,14 +1,13 @@
 // ─────────────────────────────────────────────────
-// CanvasPreviewImage — Renders a BannerVariant to Canvas2D → <img>
+// CanvasPreviewImage — Renders a BannerVariant via Fabric.js → <img>
 // ─────────────────────────────────────────────────
-// Replaces CSS DOM rendering in BannerPreviewGrid for pixel-perfect
-// consistency between Size Dashboard preview and PNG export.
-// Both use the same renderVariantToCanvas() pipeline.
+// ★ Uses the SAME Fabric.js rendering engine as the Canvas Editor.
+// This guarantees: Canvas Editor == Size Dashboard preview == Export.
 // ─────────────────────────────────────────────────
 
 import { useEffect, useRef, useState, memo } from 'react';
 import type { BannerVariant } from '@/schema/design.types';
-import { renderVariantToCanvas } from './previewRenderer';
+import { renderVariantWithFabric } from './fabricHeadlessRenderer';
 
 interface Props {
     variant: BannerVariant;
@@ -44,8 +43,8 @@ export const CanvasPreviewImage = memo(function CanvasPreviewImage({ variant, re
             }),
         };
 
-        renderVariantToCanvas(resolvedVariant)
-            .then(url => { if (renderId === renderIdRef.current) setDataUrl(url); })
+        renderVariantWithFabric(resolvedVariant)
+            .then((url: string) => { if (renderId === renderIdRef.current) setDataUrl(url); })
             .catch(() => { if (renderId === renderIdRef.current) setError(true); });
 
         return () => { renderIdRef.current++; };

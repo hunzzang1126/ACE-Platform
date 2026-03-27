@@ -1,9 +1,9 @@
 // ─────────────────────────────────────────────────
 // BannerPreviewGrid – Scaled banner preview cards
-// with Canvas2D-rendered previews + auto-loop + right-click export
+// with Fabric.js-rendered previews + auto-loop + right-click export
 // ─────────────────────────────────────────────────
-// ★ Previews use the SAME renderVariantToCanvas() pipeline as PNG export.
-// This guarantees Size Dashboard preview == Export output.
+// ★ ALL rendering (preview + export) uses headless Fabric.js.
+// Same engine as Canvas Editor = pixel-perfect consistency.
 // ─────────────────────────────────────────────────
 import { useMemo, useCallback, useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -12,7 +12,8 @@ import { loadVideoBlob } from '@/stores/videoStorage';
 import type { SmartCheckStatus } from '@/hooks/useSmartCheck';
 import { PlugCanvas } from './PlugCanvas';
 import { useDesignStore } from '@/stores/designStore';
-import { renderVariantToCanvas, downloadDataURL } from './previewRenderer';
+import { downloadDataURL } from './previewRenderer';
+import { renderVariantWithFabric } from './fabricHeadlessRenderer';
 import { PreviewContextMenu } from './PreviewContextMenu';
 import { CanvasPreviewImage } from './CanvasPreviewImage';
 
@@ -190,21 +191,21 @@ export function BannerPreviewGrid({ variants, visibleIds, externalPlaying }: Pro
         setCtxMenu(null);
         const variant = variants.find(v => v.id === variantId);
         if (!variant) return;
-        try { downloadDataURL(await renderVariantToCanvas(variant), `banner_${variant.preset.width}x${variant.preset.height}.png`); }
+        try { downloadDataURL(await renderVariantWithFabric(variant), `banner_${variant.preset.width}x${variant.preset.height}.png`); }
         catch { alert('Export failed. Try again.'); }
     }, [variants]);
 
     const handleExportAll = useCallback(async () => {
         setCtxMenu(null);
         for (const variant of visibleVariants) {
-            try { downloadDataURL(await renderVariantToCanvas(variant), `banner_${variant.preset.width}x${variant.preset.height}.png`); await new Promise(r => setTimeout(r, 300)); } catch { /* skip */ }
+            try { downloadDataURL(await renderVariantWithFabric(variant), `banner_${variant.preset.width}x${variant.preset.height}.png`); await new Promise(r => setTimeout(r, 300)); } catch { /* skip */ }
         }
     }, [visibleVariants]);
 
     const handleExportSelected = useCallback(async () => {
         setCtxMenu(null);
         for (const variant of variants.filter(v => selectedIds.has(v.id))) {
-            try { downloadDataURL(await renderVariantToCanvas(variant), `banner_${variant.preset.width}x${variant.preset.height}.png`); await new Promise(r => setTimeout(r, 300)); } catch { /* skip */ }
+            try { downloadDataURL(await renderVariantWithFabric(variant), `banner_${variant.preset.width}x${variant.preset.height}.png`); await new Promise(r => setTimeout(r, 300)); } catch { /* skip */ }
         }
     }, [variants, selectedIds]);
 

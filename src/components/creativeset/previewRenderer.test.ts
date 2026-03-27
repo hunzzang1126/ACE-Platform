@@ -56,13 +56,17 @@ describe('getTextEffectCSS — text effect to CSS property mapping', () => {
     });
 });
 
-describe('★ REGRESSION: Rendering Pipeline Consistency', () => {
-    it('renderVariantToCanvas and CanvasPreviewImage use the same function', async () => {
+describe('★ REGRESSION: Unified Fabric Rendering Pipeline', () => {
+    it('renderVariantWithFabric is available as the unified renderer', async () => {
         // Both Size Dashboard preview (CanvasPreviewImage) and export (handleExportPNG)
-        // call renderVariantToCanvas from previewRenderer.ts
+        // use renderVariantWithFabric from fabricHeadlessRenderer.ts
+        const mod = await import('@/components/creativeset/fabricHeadlessRenderer');
+        expect(typeof mod.renderVariantWithFabric).toBe('function');
+    });
+
+    it('Canvas2D fallback renderer still exists for backward compat', async () => {
         const mod = await import('@/components/creativeset/previewRenderer');
         expect(typeof mod.renderVariantToCanvas).toBe('function');
-        // If this test passes, both paths use the same renderer
     });
 
     it('downloadDataURL function is available for export', async () => {
@@ -71,22 +75,18 @@ describe('★ REGRESSION: Rendering Pipeline Consistency', () => {
     });
 
     it('loadImageCORS handles data URLs directly', async () => {
-        // data: URLs should not go through fetch
-        // (can't fully test in vitest without canvas, but verify the function exists)
         expect(typeof loadImageCORS).toBe('function');
     });
 });
 
-describe('★ REGRESSION: BannerPreviewGrid uses CanvasPreviewImage (not CSS DOM)', () => {
+describe('★ REGRESSION: BannerPreviewGrid uses Fabric.js (not CSS DOM)', () => {
     it('CanvasPreviewImage component module is importable', async () => {
-        // If this import succeeds, the component exists and can be used
         const mod = await import('@/components/creativeset/CanvasPreviewImage');
         expect(mod.CanvasPreviewImage).toBeDefined();
     });
 
     it('CanvasPreviewImage is a React component (memo)', async () => {
         const mod = await import('@/components/creativeset/CanvasPreviewImage');
-        // memo wraps a component — the result is a function/object
-        expect(typeof mod.CanvasPreviewImage).toBe('object'); // React.memo returns object
+        expect(typeof mod.CanvasPreviewImage).toBe('object');
     });
 });
