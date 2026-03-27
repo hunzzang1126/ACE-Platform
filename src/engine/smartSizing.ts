@@ -1,263 +1,49 @@
 // ─────────────────────────────────────────────────
 // Smart Sizing Engine — Template-Proven Adaptive Layout
 // ─────────────────────────────────────────────────
-// Converts a master design → optimized layout for any target size.
-// Uses the SAME strategy as template drops (applyVariantToCanvas):
-// independent X/Y scaling (stretch fill) + geometric mean for fonts.
-//
-// ★ v3: TEMPLATE-PROVEN STRATEGY
-// All elements → independent scaleX/scaleY stretch (fills canvas like painting a wall)
-// Fonts/radii → √(scaleX × scaleY) geometric mean (balanced)
-// Background → always 100% coverage
+// Types, zones, role detection → smartSizingTypes.ts
+// ─────────────────────────────────────────────────
 
 import type { DesignElement } from '@/schema/elements.types';
 import type { ElementConstraints } from '@/schema/constraints.types';
-import { resolveConstraints } from '@/schema/constraints.types';
 import { constraintsToAbsolute } from './elementConverters';
-
-// ── Aspect Ratio Categories ─────────────────────
-
-export type SizeCategory =
-    | 'ultra-wide'    // > 4.0  (728×90, 970×90)
-    | 'wide'          // 2.0~4.0 (970×250)
-    | 'landscape'     // 1.2~2.0 (300×250)
-    | 'square'        // 0.8~1.2 (1080×1080)
-    | 'portrait'      // 0.5~0.8 (320×480, 300×600)
-    | 'ultra-tall';   // < 0.5   (160×600, 1080×1920)
-
-export type ElementRole =
-    | 'background'
-    | 'headline'
-    | 'subtext'
-    | 'cta'
-    | 'logo'
-    | 'image'
-    | 'decoration';
-
-/**
- * Classify a size by its aspect ratio
- */
-export function classifyRatio(w: number, h: number): SizeCategory {
-    const ratio = w / h;
-    if (ratio > 4.0) return 'ultra-wide';
-    if (ratio > 2.0) return 'wide';
-    if (ratio > 1.2) return 'landscape';
-    if (ratio > 0.8) return 'square';
-    if (ratio > 0.5) return 'portrait';
-    return 'ultra-tall';
-}
-
-/**
- * Detect the role of an element based on its properties
- */
-export function detectElementRole(
-    element: DesignElement,
-    masterW: number,
-    masterH: number,
-): ElementRole {
-    const name = element.name.toLowerCase();
-
-    // Name-based detection (highest priority)
-    // ★ REGRESSION GUARD: Use word boundaries (\b) to prevent false positives.
-    // Without \b, /cta/ matches inside "rec[cta]ngle" → misdetects shape as CTA.
-    if (name.match(/\b(bg|background)\b/)) return 'background';
-    if (name.match(/\b(cta|button|shop|buy|learn|sign up|start|get started)\b/)) return 'cta';
-    if (name.match(/\b(logo|brand)\b/)) return 'logo';
-    if (name.match(/\b(head|title|headline)\b|main.*text/)) return 'headline';
-    if (name.match(/\b(sub|desc|body|caption)\b/)) return 'subtext';
-    if (name.match(/\b(hero|photo)\b|banner.*img/)) return 'image';
-
-    // Type + size heuristic
-    if (element.type === 'shape') {
-        const resolved = resolveConstraints(element.constraints, masterW, masterH);
-        const coverage = (resolved.width * resolved.height) / (masterW * masterH);
-        if (coverage > 0.6) return 'background';
-        return 'decoration';
-    }
-    if (element.type === 'button') return 'cta';
-    // ★ Large images covering >60% of canvas = background (e.g. AI-generated gradient images)
-    if (element.type === 'image') {
-        const resolved = resolveConstraints(element.constraints, masterW, masterH);
-        const coverage = (resolved.width * resolved.height) / (masterW * masterH);
-        if (coverage > 0.6) return 'background';
-        return 'image';
-    }
-    if (element.type === 'text') {
-        const fontSize = (element as { fontSize?: number }).fontSize ?? 16;
-        if (fontSize >= 24) return 'headline';
-        return 'subtext';
-    }
-
-    return 'decoration';
-}
-
-// ── Layout Zone System ──────────────────────────
-
-/**
- * Each zone defines where an element role should be placed
- * within a specific size category. Values are 0-1 (relative).
- */
-export interface LayoutZone {
-    x: number;      // left edge (0-1)
-    y: number;      // top edge (0-1)
-    w: number;      // width (0-1)
-    h: number;      // height (0-1)
-    maxFontScale: number;  // max font size scaling factor
-}
-
-type LayoutMap = Record<ElementRole, LayoutZone>;
-
-/**
- * Layout zones per category.
- *
- * Ultra-wide (728×90):
- * ┌────────────────────────────────────┐
- * │ LOGO │  HEADLINE  │ CTA           │
- * └────────────────────────────────────┘
- *
- * Square (1080×1080):
- * ┌──────────────┐
- * │    IMAGE     │
- * │  HEADLINE    │
- * │  SUBTEXT     │
- * │    CTA       │
- * └──────────────┘
- *
- * Ultra-tall (160×600):
- * ┌──────┐
- * │ LOGO │
- * │      │
- * │ IMG  │
- * │      │
- * │ HEAD │
- * │ SUB  │
- * │ CTA  │
- * └──────┘
- */
-export const LAYOUT_ZONES: Record<SizeCategory, LayoutMap> = {
-    'ultra-wide': {
-        background: { x: 0, y: 0, w: 1, h: 1, maxFontScale: 1 },
-        logo: { x: 0.02, y: 0.1, w: 0.15, h: 0.8, maxFontScale: 0.5 },
-        image: { x: 0.02, y: 0, w: 0.25, h: 1, maxFontScale: 1 },
-        headline: { x: 0.20, y: 0.1, w: 0.50, h: 0.5, maxFontScale: 0.6 },
-        subtext: { x: 0.20, y: 0.55, w: 0.50, h: 0.35, maxFontScale: 0.5 },
-        cta: { x: 0.75, y: 0.15, w: 0.22, h: 0.7, maxFontScale: 0.7 },
-        decoration: { x: 0, y: 0, w: 1, h: 1, maxFontScale: 0.5 },
-    },
-    'wide': {
-        background: { x: 0, y: 0, w: 1, h: 1, maxFontScale: 1 },
-        logo: { x: 0.03, y: 0.05, w: 0.15, h: 0.2, maxFontScale: 0.7 },
-        image: { x: 0, y: 0, w: 0.45, h: 1, maxFontScale: 1 },
-        headline: { x: 0.48, y: 0.08, w: 0.48, h: 0.35, maxFontScale: 0.8 },
-        subtext: { x: 0.48, y: 0.42, w: 0.48, h: 0.25, maxFontScale: 0.6 },
-        cta: { x: 0.48, y: 0.70, w: 0.30, h: 0.22, maxFontScale: 0.8 },
-        decoration: { x: 0, y: 0, w: 1, h: 1, maxFontScale: 0.6 },
-    },
-    'landscape': {
-        background: { x: 0, y: 0, w: 1, h: 1, maxFontScale: 1 },
-        logo: { x: 0.05, y: 0.05, w: 0.2, h: 0.15, maxFontScale: 0.8 },
-        image: { x: 0, y: 0, w: 0.5, h: 1, maxFontScale: 1 },
-        headline: { x: 0.08, y: 0.15, w: 0.84, h: 0.30, maxFontScale: 1 },
-        subtext: { x: 0.08, y: 0.48, w: 0.84, h: 0.20, maxFontScale: 0.8 },
-        cta: { x: 0.25, y: 0.72, w: 0.50, h: 0.20, maxFontScale: 1 },
-        decoration: { x: 0, y: 0, w: 1, h: 1, maxFontScale: 0.8 },
-    },
-    // Social sizes (1:1, 4:5) — everything center-aligned
-    'square': {
-        background: { x: 0, y: 0, w: 1, h: 1, maxFontScale: 1 },
-        logo: { x: 0.30, y: 0.03, w: 0.40, h: 0.08, maxFontScale: 0.9 },
-        image: { x: 0.05, y: 0.05, w: 0.90, h: 0.38, maxFontScale: 1 },
-        headline: { x: 0.10, y: 0.46, w: 0.80, h: 0.18, maxFontScale: 1 },
-        subtext: { x: 0.10, y: 0.65, w: 0.80, h: 0.10, maxFontScale: 0.8 },
-        cta: { x: 0.20, y: 0.80, w: 0.60, h: 0.12, maxFontScale: 1 },
-        decoration: { x: 0, y: 0, w: 1, h: 1, maxFontScale: 0.9 },
-    },
-    // Portrait / 4:5 / 9:16 — logo top, content center, CTA bottom
-    'portrait': {
-        background: { x: 0, y: 0, w: 1, h: 1, maxFontScale: 1 },
-        logo: { x: 0.25, y: 0.03, w: 0.50, h: 0.06, maxFontScale: 0.8 },
-        image: { x: 0.05, y: 0.10, w: 0.90, h: 0.35, maxFontScale: 1 },
-        headline: { x: 0.08, y: 0.48, w: 0.84, h: 0.15, maxFontScale: 0.9 },
-        subtext: { x: 0.08, y: 0.64, w: 0.84, h: 0.10, maxFontScale: 0.7 },
-        cta: { x: 0.15, y: 0.78, w: 0.70, h: 0.10, maxFontScale: 0.9 },
-        decoration: { x: 0, y: 0, w: 1, h: 1, maxFontScale: 0.7 },
-    },
-    // Ultra-tall (160x600, skyscraper) — vertical stack, center-aligned
-    'ultra-tall': {
-        background: { x: 0, y: 0, w: 1, h: 1, maxFontScale: 1 },
-        logo: { x: 0.10, y: 0.02, w: 0.80, h: 0.06, maxFontScale: 0.6 },
-        image: { x: 0.05, y: 0.10, w: 0.90, h: 0.30, maxFontScale: 1 },
-        headline: { x: 0.05, y: 0.44, w: 0.90, h: 0.15, maxFontScale: 0.8 },
-        subtext: { x: 0.05, y: 0.60, w: 0.90, h: 0.12, maxFontScale: 0.6 },
-        cta: { x: 0.10, y: 0.76, w: 0.80, h: 0.08, maxFontScale: 0.8 },
-        decoration: { x: 0, y: 0, w: 1, h: 1, maxFontScale: 0.5 },
-    },
-};
-
-// ── Role bridge: ElementRole → LayoutRole ────────
 import type { LayoutRole } from '@/schema/layoutRoles';
-import { getAspectCategory } from '@/schema/layoutRoles';
 import { computeSmartConstraints, getSmartFontSize } from './smartLayout';
+import { detectElementRole } from './smartSizingTypes';
+import type { ElementRole } from './smartSizingTypes';
+
+// Re-export everything from types module for backward compatibility
+export * from './smartSizingTypes';
+
+// ── Role bridge: ElementRole → LayoutRole ──
 
 const ELEMENT_TO_LAYOUT_ROLE: Record<ElementRole, LayoutRole> = {
-    background: 'background',
-    headline: 'headline',
-    subtext: 'subline',
-    cta: 'cta',
-    logo: 'logo',
-    image: 'hero',
-    decoration: 'accent',
+    background: 'background', headline: 'headline', subtext: 'subline',
+    cta: 'cta', logo: 'logo', image: 'hero', decoration: 'accent',
 };
 
 function toLayoutRole(elementRole: ElementRole, el: DesignElement): LayoutRole {
-    // If element already has a LayoutRole assigned, prefer it
     if (el.role) return el.role;
     return ELEMENT_TO_LAYOUT_ROLE[elementRole] ?? 'accent';
 }
 
-// ── Smart Sizing (v4: Semantic Resizing) ─────────
-// ★ v4: TWO-STRATEGY APPROACH
-// Same-category (e.g. landscape→landscape): v3 stretch fill (works perfectly)
-// Cross-category (e.g. square→ultra-wide): role-based repositioning via computeSmartConstraints
-// This is the core upgrade of Sprint 3: elements understand their ROLE and get placed
-// in semantically correct positions for each aspect ratio category.
+// ── Constants ──
 
-const MIN_FONT = 8; // minimum font size in px
-const MIN_CTA_HEIGHT = 44; // minimum CTA touch target
+const MIN_FONT = 8;
+const MIN_CTA_HEIGHT = 44;
 
-/**
- * Apply smart sizing from origin elements → target variant.
- * Returns new array of elements adapted for the target size.
- *
- * ★ v6: BACK TO BASICS — CONSTRAINT PROPORTIONAL SCALING
- * All elements → v3 independent scaleX/scaleY stretch fill
- * Fonts/radii → √(scaleX × scaleY) geometric mean
- * Background shapes → 100% target canvas fill
- * Background images → cover-style (maintain ratio, fill canvas, crop overflow)
- * NO cross-category role-based repositioning (caused text overlap + invisible text)
- */
+// ── Smart Sizing v8: Polotno-style uniform scale ──
+
 export function smartSizeElements(
-    originElements: DesignElement[],
-    originW: number,
-    originH: number,
-    targetW: number,
-    targetH: number,
+    originElements: DesignElement[], originW: number, originH: number,
+    targetW: number, targetH: number,
 ): DesignElement[] {
-    // If same size, just deep-clone
-    if (originW === targetW && originH === targetH) {
-        return JSON.parse(JSON.stringify(originElements));
-    }
+    if (originW === targetW && originH === targetH) return JSON.parse(JSON.stringify(originElements));
 
     const scaleX = targetW / originW;
     const scaleY = targetH / originH;
-    // ★ v8: Polotno-style — ONE uniform scale for ALL non-bg elements
-    // This preserves gaps between elements proportionally.
     const uniformScale = Math.min(scaleX, scaleY);
-    const scaleFontRadius = uniformScale; // Font scales same as elements
 
-    console.log(`[smartSizing] ★ v8 Polotno-style: ${originW}x${originH} → ${targetW}x${targetH}, uniformScale=${uniformScale.toFixed(3)}, scaleX=${scaleX.toFixed(2)} scaleY=${scaleY.toFixed(2)}`);
-
-    // ── Step 1: Scale all non-bg elements uniformly ──
     const result: DesignElement[] = [];
     const contentElements: Array<{ el: DesignElement; x: number; y: number; w: number; h: number }> = [];
 
@@ -265,67 +51,35 @@ export function smartSizeElements(
         const abs = constraintsToAbsolute(el.constraints, originW, originH);
         const role = detectElementRole(el, originW, originH);
 
-        // ── Background: fill target canvas 100% ──
         if (role === 'background') {
-            let bgW = targetW;
-            let bgH = targetH;
-            let bgX = 0;
-            let bgY = 0;
-
+            let bgW = targetW, bgH = targetH, bgX = 0, bgY = 0;
             if (el.type === 'image' && abs.w > 0 && abs.h > 0) {
                 const imgAspect = abs.w / abs.h;
                 const canvasAspect = targetW / targetH;
-                if (imgAspect > canvasAspect) {
-                    bgH = targetH;
-                    bgW = Math.round(targetH * imgAspect);
-                    bgX = -Math.round((bgW - targetW) / 2);
-                } else {
-                    bgW = targetW;
-                    bgH = Math.round(targetW / imgAspect);
-                    bgY = -Math.round((bgH - targetH) / 2);
-                }
+                if (imgAspect > canvasAspect) { bgH = targetH; bgW = Math.round(targetH * imgAspect); bgX = -Math.round((bgW - targetW) / 2); }
+                else { bgW = targetW; bgH = Math.round(targetW / imgAspect); bgY = -Math.round((bgH - targetH) / 2); }
             }
-
-            const bgEl = {
+            result.push({
                 ...JSON.parse(JSON.stringify(el)),
-                constraints: {
-                    horizontal: { anchor: 'left' as const, offset: bgX },
-                    vertical: { anchor: 'top' as const, offset: bgY },
-                    size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width: bgW, height: bgH },
-                    rotation: el.constraints.rotation,
-                },
-            } as DesignElement;
-            result.push(bgEl);
+                constraints: { horizontal: { anchor: 'left' as const, offset: bgX }, vertical: { anchor: 'top' as const, offset: bgY }, size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width: bgW, height: bgH }, rotation: el.constraints.rotation },
+            } as DesignElement);
             continue;
         }
 
-        // ── Non-bg: uniform scale (position + size) ──
         const newX = Math.round(abs.x * uniformScale);
         const newY = Math.round(abs.y * uniformScale);
         const newW = Math.max(4, Math.round(abs.w * uniformScale));
         const newH = Math.max(4, Math.round(abs.h * uniformScale));
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const fontPatch: Record<string, unknown> = {};
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if ((el.type === 'text' || el.type === 'button') && (el as any).fontSize) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            fontPatch.fontSize = Math.max(MIN_FONT, Math.round((el as any).fontSize * scaleFontRadius));
+            fontPatch.fontSize = Math.max(MIN_FONT, Math.round((el as any).fontSize * uniformScale));
         }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if ((el as any).borderRadius) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            fontPatch.borderRadius = Math.round((el as any).borderRadius * scaleFontRadius);
-        }
+        if ((el as any).borderRadius) fontPatch.borderRadius = Math.round((el as any).borderRadius * uniformScale);
 
         const scaled = {
             ...JSON.parse(JSON.stringify(el)),
-            constraints: {
-                horizontal: { anchor: 'left' as const, offset: newX },
-                vertical: { anchor: 'top' as const, offset: newY },
-                size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width: newW, height: newH },
-                rotation: el.constraints.rotation,
-            },
+            constraints: { horizontal: { anchor: 'left' as const, offset: newX }, vertical: { anchor: 'top' as const, offset: newY }, size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width: newW, height: newH }, rotation: el.constraints.rotation },
             ...fontPatch,
         } as DesignElement;
 
@@ -333,356 +87,109 @@ export function smartSizeElements(
         result.push(scaled);
     }
 
-    // ── Step 2: Center the content group within the target canvas ──
+    // Center content group
     if (contentElements.length > 0) {
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        for (const { x, y, w, h } of contentElements) {
-            minX = Math.min(minX, x);
-            minY = Math.min(minY, y);
-            maxX = Math.max(maxX, x + w);
-            maxY = Math.max(maxY, y + h);
-        }
-        const contentW = maxX - minX;
-        const contentH = maxY - minY;
-
-        // Offset to center content group
-        const offsetX = Math.round((targetW - contentW) / 2 - minX);
-        const offsetY = Math.round((targetH - contentH) / 2 - minY);
-
+        for (const { x, y, w, h } of contentElements) { minX = Math.min(minX, x); minY = Math.min(minY, y); maxX = Math.max(maxX, x + w); maxY = Math.max(maxY, y + h); }
+        const offsetX = Math.round((targetW - (maxX - minX)) / 2 - minX);
+        const offsetY = Math.round((targetH - (maxY - minY)) / 2 - minY);
         if (offsetX !== 0 || offsetY !== 0) {
             for (const { el } of contentElements) {
-                const c = el.constraints;
-                c.horizontal = { anchor: 'left' as const, offset: c.horizontal.offset + offsetX };
-                c.vertical = { anchor: 'top' as const, offset: c.vertical.offset + offsetY };
+                el.constraints.horizontal = { anchor: 'left' as const, offset: el.constraints.horizontal.offset + offsetX };
+                el.constraints.vertical = { anchor: 'top' as const, offset: el.constraints.vertical.offset + offsetY };
             }
-            console.log(`[smartSizing] v8 centered: offset(${offsetX},${offsetY}), contentBounds(${contentW}x${contentH})`);
         }
     }
 
-    // ── Step 3: Post-processing — text shrink-to-fit + canvas clamp ──
     return postStretchTextFit(result, targetW, targetH);
 }
 
-// ── v8: Post-Stretch Text Fit + Canvas Clamp ──
-// After uniform scale + centering, text might still overflow its box.
-// Shrink font to fit, then clamp elements inside canvas.
+// ── Post-processing: text shrink-to-fit + canvas clamp ──
 
-function postStretchTextFit(
-    elements: DesignElement[],
-    targetW: number,
-    targetH: number,
-): DesignElement[] {
+function postStretchTextFit(elements: DesignElement[], targetW: number, targetH: number): DesignElement[] {
     const MARGIN = 4;
-
     for (const el of elements) {
         const isText = el.type === 'text' || el.type === 'button';
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const textEl = el as any;
         const c = el.constraints;
-
-        const x = c.horizontal.offset;
-        const y = c.vertical.offset;
-        const h = c.size.height;
-
         if (isText && textEl.fontSize) {
             const lineH = textEl.lineHeight || 1.2;
-
-            // Shrink-to-fit: font must fit in box
-            if (textEl.fontSize * lineH > h && h > 0) {
-                const fittedFont = Math.floor(h / lineH);
-                textEl.fontSize = Math.max(MIN_FONT, fittedFont);
-                console.log(`[smartSizing] v8 shrink-to-fit: ${el.name} font → ${textEl.fontSize}px (boxH=${h})`);
+            if (textEl.fontSize * lineH > c.size.height && c.size.height > 0) {
+                textEl.fontSize = Math.max(MIN_FONT, Math.floor(c.size.height / lineH));
             }
         }
-
-        // Canvas boundary clamping
-        const curW = c.size.width;
-        const curH = c.size.height;
-
-        if (x + curW > targetW) {
-            c.horizontal = { anchor: 'left' as const, offset: Math.max(MARGIN, targetW - curW - MARGIN) };
-        }
-        if (x < 0) {
-            c.horizontal = { anchor: 'left' as const, offset: MARGIN };
-        }
-        if (y + curH > targetH) {
-            c.vertical = { anchor: 'top' as const, offset: Math.max(MARGIN, targetH - curH - MARGIN) };
-        }
-        if (y < 0) {
-            c.vertical = { anchor: 'top' as const, offset: MARGIN };
-        }
+        const x = c.horizontal.offset, y = c.vertical.offset, curW = c.size.width, curH = c.size.height;
+        if (x + curW > targetW) c.horizontal = { anchor: 'left' as const, offset: Math.max(MARGIN, targetW - curW - MARGIN) };
+        if (x < 0) c.horizontal = { anchor: 'left' as const, offset: MARGIN };
+        if (y + curH > targetH) c.vertical = { anchor: 'top' as const, offset: Math.max(MARGIN, targetH - curH - MARGIN) };
+        if (y < 0) c.vertical = { anchor: 'top' as const, offset: MARGIN };
     }
-
     return elements;
 }
 
-/**
- * Cross-category path: uses computeSmartConstraints for role-based placement.
- */
-function applyCrossCategoryLayout(
-    el: DesignElement,
-    abs: { x: number; y: number; w: number; h: number },
-    role: ElementRole,
-    layoutRole: LayoutRole,
-    targetW: number,
-    targetH: number,
-    scaleFontRadius: number,
-): DesignElement {
-    // Use the smart layout engine for positioning
-    const baseFontSize = (el as { fontSize?: number }).fontSize;
-    const smartConstraints = computeSmartConstraints({
-        role: layoutRole,
-        canvasW: targetW,
-        canvasH: targetH,
-        elWidth: abs.w,
-        elHeight: abs.h,
-        fontSize: baseFontSize,
-    });
+// ── Cross-category layout (kept for future use) ──
 
-    // ★ Font size: use smart layout engine's recommended size
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+function applyCrossCategoryLayout(
+    el: DesignElement, abs: { x: number; y: number; w: number; h: number },
+    role: ElementRole, layoutRole: LayoutRole,
+    targetW: number, targetH: number, scaleFontRadius: number,
+): DesignElement {
+    const baseFontSize = (el as { fontSize?: number }).fontSize;
+    const smartConstraints = computeSmartConstraints({ role: layoutRole, canvasW: targetW, canvasH: targetH, elWidth: abs.w, elHeight: abs.h, fontSize: baseFontSize });
     const fontPatch: Record<string, unknown> = {};
     if ((el.type === 'text' || el.type === 'button') && baseFontSize) {
-        const smartFontSize = getSmartFontSize(layoutRole, targetW, targetH);
-        // Use the larger of geometric-mean and smart-font to avoid tiny text
-        fontPatch.fontSize = Math.max(MIN_FONT, Math.round(Math.max(smartFontSize, baseFontSize * scaleFontRadius)));
+        fontPatch.fontSize = Math.max(MIN_FONT, Math.round(Math.max(getSmartFontSize(layoutRole, targetW, targetH), baseFontSize * scaleFontRadius)));
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if ((el as any).borderRadius) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        fontPatch.borderRadius = Math.round((el as any).borderRadius * scaleFontRadius);
-    }
-
-    // ★ CTA minimum height guarantee (44px touch target)
+    if ((el as any).borderRadius) fontPatch.borderRadius = Math.round((el as any).borderRadius * scaleFontRadius);
     if (role === 'cta') {
-        const resolvedH = smartConstraints.size.heightMode === 'relative'
-            ? targetH * smartConstraints.size.height
-            : smartConstraints.size.height;
-        if (resolvedH < MIN_CTA_HEIGHT) {
-            smartConstraints.size = {
-                ...smartConstraints.size,
-                heightMode: 'fixed' as const,
-                height: MIN_CTA_HEIGHT,
-            };
-        }
+        const resolvedH = smartConstraints.size.heightMode === 'relative' ? targetH * smartConstraints.size.height : smartConstraints.size.height;
+        if (resolvedH < MIN_CTA_HEIGHT) smartConstraints.size = { ...smartConstraints.size, heightMode: 'fixed' as const, height: MIN_CTA_HEIGHT };
     }
-
-    // ★ Logo: preserve aspect ratio
     if (role === 'logo' && abs.w > 0 && abs.h > 0) {
-        const logoAspect = abs.w / abs.h;
-        const targetLogoW = smartConstraints.size.widthMode === 'relative'
-            ? targetW * smartConstraints.size.width
-            : smartConstraints.size.width;
-        const targetLogoH = Math.round(targetLogoW / logoAspect);
-        smartConstraints.size = {
-            widthMode: 'fixed' as const,
-            heightMode: 'fixed' as const,
-            width: Math.round(targetLogoW),
-            height: Math.max(24, targetLogoH), // minimum 24px
-        };
+        const targetLogoW = smartConstraints.size.widthMode === 'relative' ? targetW * smartConstraints.size.width : smartConstraints.size.width;
+        smartConstraints.size = { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width: Math.round(targetLogoW), height: Math.max(24, Math.round(targetLogoW / (abs.w / abs.h))) };
     }
-
-    // ★ Image (hero): preserve aspect ratio, use zone dimensions
     if (role === 'image' && abs.w > 0 && abs.h > 0) {
         const imgAspect = abs.w / abs.h;
-        const zoneW = smartConstraints.size.widthMode === 'relative'
-            ? targetW * smartConstraints.size.width
-            : smartConstraints.size.width;
-        const zoneH = smartConstraints.size.heightMode === 'relative'
-            ? targetH * smartConstraints.size.height
-            : smartConstraints.size.height;
-        // Fit-contain within zone
+        const zoneW = smartConstraints.size.widthMode === 'relative' ? targetW * smartConstraints.size.width : smartConstraints.size.width;
+        const zoneH = smartConstraints.size.heightMode === 'relative' ? targetH * smartConstraints.size.height : smartConstraints.size.height;
         const fitW = Math.min(zoneW, zoneH * imgAspect);
-        const fitH = fitW / imgAspect;
-        smartConstraints.size = {
-            widthMode: 'fixed' as const,
-            heightMode: 'fixed' as const,
-            width: Math.round(fitW),
-            height: Math.round(fitH),
-        };
+        smartConstraints.size = { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width: Math.round(fitW), height: Math.round(fitW / imgAspect) };
     }
-
-    console.log(`[smartSizing]     → CROSS: ${layoutRole} placed via smartLayout (${targetW}x${targetH})`);
-
-    return {
-        ...JSON.parse(JSON.stringify(el)),
-        constraints: smartConstraints,
-        ...fontPatch,
-    } as DesignElement;
+    return { ...JSON.parse(JSON.stringify(el)), constraints: smartConstraints, ...fontPatch } as DesignElement;
 }
 
-/**
- * Same-category path: v3 uniform stretch (template-proven).
- */
+// ── Same-category stretch (kept for future use) ──
+
 function applySameCategoryStretch(
-    el: DesignElement,
-    abs: { x: number; y: number; w: number; h: number },
-    scaleX: number,
-    scaleY: number,
-    scaleFontRadius: number,
-    targetW: number,
-    targetH: number,
+    el: DesignElement, abs: { x: number; y: number; w: number; h: number },
+    scaleX: number, scaleY: number, scaleFontRadius: number,
+    targetW: number, targetH: number,
 ): DesignElement {
-    // ★ v7b: Content elements (text, image, video, button) use UNIFORM scale
-    // to preserve aspect ratio — never squished/stretched in one direction.
-    // Shapes/decorations keep independent X/Y stretch (they can distort).
     const isText = el.type === 'text' || el.type === 'button';
     const isMedia = el.type === 'image' || el.type === 'video';
-
     let newX: number, newY: number, newW: number, newH: number;
     const MARGIN = 4;
 
     if (isText) {
-        // ★ TEXT: Left-anchor reflow (Polotno style)
-        // Left X stays proportional → text anchored at its original relative position
-        // Width expands rightward to fill available canvas space → text reflows (wraps)
-        // Height uses uniform scale to preserve readability
-        // Font: geometric mean, then shrink-to-fit in postStretchTextFit
-        const uniformScale = Math.min(scaleX, scaleY);
-
-        newX = Math.round(abs.x * scaleX);             // Left anchor: proportional X
-        newY = Math.round(abs.y * scaleY);              // Y: proportional
-        newH = Math.max(4, Math.round(abs.h * uniformScale)); // Height: uniform (not squished)
-
-        // Width: fill from left anchor to right edge of canvas (minus margin)
-        const rightAvailable = targetW - newX - MARGIN;
-        const uniformW = Math.round(abs.w * uniformScale);
-        newW = Math.max(uniformW, rightAvailable);      // Expand right, never shrink below uniform
-
-        console.log(`[smartSizing]     → TEXT-REFLOW: ${el.name} leftX=${newX} width=${newW} (fills right) h=${newH}`);
-
+        const us = Math.min(scaleX, scaleY);
+        newX = Math.round(abs.x * scaleX); newY = Math.round(abs.y * scaleY);
+        newH = Math.max(4, Math.round(abs.h * us));
+        newW = Math.max(Math.round(abs.w * us), targetW - newX - MARGIN);
     } else if (isMedia) {
-        // ★ IMAGE/VIDEO: Uniform scale + center mapping (preserve aspect ratio)
-        const uniformScale = Math.min(scaleX, scaleY);
-        newW = Math.max(4, Math.round(abs.w * uniformScale));
-        newH = Math.max(4, Math.round(abs.h * uniformScale));
-
-        // Position: center-of-element proportional mapping
-        const originW = targetW / scaleX;
-        const originH = targetH / scaleY;
-        const centerXRatio = (abs.x + abs.w / 2) / originW;
-        const centerYRatio = (abs.y + abs.h / 2) / originH;
-        newX = Math.round(centerXRatio * targetW - newW / 2);
-        newY = Math.round(centerYRatio * targetH - newH / 2);
-
-        console.log(`[smartSizing]     → MEDIA-UNIFORM: ${el.name} scale=${uniformScale.toFixed(2)} (${newX},${newY},${newW}x${newH})`);
-
+        const us = Math.min(scaleX, scaleY);
+        newW = Math.max(4, Math.round(abs.w * us)); newH = Math.max(4, Math.round(abs.h * us));
+        const originW = targetW / scaleX, originH = targetH / scaleY;
+        newX = Math.round(((abs.x + abs.w / 2) / originW) * targetW - newW / 2);
+        newY = Math.round(((abs.y + abs.h / 2) / originH) * targetH - newH / 2);
     } else {
-        // ★ SHAPES/DECORATIONS: Independent X/Y stretch (fills canvas area)
-        newX = Math.round(abs.x * scaleX);
-        newY = Math.round(abs.y * scaleY);
-        newW = Math.max(4, Math.round(abs.w * scaleX));
-        newH = Math.max(4, Math.round(abs.h * scaleY));
-
-        console.log(`[smartSizing]     → STRETCH: ${el.name} (${el.type}) (${newX},${newY},${newW}x${newH})`);
+        newX = Math.round(abs.x * scaleX); newY = Math.round(abs.y * scaleY);
+        newW = Math.max(4, Math.round(abs.w * scaleX)); newH = Math.max(4, Math.round(abs.h * scaleY));
     }
 
-    const newConstraints: ElementConstraints = {
-        horizontal: { anchor: 'left' as const, offset: newX },
-        vertical: { anchor: 'top' as const, offset: newY },
-        size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width: newW, height: newH },
-        rotation: el.constraints.rotation,
-    };
-
-    // ★ Font + border radius: geometric mean
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const newConstraints: ElementConstraints = { horizontal: { anchor: 'left' as const, offset: newX }, vertical: { anchor: 'top' as const, offset: newY }, size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width: newW, height: newH }, rotation: el.constraints.rotation };
     const fontPatch: Record<string, unknown> = {};
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if ((el.type === 'text' || el.type === 'button') && (el as any).fontSize) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        fontPatch.fontSize = Math.max(MIN_FONT, Math.round((el as any).fontSize * scaleFontRadius));
-    }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if ((el as any).borderRadius) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        fontPatch.borderRadius = Math.round((el as any).borderRadius * scaleFontRadius);
-    }
-
-    return {
-        ...JSON.parse(JSON.stringify(el)),
-        constraints: newConstraints,
-        ...fontPatch,
-    } as DesignElement;
+    if ((el.type === 'text' || el.type === 'button') && (el as any).fontSize) fontPatch.fontSize = Math.max(MIN_FONT, Math.round((el as any).fontSize * scaleFontRadius));
+    if ((el as any).borderRadius) fontPatch.borderRadius = Math.round((el as any).borderRadius * scaleFontRadius);
+    return { ...JSON.parse(JSON.stringify(el)), constraints: newConstraints, ...fontPatch } as DesignElement;
 }
-
-
-// ── Multi-Master Architecture (P3) ──────────────────────
-//
-// Instead of scaling ONE master to all sizes (causes squishing),
-// we group all sizes into 3 master families and generate AI layouts
-// tailored to each family's aspect ratio profile.
-//
-// Landscape family: ultra-wide + wide + landscape
-// Square family:    square + mild portrait
-// Portrait family:  portrait + ultra-tall
-//
-// ────────────────────────────────────────────────────────
-
-export type MasterGroup = 'landscape' | 'square' | 'portrait';
-
-/**
- * Classify a size into one of 3 master groups.
- * Used to determine which master design to clone from.
- */
-export function classifyMasterGroup(w: number, h: number): MasterGroup {
-    const ratio = w / h;
-    if (ratio >= 0.85) return 'landscape'; // wide and ultra-wide
-    if (ratio >= 0.7) return 'square';     // square-ish (1:1, 4:5)
-    return 'portrait';                      // tall (9:16, skyscraper)
-}
-
-/**
- * Group a list of target sizes into master groups.
- * Returns map of group → target sizes that belong to it.
- */
-export function groupSizesByMaster(
-    sizes: Array<{ w: number; h: number; id: string }>
-): Record<MasterGroup, Array<{ w: number; h: number; id: string }>> {
-    const groups: Record<MasterGroup, typeof sizes> = {
-        landscape: [],
-        square: [],
-        portrait: [],
-    };
-    for (const size of sizes) {
-        const group = classifyMasterGroup(size.w, size.h);
-        groups[group].push(size);
-    }
-    return groups;
-}
-
-/**
- * Per-group layout description for Auto-Design system prompt.
- * The AI gets this BEFORE generating so it understands the typical layout.
- */
-export function getMasterGroupDescriptions(): Record<MasterGroup, string> {
-    return {
-        landscape: `MASTER GROUP: LANDSCAPE (wide banners, leaderboards)
-  Layout: HORIZONTAL. Logo/text LEFT side, CTA RIGHT side.
-  Elements fill width, shorter height. Text must be readable in single lines.
-  Priority: Headline impact, clear CTA button, no vertical stacking.`,
-
-        square: `MASTER GROUP: SQUARE (1:1 social, Facebook/Instagram)
-  Layout: CENTERED. Large image/background behind.
-  Headline CENTER-ALIGNED, CTA at bottom third.
-  Priority: Visual punch, center balance, single-screen impact.`,
-
-        portrait: `MASTER GROUP: PORTRAIT (skyscraper, Stories, 9:16)
-  Layout: VERTICAL STACK. Logo/brand TOP, headline MIDDLE, CTA BOTTOM.
-  All elements CENTER-ALIGNED horizontally. Text stacks vertically.
-  Priority: Clear reading flow top-to-bottom, generous vertical spacing.`,
-    };
-}
-
-/**
- * Get font size boost factor for a master group.
- * Landscape groups get smaller fonts (less height), portrait gets bigger.
- */
-export function getMasterGroupFontBoost(group: MasterGroup): number {
-    const boosts: Record<MasterGroup, number> = {
-        landscape: 0.85,  // compressed height → smaller fonts
-        square: 1.0,       // balanced
-        portrait: 1.15,    // tall canvas → more room for large type
-    };
-    return boosts[group];
-}
-
