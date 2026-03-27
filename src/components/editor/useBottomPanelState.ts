@@ -1,0 +1,111 @@
+// ─────────────────────────────────────────────────
+// useBottomPanelState — Playback + bar drag logic for BottomPanel
+// ─────────────────────────────────────────────────
+
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import type { EngineNode } from '@/hooks/useCanvasEngine';
+import type { OverlayElement } from '@/hooks/useOverlayElements';
+import { useAnimPresetStore } from '@/hooks/useAnimationPresets';
+import type { Engine, UnifiedLayer } from './bottomPanelHelpers';
+
+/** All state and handlers needed by the BottomPanel render layer */
+export function useBottomPanelState(
+    engine: Engine | undefined,
+    nodes: EngineNode[],
+    overlayElements: OverlayElement[],
+) {
+    const animPresets = useAnimPresetStore();
+    const [playing, setPlaying] = useState(false);
+    const [currentTime, setCurrentTime] = useState(0);
+    const [duration, setDuration] = useState(5.0);
+    const [looping, setLooping] = useState(false);
+    const [speed, setSpeed] = useState(1.0);
+    const rafRef = useRef<number>(0);
+
+    // ── Bar drag state ──
+    const [barDrag, setBarDrag] = useState<{
+        elementId: string; mode: 'move' | 'resize-left' | 'resize-right';
+        startX: number; origStart: number; origEnd: number;
+    } | null>(null);
+    const timelineBarsRef = useRef<HTMLDivElement>(null);
+
+    // ── Auto-duration ──
+    const recalcDuration = useCallback(() => {
+        const store = useAnimPresetStore.getState();
+        const allIds = [...overlayElements.map(el => el.id), ...nodes.map(n => String(n.id))];
+        let maxEnd = 0.5;
+        for (const id of allIds) { const cfg = store.getPreset(id); const et = cfg.endTime < 0 ? duration : cfg.endTime; if (et > maxEnd) maxEnd = et; }
+        const newDuration = Math.round(maxEnd * 10) / 10;
+        if (Math.abs(newDuration - duration) > 0.05) { setDuration(newDuration); try { engine?.set_duration(newDuration); } catch { /* ok */ } }
+    }, [overlayElements, nodes, duration, engine]);
+
+    // ── Bar drag handlers ──
+    const handleBarMouseDown = useCallback((e: React.MouseEvent, elementId: string, barEl: HTMLElement) => {
+        e.stopPropagation(); e.preventDefault();
+        const rect = barEl.getBoundingClientRect();
+        const localX = e.clientX - rect.left;
+        const EDGE_PX = 8;
+        let mode: 'move' | 'resize-left' | 'resize-right' = 'move';
+        if (localX <= EDGE_PX) mode = 'resize-left';
+        else if (localX >= rect.width - EDGE_PX) mode = 'resize-right';
+        const config = animPresets.getPreset(elementId);
+        setBarDrag({ elementId, mode, startX: e.clientX, origStart: config.startTime, origEnd: config.endTime < 0 ? duration : config.endTime });
+    }, [animPresets, duration]);
+
+    useEffect(() => {
+        if (!barDrag) return;
+        const container = timelineBarsRef.current;
+        if (!container) return;
+        const containerWidth = container.clientWidth;
+        const pxToTime = (px: number) => (px / containerWidth) * duration;
+        const MIN_BAR = 0.1;
+        const handleMove = (e: MouseEvent) => {
+            const dx = e.clientX - barDrag.startX;
+            const dt = pxToTime(dx);
+            let newStart = barDrag.origStart, newEnd = barDrag.origEnd;
+            if (barDrag.mode === 'move') { const barLen = barDrag.origEnd - barDrag.origStart; newStart = Math.max(0, barDrag.origStart + dt); newEnd = newStart + barLen; if (newEnd > duration) { newEnd = duration; newStart = newEnd - barLen; } if (newStart < 0) { newStart = 0; newEnd = barLen; } }
+            else if (barDrag.mode === 'resize-left') { newStart = Math.max(0, Math.min(barDrag.origStart + dt, barDrag.origEnd - MIN_BAR)); }
+            else if (barDrag.mode === 'resize-right') { newEnd = Math.max(barDrag.origStart + MIN_BAR, barDrag.origEnd + dt); }
+            animPresets.setTiming(barDrag.elementId, newStart, newEnd);
+        };
+        const handleUp = () => { setBarDrag(null); document.body.style.cursor = ''; document.body.style.userSelect = ''; recalcDuration(); };
+        document.body.style.cursor = barDrag.mode === 'move' ? 'grabbing' : 'ew-resize';
+        document.body.style.userSelect = 'none';
+        document.addEventListener('mousemove', handleMove);
+        document.addEventListener('mouseup', handleUp);
+        return () => { document.removeEventListener('mousemove', handleMove); document.removeEventListener('mouseup', handleUp); };
+    }, [barDrag, duration, animPresets]);
+
+    // ── Engine sync ──
+    const syncTime = useCallback(() => {
+        if (!engine) return;
+        try { const t = engine.anim_time?.() ?? 0; const p = engine.anim_playing?.() ?? false; setCurrentTime(t); setPlaying(p); setDuration(engine.anim_duration?.() ?? 5.0); setLooping(engine.anim_looping?.() ?? false); animPresets.setCurrentTime(t); animPresets.setIsPlaying(p); } catch { /* */ }
+    }, [engine, animPresets]);
+
+    useEffect(() => {
+        if (!engine) return;
+        const tick = () => {
+            try { const ep = engine.anim_playing?.() ?? false; setPlaying(ep); if (ep) { const t = engine.anim_time?.() ?? 0; setCurrentTime(t); animPresets.setCurrentTime(t); } animPresets.setIsPlaying(ep); } catch { /* */ }
+            rafRef.current = requestAnimationFrame(tick);
+        };
+        rafRef.current = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(rafRef.current);
+    }, [engine, animPresets]);
+
+    useEffect(() => { syncTime(); }, [syncTime]);
+
+    // ── Playback controls ──
+    const handlePlay = useCallback(() => { if (!engine) return; try { engine.anim_play(); setPlaying(true); } catch { /* */ } }, [engine]);
+    const handlePause = useCallback(() => { if (!engine) return; try { engine.anim_pause(); setPlaying(false); } catch { /* */ } }, [engine]);
+    const handleStop = useCallback(() => { if (!engine) return; try { engine.anim_stop(); setPlaying(false); setCurrentTime(0); animPresets.setCurrentTime(0); animPresets.setIsPlaying(false); } catch { /* */ } }, [engine]);
+    const handleSeek = useCallback((time: number) => { if (!engine) return; try { engine.anim_seek(time); setCurrentTime(time); animPresets.setCurrentTime(time); } catch { /* */ } }, [engine]);
+    const handleDurationChange = useCallback((d: number) => { if (!engine) return; try { engine.set_duration(d); setDuration(d); } catch { /* */ } }, [engine]);
+    const handleToggleLoop = useCallback(() => { if (!engine) return; const next = !looping; try { engine.set_looping(next); setLooping(next); } catch { /* */ } }, [engine, looping]);
+    const handleSpeedChange = useCallback((s: number) => { if (!engine) return; try { engine.anim_set_speed(s); setSpeed(s); } catch { /* */ } }, [engine]);
+
+    return {
+        animPresets, playing, currentTime, duration, looping, speed, timelineBarsRef,
+        handleBarMouseDown, handlePlay, handlePause, handleStop, handleSeek,
+        handleDurationChange, handleToggleLoop, handleSpeedChange,
+    };
+}
