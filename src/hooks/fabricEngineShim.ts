@@ -91,6 +91,27 @@ export function createEngineShim(
             fc.renderAll(); syncState();
         },
 
+        // ── Export (Pixel-perfect from Fabric canvas) ────
+        // ★ This is the ONLY correct way to export. Guarantees output
+        // matches exactly what user sees in the Canvas Editor.
+        exportToDataURL: (): string => {
+            // Hide artboard so only user content is exported
+            const artboard = fc.getObjects().find(o => isArtboard(o));
+            if (artboard) artboard.visible = false;
+            fc.renderAll();
+            const dataUrl = fc.toDataURL({
+                format: 'png',
+                left: 0,
+                top: 0,
+                width: artboardW,
+                height: artboardH,
+                multiplier: 1,
+            });
+            if (artboard) artboard.visible = true;
+            fc.renderAll();
+            return dataUrl;
+        },
+
         // ── Utility ──────────────────────────────────────
         refreshTextCoords: () => {
             let refreshed = 0;

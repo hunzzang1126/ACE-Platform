@@ -1,18 +1,20 @@
 // ─────────────────────────────────────────────────
 // BannerPreviewGrid – Scaled banner preview cards
-// with animated preview + auto-loop + right-click export
+// with Canvas2D-rendered previews + auto-loop + right-click export
+// ─────────────────────────────────────────────────
+// ★ Previews use the SAME renderVariantToCanvas() pipeline as PNG export.
+// This guarantees Size Dashboard preview == Export output.
 // ─────────────────────────────────────────────────
 import { useMemo, useCallback, useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { BannerVariant } from '@/schema/design.types';
-import { constraintsToAbsolute } from '@/engine/elementConverters';
-import { computeAnimStyle, type AnimPresetType } from '@/hooks/useAnimationPresets';
 import { loadVideoBlob } from '@/stores/videoStorage';
 import type { SmartCheckStatus } from '@/hooks/useSmartCheck';
 import { PlugCanvas } from './PlugCanvas';
 import { useDesignStore } from '@/stores/designStore';
-import { getTextEffectCSS, renderVariantToCanvas, downloadDataURL } from './previewRenderer';
+import { renderVariantToCanvas, downloadDataURL } from './previewRenderer';
 import { PreviewContextMenu } from './PreviewContextMenu';
+import { CanvasPreviewImage } from './CanvasPreviewImage';
 
 interface ContextMenuState { x: number; y: number; variantId: string; }
 
@@ -244,27 +246,12 @@ export function BannerPreviewGrid({ variants, visibleIds, externalPlaying }: Pro
                             </div>
 
                             <div className="banner-card-preview" style={{ width: previewW, height: previewH, overflow: 'hidden' }}>
-                                <div className="banner-card-canvas" style={{ width, height, transform: `scale(${scale})`, transformOrigin: 'top left', backgroundColor: (() => { if (variant.backgroundColor && variant.backgroundColor !== '#FFFFFF') return variant.backgroundColor; const bgShape = variant.elements.find(el => el.type === 'shape' && (el.constraints?.vertical?.offset ?? 0) === 0 && (el.constraints?.size?.height ?? 0) >= height * 0.8) as import('@/schema/elements.types').ShapeElement | undefined; if (bgShape?.gradientStart && bgShape?.gradientEnd) return 'transparent'; return bgShape?.fill || variant.backgroundColor || '#FFFFFF'; })() }}>
-                                    {[...variant.elements].sort((a, b) => a.zIndex - b.zIndex).map((el) => {
-                                        const resolved = constraintsToAbsolute(el.constraints, width, height);
-                                        let animStyle: React.CSSProperties = {};
-                                        if (isPlaying && el.animation && el.animation.preset !== 'none') {
-                                            animStyle = computeAnimStyle(el.animation.preset as AnimPresetType, currentTime, el.animation.duration, el.animation.startTime);
-                                        }
-                                        const shapeStyle: React.CSSProperties = el.type === 'shape' ? (() => { const s = el as import('@/schema/elements.types').ShapeElement; const base: React.CSSProperties = { borderRadius: s.borderRadius ?? 0 }; if (s.gradientStart && s.gradientEnd) base.background = `linear-gradient(${s.gradientAngle ?? 135}deg, ${s.gradientStart}, ${s.gradientEnd})`; else base.backgroundColor = s.fill || '#ccc'; return base; })() : {};
-                                        const shadowStyle: React.CSSProperties = (() => { if (!el.shadow) return {}; const { offsetX, offsetY, blur, color } = el.shadow; const v = `${offsetX}px ${offsetY}px ${blur}px ${color}`; return el.type === 'text' ? { textShadow: v } : { boxShadow: v }; })();
-                                        const customStyles: React.CSSProperties = (el as any).customStyles || {};
-
-                                        return (
-                                            <div key={el.id} className="banner-element" style={{ position: 'absolute', left: resolved.x, top: resolved.y, width: resolved.w, height: resolved.h, opacity: el.opacity, zIndex: el.zIndex, transition: isPlaying ? 'none' : undefined, ...animStyle, ...shapeStyle, ...shadowStyle, ...customStyles, ...(el.type === 'text' ? { color: el.color, fontSize: el.fontSize, fontFamily: el.fontFamily, fontWeight: el.fontWeight, fontStyle: el.fontStyle ?? 'normal', display: 'flex', alignItems: 'flex-start', justifyContent: el.textAlign === 'center' ? 'center' : el.textAlign === 'right' ? 'flex-end' : 'flex-start', overflow: 'hidden', whiteSpace: 'pre-wrap' as const, wordBreak: 'normal' as const, overflowWrap: 'break-word' as const, lineHeight: el.lineHeight ?? 1.2, letterSpacing: el.letterSpacing ? `${el.letterSpacing}px` : undefined, textAlign: el.textAlign as any, ...getTextEffectCSS(el.textEffect) } : {}), ...(el.type === 'button' ? { backgroundColor: el.backgroundColor, borderRadius: el.borderRadius ?? 0, color: el.color, fontSize: el.fontSize, fontFamily: el.fontFamily, fontWeight: el.fontWeight, display: 'flex', alignItems: 'center', justifyContent: 'center' } : {}), ...(el.type === 'image' || el.type === 'video' ? { overflow: 'hidden' } : {}) }}>
-                                                {el.type === 'text' && el.content}
-                                                {el.type === 'button' && el.label}
-                                                {el.type === 'image' && (() => { const imgSrc = resolvedImageUrls[el.id] || (el.src?.startsWith('idb://') ? '' : el.src); return imgSrc ? <img src={imgSrc} alt="" style={{ width: '100%', height: '100%', objectFit: el.fit || 'cover', display: 'block' }} /> : null; })()}
-                                                {el.type === 'video' && (() => { const videoSrc = videoUrls[el.id] || el.videoSrc || ''; return videoSrc ? <video ref={(videoEl) => { if (!videoEl) return; const start = el.animation?.startTime ?? 0; const end = start + (el.animation?.duration ?? TIMELINE_DURATION); const localT = Math.max(0, currentTime - start); const inRange = currentTime >= start && currentTime <= end; try { if (isPlaying && inRange) { if (Math.abs(videoEl.currentTime - localT) > 0.3) videoEl.currentTime = localT; if (videoEl.paused) videoEl.play().catch(() => {}); } else { if (!videoEl.paused) videoEl.pause(); videoEl.currentTime = inRange ? localT : 0; } } catch {} }} src={videoSrc} poster={el.posterSrc || undefined} muted playsInline style={{ width: '100%', height: '100%', objectFit: el.fit || 'cover', display: 'block', pointerEvents: 'none' }} /> : el.posterSrc ? <img src={el.posterSrc} alt="video" style={{ width: '100%', height: '100%', objectFit: el.fit || 'cover', display: 'block' }} /> : null; })()}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
+                                <CanvasPreviewImage
+                                    variant={variant}
+                                    resolvedImageUrls={resolvedImageUrls}
+                                    videoUrls={videoUrls}
+                                    scale={scale}
+                                />
                             </div>
 
                             {!isPlaying && (<div className="banner-card-play-overlay"><div className="banner-card-play-btn" onMouseDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); handleDoubleClick(variant.id); }} title="Open in Editor">▶</div></div>)}
