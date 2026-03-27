@@ -12,6 +12,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useUnifiedAgent, type AgentIntent } from '@/hooks/useUnifiedAgent';
 import { getModelForRole, type AceModelRole } from '@/services/modelRouter';
 import type { AgentMessage } from '@/ai/agentContext';
+import { useAuthStore } from '@/stores/authStore';
 import {
     IcSend, IcClose, IcChevronRight,
     IcLoader, IcCheck, IcError,
@@ -38,12 +39,8 @@ export function GlobalAiPanel() {
     const [showDropZone, setShowDropZone] = useState(false);
     // ★ Default model respects user plan: Starter→Haiku, Pro+→Sonnet 4
     const [selectedRole, setSelectedRole] = useState<AceModelRole>(() => {
-        try {
-            // Sync read — authStore is already hydrated by this point
-            const { useAuthStore } = require('@/stores/authStore');
-            const plan = useAuthStore.getState().user?.plan ?? 'starter';
-            return plan === 'starter' ? 'executor' : 'design';
-        } catch { return 'design'; }
+        const plan = useAuthStore.getState().user?.plan ?? 'starter';
+        return plan === 'starter' ? 'executor' : 'design';
     });
     const [showModelDropdown, setShowModelDropdown] = useState(false);
 
