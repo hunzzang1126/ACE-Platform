@@ -266,7 +266,7 @@ async function buildAndRender(
         await pause(300);
         for (const el of layer.elements) {
             const elCardId = `design-${rendered}`;
-            cb.addCard(elCardId, `Design: ${el.name || el.type ?? 'rect'}`, 'running');
+            cb.addCard(elCardId, `Design: ${el.name || (el.type ?? 'rect')}`, 'running');
             cb.moveCursor(el.x ?? 0, el.y ?? 0, el.name);
             await pause(150);
             try {
