@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────
-// agentTools.test.ts — Tests for AI Tool Definitions
+// agentTools.test.ts — Tests (v2 eval-first: 7 tools)
 // ─────────────────────────────────────────────────
 
 import { describe, it, expect } from 'vitest';
@@ -32,8 +32,22 @@ describe('agentTools', () => {
             }
         });
 
-        it('has at least 25 tools', () => {
-            expect(ALL_TOOLS.length).toBeGreaterThanOrEqual(25);
+        it('has exactly 7 essential tools', () => {
+            expect(ALL_TOOLS.length).toBe(7);
+        });
+
+        it('includes execute_dynamic_action as primary tool', () => {
+            const tool = getToolByName('execute_dynamic_action');
+            expect(tool).toBeDefined();
+            expect(tool!.category).toBe('compound');
+            expect(tool!.parameters.required).toContain('description');
+            expect(tool!.parameters.required).toContain('code');
+        });
+
+        it('includes analyze_scene as read-only tool', () => {
+            const tool = getToolByName('analyze_scene');
+            expect(tool).toBeDefined();
+            expect(tool!.parameters.required.length).toBe(0);
         });
     });
 
@@ -68,11 +82,6 @@ describe('agentTools', () => {
             const tool = getToolByName('replace_background_image');
             expect(tool!.description.toLowerCase()).toContain('replace');
             expect(tool!.description.toLowerCase()).toContain('background');
-        });
-
-        it('description mentions NOT touching other elements', () => {
-            const tool = getToolByName('replace_background_image');
-            expect(tool!.description).toContain('NOT touch');
         });
     });
 
@@ -110,17 +119,19 @@ describe('agentTools', () => {
         });
     });
 
-    // ── set_canvas_background Tool ──
+    // ── add_text and add_button ──
 
-    describe('set_canvas_background', () => {
-        it('exists in registry', () => {
-            expect(getToolByName('set_canvas_background')).toBeDefined();
+    describe('creation tools', () => {
+        it('add_text exists with content param', () => {
+            const tool = getToolByName('add_text');
+            expect(tool).toBeDefined();
+            expect(tool!.parameters.required).toContain('content');
         });
 
-        it('accepts both prompt and image_url', () => {
-            const tool = getToolByName('set_canvas_background')!;
-            expect(tool.parameters.properties).toHaveProperty('prompt');
-            expect(tool.parameters.properties).toHaveProperty('image_url');
+        it('add_button exists', () => {
+            const tool = getToolByName('add_button');
+            expect(tool).toBeDefined();
+            expect(tool!.category).toBe('create');
         });
     });
 
@@ -163,15 +174,15 @@ describe('agentTools', () => {
             expect(getToolByName('add_text')).toBeDefined();
         });
 
-        it('finds add_rect', () => {
-            expect(getToolByName('add_rect')).toBeDefined();
+        it('finds execute_dynamic_action', () => {
+            expect(getToolByName('execute_dynamic_action')).toBeDefined();
         });
     });
 
-    // ── Skill Differentiation ──
+    // ── Tool Differentiation ──
 
-    describe('skill routing tools', () => {
-        it('★ REGRESSION: replace_background_image is separate from generate_full_design', () => {
+    describe('tool routing', () => {
+        it('replace_background_image is separate from generate_full_design', () => {
             const bgTool = getToolByName('replace_background_image');
             const designTool = getToolByName('generate_full_design');
             expect(bgTool).toBeDefined();
@@ -181,10 +192,9 @@ describe('agentTools', () => {
             expect(designTool!.category).toBe('compound');
         });
 
-        it('★ REGRESSION: replace_background_image does NOT require canvas clearing', () => {
-            const bgTool = getToolByName('replace_background_image')!;
-            // The description should indicate it preserves other elements
-            expect(bgTool.description).toContain('NOT touch');
+        it('execute_dynamic_action description mentions store access', () => {
+            const tool = getToolByName('execute_dynamic_action');
+            expect(tool!.description.toLowerCase()).toContain('designstore');
         });
     });
 });

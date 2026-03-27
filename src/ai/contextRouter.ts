@@ -1,60 +1,203 @@
 // ─────────────────────────────────────────────────
-// contextRouter.ts — AI Agent Context Router
+// contextRouter.ts — Shadow Workspace + Context Router
 // ─────────────────────────────────────────────────
-// Phase 0 of the AI pipeline: Detect which page the
-// user is on and provide context-appropriate routing.
-//
-// Pages:
-//   - Dashboard: Full autonomy (project CRUD, navigation)
-//   - Size Dashboard: Sizing tools (add/remove variants, smart check)
-//   - Canvas Editor: Design pipeline (Phase 1-9)
-//
-// Non-design tasks bypass the pipeline entirely.
-// ─────────────────────────────────────────────────
+// v2: Eval-first architecture. Builds a live workspace
+// snapshot so the AI "sees" the design state before writing code.
+// Single source of system prompt truth.
 
 import { useDesignStore } from '@/stores/designStore';
+import type { DesignElement } from '@/schema/elements.types';
 
 // ── Types ────────────────────────────────────────
 
 export type PageContext = 'dashboard' | 'size-dashboard' | 'canvas-editor';
 
 export interface ContextInfo {
-    /** Which page the user is on */
     page: PageContext;
-    /** Human-readable page label for LLM */
     pageLabel: string;
-    /** Tools relevant to this context */
-    relevantToolHint: string;
-    /** Project name if available */
     projectName: string;
-    /** Canvas dimensions if in editor */
     canvasSize: { w: number; h: number } | null;
-    /** Number of variants if in size dashboard */
     variantCount: number;
-    /** Number of elements on current canvas */
     elementCount: number;
-    /** Whether design pipeline should be used */
     useDesignPipeline: boolean;
+    /** Live workspace snapshot for shadow workspace */
+    snapshot: string;
+    /** 1-line memory summary (from Supabase) */
+    memory?: string;
 }
 
 // ── Page Detection ───────────────────────────────
 
 export function detectPage(pathname: string): PageContext {
-    // /editor/detail/<id> → canvas editor
     if (pathname.includes('/editor/detail/') || pathname.includes('/editor/canvas/')) {
         return 'canvas-editor';
     }
-    // /editor → size dashboard (variant grid)
     if (pathname.includes('/editor')) {
         return 'size-dashboard';
     }
-    // everything else → main dashboard
     return 'dashboard';
+}
+
+// ── Workspace Snapshot Builder ────────────────────
+// This is the "shadow workspace" — the AI sees this before every eval.
+
+function summarizeElement(el: DesignElement, idx: number): string {
+    const parts: string[] = [];
+    parts.push(`[${idx}]`);
+    parts.push(`"${el.name}"`);
+    parts.push(el.type);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const raw = el as any;
+
+    if (el.type === 'text') {
+        const content = raw.content || '';
+        const preview = content.length > 30 ? content.slice(0, 30) + '...' : content;
+        parts.push(`"${preview}"`);
+        if (raw.fontSize) parts.push(`${raw.fontSize}px`);
+        if (raw.fontFamily) parts.push(raw.fontFamily);
+        if (raw.fontWeight && raw.fontWeight >= 700) parts.push('bold');
+        if (raw.color) parts.push(raw.color);
+    } else if (el.type === 'shape') {
+        const w = el.constraints?.size?.width || 0;
+        const h = el.constraints?.size?.height || 0;
+        if (w && h) parts.push(`${w}x${h}`);
+        if (raw.fill) parts.push(`fill=${raw.fill}`);
+        if (raw.borderRadius) parts.push(`r=${raw.borderRadius}`);
+    } else if (el.type === 'image') {
+        parts.push(raw.src ? 'has-src' : 'no-src');
+    } else if (el.type === 'button') {
+        parts.push(`"${raw.label || ''}"`);
+        if (raw.backgroundColor) parts.push(`bg=${raw.backgroundColor}`);
+    }
+
+    parts.push(`z=${el.zIndex}`);
+    if (!el.visible) parts.push('hidden');
+    if (el.locked) parts.push('locked');
+
+    return '  ' + parts.join(' ');
+}
+
+function buildWorkspaceSnapshot(ctx: ContextInfo): string {
+    const lines: string[] = ['WORKSPACE SNAPSHOT:'];
+
+    lines.push(`Page: ${ctx.pageLabel} | Project: "${ctx.projectName || 'Untitled'}"`);
+
+    if (ctx.canvasSize) {
+        lines.push(`Canvas: ${ctx.canvasSize.w}x${ctx.canvasSize.h}px`);
+    }
+
+    // Build element list from design store
+    const ds = useDesignStore.getState();
+    const cs = ds.creativeSet;
+    const masterV = cs?.variants?.find(v => v.id === cs.masterVariantId);
+
+    if (masterV?.elements?.length) {
+        lines.push(`Elements (${masterV.elements.length}):`);
+        for (let i = 0; i < masterV.elements.length; i++) {
+            lines.push(summarizeElement(masterV.elements[i]!, i));
+        }
+    } else {
+        lines.push('Elements: (empty canvas)');
+    }
+
+    if (ctx.variantCount > 1) {
+        const variantSizes = cs?.variants?.map(v =>
+            `${v.preset.width}x${v.preset.height}`
+        ).join(', ') || '';
+        lines.push(`Variants: ${ctx.variantCount} (${variantSizes})`);
+    }
+
+    return lines.join('\n');
+}
+
+// ── Store API Reference ──────────────────────────
+// Replaces 35+ tool schemas (~3,000 tokens) with ~200 tokens
+
+const STORE_API_REFERENCE = `STORE API (use via execute_dynamic_action):
+const ds = designStore;                     // current state
+const cs = ds.creativeSet;                  // active creative set
+cs.variants[i].elements                     // element array per variant
+
+Element: { id, name, type, constraints, opacity, visible, locked, zIndex, animation?, shadow?, role? }
+  text: + content, fontFamily, fontSize, fontWeight, fontStyle, color, textAlign, lineHeight, letterSpacing
+  shape: + fill, shapeType, strokeWidth, borderRadius, gradientStart/End/Angle
+  image: + src, fit, naturalWidth/Height
+  button: + label, backgroundColor, borderRadius, color
+
+Mutation patterns:
+  useDesignStore.setState(state => { /* mutate state.creativeSet directly (immer) */ });
+  useDesignStore.getState().updateMasterElement(elementId, { color: '#ff0000' });
+  useDesignStore.getState().addElementToMaster(newElement);
+  useDesignStore.getState().removeElementFromMaster(elementId);
+  useProjectStore.getState().createCreativeSet('Name');
+  useProjectStore.getState().deleteCreativeSet(id);
+  useProjectStore.getState().renameCreativeSet(id, 'New Name');
+
+Element constraints shape:
+  constraints: { horizontal: { anchor, offset }, vertical: { anchor, offset }, size: { widthMode, heightMode, width, height }, rotation }
+  anchors: 'left'|'center'|'right'|'stretch' (horizontal), 'top'|'center'|'bottom' (vertical)`;
+
+// ── System Prompt Builder ────────────────────────
+
+export function buildContextSystemPrompt(ctx: ContextInfo): string {
+    const snapshot = buildWorkspaceSnapshot(ctx);
+    const memoryLine = ctx.memory ? `\nUSER PREFERENCES: ${ctx.memory}` : '';
+
+    switch (ctx.page) {
+        case 'dashboard':
+            return `You are Glid, a professional creative platform AI. Execute requests directly and concisely.
+
+${snapshot}
+
+TOOLS: execute_dynamic_action (primary), generate_full_design
+For project CRUD (create, delete, rename, duplicate): write JS via execute_dynamic_action.
+
+${STORE_API_REFERENCE}
+
+RULES:
+- Execute immediately, be concise
+- Explain what you'll do BEFORE executing
+- Create projects with: useProjectStore.getState().createCreativeSet('Name')${memoryLine}`;
+
+        case 'size-dashboard':
+            return `You are Glid, a professional creative platform AI. Help manage size variants and edit design elements.
+
+${snapshot}
+
+TOOLS: execute_dynamic_action (primary), add_text, add_button, analyze_scene
+
+${STORE_API_REFERENCE}
+
+RULES:
+- For text/property changes across all variants → use execute_dynamic_action to iterate variants
+- For adding sizes: useDesignStore.getState().addVariant({ width, height, label })
+- Explain what you'll do BEFORE executing
+- Common sizes: 300x250, 728x90, 160x600, 320x50, 970x250, 300x600${memoryLine}`;
+
+        case 'canvas-editor': {
+            const hasElements = ctx.elementCount > 0;
+            return `You are Glid, a professional creative platform AI. Help design stunning ad creatives.
+
+${snapshot}
+
+TOOLS: generate_full_design, replace_background_image, generate_image, add_text, add_button, execute_dynamic_action (primary for modifications), analyze_scene
+
+${STORE_API_REFERENCE}
+
+RULES:
+- ${hasElements ? 'Canvas has elements. For modifications → execute_dynamic_action. For complete redesign → generate_full_design.' : 'Canvas is empty. For new designs → generate_full_design.'}
+- For background changes → replace_background_image
+- Explain what you'll do BEFORE executing
+- Write professional marketing copy (not placeholder text)
+- CTA text should be contextual: "Shop Now", "Learn More", "Get Started"${memoryLine}`;
+        }
+    }
 }
 
 // ── Context Builder ──────────────────────────────
 
-export function buildContext(pathname: string): ContextInfo {
+export function buildContext(pathname: string, memory?: string): ContextInfo {
     const page = detectPage(pathname);
     const designState = useDesignStore.getState();
     const cs = designState.creativeSet;
@@ -67,195 +210,23 @@ export function buildContext(pathname: string): ContextInfo {
         ? { w: masterVariant.preset.width, h: masterVariant.preset.height }
         : null;
 
-    switch (page) {
-        case 'dashboard':
-            return {
-                page,
-                pageLabel: 'Main Dashboard',
-                relevantToolHint: 'Project management: create, delete, rename, duplicate, open creative sets. Navigate to editor.',
-                projectName,
-                canvasSize: null,
-                variantCount: 0,
-                elementCount: 0,
-                useDesignPipeline: false,
-            };
+    const pageLabels: Record<PageContext, string> = {
+        'dashboard': 'Main Dashboard',
+        'size-dashboard': 'Size Dashboard',
+        'canvas-editor': 'Canvas Editor',
+    };
 
-        case 'size-dashboard':
-            return {
-                page,
-                pageLabel: 'Size Dashboard',
-                relevantToolHint: 'Size management: add/remove size variants, navigate to canvas editor, run smart check. View all variants in grid.',
-                projectName,
-                canvasSize,
-                variantCount,
-                elementCount,
-                useDesignPipeline: false,
-            };
-
-        case 'canvas-editor':
-            return {
-                page,
-                pageLabel: 'Canvas Editor',
-                relevantToolHint: 'Design tools: generate layouts, add/edit elements, modify styles, animations. Full design pipeline available.',
-                projectName,
-                canvasSize,
-                variantCount,
-                elementCount,
-                useDesignPipeline: true,
-            };
-    }
-}
-
-// ── System Prompt Builder ────────────────────────
-
-export function buildContextSystemPrompt(ctx: ContextInfo): string {
-    const base = `You are Glid, a professional creative platform AI assistant. You help users create stunning ad creatives.`;
-
-    switch (ctx.page) {
-        case 'dashboard':
-            return `${base}
-
-CURRENT CONTEXT: Main Dashboard
-The user is on the main dashboard where they manage creative projects.
-
-AVAILABLE ACTIONS:
-- Create new creative sets (projects) with specific sizes
-- Delete, rename, or duplicate existing projects
-- Navigate to the editor for any project
-- List all projects
-
-BEHAVIOR:
-- Execute requests directly and immediately
-- Be concise in responses
-- If the user asks to create a project, create it right away
-- If the user asks to delete something, confirm and execute
-- You have FULL AUTONOMY on this page — no need for design pipelines`;
-
-        case 'size-dashboard':
-            return `${base}
-
-CURRENT CONTEXT: Size Dashboard — Project: "${ctx.projectName}"
-${ctx.variantCount} size variant(s) configured.
-${ctx.canvasSize ? `Master size: ${ctx.canvasSize.w}x${ctx.canvasSize.h}px` : ''}
-
-AVAILABLE ACTIONS:
-- Add new size variants (e.g., 728x90, 160x600, 970x250)
-- Remove existing size variants
-- Navigate to canvas editor for any variant
-- Navigate back to main dashboard
-- update_element_text: Change text content of an element across ALL size variants at once
-- update_element_property: Modify a property (color, fontSize, fontWeight, fontFamily, opacity, etc.) across ALL variants
-- list_elements: List all elements in the master design with their names and content
-
-COMMON AD SIZES (suggest these when user asks):
-- 300x250 (Medium Rectangle)
-- 728x90 (Leaderboard)
-- 160x600 (Wide Skyscraper)
-- 320x50 (Mobile Banner)
-- 970x250 (Billboard)
-- 300x600 (Half Page)
-- 250x250 (Square)
-- 336x280 (Large Rectangle)
-
-BATCH OPERATIONS — execute_dynamic_action (FALLBACK ONLY):
-When the user requests a complex batch operation that CANNOT be handled by individual tools above (e.g., "translate all text elements to English", "swap all fonts to Montserrat", "rename all elements"), use execute_dynamic_action to write JavaScript that directly manipulates the design store.
-
-AUTONOMY RULES:
-1. Use structured tools (update_element_text, update_element_property) FIRST for all modifications
-2. Use execute_dynamic_action ONLY when structured tools cannot accomplish the task (e.g., iterating all elements by condition, batch translations, conditional logic)
-3. NEVER use execute_dynamic_action to create or position design elements — suggest navigating to the canvas editor instead
-4. When using execute_dynamic_action, explain what the code will do BEFORE executing
-
-BEHAVIOR:
-- Execute sizing and text modification requests directly
-- When user says "add all standard sizes", add the common sizes above
-- When user asks to change text, use update_element_text — it applies across ALL variants automatically
-- If user asks about design layout, suggest navigating to canvas editor`;
-
-        case 'canvas-editor': {
-            // Build existing element summary for AI context
-            const designState = useDesignStore.getState();
-            const cs = designState.creativeSet;
-            const masterV = cs?.variants?.find(v => v.id === cs.masterVariantId);
-            const elementSummary = masterV?.elements?.length
-                ? masterV.elements.map(el => {
-                    const content = (el as any).content || (el as any).label || '';
-                    return `  - "${el.name}" (${el.type})${content ? `: "${content.slice(0, 40)}"` : ''}`;
-                }).join('\n')
-                : '  (empty canvas)';
-
-            const hasElements = (masterV?.elements?.length ?? 0) > 0;
-
-            return `${base}
-
-CURRENT CONTEXT: Canvas Editor — Project: "${ctx.projectName}"
-${ctx.canvasSize ? `Canvas: ${ctx.canvasSize.w}x${ctx.canvasSize.h}px` : ''}
-${ctx.elementCount} element(s) on canvas.
-
-EXISTING ELEMENTS:
-${elementSummary}
-
-AVAILABLE ACTIONS:
-- generate_full_design: Generate a COMPLETE design from scratch (clears existing elements!)
-- add_text: Add a text element to the existing design
-- add_shape: Add a shape element to the existing design
-- add_button: Add a CTA button to the existing design
-- update_element_text: Change text content of an existing element
-- update_element_property: Modify a property (color, fontSize, fontWeight, opacity, etc.)
-- set_animation: Apply animation presets to elements
-- set_custom_style: Apply CSS effects (glow, shadow, etc.)
-- list_elements: List all elements on canvas
-
-CTA BUTTON QUALITY RULES (MANDATORY):
-- CTA button text MUST be contextual action copy: "Shop Now", "Learn More", "Get Started", "Try Free", "Book Now", "Sign Up", "Discover", "Explore"
-- NEVER use generic text like "Click Here", "Button", "CTA", or the font name as button text
-- CTA font should match the design's visual tone (not always Inter — use the design's primary font or a complementary font)
-- CTA background color should contrast with the design background for maximum visibility
-
-TEXT COPY QUALITY RULES (MANDATORY):
-- Headlines must be punchy, concise (3-8 words), and relevant to the brand/product
-- Subtext/body copy must be descriptive and add value — NEVER use placeholder text like "text", "subtext", "body", "description"
-- Instead write actual marketing copy: "Elevate your style", "Limited time offer", "Free shipping on orders $50+"
-- Match the tone of the brand (luxury = elegant, tech = clean, food = warm)
-
-BATCH OPERATIONS — execute_dynamic_action (FALLBACK ONLY):
-For complex batch operations that structured tools cannot handle (e.g., "translate all text", "swap all fonts"), use execute_dynamic_action to write JavaScript.
-
-AUTONOMY RULES:
-1. For design creation and element manipulation → ALWAYS use structured tools
-2. For batch operations structured tools CANNOT handle → use execute_dynamic_action as FALLBACK ONLY
-3. NEVER use execute_dynamic_action to create, position, or style design elements — that's what the structured tools are for
-4. When using execute_dynamic_action, explain what the code will do BEFORE executing
-
-CRITICAL ROUTING RULES:
-${hasElements ? `- The canvas ALREADY HAS ${ctx.elementCount} elements. DO NOT use generate_full_design unless the user EXPLICITLY asks to "redesign", "start over", or "create from scratch".
-- For follow-up requests like "add a button", "change the color", "make text bigger": use individual tools (add_button, update_element_property, etc.)
-- NEVER clear/destroy existing elements when the user asks for a modification or addition.
-- Always use list_elements first if you're unsure what's already on the canvas.` : `- The canvas is empty. For design requests, use generate_full_design.`}
-
-BEHAVIOR:
-- Be creative and professional in design suggestions
-- Always explain design decisions briefly
-- When modifying, reference existing element names from the list above
-
-SKILL ROUTING (choose the RIGHT tool for each request):
-- "design/create from scratch" or "make a banner" → generate_full_design (full pipeline)
-- "redesign/start over" → generate_full_design
-- "change/replace/swap background image" → replace_background_image
-- "try another background/different image" → replace_background_image
-- "add text/button/shape" → add_text / add_shape
-- "change color/font/size of X" → update_element_property
-- "change text content" → update_element_text
-- "translate all/batch modify" → execute_dynamic_action
-- Questions or advice → text response only (no tools)
-
-IMAGE GENERATION RULES:
-- ALWAYS generate images matching canvas size: ${ctx.canvasSize ? ctx.canvasSize.w + 'x' + ctx.canvasSize.h + 'px' : 'use actual canvas dimensions'}
-- Background images MUST cover the ENTIRE canvas
-- When replacing backgrounds, use replace_background_image (handles cleanup)
-- Write descriptive prompts: mood + lighting + subject + composition`;
-        }
-    }
+    return {
+        page,
+        pageLabel: pageLabels[page],
+        projectName,
+        canvasSize,
+        variantCount,
+        elementCount,
+        useDesignPipeline: page === 'canvas-editor',
+        snapshot: '', // populated via buildWorkspaceSnapshot() during prompt build
+        memory,
+    };
 }
 
 // ── Enrich User Message with Context ─────────────

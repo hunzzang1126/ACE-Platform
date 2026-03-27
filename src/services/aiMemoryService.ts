@@ -264,3 +264,94 @@ function saveLocalMemory(memory: AiMemory): void {
         localStorage.setItem(LOCAL_KEY, JSON.stringify(memory));
     } catch { /* quota exceeded — ok */ }
 }
+
+// ═══════════════════════════════════════════════════
+// FACT EXTRACTION (Cursor-style passive learning)
+// ═══════════════════════════════════════════════════
+
+/**
+ * Extract user preferences from a conversation exchange.
+ * Simple keyword matching — no extra API call needed.
+ */
+export function extractFacts(
+    userMessage: string,
+    aiReply: string,
+): Partial<AiPreferences> {
+    const facts: Partial<AiPreferences> = {};
+    const msg = userMessage.toLowerCase();
+
+    // Font preferences
+    const fontMatch = msg.match(/(?:use|font|typeface)\s+([a-z\s]+?)(?:\s|$|,|\.|!)/i);
+    if (fontMatch?.[1]) {
+        const font = fontMatch[1].trim();
+        if (font.length > 2 && font.length < 30) {
+            facts.preferredFonts = [font.charAt(0).toUpperCase() + font.slice(1)];
+        }
+    }
+
+    // Color tone
+    if (msg.includes('dark') || msg.includes('moody') || msg.includes('night')) {
+        facts.colorTone = 'dark';
+    } else if (msg.includes('bright') || msg.includes('vibrant') || msg.includes('colorful')) {
+        facts.colorTone = 'bright';
+    } else if (msg.includes('warm') || msg.includes('cozy') || msg.includes('earthy')) {
+        facts.colorTone = 'warm';
+    } else if (msg.includes('cool') || msg.includes('cold') || msg.includes('icy')) {
+        facts.colorTone = 'cool';
+    } else if (msg.includes('minimal') || msg.includes('clean') || msg.includes('simple')) {
+        facts.colorTone = 'neutral';
+    }
+
+    // Style
+    if (msg.includes('minimal') || msg.includes('clean')) facts.preferredStyle = 'minimal';
+    if (msg.includes('realistic') || msg.includes('photo')) facts.preferredStyle = 'realistic';
+    if (msg.includes('illustration') || msg.includes('cartoon')) facts.preferredStyle = 'illustration';
+    if (msg.includes('abstract')) facts.preferredStyle = 'abstract';
+
+    // Industry detection
+    const industries: Record<string, string> = {
+        shoe: 'fashion', sneaker: 'fashion', clothing: 'fashion', fashion: 'fashion',
+        food: 'food', restaurant: 'food', recipe: 'food', coffee: 'food',
+        tech: 'technology', software: 'technology', app: 'technology', saas: 'technology',
+        beauty: 'beauty', cosmetic: 'beauty', skincare: 'beauty',
+        fitness: 'health', gym: 'health', wellness: 'health', health: 'health',
+        real: 'real estate', property: 'real estate', housing: 'real estate',
+        car: 'automotive', auto: 'automotive', vehicle: 'automotive',
+        travel: 'travel', hotel: 'travel', flight: 'travel', vacation: 'travel',
+    };
+    for (const [keyword, industry] of Object.entries(industries)) {
+        if (msg.includes(keyword)) {
+            facts.industry = industry;
+            break;
+        }
+    }
+
+    // Language detection from content
+    if (/[\u3131-\u314e\u314f-\u3163\uac00-\ud7a3]/.test(userMessage)) {
+        facts.contentLanguage = 'Korean';
+    } else if (/[\u4e00-\u9fff]/.test(userMessage)) {
+        facts.contentLanguage = 'Chinese';
+    } else if (/[\u3040-\u309f\u30a0-\u30ff]/.test(userMessage)) {
+        facts.contentLanguage = 'Japanese';
+    }
+
+    return facts;
+}
+
+/**
+ * Convenience: merge extracted facts into existing memory and save.
+ * Used by aiService.ts post-interaction.
+ */
+export async function saveAiMemory(
+    facts: Partial<AiPreferences>,
+): Promise<void> {
+    const memory = await loadMemory();
+    const merged = { ...memory.preferences, ...facts };
+    // Merge font arrays
+    if (facts.preferredFonts && memory.preferences.preferredFonts) {
+        const all = new Set([...memory.preferences.preferredFonts, ...facts.preferredFonts]);
+        merged.preferredFonts = [...all].slice(0, 5);
+    }
+    memory.preferences = merged;
+    await saveMemory(memory);
+}

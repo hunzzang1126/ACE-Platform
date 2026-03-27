@@ -1,20 +1,16 @@
 // ─────────────────────────────────────────────────
-// AI Service — Claude API + Agentic Loop
+// AI Service v2 — Eval-First Agentic Loop
 // ─────────────────────────────────────────────────
-// Client-side LLM integration via OpenRouter:
-// - OpenAI-compatible chat/completions API
-// - Extended thinking for complex reasoning
-// - 4-phase agentic loop (think → plan → execute → reflect)
-// ─────────────────────────────────────────────────
+// Simplified: no extended thinking, no vision healing,
+// contextRouter as sole prompt source, 1 retry max.
+// Narration: AI explains before executing, results shown after.
 
 import { AgentContext, type AgentMessage, type ToolCallRecord, type SceneNodeInfo } from './agentContext';
 import { ALL_TOOLS } from './agentTools';
 import { toClaudeTools } from './aceToolDef';
 import { executeToolCall, type ExecutionResult } from './commandExecutor';
-import { DASHBOARD_TOOL_NAMES } from './dashboardTools';
-import { buildSmartContext, pushAction, pushLastTouched, type SmartContext } from './smartContextBuilder';
+import { buildContext, buildContextSystemPrompt, enrichMessageWithContext } from './contextRouter';
 import { getOpenRouterKey } from '@/config/apiKeys';
-import type { CreativeSet } from '@/schema/design.types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Engine = any;
@@ -30,7 +26,7 @@ export interface AiConfig {
 const DEFAULT_CONFIG: AiConfig = {
     endpoint: 'https://openrouter.ai/api',
     model: 'anthropic/claude-sonnet-4',
-    maxToolRounds: 2, // ★ STRUCTURAL MINIMUM: 1 tool batch + 1 text response. ALL work must complete in ONE tool call round.
+    maxToolRounds: 2, // 1 tool batch + 1 text response
 };
 
 export function loadConfig(): AiConfig {
@@ -38,7 +34,6 @@ export function loadConfig(): AiConfig {
         const stored = localStorage.getItem('ace-ai-config');
         if (stored) {
             const parsed = JSON.parse(stored);
-            // NEVER load maxToolRounds from storage — always use code default
             delete parsed.maxToolRounds;
             return { ...DEFAULT_CONFIG, ...parsed };
         }
@@ -47,7 +42,6 @@ export function loadConfig(): AiConfig {
 }
 
 export function saveConfig(config: AiConfig): void {
-    // Don't persist maxToolRounds — it's a code-level constant
     const { maxToolRounds: _, ...rest } = config;
     localStorage.setItem('ace-ai-config', JSON.stringify(rest));
 }
@@ -94,8 +88,6 @@ interface ClaudeResponse {
     model: string;
     stop_reason: 'end_turn' | 'tool_use' | 'max_tokens' | 'stop_sequence';
     usage: { input_tokens: number; output_tokens: number };
-    /** Extended thinking reasoning (if enabled) */
-    reasoning?: string;
 }
 
 // ── AI Service ───────────────────────────────────
@@ -104,18 +96,11 @@ export class AiService {
     private context: AgentContext;
     private config: AiConfig;
     private trackedNodes: SceneNodeInfo[];
-    /** Design context for smart context builder */
-    designContext?: { creativeSet: CreativeSet | null; activeVariantId?: string };
 
     constructor(trackedNodes: SceneNodeInfo[]) {
         this.context = new AgentContext();
         this.config = loadConfig();
         this.trackedNodes = trackedNodes;
-    }
-
-    /** Set the current design context for smart AI prompting */
-    setDesignContext(creativeSet: CreativeSet | null, activeVariantId?: string): void {
-        this.designContext = { creativeSet, activeVariantId };
     }
 
     getContext(): AgentContext {
@@ -145,7 +130,7 @@ export class AiService {
     }
 
     /**
-     * Main chat method — runs the full agentic loop with Claude.
+     * Main chat — runs eval-first agentic loop.
      */
     async chat(
         userMessage: string,
@@ -166,119 +151,52 @@ export class AiService {
         };
         this.context.addMessage(userMsg);
 
-        // Phase 0: Canvas scan — extract REAL scene nodes from engine
-        if (engine) {
-            this.trackedNodes = AgentContext.extractSceneNodes(engine);
-        }
-        let canvasSummary = 'No canvas engine connected (dashboard mode).';
-        if (engine) {
-            const nodeCount = this.trackedNodes.length;
-            const animPlaying = engine.anim_playing?.() ? 'yes' : 'no';
-            const trackedSummary = nodeCount > 0
-                ? this.trackedNodes.map(n => `• ${n.label} (${n.type}, id ${n.id})`).join('\n')
-                : 'Empty canvas';
-            canvasSummary = `Canvas: ${nodeCount} element${nodeCount !== 1 ? 's' : ''} · Animation: ${animPlaying}\n${trackedSummary}`;
-        }
-        progress.onCanvasScan(canvasSummary);
+        // Phase 0: Build shadow workspace snapshot
+        const pathname = typeof window !== 'undefined' ? window.location.pathname : '/';
+        const ctx = buildContext(pathname);
+        const systemPrompt = buildContextSystemPrompt(ctx);
+
+        // Enrich message with context
+        const enrichedMessage = enrichMessageWithContext(userMessage, ctx);
+
+        // Show workspace scan
+        const scanSummary = ctx.elementCount > 0
+            ? `${ctx.pageLabel}: ${ctx.elementCount} elements on ${ctx.canvasSize?.w}x${ctx.canvasSize?.h}px canvas`
+            : `${ctx.pageLabel}: empty canvas`;
+        progress.onCanvasScan(scanSummary);
         await nextFrame();
-        await sleep(400);
-
-        // Build system prompt with smart context
-        const smartCtx = buildSmartContext(
-            engine ? 'editor' : 'dashboard',
-            this.designContext?.creativeSet,
-            this.designContext?.activeVariantId,
-        );
-        const systemPrompt = AgentContext.buildSystemPrompt(engine, this.trackedNodes, smartCtx);
-
-        // Track user action for context continuity
-        pushAction(`User: ${userMessage.substring(0, 100)}`);
+        await sleep(300);
 
         // Phase 1: Thinking
-        progress.onThinking(`Analyzing your request with Claude...\nUsing: ${this.config.model}`);
+        progress.onThinking('Analyzing your request...');
         await nextFrame();
 
         try {
-            await this.agenticLoop(engine, systemPrompt, progress, executorOverride);
+            await this.agenticLoop(engine, systemPrompt, enrichedMessage, progress, executorOverride);
         } catch (err) {
             progress.onError(`AI Error: ${err}`);
         }
+
+        // Post-interaction: save facts to memory (fire-and-forget)
+        this.saveInteractionMemory(userMessage).catch(() => {});
     }
 
     /**
-     * Vision Healing — AI Agent fixes design quality issues.
-     * Called by autoDesignLoop when Vision QA scores below threshold.
-     * Uses the same agenticLoop but with a healing-specific prompt.
-     */
-    async healDesign(
-        engine: Engine,
-        issues: Array<{ type: string; severity: string; element?: string; description: string; suggestion?: string }>,
-        score: number,
-        canvasW: number,
-        canvasH: number,
-        progress: LiveProgress,
-    ): Promise<void> {
-        if (!engine) {
-            progress.onError('Cannot heal: no canvas engine');
-            return;
-        }
-
-        // Scan current canvas state
-        this.trackedNodes = AgentContext.extractSceneNodes(engine);
-
-        // Build healing-specific system prompt
-        const healingPrompt = AgentContext.buildHealingPrompt(
-            issues,
-            this.trackedNodes,
-            canvasW,
-            canvasH,
-            score,
-        );
-
-        // Inject a synthetic "user message" for the healing loop
-        // (Not added to conversation history — healing is an internal pipeline step)
-        const healingInstruction = `Fix the ${issues.length} design quality issues identified by Vision QA. Current score: ${score}/100. Target: 80+. Use atomic tools only.`;
-
-        // Temporarily inject the healing message for Claude
-        const savedHistory = [...this.context.getHistory()];
-        this.context.addMessage({
-            role: 'user',
-            content: healingInstruction,
-            timestamp: Date.now(),
-        });
-
-        progress.onThinking(`Vision Healer analyzing ${issues.length} issues...`);
-        await nextFrame();
-
-        try {
-            await this.agenticLoop(engine, healingPrompt, progress);
-        } catch (err) {
-            console.warn('[VisionHealer] Agent healing failed:', err);
-        }
-
-        // Restore conversation history — healing messages should not pollute user chat
-        this.context.clear();
-        for (const msg of savedHistory) {
-            this.context.addMessage(msg);
-        }
-    }
-
-    /**
-     * The core agentic loop — handles multi-round tool calling with Claude.
+     * Core agentic loop — single round + text response.
      */
     private async agenticLoop(
         engine: Engine,
-        initialSystemPrompt: string,
+        systemPrompt: string,
+        enrichedUserMessage: string,
         progress: LiveProgress,
         executorOverride?: ToolExecutorOverride,
     ): Promise<void> {
-        const messages = this.buildClaudeMessages();
+        const messages = this.buildClaudeMessages(enrichedUserMessage);
         const tools = toClaudeTools(ALL_TOOLS);
-        let systemPrompt = initialSystemPrompt;
 
         let rounds = 0;
         let finished = false;
-        const allToolRecords: ToolCallRecord[] = []; // Accumulate across all rounds
+        const allToolRecords: ToolCallRecord[] = [];
 
         await nextFrame();
 
@@ -288,21 +206,14 @@ export class AiService {
             const response = await this.callClaude(systemPrompt, messages, tools, progress);
 
             if (!response) {
-                progress.onError('No response from Claude');
+                progress.onError('No response from AI');
                 return;
             }
 
-            // ★ Extended Thinking: Show reasoning before tool execution
-            if (response.reasoning) {
-                progress.onThinking(response.reasoning);
-                await nextFrame();
-            }
-
-            // Extract text and tool_use blocks
             const textBlocks = response.content.filter(b => b.type === 'text');
             const toolBlocks = response.content.filter(b => b.type === 'tool_use');
 
-            // Stream text content
+            // ★ Narration: stream AI's explanation text BEFORE executing tools
             for (const block of textBlocks) {
                 if (block.text) {
                     for (const char of block.text) {
@@ -313,20 +224,18 @@ export class AiService {
             }
 
             if (response.stop_reason === 'tool_use' && toolBlocks.length > 0) {
-                // Phase 2: Planning
-                const planSteps = toolBlocks.map(tc =>
-                    `${tc.name}(${truncateArgs(JSON.stringify(tc.input ?? {}))})`
-                );
-                progress.onPlan(planSteps);
-                await sleep(600);
-
-                // Store assistant message with tool_use blocks
-                messages.push({
-                    role: 'assistant',
-                    content: response.content,
+                // Show plan with natural language labels
+                const planSteps = toolBlocks.map(tc => {
+                    const params = tc.input as Record<string, unknown> ?? {};
+                    return humanizeToolStep(tc.name!, params);
                 });
+                progress.onPlan(planSteps);
+                await sleep(400);
 
-                // Phase 3: Execute tools and build tool_result blocks
+                // Store assistant message
+                messages.push({ role: 'assistant', content: response.content });
+
+                // Execute tools
                 const toolResults: ClaudeContentBlock[] = [];
                 const toolRecords: ToolCallRecord[] = [];
 
@@ -339,32 +248,18 @@ export class AiService {
 
                     const startTime = Date.now();
 
-                    // Route execution: override → dashboard → canvas
+                    // Route: override → canvas executor
                     let result: ExecutionResult;
                     const overrideResult = executorOverride?.(tc.name!, params);
                     if (overrideResult) {
                         result = overrideResult;
-                    } else if (DASHBOARD_TOOL_NAMES.has(tc.name!)) {
-                        result = { success: false, message: `Dashboard tool "${tc.name}" not available.` };
-                    } else if (engine) {
-                        result = await executeToolCall(engine, tc.name!, params, this.trackedNodes);
                     } else {
-                        result = { success: false, message: 'Canvas engine not available. Navigate to the editor first.' };
+                        result = await executeToolCall(engine, tc.name!, params, this.trackedNodes);
                     }
                     const durationMs = Date.now() - startTime;
 
                     progress.onStepComplete(i, result);
-                    await sleep(300);
-
-                    // ★ Part 4: Track last-touched element for pronoun resolution
-                    if (result.success) {
-                        const nodeId = result.nodeId ?? Number(params.node_id ?? params.id ?? -1);
-                        if (nodeId >= 0) {
-                            const nodeName = this.trackedNodes.find(nd => nd.id === nodeId)?.label
-                                ?? String(params.name ?? `element #${nodeId}`);
-                            pushLastTouched(nodeName, nodeId, tc.name!);
-                        }
-                    }
+                    await sleep(200);
 
                     toolResults.push({
                         type: 'tool_result',
@@ -381,28 +276,11 @@ export class AiService {
                     });
                 }
 
-                // Accumulate for final message
                 allToolRecords.push(...toolRecords);
 
-                // Send tool results back as a user message
-                messages.push({
-                    role: 'user',
-                    content: toolResults,
-                });
+                messages.push({ role: 'user', content: toolResults });
 
-                // ★ LIVE SCENE REFRESH: Re-scan canvas after tool execution
-                // so the next LLM round sees the result of its own actions.
-                if (engine) {
-                    this.trackedNodes = AgentContext.extractSceneNodes(engine);
-                    const smartCtx = buildSmartContext(
-                        'editor',
-                        this.designContext?.creativeSet,
-                        this.designContext?.activeVariantId,
-                    );
-                    systemPrompt = AgentContext.buildSystemPrompt(engine, this.trackedNodes, smartCtx);
-                }
-
-                // Store text from this round if any
+                // Store text narration from this round
                 const roundText = textBlocks.map(b => b.text).filter(Boolean).join('\n');
                 if (roundText) {
                     this.context.addMessage({
@@ -413,13 +291,12 @@ export class AiService {
                     });
                 }
             } else {
-                // No tool calls — final text response
+                // Final text response
                 finished = true;
 
                 const content = textBlocks.map(b => b.text).filter(Boolean).join('\n');
-
                 progress.onReflection(content);
-                await sleep(500);
+                await sleep(300);
 
                 const assistantMsg: AgentMessage = {
                     role: 'assistant',
@@ -433,46 +310,40 @@ export class AiService {
         }
 
         if (rounds >= this.config.maxToolRounds && !finished) {
-            progress.onError(`Reached maximum tool rounds (${this.config.maxToolRounds}). Stopping.`);
+            progress.onError(`Reached maximum tool rounds (${this.config.maxToolRounds}).`);
         }
     }
 
     /**
-     * Build Claude messages from conversation history.
-     * ★ CONVERSATION MEMORY: Compresses older messages into a summary
-     * so the AI remembers context even in 20+ message conversations.
+     * Build conversation messages for Claude.
+     * Rolling summarization for long conversations.
      */
-    private buildClaudeMessages(): ClaudeMessage[] {
+    private buildClaudeMessages(currentMessage?: string): ClaudeMessage[] {
         const messages: ClaudeMessage[] = [];
         const all = this.context.getHistory()
             .filter(m => m.role === 'user' || m.role === 'assistant');
 
-        // Keep last 10 messages verbatim for full context
         const RECENT_WINDOW = 10;
 
         if (all.length > RECENT_WINDOW) {
-            // Summarize older messages into a compact context block
             const older = all.slice(0, all.length - RECENT_WINDOW);
             const summaryLines: string[] = [];
             for (const msg of older) {
                 const prefix = msg.role === 'user' ? 'User' : 'AI';
-                // Compress each message to max 80 chars
                 const short = msg.content.replace(/\n+/g, ' ').slice(0, 80);
                 summaryLines.push(`${prefix}: ${short}`);
             }
-            const summary = summaryLines.join('\n');
             messages.push({
                 role: 'user',
-                content: `[CONVERSATION HISTORY — ${older.length} earlier messages summarized]\n${summary}\n[END HISTORY — recent messages follow]`,
+                content: `[HISTORY — ${older.length} earlier messages]\n${summaryLines.join('\n')}\n[END]`,
             });
-            // Claude needs alternating roles — inject a brief ack
             messages.push({
                 role: 'assistant',
-                content: 'Understood, I have the conversation context.',
+                content: 'Understood.',
             });
         }
 
-        // Add recent messages verbatim
+        // Recent messages (excluding the current one which was already added to context)
         const recent = all.slice(-RECENT_WINDOW);
         for (const msg of recent) {
             messages.push({
@@ -480,11 +351,18 @@ export class AiService {
                 content: msg.content,
             });
         }
+
+        // Override the last user message with enriched version if provided
+        if (currentMessage && messages.length > 0 && messages[messages.length - 1]!.role === 'user') {
+            messages[messages.length - 1]!.content = currentMessage;
+        }
+
         return messages;
     }
 
     /**
-     * Call the Claude Messages API.
+     * Call Claude via OpenRouter — simplified, no extended thinking.
+     * max_tokens: 4096 (halved), retries: 1 (was 3).
      */
     private async callClaude(
         systemPrompt: string,
@@ -492,7 +370,7 @@ export class AiService {
         tools: ReturnType<typeof toClaudeTools>,
         progress: LiveProgress,
     ): Promise<ClaudeResponse | null> {
-        // ★ Plan-based model routing: Free → Haiku, Pro → Sonnet 4
+        // Plan-based model routing
         const { useAuthStore } = await import('@/stores/authStore');
         const { PLAN_LIMITS } = await import('@/schema/planTypes');
         const authState = useAuthStore.getState();
@@ -502,13 +380,12 @@ export class AiService {
         console.log(`[AiService] Plan: ${userPlan} → Model: ${model}`);
         const apiKey = getOpenRouterKey();
 
-        // Use Vite dev proxy to bypass CORS
         const isLocalDev = typeof window !== 'undefined' && window.location.hostname === 'localhost';
         const apiUrl = isLocalDev
             ? '/api/openrouter/v1/chat/completions'
             : 'https://openrouter.ai/api/v1/chat/completions';
 
-        // Convert Anthropic messages → OpenAI format
+        // Build OpenAI-format messages
         const openAiMessages: Array<Record<string, unknown>> = [];
         if (systemPrompt) {
             openAiMessages.push({ role: 'system', content: systemPrompt });
@@ -517,9 +394,7 @@ export class AiService {
             if (typeof msg.content === 'string') {
                 openAiMessages.push({ role: msg.role, content: msg.content });
             } else if (Array.isArray(msg.content)) {
-                // Handle tool_result blocks (user role) and tool_use blocks (assistant role)
                 if (msg.role === 'user') {
-                    // Convert tool_result blocks to OpenAI tool message format
                     const toolResults = msg.content.filter((b: ClaudeContentBlock) => b.type === 'tool_result');
                     if (toolResults.length > 0) {
                         for (const tr of toolResults) {
@@ -533,15 +408,12 @@ export class AiService {
                         openAiMessages.push({ role: msg.role, content: msg.content });
                     }
                 } else {
-                    // Assistant message with tool_use blocks → OpenAI tool_calls format
                     const textParts = msg.content.filter((b: ClaudeContentBlock) => b.type === 'text');
                     const toolParts = msg.content.filter((b: ClaudeContentBlock) => b.type === 'tool_use');
                     const openAiMsg: Record<string, unknown> = { role: 'assistant' };
-                    if (textParts.length > 0) {
-                        openAiMsg.content = textParts.map((b: ClaudeContentBlock) => b.text).join('\n');
-                    } else {
-                        openAiMsg.content = null;
-                    }
+                    openAiMsg.content = textParts.length > 0
+                        ? textParts.map((b: ClaudeContentBlock) => b.text).join('\n')
+                        : null;
                     if (toolParts.length > 0) {
                         openAiMsg.tool_calls = toolParts.map((tc: ClaudeContentBlock) => ({
                             id: tc.id,
@@ -554,7 +426,6 @@ export class AiService {
             }
         }
 
-        // Convert Anthropic tool schema → OpenAI function format
         const openAiTools = tools.length > 0 ? tools.map(t => ({
             type: 'function' as const,
             function: {
@@ -564,30 +435,21 @@ export class AiService {
             },
         })) : undefined;
 
-        // ★ Extended Thinking — let Claude reason deeply before acting
-        // Uses OpenRouter's thinking parameter for Claude Sonnet 4+
-        const isClaudeThinking = model.includes('claude') && (
-            model.includes('sonnet-4') || model.includes('opus-4')
-        );
-
+        // ★ No extended thinking — removed entirely
         const body: Record<string, unknown> = {
             model,
-            max_tokens: 8192,
+            max_tokens: 4096, // ★ Halved from 8192
             messages: openAiMessages,
             tools: openAiTools,
         };
 
-        if (isClaudeThinking) {
-            body.thinking = { type: 'enabled', budget_tokens: 4096 };
-        }
+        console.log(`[AiService] → ${apiUrl} (model: ${model}, msgs: ${openAiMessages.length}, tools: ${tools.length})`);
 
-        console.log(`[AiService] callClaude → ${apiUrl} (model: ${model}, msgs: ${openAiMessages.length})`);
-
-        // Retry loop for rate limits (429)
-        const maxRetries = 3;
+        // ★ 1 retry max (was 3)
+        const maxRetries = 1;
         let lastError = '';
 
-        for (let attempt = 0; attempt < maxRetries; attempt++) {
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
             const resp = await fetch(apiUrl, {
                 method: 'POST',
                 headers: {
@@ -600,12 +462,11 @@ export class AiService {
             });
 
             if (resp.ok) {
-                // Convert OpenAI response → Anthropic ClaudeResponse format
                 const data = await resp.json() as Record<string, unknown>;
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const choice = (data.choices as any[])?.[0];
                 if (!choice) {
-                    progress.onError('Empty response from OpenRouter');
+                    progress.onError('Empty response from AI');
                     return null;
                 }
 
@@ -631,9 +492,6 @@ export class AiService {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const usage = data.usage as any ?? { input_tokens: 0, output_tokens: 0 };
 
-                // ★ Extract extended thinking reasoning
-                const reasoning = msg.reasoning ?? msg.thinking ?? null;
-
                 const result: ClaudeResponse = {
                     id: data.id as string ?? '',
                     type: 'message',
@@ -642,42 +500,55 @@ export class AiService {
                     model: data.model as string ?? model,
                     stop_reason: stopReason as ClaudeResponse['stop_reason'],
                     usage: { input_tokens: usage.prompt_tokens ?? 0, output_tokens: usage.completion_tokens ?? 0 },
-                    reasoning: typeof reasoning === 'string' ? reasoning : undefined,
                 };
 
-                console.log(`[AiService] OpenRouter response: stop=${result.stop_reason}, blocks=${result.content.length}, thinking=${result.reasoning ? result.reasoning.length + 'chars' : 'off'}, usage=${result.usage.input_tokens}in/${result.usage.output_tokens}out`);
+                console.log(`[AiService] Response: stop=${result.stop_reason}, tools=${result.content.filter(b => b.type === 'tool_use').length}, in=${result.usage.input_tokens}|out=${result.usage.output_tokens}`);
                 return result;
             }
 
-            // Rate limit — retry with backoff
-            if (resp.status === 429) {
-                const waitSec = 10 * Math.pow(2, attempt);
-                console.warn(`[AiService] Rate limited (429). Retrying in ${waitSec}s... (attempt ${attempt + 1}/${maxRetries})`);
-                progress.onThinking(`Rate limited. Waiting ${waitSec}s before retrying... (${attempt + 1}/${maxRetries})`);
+            if (resp.status === 429 && attempt < maxRetries) {
+                const waitSec = 10;
+                console.warn(`[AiService] Rate limited (429). Retrying in ${waitSec}s...`);
+                progress.onThinking(`Rate limited. Retrying in ${waitSec}s...`);
                 await sleep(waitSec * 1000);
                 continue;
             }
 
-            // Other error — don't retry
             const errorText = await resp.text();
             try {
                 const errJson = JSON.parse(errorText);
-                lastError = errJson?.error?.message || `OpenRouter API Error ${resp.status}: ${errorText.substring(0, 200)}`;
+                lastError = errJson?.error?.message || `API Error ${resp.status}: ${errorText.substring(0, 200)}`;
             } catch {
-                lastError = `OpenRouter API Error ${resp.status}: ${errorText.substring(0, 200)}`;
+                lastError = `API Error ${resp.status}: ${errorText.substring(0, 200)}`;
             }
             console.error(`[AiService] ${lastError}`);
             progress.onError(lastError);
             return null;
         }
 
-        // All retries exhausted
-        progress.onError(`Rate limit exceeded after ${maxRetries} retries. Please wait a minute and try again.`);
+        progress.onError(`Rate limited. Please wait a moment and try again.`);
         return null;
+    }
+
+    /**
+     * Save interaction facts to Supabase memory (fire-and-forget).
+     * Extracts user preferences and design patterns.
+     */
+    private async saveInteractionMemory(userMessage: string): Promise<void> {
+        try {
+            const { saveAiMemory, extractFacts } = await import('@/services/aiMemoryService');
+            const facts = extractFacts(userMessage, this.getLastReply());
+            if (Object.keys(facts).length > 0) {
+                await saveAiMemory(facts);
+                console.log('[AiService] Memory saved:', Object.keys(facts));
+            }
+        } catch {
+            // Memory save is optional — silently fail
+        }
     }
 }
 
-// ── Types ────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────
 
 function sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -689,12 +560,26 @@ function nextFrame(): Promise<void> {
     });
 }
 
-function truncateArgs(argsJson: string): string {
-    try {
-        const obj = JSON.parse(argsJson);
-        const short = JSON.stringify(obj);
-        return short.length > 60 ? short.slice(0, 57) + '...' : short;
-    } catch {
-        return argsJson.length > 60 ? argsJson.slice(0, 57) + '...' : argsJson;
+/**
+ * Convert a tool call into a human-readable narration step.
+ */
+function humanizeToolStep(name: string, params: Record<string, unknown>): string {
+    switch (name) {
+        case 'execute_dynamic_action':
+            return (params.description as string) || 'Executing custom action...';
+        case 'generate_full_design':
+            return `Creating design: "${(params.prompt as string)?.slice(0, 50) || 'new design'}"`;
+        case 'replace_background_image':
+            return `Generating background: "${(params.prompt as string)?.slice(0, 50) || 'new image'}"`;
+        case 'generate_image':
+            return `Generating image: "${(params.prompt as string)?.slice(0, 50) || 'new image'}"`;
+        case 'add_text':
+            return `Adding text: "${(params.content as string)?.slice(0, 30) || 'text'}"`;
+        case 'add_button':
+            return `Adding button: "${(params.text as string) || 'Shop Now'}"`;
+        case 'analyze_scene':
+            return 'Reading canvas state...';
+        default:
+            return name.replace(/_/g, ' ');
     }
 }

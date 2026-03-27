@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────
-// contextRouter.test.ts — Unit tests
+// contextRouter.test.ts — Unit tests (v2 eval-first)
 // ─────────────────────────────────────────────────
 
 import { describe, it, expect } from 'vitest';
@@ -62,17 +62,6 @@ describe('contextRouter', () => {
             expect(ctx.pageLabel).toBe('Canvas Editor');
             expect(ctx.useDesignPipeline).toBe(true);
         });
-
-        it('includes relevant tool hints', () => {
-            const dashboard = buildContext('/');
-            expect(dashboard.relevantToolHint).toContain('Project management');
-
-            const sizeDb = buildContext('/editor');
-            expect(sizeDb.relevantToolHint).toContain('Size management');
-
-            const editor = buildContext('/editor/detail/x');
-            expect(editor.relevantToolHint).toContain('Design tools');
-        });
     });
 
     // ── enrichMessageWithContext ──
@@ -85,8 +74,7 @@ describe('contextRouter', () => {
             expect(result).toContain('User request: create a new project');
         });
 
-        it('includes project name when available', () => {
-            // buildContext reads from designStore, which defaults to empty
+        it('includes page info for canvas editor', () => {
             const ctx = buildContext('/editor/detail/abc');
             const result = enrichMessageWithContext('make it red', ctx);
             expect(result).toContain('[CONTEXT] Page: Canvas Editor');
@@ -96,68 +84,63 @@ describe('contextRouter', () => {
     // ── buildContextSystemPrompt ──
 
     describe('buildContextSystemPrompt', () => {
-        it('returns dashboard-specific prompt for dashboard page', () => {
+        it('returns dashboard-specific prompt mentioning Glid', () => {
             const ctx = buildContext('/');
             const prompt = buildContextSystemPrompt(ctx);
             expect(prompt).toContain('Glid');
-            expect(prompt).toContain('Main Dashboard');
-            expect(prompt).toContain('FULL AUTONOMY');
+            expect(prompt).toContain('execute_dynamic_action');
         });
 
-        it('returns size-specific prompt for size dashboard', () => {
+        it('returns size-specific prompt with common sizes', () => {
             const ctx = buildContext('/editor');
             const prompt = buildContextSystemPrompt(ctx);
             expect(prompt).toContain('Size Dashboard');
             expect(prompt).toContain('300x250');
         });
 
-        it('returns editor-specific prompt for canvas editor', () => {
+        it('returns editor-specific prompt with generate_full_design', () => {
             const ctx = buildContext('/editor/detail/x');
             const prompt = buildContextSystemPrompt(ctx);
             expect(prompt).toContain('Canvas Editor');
             expect(prompt).toContain('generate_full_design');
         });
 
-        it('includes SKILL ROUTING section in canvas editor prompt', () => {
-            const ctx = buildContext('/editor/detail/x');
-            const prompt = buildContextSystemPrompt(ctx);
-            expect(prompt).toContain('SKILL ROUTING');
-        });
-
-        it('★ REGRESSION: skill routing mentions replace_background_image', () => {
+        it('includes replace_background_image in canvas editor prompt', () => {
             const ctx = buildContext('/editor/detail/x');
             const prompt = buildContextSystemPrompt(ctx);
             expect(prompt).toContain('replace_background_image');
         });
 
-        it('★ REGRESSION: skill routing differentiates bg replacement from full design', () => {
-            const ctx = buildContext('/editor/detail/x');
-            const prompt = buildContextSystemPrompt(ctx);
-            // Both tools must be mentioned with different trigger phrases
-            expect(prompt).toContain('replace_background_image');
-            expect(prompt).toContain('generate_full_design');
-            expect(prompt).toContain('change/replace/swap background');
-            expect(prompt).toContain('design/create from scratch');
+        it('includes STORE API reference in all prompts', () => {
+            const dashCtx = buildContext('/');
+            expect(buildContextSystemPrompt(dashCtx)).toContain('STORE API');
+
+            const editorCtx = buildContext('/editor/detail/x');
+            expect(buildContextSystemPrompt(editorCtx)).toContain('STORE API');
         });
 
-        it('includes IMAGE GENERATION RULES in canvas editor prompt', () => {
+        it('includes WORKSPACE SNAPSHOT in all prompts', () => {
             const ctx = buildContext('/editor/detail/x');
             const prompt = buildContextSystemPrompt(ctx);
-            expect(prompt).toContain('IMAGE GENERATION RULES');
-            expect(prompt).toContain('canvas size');
+            expect(prompt).toContain('WORKSPACE SNAPSHOT');
         });
 
-        it('includes text-only advice option in skill routing', () => {
+        it('tells AI to explain before executing', () => {
             const ctx = buildContext('/editor/detail/x');
             const prompt = buildContextSystemPrompt(ctx);
-            expect(prompt).toContain('Questions or advice');
-            expect(prompt).toContain('text response only');
+            expect(prompt).toContain('Explain what you\'ll do BEFORE executing');
         });
 
-        it('includes batch/translate option in skill routing', () => {
+        it('mentions execute_dynamic_action as primary for modifications', () => {
             const ctx = buildContext('/editor/detail/x');
             const prompt = buildContextSystemPrompt(ctx);
-            expect(prompt).toContain('translate all/batch modify');
+            expect(prompt).toContain('execute_dynamic_action');
+        });
+
+        it('includes analyze_scene in tool list', () => {
+            const ctx = buildContext('/editor/detail/x');
+            const prompt = buildContextSystemPrompt(ctx);
+            expect(prompt).toContain('analyze_scene');
         });
     });
 });

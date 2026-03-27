@@ -1,67 +1,23 @@
 // ─────────────────────────────────────────────────
-// Command Executor — Routes AI tool calls → Engine
+// Command Executor v2 — Slim Router (7 tools only)
 // ─────────────────────────────────────────────────
-// Main switch/case router. Specialized executors live
-// in executorCompound.ts and executorHelpers.ts.
-// ─────────────────────────────────────────────────
+// Routes only the 7 essential tools:
+//   generate_image, replace_background_image, generate_full_design,
+//   fill_to_page, add_text, add_button, execute_dynamic_action, analyze_scene
+// All other operations go through execute_dynamic_action (eval).
 
 import type { SceneNodeInfo } from './agentContext';
 import type { Engine, ExecutionResult } from './executorHelpers';
 import { generateImage } from '@/services/imageGenClient';
 import type { ImageGenResult } from '@/services/imageGenClient';
-import { rgbToHex, makeNodeInfo } from './executorHelpers';
-import { pushLastTouched, pushAiChange } from './smartContextBuilder';
-import {
-    executeAddText,
-    executeSetAnimPreset,
-    executeRenderBanner,
-    executeCreateLayout,
-    executeAnimateAll,
-    analyzeScene,
-    setExecuteToolCallRef,
-} from './executorCompound';
+import { executeDesignCommand } from './executors/designExecutor';
 
 // Re-export types for consumers
 export type { ExecutionResult } from './executorHelpers';
 
-/** Track element modification for AI pronoun resolution ("make it bigger") */
-function trackTouch(result: ExecutionResult, toolName: string, params: Record<string, unknown>, trackedNodes: SceneNodeInfo[]): void {
-    if (!result.success) return;
-    const nodeId = result.nodeId ?? Number(params.node_id ?? params.id ?? -1);
-    if (nodeId < 0) return;
-    const node = trackedNodes.find(n => n.id === nodeId);
-    const name = node?.label ?? String(params.name ?? `element #${nodeId}`);
-    pushLastTouched(name, nodeId, toolName);
-
-    // ★ Auto-log AI change for follow-up context ("undo that", "keep going")
-    const summary = _buildChangeSummary(toolName, params);
-    pushAiChange({ tool: toolName, elementName: name, summary, timestamp: Date.now() });
-}
-
-/** Build a concise summary of what a tool call changed */
-function _buildChangeSummary(toolName: string, params: Record<string, unknown>): string {
-    const p = params;
-    switch (toolName) {
-        case 'set_position': return `position → (${p.x}, ${p.y})`;
-        case 'set_size': return `size → ${p.w}x${p.h}`;
-        case 'set_font_size': return `fontSize → ${p.size}`;
-        case 'set_fill_hex': return `fill → ${p.hex}`;
-        case 'set_color': return `color → ${p.hex ?? p.color}`;
-        case 'set_text': return `text → "${String(p.text ?? '').slice(0, 30)}"`;
-        case 'set_opacity': return `opacity → ${p.opacity}`;
-        case 'set_rotation': return `rotation → ${p.angle}deg`;
-        case 'set_z_index': return `z-index → ${p.z}`;
-        case 'set_animation': return `animation → ${p.preset}`;
-        case 'set_custom_style': return `custom style applied`;
-        case 'remove_node': return `removed`;
-        case 'clone_node': return `cloned`;
-        default: return `${toolName}(${Object.entries(p).map(([k, v]) => `${k}=${String(v).slice(0, 20)}`).join(', ').slice(0, 60)})`;
-    }
-}
-
 /**
- * Execute a single tool call on the engine.
- * Returns node tracking info for Scene RAG updates.
+ * Execute a single tool call.
+ * Only handles the 7 essential tools — everything else is eval.
  */
 export async function executeToolCall(
     engine: Engine,
@@ -69,183 +25,22 @@ export async function executeToolCall(
     params: Record<string, unknown>,
     trackedNodes: SceneNodeInfo[],
 ): Promise<ExecutionResult> {
-    if (!engine) {
-        return { success: false, message: `Cannot execute "${toolName}": no canvas engine available. Navigate to a canvas editor first.` };
-    }
-
-    // ── Safe param extraction ──
+    // Helper
+    const str = (key: string, fallback = ''): string => {
+        const v = params[key];
+        return typeof v === 'string' ? v : fallback;
+    };
     const num = (key: string, fallback = 0): number => {
         const v = params[key];
         if (v === undefined || v === null) return fallback;
         const n = Number(v);
         return Number.isFinite(n) ? n : fallback;
     };
-    const str = (key: string, fallback = ''): string => {
-        const v = params[key];
-        return typeof v === 'string' ? v : fallback;
-    };
 
     try {
         switch (toolName) {
-            // ── Create ───────────────────────────────
-            case 'add_rect': {
-                const x = num('x'), y = num('y'), w = num('w', 100), h = num('h', 100);
-                const r = num('r', 0.5), g = num('g', 0.5), b = num('b', 0.5), a = num('a', 1.0);
-                const id = engine.add_rect(x, y, w, h, r, g, b, a) as number;
-                trackedNodes.push(makeNodeInfo(id, 'rect', x, y, w, h, rgbToHex(r, g, b), a));
-                return { success: true, message: `Rectangle created at (${x}, ${y}) with size ${w}×${h}`, nodeId: id };
-            }
-            case 'add_rounded_rect': {
-                const x = num('x'), y = num('y'), w = num('w', 100), h = num('h', 100);
-                const r = num('r', 0.5), g = num('g', 0.5), b = num('b', 0.5), a = num('a', 1.0);
-                const radius = num('radius', 8);
-                const id = engine.add_rounded_rect(x, y, w, h, r, g, b, a, radius) as number;
-                trackedNodes.push(makeNodeInfo(id, 'rounded_rect', x, y, w, h, rgbToHex(r, g, b), a));
-                return { success: true, message: `Rounded rect created (radius ${radius}) at (${x}, ${y})`, nodeId: id };
-            }
-            case 'add_ellipse': {
-                const cx = num('cx', 100), cy = num('cy', 100), rx = num('rx', 50), ry = num('ry', 50);
-                const r = num('r', 0.5), g = num('g', 0.5), b = num('b', 0.5), a = num('a', 1.0);
-                const id = engine.add_ellipse(cx, cy, rx, ry, r, g, b, a) as number;
-                trackedNodes.push(makeNodeInfo(id, 'ellipse', cx - rx, cy - ry, rx * 2, ry * 2, rgbToHex(r, g, b), a));
-                return { success: true, message: `Ellipse created at center (${cx}, ${cy}) with radii ${rx}×${ry}`, nodeId: id };
-            }
-            case 'add_gradient_rect': {
-                const x = num('x'), y = num('y'), w = num('w', 100), h = num('h', 100);
-                const r1 = num('r1', 0.2), g1 = num('g1', 0.4), b1 = num('b1', 0.8), a1 = num('a1', 1.0);
-                const r2 = num('r2', 0.8), g2 = num('g2', 0.2), b2 = num('b2', 0.4), a2 = num('a2', 1.0);
-                const angle_deg = num('angle_deg', 45);
-                // ★ REGRESSION GUARD: engine expects hex strings, NOT raw RGBA floats
-                const toHex = (rv: number, gv: number, bv: number) => {
-                    const clamp = (v: number) => Math.max(0, Math.min(255, Math.round(v * 255)));
-                    return `#${clamp(rv).toString(16).padStart(2, '0')}${clamp(gv).toString(16).padStart(2, '0')}${clamp(bv).toString(16).padStart(2, '0')}`;
-                };
-                const hex1 = toHex(r1, g1, b1);
-                const hex2 = toHex(r2, g2, b2);
-                const id = engine.add_gradient_rect(x, y, w, h, hex1, hex2, angle_deg) as number;
-                trackedNodes.push(makeNodeInfo(id, 'gradient_rect', x, y, w, h, 'gradient', a1));
-                return { success: true, message: `Gradient rect at (${x}, ${y}), angle ${angle_deg}°, ${hex1} → ${hex2}`, nodeId: id };
-            }
 
-            // ── Style ────────────────────────────────
-            case 'set_opacity': {
-                const node_id = num('node_id'), opacity = num('opacity', 1.0);
-                const node = trackedNodes.find(n => n.id === node_id);
-                if (node) node.opacity = opacity;
-                return { success: true, message: `Opacity of node ${node_id} set to ${opacity}` };
-            }
-            case 'set_blend_mode': {
-                const node_id = num('node_id'), mode = str('mode', 'normal');
-                engine.set_blend_mode(node_id, mode);
-                const node = trackedNodes.find(n => n.id === node_id);
-                if (node) node.effects.blendMode = mode;
-                return { success: true, message: `Blend mode of node ${node_id} set to "${mode}"` };
-            }
-
-            // ── Effects ──────────────────────────────
-            case 'set_shadow': {
-                const node_id = num('node_id');
-                const ox = num('offset_x', 2), oy = num('offset_y', 2), blur = num('blur', 4);
-                const r = num('r'), g = num('g'), b = num('b'), a = num('a', 0.5);
-                engine.set_shadow(node_id, ox, oy, blur, r, g, b, a);
-                const node = trackedNodes.find(n => n.id === node_id);
-                if (node) node.effects.hasShadow = true;
-                return { success: true, message: `Shadow applied to node ${node_id} (blur ${blur})` };
-            }
-            case 'remove_shadow': {
-                const node_id = num('node_id');
-                engine.remove_shadow(node_id);
-                const node = trackedNodes.find(n => n.id === node_id);
-                if (node) node.effects.hasShadow = false;
-                return { success: true, message: `Shadow removed from node ${node_id}` };
-            }
-            case 'set_brightness': {
-                const node_id = num('node_id'), v = num('brightness', 1);
-                engine.set_brightness(node_id, v);
-                const node = trackedNodes.find(n => n.id === node_id);
-                if (node) node.effects.brightness = v;
-                return { success: true, message: `Brightness of node ${node_id} set to ${v}` };
-            }
-            case 'set_contrast': {
-                const node_id = num('node_id'), v = num('contrast', 1);
-                engine.set_contrast(node_id, v);
-                const node = trackedNodes.find(n => n.id === node_id);
-                if (node) node.effects.contrast = v;
-                return { success: true, message: `Contrast of node ${node_id} set to ${v}` };
-            }
-            case 'set_saturation': {
-                const node_id = num('node_id'), v = num('saturation', 1);
-                engine.set_saturation(node_id, v);
-                const node = trackedNodes.find(n => n.id === node_id);
-                if (node) node.effects.saturation = v;
-                return { success: true, message: `Saturation of node ${node_id} set to ${v}` };
-            }
-            case 'set_hue_rotate': {
-                const node_id = num('node_id'), deg = num('degrees');
-                engine.set_hue_rotate(node_id, deg);
-                const node = trackedNodes.find(n => n.id === node_id);
-                if (node) node.effects.hueRotate = deg;
-                return { success: true, message: `Hue of node ${node_id} rotated by ${deg}°` };
-            }
-
-            // ── Animation ────────────────────────────
-            case 'add_keyframe': {
-                const node_id = num('node_id'), prop = str('property', 'opacity');
-                const time = num('time'), value = num('value'), easing = str('easing', 'linear');
-                engine.add_keyframe(node_id, prop, time, value, easing);
-                const node = trackedNodes.find(n => n.id === node_id);
-                if (node) node.animations.push(`${prop}: ${time}s → ${value}`);
-                return { success: true, message: `Keyframe: node ${node_id}.${prop} = ${value} at ${time}s (${easing})` };
-            }
-            case 'set_duration': return { success: true, message: `Timeline duration set to ${num('duration', 2)}s` };
-            case 'set_looping': {
-                const v = params.looping !== false;
-                engine.set_looping(v);
-                return { success: true, message: `Looping ${v ? 'enabled' : 'disabled'}` };
-            }
-            case 'anim_play': { engine.anim_play(); return { success: true, message: 'Animation playing' }; }
-            case 'anim_pause': { engine.anim_pause(); return { success: true, message: 'Animation paused' }; }
-            case 'anim_stop': { engine.anim_stop(); return { success: true, message: 'Animation stopped and reset' }; }
-            case 'anim_seek': { engine.anim_seek(num('time')); return { success: true, message: `Seeked to ${num('time')}s` }; }
-            case 'anim_set_speed': { engine.anim_set_speed(num('speed', 1)); return { success: true, message: `Playback speed set to ${num('speed', 1)}x` }; }
-
-            // ── Selection ────────────────────────────
-            case 'select_node': { engine.select(num('node_id')); return { success: true, message: `Node ${num('node_id')} selected` }; }
-            case 'deselect_all': { engine.deselect_all(); return { success: true, message: 'All nodes deselected' }; }
-
-            // ── Scene ────────────────────────────────
-            case 'clear_scene': { engine.clear(); trackedNodes.length = 0; return { success: true, message: 'Canvas cleared' }; }
-            case 'delete_selected': { engine.delete_selected(); return { success: true, message: 'Selected nodes deleted' }; }
-
-            // ── Undo ─────────────────────────────────
-            case 'undo': { const ok = engine.undo(); return { success: ok, message: ok ? 'Undone' : 'Nothing to undo' }; }
-            case 'redo': { const ok = engine.redo(); return { success: ok, message: ok ? 'Redone' : 'Nothing to redo' }; }
-
-            // ── Delegated executors ──────────────────
-            case 'add_text': return executeAddText(engine, params, trackedNodes);
-            case 'set_animation_preset': return executeSetAnimPreset(engine, params, trackedNodes);
-            case 'create_layout': return executeCreateLayout(engine, params, trackedNodes);
-            case 'animate_all': return executeAnimateAll(engine, params, trackedNodes);
-            case 'analyze_scene': return { success: true, message: analyzeScene(trackedNodes) };
-            case 'render_banner': return executeRenderBanner(engine, params, trackedNodes);
-
-            // ── Fill to Page (Cover) ────────────────────
-            case 'fill_to_page': {
-                const nodeId = params.node_id != null ? num('node_id') : undefined;
-                if (!engine?.fill_to_page) {
-                    return { success: false, message: 'fill_to_page not available on this engine' };
-                }
-                engine.fill_to_page(nodeId);
-                const canvasW = engine.canvas_width?.() ?? engine.get_canvas_size?.()?.width ?? 300;
-                const canvasH = engine.canvas_height?.() ?? engine.get_canvas_size?.()?.height ?? 250;
-                return {
-                    success: true,
-                    message: `Image filled to page (${canvasW}x${canvasH}) — aspect ratio preserved, overflow cropped from center`,
-                    nodeId: nodeId,
-                };
-            }
-
-            // ── Image Generation (Atomic) ────────────
+            // ── Image Generation ─────────────────────
             case 'generate_image': {
                 const prompt = str('prompt', 'abstract background');
                 const style = str('style', 'photography') as 'realistic' | 'illustration' | 'abstract' | 'minimal' | 'photography';
@@ -254,12 +49,12 @@ export async function executeToolCall(
                 let result: ImageGenResult;
                 try {
                     result = await generateImage({
-                        prompt: `${prompt}. No text, no logos, no watermarks. Professional quality, premium composition.`,
+                        prompt: `${prompt}. No text, no logos, no watermarks. Professional quality.`,
                         width: canvasW,
                         height: canvasH,
-                        model: 'flux', // ★ FLUX.2 Pro: native width/height support
+                        model: 'flux',
                         style,
-                        negativePrompt: 'text, logos, watermark, low quality, blurry, jpeg artifacts, noise, pixelated',
+                        negativePrompt: 'text, logos, watermark, low quality, blurry',
                     });
                 } catch (err) {
                     return { success: false, message: `Image generation failed: ${err}` };
@@ -269,307 +64,80 @@ export async function executeToolCall(
                 }
                 return {
                     success: true,
-                    message: `Image generated (${canvasW}x${canvasH}) via ${result.model}${result.isFallback ? ' (gradient fallback)' : ''}`,
+                    message: `Image generated (${canvasW}x${canvasH}) via ${result.model}`,
                     data: { image_url: result.imageUrl },
                 };
             }
 
-            case 'set_canvas_background': {
-                if (!engine?.add_image) return { success: false, message: 'Canvas engine not available' };
-                const canvasW = engine.canvas_width?.() ?? 300;
-                const canvasH = engine.canvas_height?.() ?? 250;
-
-                // Accept image_url directly, OR a prompt to generate one
-                let imageUrl = str('image_url');
-                if (!imageUrl) {
-                    const prompt = str('prompt');
-                    if (!prompt) return { success: false, message: 'Provide either image_url or prompt' };
-                    // ★ Self-contained: generate + place in one step
-                    try {
-                        const genResult = await generateImage({
-                            prompt: `${prompt}. No text, no logos, no watermarks. Professional quality, premium composition.`,
-                            width: canvasW,
-                            height: canvasH,
-                            model: 'flux', // ★ FLUX.2 Pro: native width/height support
-                            style: 'photography',
-                            negativePrompt: 'text, logos, watermark, low quality, blurry, jpeg artifacts, noise, pixelated',
-                        });
-                        if (!genResult.success || !genResult.imageUrl) {
-                            return { success: false, message: `Image generation failed: ${genResult.message}` };
-                        }
-                        imageUrl = genResult.imageUrl;
-                    } catch (err) {
-                        return { success: false, message: `Image generation failed: ${err}` };
-                    }
-                }
-
-                try {
-                    const nodeId = await engine.add_image(0, 0, imageUrl, canvasW, canvasH, 'ai_background');
-                    // Send to back (z-index 0 for background)
-                    if (engine.send_to_back) engine.send_to_back(nodeId);
-                    trackedNodes.push({
-                        id: nodeId, type: 'rect' as const, x: 0, y: 0, width: canvasW, height: canvasH,
-                        color: 'image', opacity: 1, zIndex: 0, label: `Background Image #${nodeId}`,
-                        effects: { hasShadow: false, brightness: 1, contrast: 1, saturation: 1, hueRotate: 0, blendMode: 'normal' },
-                        animations: [],
-                    });
-                    return { success: true, message: `Background image set (${canvasW}x${canvasH})`, nodeId };
-                } catch (err) {
-                    return { success: false, message: `Failed to set background: ${err}` };
-                }
-            }
-
-            case 'add_image_layer': {
-                const imageUrl = str('image_url');
-                if (!imageUrl) return { success: false, message: 'No image_url provided' };
-                if (!engine?.add_image) return { success: false, message: 'Canvas engine not available' };
-                const x = num('x'), y = num('y');
-                const w = params.w != null ? num('w') : undefined;
-                const h = params.h != null ? num('h') : undefined;
-                const name = str('name', 'image_layer');
-                try {
-                    const nodeId = await engine.add_image(x, y, imageUrl, w, h, name);
-                    return { success: true, message: `Image layer added at (${x}, ${y})${w ? ` size ${w}x${h}` : ''}`, nodeId };
-                } catch (err) {
-                    return { success: false, message: `Failed to add image layer: ${err}` };
-                }
-            }
-
-            // ── Replace Background Image (Skill) ─────
+            // ── Replace Background ───────────────────
             case 'replace_background_image': {
                 if (!engine?.add_image) return { success: false, message: 'Canvas engine not available' };
                 const prompt = str('prompt');
-                if (!prompt) return { success: false, message: 'No prompt provided for background image' };
+                if (!prompt) return { success: false, message: 'No prompt provided' };
                 const style = str('style', 'photography') as 'realistic' | 'illustration' | 'abstract' | 'minimal' | 'photography';
-                const canvasW = engine.canvas_width?.() ?? engine.get_canvas_size?.()?.width ?? 300;
-                const canvasH = engine.canvas_height?.() ?? engine.get_canvas_size?.()?.height ?? 250;
+                const canvasW = engine.canvas_width?.() ?? 300;
+                const canvasH = engine.canvas_height?.() ?? 250;
 
-                // Step 1: Find and delete existing background
+                // Delete existing background
                 try {
                     const allNodes = JSON.parse(engine.get_all_nodes?.() ?? '[]');
                     for (const node of allNodes) {
                         const name = (node.name ?? node.label ?? '').toLowerCase();
-                        if (name.includes('background') || name.includes('ai_background') || name.includes('bg')) {
+                        if (name.includes('background') || name.includes('bg')) {
                             try { engine.delete_node?.(node.id); } catch { /* ok */ }
                         }
                     }
-                } catch { /* no existing bg to delete */ }
+                } catch { /* no existing bg */ }
 
-                // Step 2: Generate new image at canvas size
+                // Generate new
                 try {
                     const genResult = await generateImage({
-                        prompt: `${prompt}. Background image for premium advertisement. No text, no logos, no watermarks, no UI elements. Cinematic lighting, room for text overlay.`,
+                        prompt: `${prompt}. Background for premium ad. No text, no logos. Cinematic lighting.`,
                         width: canvasW,
                         height: canvasH,
                         model: 'imagen',
                         style,
-                        negativePrompt: 'text, logos, watermark, low quality, blurry, distorted, jpeg artifacts, noise, pixelated',
+                        negativePrompt: 'text, logos, watermark, low quality, blurry',
                     });
                     if (!genResult.success || !genResult.imageUrl) {
                         return { success: false, message: `Image generation failed: ${genResult.message}` };
                     }
-
-                    // Step 3: Place new background at z-index 0
                     const nodeId = await engine.add_image(0, 0, genResult.imageUrl, canvasW, canvasH, 'ai_background');
                     if (engine.send_to_back) engine.send_to_back(nodeId);
-
-                    return {
-                        success: true,
-                        message: `Background replaced (${canvasW}x${canvasH}) via ${genResult.model}${genResult.isFallback ? ' (gradient fallback)' : ''}`,
-                        nodeId,
-                    };
+                    return { success: true, message: `Background replaced (${canvasW}x${canvasH})`, nodeId };
                 } catch (err) {
                     return { success: false, message: `Background replacement failed: ${err}` };
                 }
             }
 
-            // ── Canvas Modification (Atomic) ─────────
-            // ★ FIX 3: These tools were referenced in system prompts but never implemented.
-            // Without them, "rearrange" requests silently fail — AI generates tool calls
-            // that execute nothing. Now they actually mutate canvas elements.
-            case 'set_position': {
-                const node_id = num('node_id');
-                const x = num('x'), y = num('y');
-                // Resolve by node ID, or try by name for AI convenience
-                const nodeName = str('name');
-                let targetId = node_id;
-                if (targetId <= 0 && nodeName) {
-                    const found = trackedNodes.find(n => n.label.toLowerCase().includes(nodeName.toLowerCase()));
-                    if (found) targetId = found.id;
-                }
-                if (targetId <= 0) return { success: false, message: `Cannot find element (id=${node_id}, name="${nodeName}")` };
-                engine.set_position(targetId, x, y);
-                const node = trackedNodes.find(n => n.id === targetId);
-                if (node) { node.x = x; node.y = y; }
-                const result: ExecutionResult = { success: true, message: `Moved element ${targetId} to (${x}, ${y})`, nodeId: targetId };
-                trackTouch(result, toolName, params, trackedNodes);
-                return result;
-            }
-            case 'set_size': {
-                const node_id = num('node_id');
-                const w = num('w'), h = num('h');
-                const nodeName = str('name');
-                let targetId = node_id;
-                if (targetId <= 0 && nodeName) {
-                    const found = trackedNodes.find(n => n.label.toLowerCase().includes(nodeName.toLowerCase()));
-                    if (found) targetId = found.id;
-                }
-                if (targetId <= 0) return { success: false, message: `Cannot find element (id=${node_id}, name="${nodeName}")` };
-                engine.set_size(targetId, w, h);
-                const node = trackedNodes.find(n => n.id === targetId);
-                if (node) { node.width = w; node.height = h; }
-                const result: ExecutionResult = { success: true, message: `Resized element ${targetId} to ${w}x${h}`, nodeId: targetId };
-                trackTouch(result, toolName, params, trackedNodes);
-                return result;
-            }
-            case 'set_text': {
-                const node_id = num('node_id');
-                const content = str('content');
-                const nodeName = str('name');
-                let targetId = node_id;
-                if (targetId <= 0 && nodeName) {
-                    const found = trackedNodes.find(n => n.label.toLowerCase().includes(nodeName.toLowerCase()));
-                    if (found) targetId = found.id;
-                }
-                if (targetId <= 0) return { success: false, message: `Cannot find element (id=${node_id}, name="${nodeName}")` };
-                engine.update_text(targetId, { content });
-                const result: ExecutionResult = { success: true, message: `Text of element ${targetId} changed to "${content.slice(0, 40)}"`, nodeId: targetId };
-                trackTouch(result, toolName, params, trackedNodes);
-                return result;
-            }
-            case 'set_font_size': {
-                const node_id = num('node_id');
-                const font_size = num('font_size', 16);
-                const nodeName = str('name');
-                let targetId = node_id;
-                if (targetId <= 0 && nodeName) {
-                    const found = trackedNodes.find(n => n.label.toLowerCase().includes(nodeName.toLowerCase()));
-                    if (found) targetId = found.id;
-                }
-                if (targetId <= 0) return { success: false, message: `Cannot find element` };
-                engine.update_text(targetId, { fontSize: font_size });
-                const result: ExecutionResult = { success: true, message: `Font size of element ${targetId} set to ${font_size}px`, nodeId: targetId };
-                trackTouch(result, toolName, params, trackedNodes);
-                return result;
-            }
-            case 'set_fill_hex': {
-                const node_id = num('node_id');
-                const hex = str('hex', '#FFFFFF');
-                const nodeName = str('name');
-                let targetId = node_id;
-                if (targetId <= 0 && nodeName) {
-                    const found = trackedNodes.find(n => n.label.toLowerCase().includes(nodeName.toLowerCase()));
-                    if (found) targetId = found.id;
-                }
-                if (targetId <= 0) return { success: false, message: `Cannot find element` };
-                // Convert hex to 0-1 RGB
-                const c = hex.replace('#', '');
-                const r = parseInt(c.slice(0, 2), 16) / 255;
-                const g = parseInt(c.slice(2, 4), 16) / 255;
-                const b = parseInt(c.slice(4, 6), 16) / 255;
-                engine.set_fill(targetId, r, g, b, 1.0);
-                const node = trackedNodes.find(n => n.id === targetId);
-                if (node) node.color = hex;
-                const result: ExecutionResult = { success: true, message: `Fill color of element ${targetId} set to ${hex}`, nodeId: targetId };
-                trackTouch(result, toolName, params, trackedNodes);
-                return result;
-            }
-            case 'set_color': {
-                // Alias for set_fill_hex — some prompts use this name
-                const node_id = num('node_id');
-                const hex = str('hex') || str('color', '#FFFFFF');
-                const nodeName = str('name');
-                let targetId = node_id;
-                if (targetId <= 0 && nodeName) {
-                    const found = trackedNodes.find(n => n.label.toLowerCase().includes(nodeName.toLowerCase()));
-                    if (found) targetId = found.id;
-                }
-                if (targetId <= 0) return { success: false, message: `Cannot find element` };
-                const c = hex.replace('#', '');
-                const r = parseInt(c.slice(0, 2), 16) / 255;
-                const g = parseInt(c.slice(2, 4), 16) / 255;
-                const b = parseInt(c.slice(4, 6), 16) / 255;
-                engine.set_fill(targetId, r, g, b, 1.0);
-                const node = trackedNodes.find(n => n.id === targetId);
-                if (node) node.color = hex;
-                return { success: true, message: `Color of element ${targetId} set to ${hex}`, nodeId: targetId };
-            }
-            case 'remove_node': {
-                const node_id = num('node_id');
-                const nodeName = str('name');
-                let targetId = node_id;
-                if (targetId <= 0 && nodeName) {
-                    const found = trackedNodes.find(n => n.label.toLowerCase().includes(nodeName.toLowerCase()));
-                    if (found) targetId = found.id;
-                }
-                if (targetId <= 0) return { success: false, message: `Cannot find element` };
-                engine.select(targetId);
-                engine.delete_selected();
-                const idx = trackedNodes.findIndex(n => n.id === targetId);
-                if (idx >= 0) trackedNodes.splice(idx, 1);
-                return { success: true, message: `Element ${targetId} removed`, nodeId: targetId };
-            }
-
-            // ── Full Design Pipeline (Meta-Tool) ─────
-            case 'generate_full_design': {
-                // This is handled at a higher level in useUnifiedAgent.ts
-                // When the LLM calls this, the executor override in useUnifiedAgent intercepts it
-                return { success: false, message: 'generate_full_design must be handled by the agent orchestrator. This tool is intercepted at a higher level.' };
-            }
-
-            case 'generate_campaign': {
-                // Campaign generation is handled at a higher level (like generate_full_design)
-                // The agent orchestrator intercepts this and calls campaignGenerator.generateCampaign()
-                return { success: false, message: 'generate_campaign must be handled by the agent orchestrator. This tool is intercepted at a higher level.' };
-            }
-
-            // ── Background Removal (WASM) ─────
-            case 'remove_background': {
-                if (!engine?.replace_image_src) return { success: false, message: 'Canvas engine not available (missing replaceImageSrc)' };
+            // ── Fill to Page ─────────────────────────
+            case 'fill_to_page': {
                 const nodeId = params.node_id != null ? num('node_id') : undefined;
-                const elementName = str('element_name');
-
-                // Find the target image node
-                let targetNode: { id: number; src?: string; type: string; name?: string } | undefined;
-                const nodesRaw = engine.get_all_nodes?.();
-                if (nodesRaw) {
-                    const allNodes = JSON.parse(nodesRaw) as Array<{ id: number; src?: string; type: string; name?: string }>;
-                    if (nodeId != null) {
-                        targetNode = allNodes.find(n => n.id === nodeId);
-                    } else if (elementName) {
-                        targetNode = allNodes.find(n => n.name?.toLowerCase().includes(elementName.toLowerCase()) && n.type === 'image');
-                    } else {
-                        // Find first image node
-                        targetNode = allNodes.find(n => n.type === 'image');
-                    }
+                if (!engine?.fill_to_page) {
+                    return { success: false, message: 'fill_to_page not available' };
                 }
-
-                if (!targetNode) return { success: false, message: `Image node not found (node_id=${nodeId}, name=${elementName})` };
-                if (targetNode.type !== 'image') return { success: false, message: `Node ${targetNode.id} is not an image (type: ${targetNode.type})` };
-                if (!targetNode.src) return { success: false, message: `Image node ${targetNode.id} has no source URL` };
-
-                try {
-                    const { removeBackgroundFromUrl, blobToDataUrl } = await import('@/services/backgroundRemovalService');
-                    const resultBlob = await removeBackgroundFromUrl(targetNode.src);
-                    const dataUrl = await blobToDataUrl(resultBlob);
-                    await engine.replace_image_src(targetNode.id, dataUrl);
-                    return { success: true, message: `Background removed from "${targetNode.name ?? targetNode.id}"`, nodeId: targetNode.id };
-                } catch (err) {
-                    return { success: false, message: `Background removal failed: ${err}` };
-                }
+                engine.fill_to_page(nodeId);
+                const canvasW = engine.canvas_width?.() ?? 300;
+                const canvasH = engine.canvas_height?.() ?? 250;
+                return { success: true, message: `Image filled to page (${canvasW}x${canvasH})`, nodeId };
             }
 
-            default:
-                return { success: false, message: `Unknown tool: ${toolName}` };
+            // ── Full Design Pipeline ─────────────────
+            case 'generate_full_design': {
+                // Intercepted by useUnifiedAgent at a higher level
+                return { success: false, message: 'generate_full_design is handled by the agent orchestrator.' };
+            }
+
+            // ── Design Store Commands ────────────────
+            // add_text, add_button, execute_dynamic_action, analyze_scene
+            // + any remaining store-based commands
+            default: {
+                const designResult = await executeDesignCommand(toolName, params);
+                if (designResult !== null) return designResult;
+                return { success: false, message: `Unknown tool: "${toolName}". Use execute_dynamic_action for custom operations.` };
+            }
         }
     } catch (err) {
         return { success: false, message: `Error executing ${toolName}: ${err}` };
     }
-
-    // ★ UNREACHABLE — switch always returns. But TypeScript needs this.
-    // Actual trackTouch calls are made by the caller (aiService.ts agenticLoop)
-    // after receiving the result. See the integration in agenticLoop().
 }
-
-// Register this function for use by executorCompound (render_banner needs recursive calls)
-setExecuteToolCallRef(executeToolCall);

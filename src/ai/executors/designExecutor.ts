@@ -508,7 +508,9 @@ export function executeDesignTool(
             return { success: true, message: `Applied custom styles to ${updated} element(s) matching "${params.element_name}": ${styleList}` };
         }
 
-        // ── Dynamic Action ──
+        // ── Dynamic Action (PRIMARY EVAL TOOL) ──
+        // ★ This is the core of the eval-first architecture.
+        // AI writes JS code that directly manipulates stores.
         case 'execute_dynamic_action': {
             const description = params.description as string || 'Custom action';
             const code = params.code as string;
@@ -516,17 +518,23 @@ export function executeDesignTool(
                 return { success: false, message: 'code is required.' };
             }
 
+            // ★ STATE ROLLBACK: Snapshot state before eval → restore on error
+            const stateSnapshot = JSON.stringify(useDesignStore.getState().creativeSet);
+            const startTime = performance.now();
+
             try {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const fn = new Function(
                     'designStore',
                     'useDesignStore',
                     'useProjectStore',
+                    'useAnimPresetStore',
+                    'uuid',
                     `"use strict";
                     try {
                         ${code}
                     } catch (e) {
-                        return "Error: " + e.message;
+                        return "Error: " + e.message + (e.stack ? " | Stack: " + e.stack.split("\\n").slice(0,3).join(" ") : "");
                     }`
                 );
 
@@ -534,14 +542,40 @@ export function executeDesignTool(
                     useDesignStore.getState(),
                     useDesignStore,
                     useProjectStore,
+                    useAnimPresetStore,
+                    uuid,
                 );
 
+                const elapsed = (performance.now() - startTime).toFixed(1);
                 const resultStr = typeof result === 'string' ? result : JSON.stringify(result ?? 'Done');
-                console.log(`[DashboardExecutor] Dynamic action "${description}" result:`, resultStr);
-                return { success: true, message: `[OK] ${description}: ${resultStr}` };
+
+                // Check if result indicates an error
+                if (typeof resultStr === 'string' && resultStr.startsWith('Error:')) {
+                    // Rollback state on eval error
+                    try {
+                        const restored = JSON.parse(stateSnapshot);
+                        useDesignStore.setState({ creativeSet: restored });
+                        console.warn(`[EvalSandbox] "${description}" failed, state rolled back. (${elapsed}ms)`);
+                    } catch { /* rollback failed — state may be inconsistent */ }
+                    return { success: false, message: `${description}: ${resultStr}` };
+                }
+
+                console.log(`[EvalSandbox] "${description}" OK (${elapsed}ms):`, resultStr.slice(0, 100));
+                return { success: true, message: `${description}: ${resultStr}` };
             } catch (err) {
-                console.error(`[DashboardExecutor] Dynamic action failed:`, err);
-                return { success: false, message: `Failed to execute "${description}": ${err}` };
+                // ★ ROLLBACK on uncaught error
+                try {
+                    const restored = JSON.parse(stateSnapshot);
+                    useDesignStore.setState({ creativeSet: restored });
+                    console.warn(`[EvalSandbox] "${description}" crashed, state rolled back`);
+                } catch { /* rollback failed */ }
+
+                const elapsed = (performance.now() - startTime).toFixed(1);
+                const errMsg = err instanceof Error
+                    ? `${err.message} (${err.stack?.split('\n').slice(0, 2).join(' | ')})`
+                    : String(err);
+                console.error(`[EvalSandbox] "${description}" failed (${elapsed}ms):`, errMsg);
+                return { success: false, message: `Failed: "${description}" — ${errMsg}` };
             }
         }
 
@@ -549,3 +583,6 @@ export function executeDesignTool(
             return null; // Not handled by this executor
     }
 }
+
+/** Alias for commandExecutor.ts compatibility */
+export const executeDesignCommand = executeDesignTool;

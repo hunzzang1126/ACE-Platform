@@ -59,11 +59,11 @@ function buildRichDetail(
 
 function phaseLabel(phase: LiveState['phase']): string {
     switch (phase) {
-        case 'scanning': return 'Scanning canvas...';
+        case 'scanning': return 'Reading workspace...';
         case 'thinking': return 'Thinking...';
-        case 'planning': return 'Planning steps...';
-        case 'executing': return 'Making changes...';
-        case 'reflecting': return 'Reviewing...';
+        case 'planning': return 'Planning changes...';
+        case 'executing': return 'Working...';
+        case 'reflecting': return 'Reviewing result...';
         case 'done': return 'Complete';
         default: return '';
     }
@@ -140,6 +140,7 @@ export function LiveProgressPanel({ live }: { live: LiveState }) {
             {/* Steps */}
             {!collapsed && (
                 <div className="ai-progress-entries">
+                    {isActive && <div className="ai-shimmer-bar" />}
                     {entries.map((entry, i) => (
                         <ProgressEntry key={i} entry={entry} />
                     ))}
