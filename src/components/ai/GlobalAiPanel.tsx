@@ -36,7 +36,15 @@ const QUICK_ACTIONS = [
 export function GlobalAiPanel() {
     const [open, setOpen] = useState(false);
     const [showDropZone, setShowDropZone] = useState(false);
-    const [selectedRole, setSelectedRole] = useState<AceModelRole>('design');
+    // ★ Default model respects user plan: Starter→Haiku, Pro+→Sonnet 4
+    const [selectedRole, setSelectedRole] = useState<AceModelRole>(() => {
+        try {
+            // Sync read — authStore is already hydrated by this point
+            const { useAuthStore } = require('@/stores/authStore');
+            const plan = useAuthStore.getState().user?.plan ?? 'starter';
+            return plan === 'starter' ? 'executor' : 'design';
+        } catch { return 'design'; }
+    });
     const [showModelDropdown, setShowModelDropdown] = useState(false);
 
     const activeModel = getModelForRole(selectedRole);
