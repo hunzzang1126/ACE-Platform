@@ -120,6 +120,19 @@ export class AiService {
         return !!getOpenRouterKey();
     }
 
+    /** Inject current creative set context for the agentic loop */
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    private _designContext: { creativeSet: any | null; masterVariantId?: string } = { creativeSet: null };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    setDesignContext(creativeSet: any | null, masterVariantId?: string): void {
+        this._designContext = { creativeSet, masterVariantId };
+    }
+
+    getDesignContext() {
+        return this._designContext;
+    }
+
     getLastReply(): string {
         const msgs = this.context.getHistory();
         for (let i = msgs.length - 1; i >= 0; i--) {
