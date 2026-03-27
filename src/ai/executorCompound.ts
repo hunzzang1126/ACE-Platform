@@ -306,8 +306,12 @@ export function executeAnimateAll(
 
 // ── analyze_scene ───────────────────────────────
 
+import { STORE_API_REFERENCE } from './contextRouter';
+
 export function analyzeScene(trackedNodes: SceneNodeInfo[]): string {
-    if (trackedNodes.length === 0) return 'Canvas is empty. No elements to analyze.';
+    if (trackedNodes.length === 0) {
+        return `Canvas is empty. No elements to analyze.\n\n${STORE_API_REFERENCE}`;
+    }
 
     const lines: string[] = [];
     lines.push(`**Scene Analysis** — ${trackedNodes.length} elements:`);
@@ -329,5 +333,9 @@ export function analyzeScene(trackedNodes: SceneNodeInfo[]): string {
     if (issues.length > 0) {
         lines.push('', '**Issues:**', ...issues);
     }
+
+    // ★ Inject store API reference so the AI learns it on first analyze_scene call
+    lines.push('', STORE_API_REFERENCE);
+
     return lines.join('\n');
 }

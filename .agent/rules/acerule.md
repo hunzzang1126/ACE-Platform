@@ -14,6 +14,33 @@ trigger: always_on
 
 ---
 
+# AI AGENT QUALITY STANDARD — CURSOR IS THE MINIMUM BENCHMARK
+
+> **ACE's AI agent MUST surpass Cursor-level quality. This is non-negotiable.**
+> Cursor is the bar. ACE must exceed it in every dimension.
+>
+> **System Prompt**: Max ~300-500 tokens. Rules only — no verbose tool descriptions,
+> no layout blueprints, no repeated boilerplate. API references go in tool results,
+> not system prompts. If the system prompt exceeds 500 tokens, it's too fat — trim it.
+>
+> **Token Efficiency**: Eval-first architecture. The AI writes JS code via
+> `execute_dynamic_action` to manipulate stores directly. Narrow tools are dead weight.
+> Every unnecessary tool schema = wasted tokens = wasted money.
+>
+> **Streaming Narration**: The AI MUST explain what it's doing in real-time.
+> "Thinking..." → "Changing headline color..." → "Done." Like Cursor's streaming output.
+> Silent execution is unacceptable — users must see progress.
+>
+> **Context Awareness**: The AI reads a live workspace snapshot before every interaction.
+> It knows: current page, elements, canvas size, project name. No blind guessing.
+>
+> **Memory**: Post-interaction fact extraction → Supabase. The agent gets smarter
+> across sessions. Cursor doesn't even do this — ACE must.
+>
+> **ALWAYS ASK**: "Would Cursor's agent handle this better?" If yes, we're not done.
+
+---
+
 # ABSOLUTE RULE: NO BROWSER TESTING BOT
 
 > **NEVER use `browser_subagent` for QA or testing. EVER.**

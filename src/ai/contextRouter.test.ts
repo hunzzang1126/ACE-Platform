@@ -111,12 +111,12 @@ describe('contextRouter', () => {
             expect(prompt).toContain('replace_background_image');
         });
 
-        it('includes STORE API reference in all prompts', () => {
+        it('does NOT include STORE API in system prompt (moved to analyze_scene)', () => {
             const dashCtx = buildContext('/');
-            expect(buildContextSystemPrompt(dashCtx)).toContain('STORE API');
+            expect(buildContextSystemPrompt(dashCtx)).not.toContain('STORE API');
 
             const editorCtx = buildContext('/editor/detail/x');
-            expect(buildContextSystemPrompt(editorCtx)).toContain('STORE API');
+            expect(buildContextSystemPrompt(editorCtx)).not.toContain('STORE API');
         });
 
         it('includes WORKSPACE SNAPSHOT in all prompts', () => {
@@ -128,7 +128,7 @@ describe('contextRouter', () => {
         it('tells AI to explain before executing', () => {
             const ctx = buildContext('/editor/detail/x');
             const prompt = buildContextSystemPrompt(ctx);
-            expect(prompt).toContain('Explain what you\'ll do BEFORE executing');
+            expect(prompt).toContain('Explain before executing');
         });
 
         it('mentions execute_dynamic_action as primary for modifications', () => {

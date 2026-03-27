@@ -112,9 +112,10 @@ function buildWorkspaceSnapshot(ctx: ContextInfo): string {
 }
 
 // ── Store API Reference ──────────────────────────
-// Replaces 35+ tool schemas (~3,000 tokens) with ~200 tokens
+// ★ NOT in system prompt. Injected via analyze_scene tool result only.
+// AI learns it once per conversation, not every turn.
 
-const STORE_API_REFERENCE = `STORE API (use via execute_dynamic_action):
+export const STORE_API_REFERENCE = `STORE API (use via execute_dynamic_action):
 const ds = designStore;                     // current state
 const cs = ds.creativeSet;                  // active creative set
 cs.variants[i].elements                     // element array per variant
@@ -139,58 +140,37 @@ Element constraints shape:
   anchors: 'left'|'center'|'right'|'stretch' (horizontal), 'top'|'center'|'bottom' (vertical)`;
 
 // ── System Prompt Builder ────────────────────────
+// ★ Cursor-level: ~300-400 tokens. Rules only. No API references.
 
 export function buildContextSystemPrompt(ctx: ContextInfo): string {
     const snapshot = buildWorkspaceSnapshot(ctx);
-    const memoryLine = ctx.memory ? `\nUSER PREFERENCES: ${ctx.memory}` : '';
+    const mem = ctx.memory ? `\nUser prefs: ${ctx.memory}` : '';
+
+    // ★ Common header: 2 lines. Same for all pages.
+    const header = `You are Glid, ACE creative platform AI. Be concise. Explain before executing.`;
 
     switch (ctx.page) {
         case 'dashboard':
-            return `You are Glid, a professional creative platform AI. Execute requests directly and concisely.
-
+            return `${header}
 ${snapshot}
-
-TOOLS: execute_dynamic_action (primary), generate_full_design
-For project CRUD (create, delete, rename, duplicate): write JS via execute_dynamic_action.
-
-${STORE_API_REFERENCE}
-
-RULES:
-- Execute immediately, be concise
-- Explain what you'll do BEFORE executing
-- Create projects with: useProjectStore.getState().createCreativeSet('Name')${memoryLine}`;
+Tools: execute_dynamic_action (JS eval on stores), generate_full_design
+For CRUD: use execute_dynamic_action. Use analyze_scene to inspect state.${mem}`;
 
         case 'size-dashboard':
-            return `You are Glid, a professional creative platform AI. Help manage size variants and edit design elements.
-
+            return `${header}
 ${snapshot}
-
-TOOLS: execute_dynamic_action (primary), add_text, add_button, analyze_scene
-
-${STORE_API_REFERENCE}
-
-RULES:
-- For text/property changes across all variants → use execute_dynamic_action to iterate variants
-- For adding sizes: useDesignStore.getState().addVariant({ width, height, label })
-- Explain what you'll do BEFORE executing
-- Common sizes: 300x250, 728x90, 160x600, 320x50, 970x250, 300x600${memoryLine}`;
+Tools: execute_dynamic_action, add_text, add_button, analyze_scene
+For variants: useDesignStore.getState().addVariant({ width, height, label })
+Common sizes: 300x250, 728x90, 160x600, 320x50, 970x250, 300x600${mem}`;
 
         case 'canvas-editor': {
-            const hasElements = ctx.elementCount > 0;
-            return `You are Glid, a professional creative platform AI. Help design stunning ad creatives.
-
+            const empty = ctx.elementCount === 0;
+            return `${header}
 ${snapshot}
-
-TOOLS: generate_full_design, replace_background_image, generate_image, add_text, add_button, execute_dynamic_action (primary for modifications), analyze_scene
-
-${STORE_API_REFERENCE}
-
-RULES:
-- ${hasElements ? 'Canvas has elements. For modifications → execute_dynamic_action. For complete redesign → generate_full_design.' : 'Canvas is empty. For new designs → generate_full_design.'}
-- For background changes → replace_background_image
-- Explain what you'll do BEFORE executing
-- Write professional marketing copy (not placeholder text)
-- CTA text should be contextual: "Shop Now", "Learn More", "Get Started"${memoryLine}`;
+Tools: generate_full_design, replace_background_image, generate_image, add_text, add_button, execute_dynamic_action, analyze_scene
+${empty ? 'Canvas empty → generate_full_design for new designs.' : 'For modifications → execute_dynamic_action. For redesign → generate_full_design.'}
+For background → replace_background_image. Use analyze_scene to read store API.
+Write real marketing copy. No placeholder text.${mem}`;
         }
     }
 }
