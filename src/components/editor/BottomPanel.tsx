@@ -210,7 +210,7 @@ export function BottomPanel({ variant, engine, nodes, selection, actions, overla
 
             if (layer.kind === 'engine' && engine) {
                 try {
-                    engine.set_z_index(parseInt(layer.id), newZ);
+                    engine.set_z_index_and_reorder(parseInt(layer.id), newZ);
                 } catch { /* ok */ }
             } else if (layer.kind === 'overlay') {
                 onOverlaySetZIndex?.(layer.id, newZ);

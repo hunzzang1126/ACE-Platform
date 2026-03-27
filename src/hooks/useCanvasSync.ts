@@ -373,6 +373,13 @@ export function useCanvasSync(
 
                 restoredShapes++;
 
+                // ★ FIX: Override __glidZIndex with STORED value.
+                // Without this, sync elements get sequential z-indices from add order,
+                // which collides with async image z-indices during reorder_by_z_index.
+                if (typeof engine.set_z_index === 'function') {
+                    engine.set_z_index(nodeId, el.zIndex ?? 0);
+                }
+
                 if (el.animation && el.animation.preset !== 'none') {
                     useAnimPresetStore.getState().setPreset(`engine-${nodeId}`, {
                         anim: el.animation.preset,
@@ -447,6 +454,11 @@ export function useCanvasSync(
                 }
 
                 restoredShapes++;
+
+                // ★ FIX: Override __glidZIndex with STORED value (same fix as shapes above).
+                if (typeof engine.set_z_index === 'function') {
+                    engine.set_z_index(nodeId, el.zIndex ?? 1);
+                }
 
                 if (el.animation && el.animation.preset !== 'none') {
                     useAnimPresetStore.getState().setPreset(`engine-${nodeId}`, {

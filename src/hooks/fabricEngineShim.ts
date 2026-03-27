@@ -608,6 +608,14 @@ export function createEngineShim(
                 fc.renderAll();
             }
         },
+
+        /** ★ Set __glidZIndex on a Fabric object for correct z-order sorting.
+         * Critical for restore: sync elements get sequential __glidZIndex from add order,
+         * but stored zIndex values must be applied to prevent collisions with async images. */
+        set_z_index: (nodeId: number, zIndex: number) => {
+            const obj = findById(nodeId);
+            if (obj) (obj as any).__glidZIndex = zIndex;
+        },
         // ── Grouping ─────────────────────────────────────
         group_elements: (ids: number[], name?: string): number => {
             const objects = ids.map(findById).filter(Boolean) as FabricObject[];
@@ -813,12 +821,13 @@ export function createEngineShim(
             const obj = findById(id);
             if (obj) { obj.set({ fill: rgbToHex(r, g, b) }); fc.renderAll(); }
         },
-        set_z_index: (id: number, z: number) => {
+        set_z_index_and_reorder: (id: number, z: number) => {
             const obj = findById(id);
             if (!obj) return;
             (obj as any).__glidZIndex = z;
             const objs = userObjects().sort((a, b) => ((a as any).__glidZIndex ?? 0) - ((b as any).__glidZIndex ?? 0));
             objs.forEach((o, i) => { fc.moveObjectTo(o, i + 1); });
+            objs.forEach(o => { o.dirty = true; o.setCoords(); }); // ★ FIX: invalidate cache
             fc.renderAll();
             syncState();
         },

@@ -362,7 +362,7 @@ export function useCanvasEngine(
         const engine = engineRef.current;
         if (!engine) return;
         const maxZ = nodes.reduce((m, n) => Math.max(m, n.z_index), 0);
-        try { engine.set_z_index(id, maxZ + 1); } catch { /* fallback */ }
+        try { engine.set_z_index_and_reorder(id, maxZ + 1); } catch { /* fallback */ }
         syncState();
     }, [nodes, syncState]);
 
@@ -370,7 +370,7 @@ export function useCanvasEngine(
         const engine = engineRef.current;
         if (!engine) return;
         const minZ = nodes.reduce((m, n) => Math.min(m, n.z_index), 0);
-        try { engine.set_z_index(id, minZ - 1); } catch { /* fallback */ }
+        try { engine.set_z_index_and_reorder(id, minZ - 1); } catch { /* fallback */ }
         syncState();
     }, [nodes, syncState]);
 
@@ -379,7 +379,7 @@ export function useCanvasEngine(
         if (!engine) return;
         const node = nodes.find(n => n.id === id);
         if (!node) return;
-        try { engine.set_z_index(id, node.z_index + 1); } catch { /* fallback */ }
+        try { engine.set_z_index_and_reorder(id, node.z_index + 1); } catch { /* fallback */ }
         syncState();
     }, [nodes, syncState]);
 
@@ -388,7 +388,7 @@ export function useCanvasEngine(
         if (!engine) return;
         const node = nodes.find(n => n.id === id);
         if (!node) return;
-        try { engine.set_z_index(id, node.z_index - 1); } catch { /* fallback */ }
+        try { engine.set_z_index_and_reorder(id, node.z_index - 1); } catch { /* fallback */ }
         syncState();
     }, [nodes, syncState]);
 

@@ -30,9 +30,10 @@ export async function removeBackground(
     }
 
     const result = await removeBg(imageBlob, {
-        // ★ Use jsDelivr CDN for WASM models (more reliable than unpkg)
-        publicPath: 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.7.0/dist/',
-        model: 'isnet_fp16',
+        // ★ FIX: Use library's built-in CDN (staticimgly.com) — it has resources.json + WASM models.
+        // jsDelivr and unpkg only serve JS bundles, NOT the model files, causing
+        // "Resource /models/isnet_fp16 not found" errors.
+        // Omitting publicPath = use the library's own CDN which always works.
         progress: onProgress
             ? (key: string, current: number, total: number) => {
                   onProgress(total > 0 ? current / total : 0);
