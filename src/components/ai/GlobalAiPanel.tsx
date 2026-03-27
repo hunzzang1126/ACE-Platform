@@ -42,6 +42,13 @@ export function GlobalAiPanel() {
         const plan = useAuthStore.getState().user?.plan ?? 'starter';
         return plan === 'starter' ? 'executor' : 'design';
     });
+    // ★ GUARD: Reset to allowed model if plan doesn't permit current selection
+    const userPlan = useAuthStore(s => s.user?.plan ?? 'starter');
+    useEffect(() => {
+        if (userPlan === 'starter' && selectedRole === 'design') {
+            setSelectedRole('executor');
+        }
+    }, [userPlan, selectedRole]);
     const [showModelDropdown, setShowModelDropdown] = useState(false);
 
     const activeModel = getModelForRole(selectedRole);

@@ -365,14 +365,19 @@ export class AiService {
         progress: LiveProgress,
     ): Promise<ClaudeResponse | null> {
         // ★ FIX: User's UI selection is ALWAYS primary.
-        // Plan gating happens at the dropdown level (GlobalAiPanel), not here.
+        // Plan gating at UI + API level for defense in depth.
         const { useAuthStore } = await import('@/stores/authStore');
         const { PLAN_LIMITS } = await import('@/schema/planTypes');
         const authState = useAuthStore.getState();
         const userPlan = authState.user?.plan ?? 'starter';
         const planDefaults = PLAN_LIMITS[userPlan];
-        // this.config.model = user's explicit dropdown selection. Only fall back to plan default if empty.
-        const model = this.config.model || planDefaults?.defaultModel || 'anthropic/claude-3.5-haiku';
+        // User's dropdown selection, fallback to plan default if empty
+        let model = this.config.model || planDefaults?.defaultModel || 'anthropic/claude-3.5-haiku';
+        // ★ API GUARD: reject model if not in plan's allowedModels
+        if (planDefaults?.allowedModels && !planDefaults.allowedModels.includes(model)) {
+            console.warn(`[AiService] Model "${model}" not allowed on ${userPlan} plan. Forcing ${planDefaults.defaultModel}`);
+            model = planDefaults.defaultModel;
+        }
         console.log(`[AiService] Plan: ${userPlan} → Model: ${model} (user-selected: ${this.config.model})`);
         const apiKey = getOpenRouterKey();
 
