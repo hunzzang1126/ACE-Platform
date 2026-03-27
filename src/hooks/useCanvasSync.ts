@@ -1,622 +1,191 @@
+// ─────────────────────────────────────────────────
+// useCanvasSync — Bidirectional sync between engine + designStore
+// ─────────────────────────────────────────────────
+// Save helpers → canvasSyncSave.ts
+// ─────────────────────────────────────────────────
+
 import { useCallback } from 'react';
-import { extractAssets, resolveAsset, isAssetRef } from '@/services/assetService';
+import { isAssetRef, resolveAsset } from '@/services/assetService';
 import { useDesignStore } from '@/stores/designStore';
 import { loadVideoBlob } from '@/stores/videoStorage';
-import type { DesignElement, ShapeElement, TextElement, ImageElement, VideoElement, ElementAnimation } from '@/schema/elements.types';
-import type { ElementConstraints } from '@/schema/constraints.types';
+import type { DesignElement, ShapeElement, TextElement, ImageElement, VideoElement } from '@/schema/elements.types';
 import type { EngineNode } from './useCanvasEngine';
 import type { OverlayElement } from './useOverlayElements';
 import { useAnimPresetStore } from './useAnimationPresets';
+import { constraintsToAbsolute, hexToRgbFloat } from '@/engine/elementConverters';
 import {
-    absoluteToConstraints,
-    constraintsToAbsolute,
-    rgbFloatToHex,
-    hexToRgbFloat,
-    engineNodeToShapeElement,
-    engineNodeToTextElement,
-    engineNodeToImageElement,
-    overlayToDesignElement,
-    getAnimationForElement,
-} from '@/engine/elementConverters';
-import { fabricJsonToElements } from '@/engine/fabricSerializer';
+    restoreIdbRefs, preserveCustomStyles, convertNodesToElements,
+    readNodesFromEngine, addOverlaysAndSort, asyncExtractAssets,
+} from './canvasSyncSave';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Engine = any;
 
-/** Parse CSS shadow color string (rgba/rgb/hex) → [r, g, b, a] floats (0-1) */
+/** Parse CSS shadow color string → [r, g, b, a] floats (0-1) */
 function parseShadowColor(color: string): [number, number, number, number] {
-    const rgbaMatch = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
-    if (rgbaMatch) {
-        return [
-            parseInt(rgbaMatch[1]!) / 255,
-            parseInt(rgbaMatch[2]!) / 255,
-            parseInt(rgbaMatch[3]!) / 255,
-            rgbaMatch[4] !== undefined ? parseFloat(rgbaMatch[4]!) : 1.0,
-        ];
-    }
-    // Hex fallback
+    const m = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+    if (m) return [parseInt(m[1]!) / 255, parseInt(m[2]!) / 255, parseInt(m[3]!) / 255, m[4] !== undefined ? parseFloat(m[4]!) : 1.0];
     const hex = color.replace('#', '');
-    if (hex.length >= 6) {
-        return [
-            parseInt(hex.slice(0, 2), 16) / 255,
-            parseInt(hex.slice(2, 4), 16) / 255,
-            parseInt(hex.slice(4, 6), 16) / 255,
-            1.0,
-        ];
-    }
-    return [0, 0, 0, 0.5]; // default
+    if (hex.length >= 6) return [parseInt(hex.slice(0, 2), 16) / 255, parseInt(hex.slice(2, 4), 16) / 255, parseInt(hex.slice(4, 6), 16) / 255, 1.0];
+    return [0, 0, 0, 0.5];
 }
 
-
-// ── Hook ────────────────────────────────────────
-
-export function useCanvasSync(
-    variantId: string | undefined,
-    canvasW: number,
-    canvasH: number,
-) {
+export function useCanvasSync(variantId: string | undefined, canvasW: number, canvasH: number) {
     const replaceVariantElements = useDesignStore((s) => s.replaceVariantElements);
-    // ★ REGRESSION GUARD: Do NOT capture creativeSet in a closure for save functions.
-    // Always use useDesignStore.getState().creativeSet for real-time reads.
-    // Capturing via useDesignStore((s) => s.creativeSet) creates a stale reference
-    // that causes the size dashboard to show pre-edit state after saving.
-    const creativeSetForRestore = useDesignStore((s) => s.creativeSet);
 
-    /**
-     * Save current canvas state → designStore.
-     * ★ NOTE: fabricJSON save is DISABLED for now because Fabric toObject()
-     * includes base64 image data, causing localStorage quota overflow (~1.8MB per variant).
-     * We keep the fabricSerializer module for future use when storage moves to IndexedDB.
-     * Currently uses the proven legacy conversion pipeline.
-     */
     const saveToStore = useCallback((
-        engineRef: React.RefObject<Engine | null>,
-        overlayElements: OverlayElement[],
+        engineRef: React.RefObject<Engine | null>, overlayElements: OverlayElement[],
     ): { success: boolean; message: string } => {
-        // ★ REGRESSION GUARD: Read fresh state, never stale closure
         const cs = useDesignStore.getState().creativeSet;
-        if (!variantId || !cs) {
-            return { success: false, message: 'No variant or creative set active.' };
-        }
-
+        if (!variantId || !cs) return { success: false, message: 'No variant or creative set active.' };
         const engine = engineRef.current;
-        if (!engine) {
-            return { success: false, message: 'Engine not ready.' };
-        }
+        if (!engine) return { success: false, message: 'Engine not ready.' };
 
-        const elements: DesignElement[] = [];
-
-        // Convert engine nodes → DesignElements using proven legacy pipeline
-        try {
-            // ★ FIX: Sync z-index from actual Fabric stack order BEFORE reading.
-            // Without this, __glidZIndex values from creation time are saved,
-            // not the current stack position (which may have changed via reorder).
-            if (typeof engine.syncZIndexFromStack === 'function') {
-                engine.syncZIndexFromStack();
-            }
-
-            const raw = engine.get_all_nodes();
-            const nodes: EngineNode[] = JSON.parse(raw);
-            for (const node of nodes) {
-                // ★ DEBUG: trace text effect persistence
-                if (node.type === 'text' && node.textEffect_type && node.textEffect_type !== 'none') {
-                    console.log(`[useCanvasSync] SAVE: text "${node.name}" has effect: ${node.textEffect_type} intensity=${node.textEffect_intensity} color=${node.textEffect_color}`);
-                }
-                if (node.type === 'text') {
-                    const el = engineNodeToTextElement(node, canvasW, canvasH);
-                    if (el.textEffect) {
-                        console.log(`[useCanvasSync] SAVE → element textEffect:`, JSON.stringify(el.textEffect));
-                    }
-                    elements.push(el);
-                } else if (node.type === 'image') {
-                    elements.push(engineNodeToImageElement(node, canvasW, canvasH));
-                } else {
-                    elements.push(engineNodeToShapeElement(node, canvasW, canvasH));
-                }
-            }
-        } catch (err) {
-            console.warn('[useCanvasSync] Failed to read engine nodes:', err);
-        }
-
-        // Save video overlays — they are HTML-based but still need persistence
-        for (const oel of overlayElements) {
-            elements.push(overlayToDesignElement(oel, canvasW, canvasH));
-        }
-
-        // Sort by zIndex
-        elements.sort((a, b) => a.zIndex - b.zIndex);
-
-        // ★ FIX: Preserve customStyles from existing store elements.
-        // set_custom_style writes to DesignElements in Zustand store,
-        // but the save pipeline reads from Fabric canvas which doesn't store CSS.
-        // Merge customStyles back by matching element name or id.
-        const existingVariant = cs.variants.find(v => v.id === variantId);
-        if (existingVariant) {
-            const stylesByName = new Map<string, Record<string, string>>();
-            const stylesById = new Map<string, Record<string, string>>();
-            for (const el of existingVariant.elements) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const cs = (el as any).customStyles;
-                if (cs && Object.keys(cs).length > 0) {
-                    if (el.name) stylesByName.set(el.name, cs);
-                    stylesById.set(el.id, cs);
-                }
-            }
-            for (const el of elements) {
-                const existing = (el.name ? stylesByName.get(el.name) : undefined)
-                    || stylesById.get(el.id);
-                if (existing) {
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    (el as any).customStyles = existing;
-                }
-            }
-        }
-
-        // ★★ CRITICAL: Restore idb:// refs for image elements.
-        // The engine holds runtime blob: URLs (created by resolveAsset during restore).
-        // blob: URLs are SESSION-SCOPED — they become ERR_FILE_NOT_FOUND on page reload.
-        // Map them back to the original idb:// refs from the current store state.
-        const variant = cs.variants.find(v => v.id === variantId);
-        if (variant) {
-            // Build lookup: element name → original src (idb:// or data:)
-            const storedSrcByName = new Map<string, string>();
-            const storedSrcById = new Map<string, string>();
-            for (const el of variant.elements) {
-                if (el.type === 'image' && (el as ImageElement).src) {
-                    const src = (el as ImageElement).src!;
-                    // Only preserve idb:// or data: URLs — NOT blob: URLs
-                    if (src.startsWith('idb://') || src.startsWith('data:')) {
-                        if (el.name) storedSrcByName.set(el.name, src);
-                        storedSrcById.set(el.id, src);
-                    }
-                }
-            }
-            // Restore idb:// refs for images that currently have blob: URLs
-            for (const el of elements) {
-                if (el.type !== 'image') continue;
-                const img = el as ImageElement;
-                if (!img.src || !img.src.startsWith('blob:')) continue;
-                // Try matching by name first, then by id
-                const original = (img.name ? storedSrcByName.get(img.name) : undefined)
-                    || storedSrcById.get(img.id);
-                if (original) {
-                    img.src = original;
-                }
-            }
-        }
-
-        // ★ Phase 2: Extract base64 images → idb:// refs (async, non-blocking)
-        // Save immediately with raw data, then async-extract in background
+        let elements: DesignElement[] = [];
+        try { elements = readNodesFromEngine(engine, canvasW, canvasH); } catch (err) { console.warn('[useCanvasSync] Failed:', err); }
+        addOverlaysAndSort(elements, overlayElements, canvasW, canvasH);
+        preserveCustomStyles(elements, variantId);
+        restoreIdbRefs(elements, variantId);
         replaceVariantElements(variantId, elements);
-
-        // Background: replace data URLs with idb:// refs
-        extractAssets(elements).then(extracted => {
-            const hasChanges = extracted.some((el, i) =>
-                el.type === 'image' && (el as any).src !== (elements[i] as any).src
-            );
-            if (hasChanges) {
-                replaceVariantElements(variantId, extracted);
-                console.log('[useCanvasSync] Asset extraction complete — base64 → idb:// refs');
-            }
-        }).catch(err => {
-            console.warn('[useCanvasSync] Asset extraction failed:', err);
-        });
+        asyncExtractAssets(elements, variantId, replaceVariantElements);
 
         const isMaster = cs.masterVariantId === variantId;
-        const msg = isMaster
-            ? `Saved ${elements.length} elements to master. Propagated to ${cs.variants.length - 1} sizes.`
-            : `Saved ${elements.length} elements to variant.`;
-
+        const msg = isMaster ? `Saved ${elements.length} elements to master. Propagated to ${cs.variants.length - 1} sizes.` : `Saved ${elements.length} elements to variant.`;
         console.log(`[useCanvasSync] ${msg}`);
         return { success: true, message: msg };
     }, [variantId, canvasW, canvasH, replaceVariantElements]);
 
-    /**
-     * Save from pre-cached node data (for unmount when engine may already be freed).
-     * Takes EngineNode[] directly instead of reading from the live engine.
-     */
     const saveFromCachedNodes = useCallback((
-        cachedNodes: EngineNode[],
-        overlayElements: OverlayElement[],
+        cachedNodes: EngineNode[], overlayElements: OverlayElement[],
     ): { success: boolean; message: string } => {
-        // ★ REGRESSION GUARD: Read fresh state, never stale closure
         const cs = useDesignStore.getState().creativeSet;
-        if (!variantId || !cs) {
-            return { success: false, message: 'No variant or creative set active.' };
-        }
-
-        const elements: DesignElement[] = [];
-
-        // 1. Convert cached engine nodes → DesignElements by type
-        for (const node of cachedNodes) {
-            if (node.type === 'text') {
-                elements.push(engineNodeToTextElement(node, canvasW, canvasH));
-            } else if (node.type === 'image') {
-                elements.push(engineNodeToImageElement(node, canvasW, canvasH));
-            } else {
-                elements.push(engineNodeToShapeElement(node, canvasW, canvasH));
-            }
-        }
-
-        // Save video overlays for persistence
-        for (const oel of overlayElements) {
-            elements.push(overlayToDesignElement(oel, canvasW, canvasH));
-        }
-
-        // 3. Sort by zIndex
-        elements.sort((a, b) => a.zIndex - b.zIndex);
-
-        // ★★ CRITICAL: Restore idb:// refs for images (same as saveToStore).
-        // blob: URLs are session-scoped — must map back to idb:// before persisting.
-        const variant = cs.variants.find(v => v.id === variantId);
-        if (variant) {
-            const storedSrcByName = new Map<string, string>();
-            const storedSrcById = new Map<string, string>();
-            for (const el of variant.elements) {
-                if (el.type === 'image' && (el as ImageElement).src) {
-                    const src = (el as ImageElement).src!;
-                    if (src.startsWith('idb://') || src.startsWith('data:')) {
-                        if (el.name) storedSrcByName.set(el.name, src);
-                        storedSrcById.set(el.id, src);
-                    }
-                }
-            }
-            for (const el of elements) {
-                if (el.type !== 'image') continue;
-                const img = el as ImageElement;
-                if (!img.src || !img.src.startsWith('blob:')) continue;
-                const original = (img.name ? storedSrcByName.get(img.name) : undefined)
-                    || storedSrcById.get(img.id);
-                if (original) {
-                    img.src = original;
-                }
-            }
-        }
-
-        // 4. Write to store
+        if (!variantId || !cs) return { success: false, message: 'No variant or creative set active.' };
+        const elements = convertNodesToElements(cachedNodes, canvasW, canvasH);
+        addOverlaysAndSort(elements, overlayElements, canvasW, canvasH);
+        restoreIdbRefs(elements, variantId);
         replaceVariantElements(variantId, elements);
 
         const isMaster = cs.masterVariantId === variantId;
-        const msg = isMaster
-            ? `Saved ${elements.length} elements (from cache). Propagated to ${cs.variants.length - 1} sizes.`
-            : `Saved ${elements.length} elements (from cache) to variant.`;
-
+        const msg = isMaster ? `Saved ${elements.length} elements (from cache). Propagated to ${cs.variants.length - 1} sizes.` : `Saved ${elements.length} elements (from cache) to variant.`;
         console.log(`[useCanvasSync] ${msg}`);
         return { success: true, message: msg };
     }, [variantId, canvasW, canvasH, replaceVariantElements]);
 
-    /**
-     * Restore saved elements from designStore → engine + overlay.
-     * ★ NOTE: Fabric-native loadFromJSON() restore is DISABLED for now because:
-     * - fabricJSON includes artboard object, causing duplication
-     * - loadFromJSON clears the canvas (including artboard setup done by useFabricCanvas)
-     * Uses the proven legacy element-by-element reconstruction.
-     */
-    const restoreFromStore = useCallback(async (
-        engine: Engine,
-    ): Promise<{ restoredShapes: number; overlayElements: OverlayElement[] }> => {
-        // ★ Use fresh state for restore too — especially important after AI adds elements
+    const restoreFromStore = useCallback(async (engine: Engine): Promise<{ restoredShapes: number; overlayElements: OverlayElement[] }> => {
         const cs = useDesignStore.getState().creativeSet;
-        if (!variantId || !cs) {
-            return { restoredShapes: 0, overlayElements: [] };
-        }
-
+        if (!variantId || !cs) return { restoredShapes: 0, overlayElements: [] };
         const variant = cs.variants.find((v) => v.id === variantId);
-        if (!variant || !variant.elements || variant.elements.length === 0) {
-            console.log('[useCanvasSync] No saved elements to restore');
-            return { restoredShapes: 0, overlayElements: [] };
-        }
-
-        console.log(`[useCanvasSync] Restoring ${variant.elements.length} elements from store...`);
+        if (!variant?.elements?.length) return { restoredShapes: 0, overlayElements: [] };
 
         let restoredShapes = 0;
         const overlayElements: OverlayElement[] = [];
-        // ★ Collect async image/video loads to await SEQUENTIALLY (not parallel).
-        // Loading images in parallel causes z-order race conditions:
-        // each add_image() calls moveObjectTo() based on userObjects() at that instant,
-        // but concurrent loads mean userObjects() is stale between resolves.
         const pendingImageLoads: (() => Promise<void>)[] = [];
         const pendingVideoLoads: Promise<void>[] = [];
-
-        // ★ CRITICAL: Sort elements by zIndex before restoring.
-        // Fabric.js uses insertion order for stacking — last added = on top = receives clicks first.
-        // Without sorting, a background (zIndex 0) saved AFTER text (zIndex 2) in the array
-        // would be added last, sit on top, and steal all clicks.
-        const sortedElements = [...variant.elements]
-            .map(el => ({ ...el, locked: false })) // ★ Force-unlock: template overrides may have stale locked state
-            .sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
+        const sortedElements = [...variant.elements].map(el => ({ ...el, locked: false })).sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
 
         for (const el of sortedElements) {
             if (el.type === 'shape') {
-                const shape = el as ShapeElement;
-                const { x, y, w, h } = constraintsToAbsolute(shape.constraints, canvasW, canvasH);
-
-                let nodeId: number;
-                if (shape.gradientStart && shape.gradientEnd) {
-                    // Gradient rect — try shim's hex-based API first, fallback to WASM float API
-                    try {
-                        nodeId = engine.add_gradient_rect(x, y, w, h, shape.gradientStart, shape.gradientEnd, shape.gradientAngle ?? 135, shape.borderRadius ?? 0, shape.name);
-                    } catch {
-                        // WASM engine: convert hex → float RGB
-                        const [r1, g1, b1, a1] = hexToRgbFloat(shape.gradientStart);
-                        const [r2, g2, b2, a2] = hexToRgbFloat(shape.gradientEnd);
-                        nodeId = engine.add_gradient_rect(x, y, w, h, r1, g1, b1, a1, r2, g2, b2, a2, shape.gradientAngle ?? 135);
-                    }
-                } else if (shape.shapeType === 'ellipse') {
-                    const [r, g, b, a] = hexToRgbFloat(shape.fill || '#808080');
-                    nodeId = engine.add_ellipse(x + w / 2, y + h / 2, w / 2, h / 2, r, g, b, a);
-                } else if (shape.borderRadius && shape.borderRadius > 0) {
-                    const [r, g, b, a] = hexToRgbFloat(shape.fill || '#808080');
-                    nodeId = engine.add_rounded_rect(x, y, w, h, r, g, b, a, shape.borderRadius);
-                } else {
-                    const [r, g, b, a] = hexToRgbFloat(shape.fill || '#808080');
-                    nodeId = engine.add_rect(x, y, w, h, r, g, b, a);
-                }
-
-                if (shape.opacity !== undefined && shape.opacity !== 1) {
-                    try { engine.set_opacity(nodeId, shape.opacity); } catch { /* ok */ }
-                }
-                // ★ Restore shadow/glow effect
-                if (el.shadow) {
-                    try {
-                        const [sr, sg, sb, sa] = parseShadowColor(el.shadow.color);
-                        engine.set_shadow(nodeId, el.shadow.offsetX, el.shadow.offsetY, el.shadow.blur, sr, sg, sb, sa);
-                    } catch { /* ok */ }
-                }
-                // ★ Restore visible/locked state
-                if (el.visible === false) {
-                    try { engine.set_visible?.(nodeId, false); } catch { /* ok */ }
-                }
-                if (el.locked) {
-                    try { engine.set_locked?.(nodeId, true); } catch { /* ok */ }
-                }
-
+                restoreShape(engine, el as ShapeElement, canvasW, canvasH, parseShadowColor);
                 restoredShapes++;
-
-                // ★ FIX: Override __glidZIndex with STORED value.
-                // Without this, sync elements get sequential z-indices from add order,
-                // which collides with async image z-indices during reorder_by_z_index.
-                if (typeof engine.set_z_index === 'function') {
-                    engine.set_z_index(nodeId, el.zIndex ?? 0);
-                }
-
-                if (el.animation && el.animation.preset !== 'none') {
-                    useAnimPresetStore.getState().setPreset(`engine-${nodeId}`, {
-                        anim: el.animation.preset,
-                        animDuration: el.animation.duration,
-                        startTime: el.animation.startTime,
-                    });
-                }
-
             } else if (el.type === 'text') {
-                const text = el as TextElement;
-                let { x, y, w, h } = constraintsToAbsolute(text.constraints, canvasW, canvasH);
-
-                // ★ REGRESSION GUARD: Clamp text position inside canvas bounds.
-                // Constraint round-trip (abs→constraints→abs) can produce off-canvas
-                // positions if anchor type changes (e.g. 'left' → 'center' → 'bottom')
-                // across different canvas sizes. Off-canvas text = invisible to user.
-                const textH = h > 0 ? h : (text.fontSize || 16) * 2; // approx text height
-                if (x < -w) x = 0;
-                if (y < -textH) y = 0;
-                if (x > canvasW) x = Math.max(0, canvasW - w);
-                if (y > canvasH) y = Math.max(0, canvasH - textH);
-
-                // ★ Ensure minimum usable width
-                if (w <= 0) w = canvasW * 0.85;
-
-                console.log(`[useCanvasSync] RESTORE text "${el.name}": pos=(${x},${y}) w=${w} content="${(text.content || '').slice(0, 30)}" color=${text.color} fontSize=${text.fontSize}`);
-
-                const [tr, tg, tb] = hexToRgbFloat(text.color || '#ffffff');
-
-                const nodeId = engine.add_text(
-                    x, y,
-                    text.content || '',
-                    text.fontSize || 16,
-                    text.fontFamily || 'Inter',
-                    String(text.fontWeight || 400),
-                    tr, tg, tb, 1.0,
-                    w,
-                    text.textAlign || 'center',
-                    text.name,
-                    text.lineHeight,
-                    text.letterSpacing,
-                    text.fontStyle,
-                );
-
-                if (text.opacity !== undefined && text.opacity !== 1) {
-                    try { engine.set_opacity(nodeId, text.opacity); } catch { /* ok */ }
-                }
-                // ★ Restore shadow/glow effect for text
-                if (el.shadow) {
-                    try {
-                        const [sr, sg, sb, sa] = parseShadowColor(el.shadow.color);
-                        engine.set_shadow(nodeId, el.shadow.offsetX, el.shadow.offsetY, el.shadow.blur, sr, sg, sb, sa);
-                    } catch { /* ok */ }
-                }
-                // ★ Restore text effect (Canva-style: outline, neon, glitch, 70s, etc.)
-                if (text.textEffect && text.textEffect.type !== 'none') {
-                    console.log(`[useCanvasSync] RESTORE: text "${el.name}" effect: ${text.textEffect.type} intensity=${text.textEffect.intensity} color=${text.textEffect.color} → nodeId=${nodeId}`);
-                    try {
-                        engine.set_text_effect(nodeId, text.textEffect.type, text.textEffect.intensity ?? 50, text.textEffect.color ?? '#ffffff');
-                    } catch (err) {
-                        console.warn('[useCanvasSync] Failed to restore text effect:', err);
-                    }
-                } else {
-                    console.log(`[useCanvasSync] RESTORE: text "${el.name}" — NO textEffect`);
-                }
-                // ★ Restore visible/locked
-                if (el.visible === false) {
-                    try { engine.set_visible?.(nodeId, false); } catch { /* ok */ }
-                }
-                if (el.locked) {
-                    try { engine.set_locked?.(nodeId, true); } catch { /* ok */ }
-                }
-
+                restoreText(engine, el as TextElement, canvasW, canvasH, parseShadowColor);
                 restoredShapes++;
-
-                // ★ FIX: Override __glidZIndex with STORED value (same fix as shapes above).
-                if (typeof engine.set_z_index === 'function') {
-                    engine.set_z_index(nodeId, el.zIndex ?? 1);
-                }
-
-                if (el.animation && el.animation.preset !== 'none') {
-                    useAnimPresetStore.getState().setPreset(`engine-${nodeId}`, {
-                        anim: el.animation.preset,
-                        animDuration: el.animation.duration,
-                        startTime: el.animation.startTime,
-                    });
-                }
-
             } else if (el.type === 'image') {
-                const img = el as ImageElement;
-                let { x, y, w, h } = constraintsToAbsolute(img.constraints, canvasW, canvasH);
-
-                const isOutOfCanvas = w <= 0 || h <= 0
-                    || x >= canvasW || y >= canvasH
-                    || x + w <= 0 || y + h <= 0;
-                if (isOutOfCanvas) {
-                    w = Math.min(canvasW * 0.5, img.naturalWidth ?? canvasW * 0.5);
-                    h = Math.min(canvasH * 0.5, img.naturalHeight ?? canvasH * 0.5);
-                    x = Math.round((canvasW - w) / 2);
-                    y = Math.round((canvasH - h) / 2);
-                }
-
-                if (img.src) {
-                    // ★ SEQUENTIAL IMAGE LOADING: capture closure vars, load one at a time
-                    const capturedX = x, capturedY = y, capturedW = w, capturedH = h;
-                    const capturedImg = img;
-                    pendingImageLoads.push(async () => {
-                        const resolvedSrc = isAssetRef(capturedImg.src!)
-                            ? await resolveAsset(capturedImg.src!)
-                            : capturedImg.src!;
-                        const nodeId = await engine.add_image(
-                            capturedX, capturedY, resolvedSrc, capturedW, capturedH, capturedImg.name, capturedImg.zIndex,
-                            capturedImg.naturalWidth, capturedImg.naturalHeight,
-                        );
-                        if (capturedImg.opacity !== undefined && capturedImg.opacity !== 1) {
-                            try { engine.set_opacity(nodeId, capturedImg.opacity); } catch { /* ok */ }
-                        }
-                        // ★ Restore shadow for images
-                        if (el.shadow) {
-                            try {
-                                const [sr, sg, sb, sa] = parseShadowColor(el.shadow.color);
-                                engine.set_shadow(nodeId, el.shadow.offsetX, el.shadow.offsetY, el.shadow.blur, sr, sg, sb, sa);
-                            } catch { /* ok */ }
-                        }
-                    });
-                }
-
+                restoreImage(engine, el as ImageElement, canvasW, canvasH, parseShadowColor, pendingImageLoads);
                 restoredShapes++;
-
-                if (el.animation && el.animation.preset !== 'none') {
-                    useAnimPresetStore.getState().setPreset(img.id, {
-                        anim: el.animation.preset,
-                        animDuration: el.animation.duration,
-                        startTime: el.animation.startTime,
-                    });
-                }
-
             } else if (el.type === 'video') {
-                const vid = el as VideoElement;
-                let { x, y, w, h } = constraintsToAbsolute(vid.constraints, canvasW, canvasH);
+                restoreVideo(el as VideoElement, canvasW, canvasH, overlayElements, pendingVideoLoads);
+            }
 
-                const isOutOfCanvas = w <= 0 || h <= 0
-                    || x >= canvasW || y >= canvasH
-                    || x + w <= 0 || y + h <= 0;
-                if (isOutOfCanvas) {
-                    x = 0; y = 0; w = canvasW; h = canvasH;
-                } else {
-                    x = Math.max(0, Math.min(x, canvasW - 10));
-                    y = Math.max(0, Math.min(y, canvasH - 10));
-                    w = Math.min(w, canvasW - x);
-                    h = Math.min(h, canvasH - y);
-                }
-
-                const oel: OverlayElement = {
-                    id: vid.id,
-                    type: 'video',
-                    x, y, w, h,
-                    name: vid.name,
-                    videoSrc: vid.videoSrc || '',
-                    posterSrc: vid.posterSrc,
-                    fileName: vid.fileName,
-                    objectFit: (vid.fit === 'cover' || vid.fit === 'contain' || vid.fit === 'fill') ? vid.fit : 'cover',
-                    muted: vid.muted ?? true,
-                    loop: vid.loop ?? true,
-                    autoplay: vid.autoplay ?? true,
-                    opacity: vid.opacity ?? 1,
-                    visible: vid.visible !== false,
-                    locked: vid.locked ?? false,
-                    zIndex: vid.zIndex ?? 1,
-                };
-                overlayElements.push(oel);
-
-                if (!oel.videoSrc || oel.videoSrc.startsWith('blob:')) {
-                    pendingVideoLoads.push(
-                        loadVideoBlob(vid.id).then((freshUrl) => {
-                            if (freshUrl) oel.videoSrc = freshUrl;
-                        }).catch(() => {/* IndexedDB unavailable */ })
-                    );
-                }
-
-                if (el.animation && el.animation.preset !== 'none') {
-                    useAnimPresetStore.getState().setPreset(vid.id, {
-                        anim: el.animation.preset,
-                        animDuration: el.animation.duration,
-                        startTime: el.animation.startTime,
-                    });
-                }
+            if (el.animation && el.animation.preset !== 'none') {
+                const key = el.type === 'image' || el.type === 'video' ? el.id : `engine-${el.id}`;
+                useAnimPresetStore.getState().setPreset(key, { anim: el.animation.preset, animDuration: el.animation.duration, startTime: el.animation.startTime });
             }
         }
 
-        // ★ SEQUENTIAL IMAGE LOADING: Load images one by one so each add_image()
-        // sees the correct Fabric stack state. This prevents z-order race conditions.
-        for (const loadFn of pendingImageLoads) {
-            await loadFn();
-        }
-
-        // Wait for video blob loads too
+        for (const loadFn of pendingImageLoads) await loadFn();
         await Promise.all(pendingVideoLoads);
 
-        // ★ DEFINITIVE REORDER: After ALL objects are added, do a final z-order sort.
-        // This is the authoritative pass — any interim ordering issues are corrected here.
-        if (typeof engine.reorder_by_z_index === 'function') {
-            engine.reorder_by_z_index();
-        }
-
-        // ★ FIX: Delayed second reorder — catches Fabric texture cache staleness
-        // that occurs when async image loads trigger internal re-renders AFTER the
-        // first reorder. This is the definitive "final word" on z-order.
-        setTimeout(() => {
-            if (typeof engine.reorder_by_z_index === 'function') {
-                engine.reorder_by_z_index();
-                console.log('[useCanvasSync] Delayed z-reorder completed (cache invalidation)');
-            }
-        }, 200);
-
-        // ★ FONT-AWARE BOUNDING BOX REFRESH:
-        // Fabric Textbox auto-calculates height from font metrics.
-        // If web fonts (Inter, etc.) haven't finished loading yet when add_text runs,
-        // Fabric uses the fallback font → wrong height → wrong bounding box → 
-        // setCoords() caches wrong hit area → text is VISIBLE but NOT CLICKABLE.
-        // Fix: wait for all fonts to load, then recalculate text dimensions + coords.
+        if (typeof engine.reorder_by_z_index === 'function') engine.reorder_by_z_index();
+        setTimeout(() => { if (typeof engine.reorder_by_z_index === 'function') { engine.reorder_by_z_index(); } }, 200);
         if (typeof document !== 'undefined' && document.fonts?.ready) {
             document.fonts.ready.then(() => {
-                if (typeof engine.refreshTextCoords === 'function') {
-                    engine.refreshTextCoords();
-                }
-                // ★ FIX: Final reorder after fonts load — font loading can
-                // change text dimensions, triggering Fabric internal re-renders.
-                if (typeof engine.reorder_by_z_index === 'function') {
-                    engine.reorder_by_z_index();
-                }
+                if (typeof engine.refreshTextCoords === 'function') engine.refreshTextCoords();
+                if (typeof engine.reorder_by_z_index === 'function') engine.reorder_by_z_index();
             });
         }
 
-        console.log(`[useCanvasSync] Legacy restored ${restoredShapes} shapes, ${overlayElements.length} overlays`);
+        console.log(`[useCanvasSync] Restored ${restoredShapes} shapes, ${overlayElements.length} overlays`);
         return { restoredShapes, overlayElements };
     }, [variantId, canvasW, canvasH]);
 
     return { saveToStore, saveFromCachedNodes, restoreFromStore };
+}
+
+// ── Restore Helpers (private) ──
+
+function restoreShape(engine: Engine, shape: ShapeElement, canvasW: number, canvasH: number, parseShadow: typeof parseShadowColor): void {
+    const { x, y, w, h } = constraintsToAbsolute(shape.constraints, canvasW, canvasH);
+    let nodeId: number;
+    if (shape.gradientStart && shape.gradientEnd) {
+        try { nodeId = engine.add_gradient_rect(x, y, w, h, shape.gradientStart, shape.gradientEnd, shape.gradientAngle ?? 135, shape.borderRadius ?? 0, shape.name); }
+        catch { const [r1, g1, b1, a1] = hexToRgbFloat(shape.gradientStart); const [r2, g2, b2, a2] = hexToRgbFloat(shape.gradientEnd); nodeId = engine.add_gradient_rect(x, y, w, h, r1, g1, b1, a1, r2, g2, b2, a2, shape.gradientAngle ?? 135); }
+    } else if (shape.shapeType === 'ellipse') {
+        const [r, g, b, a] = hexToRgbFloat(shape.fill || '#808080'); nodeId = engine.add_ellipse(x + w / 2, y + h / 2, w / 2, h / 2, r, g, b, a);
+    } else if (shape.borderRadius && shape.borderRadius > 0) {
+        const [r, g, b, a] = hexToRgbFloat(shape.fill || '#808080'); nodeId = engine.add_rounded_rect(x, y, w, h, r, g, b, a, shape.borderRadius);
+    } else {
+        const [r, g, b, a] = hexToRgbFloat(shape.fill || '#808080'); nodeId = engine.add_rect(x, y, w, h, r, g, b, a);
+    }
+    if (shape.opacity !== undefined && shape.opacity !== 1) try { engine.set_opacity(nodeId, shape.opacity); } catch { /* ok */ }
+    if (shape.shadow) { try { const [sr, sg, sb, sa] = parseShadow(shape.shadow.color); engine.set_shadow(nodeId, shape.shadow.offsetX, shape.shadow.offsetY, shape.shadow.blur, sr, sg, sb, sa); } catch { /* ok */ } }
+    if (shape.visible === false) try { engine.set_visible?.(nodeId, false); } catch { /* ok */ }
+    if (typeof engine.set_z_index === 'function') engine.set_z_index(nodeId, shape.zIndex ?? 0);
+}
+
+function restoreText(engine: Engine, text: TextElement, canvasW: number, canvasH: number, parseShadow: typeof parseShadowColor): void {
+    let { x, y, w, h } = constraintsToAbsolute(text.constraints, canvasW, canvasH);
+    const textH = h > 0 ? h : (text.fontSize || 16) * 2;
+    if (x < -w) x = 0; if (y < -textH) y = 0;
+    if (x > canvasW) x = Math.max(0, canvasW - w); if (y > canvasH) y = Math.max(0, canvasH - textH);
+    if (w <= 0) w = canvasW * 0.85;
+    const [tr, tg, tb] = hexToRgbFloat(text.color || '#ffffff');
+    const nodeId = engine.add_text(x, y, text.content || '', text.fontSize || 16, text.fontFamily || 'Inter', String(text.fontWeight || 400), tr, tg, tb, 1.0, w, text.textAlign || 'center', text.name, text.lineHeight, text.letterSpacing, text.fontStyle);
+    if (text.opacity !== undefined && text.opacity !== 1) try { engine.set_opacity(nodeId, text.opacity); } catch { /* ok */ }
+    if (text.shadow) { try { const [sr, sg, sb, sa] = parseShadow(text.shadow.color); engine.set_shadow(nodeId, text.shadow.offsetX, text.shadow.offsetY, text.shadow.blur, sr, sg, sb, sa); } catch { /* ok */ } }
+    if (text.textEffect && text.textEffect.type !== 'none') { try { engine.set_text_effect(nodeId, text.textEffect.type, text.textEffect.intensity ?? 50, text.textEffect.color ?? '#ffffff'); } catch { /* ok */ } }
+    if (text.visible === false) try { engine.set_visible?.(nodeId, false); } catch { /* ok */ }
+    if (typeof engine.set_z_index === 'function') engine.set_z_index(nodeId, text.zIndex ?? 1);
+}
+
+function restoreImage(engine: Engine, img: ImageElement, canvasW: number, canvasH: number, parseShadow: typeof parseShadowColor, pendingLoads: (() => Promise<void>)[]): void {
+    let { x, y, w, h } = constraintsToAbsolute(img.constraints, canvasW, canvasH);
+    const isOut = w <= 0 || h <= 0 || x >= canvasW || y >= canvasH || x + w <= 0 || y + h <= 0;
+    if (isOut) { w = Math.min(canvasW * 0.5, img.naturalWidth ?? canvasW * 0.5); h = Math.min(canvasH * 0.5, img.naturalHeight ?? canvasH * 0.5); x = Math.round((canvasW - w) / 2); y = Math.round((canvasH - h) / 2); }
+    if (img.src) {
+        const cx = x, cy = y, cw = w, ch = h, ci = img;
+        pendingLoads.push(async () => {
+            const resolved = isAssetRef(ci.src!) ? await resolveAsset(ci.src!) : ci.src!;
+            const nodeId = await engine.add_image(cx, cy, resolved, cw, ch, ci.name, ci.zIndex, ci.naturalWidth, ci.naturalHeight);
+            if (ci.opacity !== undefined && ci.opacity !== 1) try { engine.set_opacity(nodeId, ci.opacity); } catch { /* ok */ }
+            if (ci.shadow) { try { const [sr, sg, sb, sa] = parseShadow(ci.shadow.color); engine.set_shadow(nodeId, ci.shadow.offsetX, ci.shadow.offsetY, ci.shadow.blur, sr, sg, sb, sa); } catch { /* ok */ } }
+        });
+    }
+}
+
+function restoreVideo(vid: VideoElement, canvasW: number, canvasH: number, overlayElements: OverlayElement[], pendingLoads: Promise<void>[]): void {
+    let { x, y, w, h } = constraintsToAbsolute(vid.constraints, canvasW, canvasH);
+    const isOut = w <= 0 || h <= 0 || x >= canvasW || y >= canvasH || x + w <= 0 || y + h <= 0;
+    if (isOut) { x = 0; y = 0; w = canvasW; h = canvasH; } else { x = Math.max(0, Math.min(x, canvasW - 10)); y = Math.max(0, Math.min(y, canvasH - 10)); w = Math.min(w, canvasW - x); h = Math.min(h, canvasH - y); }
+    const oel: OverlayElement = {
+        id: vid.id, type: 'video', x, y, w, h, name: vid.name,
+        videoSrc: vid.videoSrc || '', posterSrc: vid.posterSrc, fileName: vid.fileName,
+        objectFit: (vid.fit === 'cover' || vid.fit === 'contain' || vid.fit === 'fill') ? vid.fit : 'cover',
+        muted: vid.muted ?? true, loop: vid.loop ?? true, autoplay: vid.autoplay ?? true,
+        opacity: vid.opacity ?? 1, visible: vid.visible !== false, locked: vid.locked ?? false, zIndex: vid.zIndex ?? 1,
+    };
+    overlayElements.push(oel);
+    if (!oel.videoSrc || oel.videoSrc.startsWith('blob:')) {
+        pendingLoads.push(loadVideoBlob(vid.id).then((url) => { if (url) oel.videoSrc = url; }).catch(() => {}));
+    }
 }
