@@ -383,7 +383,22 @@ export function useCanvasSync(
 
             } else if (el.type === 'text') {
                 const text = el as TextElement;
-                const { x, y, w } = constraintsToAbsolute(text.constraints, canvasW, canvasH);
+                let { x, y, w, h } = constraintsToAbsolute(text.constraints, canvasW, canvasH);
+
+                // ★ REGRESSION GUARD: Clamp text position inside canvas bounds.
+                // Constraint round-trip (abs→constraints→abs) can produce off-canvas
+                // positions if anchor type changes (e.g. 'left' → 'center' → 'bottom')
+                // across different canvas sizes. Off-canvas text = invisible to user.
+                const textH = h > 0 ? h : (text.fontSize || 16) * 2; // approx text height
+                if (x < -w) x = 0;
+                if (y < -textH) y = 0;
+                if (x > canvasW) x = Math.max(0, canvasW - w);
+                if (y > canvasH) y = Math.max(0, canvasH - textH);
+
+                // ★ Ensure minimum usable width
+                if (w <= 0) w = canvasW * 0.85;
+
+                console.log(`[useCanvasSync] RESTORE text "${el.name}": pos=(${x},${y}) w=${w} content="${(text.content || '').slice(0, 30)}" color=${text.color} fontSize=${text.fontSize}`);
 
                 const [tr, tg, tb] = hexToRgbFloat(text.color || '#ffffff');
 
@@ -394,7 +409,7 @@ export function useCanvasSync(
                     text.fontFamily || 'Inter',
                     String(text.fontWeight || 400),
                     tr, tg, tb, 1.0,
-                    w > 0 ? w : canvasW * 0.85,
+                    w,
                     text.textAlign || 'center',
                     text.name,
                     text.lineHeight,
