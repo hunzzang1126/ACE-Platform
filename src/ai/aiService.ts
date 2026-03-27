@@ -213,15 +213,8 @@ export class AiService {
             const textBlocks = response.content.filter(b => b.type === 'text');
             const toolBlocks = response.content.filter(b => b.type === 'tool_use');
 
-            // ★ Narration: stream AI's explanation text BEFORE executing tools
-            for (const block of textBlocks) {
-                if (block.text) {
-                    for (const char of block.text) {
-                        progress.onToken(char);
-                        await sleep(6);
-                    }
-                }
-            }
+            // ★ Narration: text was already streamed token-by-token via SSE in callClaude.
+            // No fake char-by-char loop needed.
 
             if (response.stop_reason === 'tool_use' && toolBlocks.length > 0) {
                 // Show plan with natural language labels
@@ -361,7 +354,8 @@ export class AiService {
     }
 
     /**
-     * Call Claude via OpenRouter — simplified, no extended thinking.
+     * Call Claude via OpenRouter — ★ SSE STREAMING for Cursor-grade UX.
+     * Tokens stream to progress.onToken() in real-time.
      * max_tokens: 4096 (halved), retries: 1 (was 3).
      */
     private async callClaude(
@@ -435,15 +429,16 @@ export class AiService {
             },
         })) : undefined;
 
-        // ★ No extended thinking — removed entirely
+        // ★ SSE streaming enabled
         const body: Record<string, unknown> = {
             model,
-            max_tokens: 4096, // ★ Halved from 8192
+            max_tokens: 4096,
             messages: openAiMessages,
             tools: openAiTools,
+            stream: true,  // ★ Cursor-grade: token-by-token streaming
         };
 
-        console.log(`[AiService] → ${apiUrl} (model: ${model}, msgs: ${openAiMessages.length}, tools: ${tools.length})`);
+        console.log(`[AiService] → ${apiUrl} (model: ${model}, msgs: ${openAiMessages.length}, tools: ${tools.length}, stream: true)`);
 
         // ★ 1 retry max (was 3)
         const maxRetries = 1;
@@ -462,48 +457,7 @@ export class AiService {
             });
 
             if (resp.ok) {
-                const data = await resp.json() as Record<string, unknown>;
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const choice = (data.choices as any[])?.[0];
-                if (!choice) {
-                    progress.onError('Empty response from AI');
-                    return null;
-                }
-
-                const msg = choice.message ?? {};
-                const content: ClaudeContentBlock[] = [];
-
-                if (msg.content) {
-                    content.push({ type: 'text', text: msg.content });
-                }
-                if (msg.tool_calls) {
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    for (const tc of msg.tool_calls as any[]) {
-                        content.push({
-                            type: 'tool_use',
-                            id: tc.id,
-                            name: tc.function?.name,
-                            input: JSON.parse(tc.function?.arguments ?? '{}'),
-                        });
-                    }
-                }
-
-                const stopReason = msg.tool_calls?.length > 0 ? 'tool_use' : 'end_turn';
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const usage = data.usage as any ?? { input_tokens: 0, output_tokens: 0 };
-
-                const result: ClaudeResponse = {
-                    id: data.id as string ?? '',
-                    type: 'message',
-                    role: 'assistant',
-                    content,
-                    model: data.model as string ?? model,
-                    stop_reason: stopReason as ClaudeResponse['stop_reason'],
-                    usage: { input_tokens: usage.prompt_tokens ?? 0, output_tokens: usage.completion_tokens ?? 0 },
-                };
-
-                console.log(`[AiService] Response: stop=${result.stop_reason}, tools=${result.content.filter(b => b.type === 'tool_use').length}, in=${result.usage.input_tokens}|out=${result.usage.output_tokens}`);
-                return result;
+                return await this.parseSSEStream(resp, model, progress);
             }
 
             if (resp.status === 429 && attempt < maxRetries) {
@@ -528,6 +482,124 @@ export class AiService {
 
         progress.onError(`Rate limited. Please wait a moment and try again.`);
         return null;
+    }
+
+    /**
+     * ★ SSE Stream Parser — Cursor-grade token streaming.
+     * Reads OpenRouter SSE chunks, emits tokens in real-time via progress.onToken(),
+     * accumulates text + tool calls, returns complete ClaudeResponse at the end.
+     */
+    private async parseSSEStream(
+        resp: Response,
+        model: string,
+        progress: LiveProgress,
+    ): Promise<ClaudeResponse | null> {
+        const reader = resp.body?.getReader();
+        if (!reader) {
+            progress.onError('Streaming not supported');
+            return null;
+        }
+
+        const decoder = new TextDecoder();
+        let sseBuffer = '';
+        let fullText = '';
+        let responseId = '';
+        let inputTokens = 0;
+        let outputTokens = 0;
+
+        // Tool call accumulation (OpenAI streams tool calls in incremental chunks)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const toolCallMap = new Map<number, { id: string; name: string; args: string }>();
+
+        try {
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                sseBuffer += decoder.decode(value, { stream: true });
+                const lines = sseBuffer.split('\n');
+                sseBuffer = lines.pop() ?? '';  // Keep incomplete line in buffer
+
+                for (const line of lines) {
+                    const trimmed = line.trim();
+                    if (!trimmed || !trimmed.startsWith('data: ')) continue;
+                    if (trimmed === 'data: [DONE]') continue;
+
+                    try {
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        const chunk = JSON.parse(trimmed.slice(6)) as any;
+                        if (chunk.id) responseId = chunk.id;
+
+                        // Usage info (sent in final chunk by some providers)
+                        if (chunk.usage) {
+                            inputTokens = chunk.usage.prompt_tokens ?? inputTokens;
+                            outputTokens = chunk.usage.completion_tokens ?? outputTokens;
+                        }
+
+                        const delta = chunk.choices?.[0]?.delta;
+                        if (!delta) continue;
+
+                        // ★ Text content — stream to UI immediately
+                        if (delta.content) {
+                            fullText += delta.content;
+                            progress.onToken(delta.content);
+                        }
+
+                        // ★ Tool calls — accumulate incrementally
+                        if (delta.tool_calls) {
+                            for (const tc of delta.tool_calls) {
+                                const idx = tc.index ?? 0;
+                                if (!toolCallMap.has(idx)) {
+                                    toolCallMap.set(idx, { id: tc.id ?? '', name: '', args: '' });
+                                }
+                                const entry = toolCallMap.get(idx)!;
+                                if (tc.id) entry.id = tc.id;
+                                if (tc.function?.name) entry.name += tc.function.name;
+                                if (tc.function?.arguments) entry.args += tc.function.arguments;
+                            }
+                        }
+                    } catch {
+                        // Skip malformed SSE chunks
+                    }
+                }
+            }
+        } finally {
+            reader.releaseLock();
+        }
+
+        // Build ClaudeResponse from accumulated stream data
+        const content: ClaudeContentBlock[] = [];
+        if (fullText) {
+            content.push({ type: 'text', text: fullText });
+        }
+
+        for (const [, tc] of toolCallMap) {
+            try {
+                content.push({
+                    type: 'tool_use',
+                    id: tc.id,
+                    name: tc.name,
+                    input: JSON.parse(tc.args || '{}'),
+                });
+            } catch {
+                console.warn(`[AiService] Failed to parse tool args for ${tc.name}`);
+            }
+        }
+
+        const stopReason = toolCallMap.size > 0 ? 'tool_use' : 'end_turn';
+
+        const result: ClaudeResponse = {
+            id: responseId,
+            type: 'message',
+            role: 'assistant',
+            content,
+            model,
+            stop_reason: stopReason as ClaudeResponse['stop_reason'],
+            usage: { input_tokens: inputTokens, output_tokens: outputTokens },
+        };
+
+        console.log(`[AiService] Stream complete: stop=${result.stop_reason}, tools=${toolCallMap.size}, text=${fullText.length}ch, in=${inputTokens}|out=${outputTokens}`);
+        return result;
     }
 
     /**

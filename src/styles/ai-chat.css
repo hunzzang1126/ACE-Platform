@@ -641,3 +641,31 @@
 /* Staggered dot animation */
 .ai-dot:nth-child(2) { animation-delay: 0.16s; }
 .ai-dot:nth-child(3) { animation-delay: 0.32s; }
+
+/* ── Cursor-Grade Streaming ── */
+
+.ai-streaming-text {
+    font-size: 13.5px;
+    line-height: 1.65;
+    color: #1e293b;
+    white-space: pre-wrap;
+    word-break: break-word;
+    padding: 2px 0;
+}
+
+.ai-typing-cursor {
+    display: inline-block;
+    width: 2px;
+    height: 1.1em;
+    background: linear-gradient(180deg, #7c3aed, #a78bfa);
+    margin-left: 1px;
+    vertical-align: text-bottom;
+    border-radius: 1px;
+    animation: cursorBlink 0.7s ease-in-out infinite;
+}
+
+@keyframes cursorBlink {
+    0%, 45% { opacity: 1; }
+    50%, 95% { opacity: 0; }
+    100% { opacity: 1; }
+}
