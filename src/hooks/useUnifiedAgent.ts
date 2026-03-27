@@ -245,7 +245,7 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
                 const designState = useDesignStore.getState();
                 if (serviceRef.current) {
                     serviceRef.current.setDesignContext(designState.creativeSet ?? null, designState.creativeSet?.masterVariantId);
-                    console.log(`[ContextRouter] Page: ${ctx.pageLabel}, Pipeline: ${ctx.useDesignPipeline ? 'design' : 'direct'}, Tools: ${ctx.relevantToolHint.slice(0, 60)}...`);
+                    console.log(`[ContextRouter] Page: ${ctx.pageLabel}, Pipeline: ${ctx.useDesignPipeline ? 'design' : 'direct'}, Elements: ${ctx.elementCount}`);
                 }
                 reply = await runChatFlow(enrichedMsg, config);
             }
