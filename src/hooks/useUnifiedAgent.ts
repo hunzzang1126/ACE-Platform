@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────
 // Intent detection: classify user messages → route to correct pipeline
 // Orchestrates: chat, auto-design, scan-design, modify, smart-check
-// Provides live cursor coordinates for canvas animation effect
+// Flow logic extracted: agentGenerateFlow.ts, agentFlowTypes.ts
 // ─────────────────────────────────────────────────
 
 import { useState, useCallback, useRef } from 'react';
@@ -15,14 +15,13 @@ import { getModelForRole, type AceModelRole } from '@/services/modelRouter';
 import type { AgentMessage } from '@/ai/agentContext';
 import type { NavigateFunction } from 'react-router-dom';
 import { useLocation } from 'react-router-dom';
-import { buildContext, enrichMessageWithContext, buildContextSystemPrompt } from '@/ai/contextRouter';
+import { buildContext, enrichMessageWithContext } from '@/ai/contextRouter';
 import { resilientImport } from '@/utils/resilientImport';
+import { executeGenerateFlow } from './agentGenerateFlow';
+import type { AgentFlowCallbacks, FlowEngine } from './agentFlowTypes';
 
 // ── Types ────────────────────────────────────────
 
-// AgentIntent type is defined below after intent detection section
-
-// ProgressCard type kept for backward compat, data now lives inside AgentMessage.actionCard
 export interface ProgressCard {
     id: string;
     label: string;
@@ -53,13 +52,7 @@ const INITIAL_STATE: UnifiedAgentState = {
     liveCursor: { active: false, x: 0, y: 0 },
 };
 
-// ── Intent Detection (LEGACY — scan-only) ────────
-// All text input routes to the LLM agentic loop (Single Loop).
-// Only image data triggers the scan flow.
-
 export type AgentIntent = 'scan' | 'agent';
-
-// ── Hook ─────────────────────────────────────────
 
 interface UseUnifiedAgentOptions {
     navigate: NavigateFunction;
@@ -70,623 +63,68 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
     const [messages, setMessages] = useState<AgentMessage[]>([]);
     const [state, setState] = useState<UnifiedAgentState>(INITIAL_STATE);
     const [input, setInput] = useState('');
+    const engineRef = useRef<any>(null);
+    const serviceRef = useRef<AiService | null>(null);
     const location = useLocation();
 
-    const serviceRef = useRef<AiService | null>(null);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const engineRef = useRef<any>(null);
-
-    // ── Narration — Pencil-style live explanation ─
-    // Pushes conversational messages that explain what the AI is about to do
+    // ── Narration & Card callbacks ──
     const narrate = useCallback((text: string) => {
-        setMessages(prev => [...prev, {
-            role: 'assistant',
-            content: text,
-            timestamp: Date.now(),
-        }]);
+        setMessages(prev => {
+            const last = prev[prev.length - 1];
+            if (last?.role === 'narration') return [...prev.slice(0, -1), { ...last, content: text, timestamp: Date.now() }];
+            return [...prev, { role: 'narration' as AgentMessage['role'], content: text, timestamp: Date.now() }];
+        });
     }, []);
 
-    // ── Progress card helpers — push into messages ─
-    // Cards are now interleaved with narration as action messages
     const addCard = useCallback((id: string, label: string, status: ProgressCard['status'] = 'running', opts?: { reasoning?: string; expandedDetail?: string }) => {
-        setMessages(prev => [...prev, {
-            role: 'action' as const,
-            content: label,
-            timestamp: Date.now(),
-            actionCard: { id, label, status, reasoning: opts?.reasoning, expandedDetail: opts?.expandedDetail },
-        }]);
+        const card: ProgressCard = { id, label, status, ...opts };
+        setMessages(prev => [...prev, { role: 'action' as AgentMessage['role'], content: '', timestamp: Date.now(), actionCard: card }]);
     }, []);
 
     const updateCard = useCallback((id: string, status: ProgressCard['status'], detail?: string, opts?: { reasoning?: string; expandedDetail?: string }) => {
         setMessages(prev => prev.map(m => {
-            if (m.role === 'action' && m.actionCard?.id === id) {
-                return {
-                    ...m,
-                    actionCard: {
-                        ...m.actionCard,
-                        status,
-                        ...(detail != null ? { detail } : {}),
-                        ...(opts?.reasoning != null ? { reasoning: opts.reasoning } : {}),
-                        ...(opts?.expandedDetail != null ? { expandedDetail: opts.expandedDetail } : {}),
-                    },
-                };
+            if (m.actionCard?.id === id) {
+                return { ...m, actionCard: { ...m.actionCard, status, ...(detail !== undefined ? { detail } : {}), ...(opts?.reasoning !== undefined ? { reasoning: opts.reasoning } : {}), ...(opts?.expandedDetail !== undefined ? { expandedDetail: opts.expandedDetail } : {}) } };
             }
             return m;
         }));
     }, []);
 
-    // ── Live cursor animation ────────────────────
     const moveCursor = useCallback((x: number, y: number, label?: string) => {
-        setState(prev => ({
-            ...prev,
-            liveCursor: { active: true, x, y, label },
-        }));
+        setState(prev => ({ ...prev, liveCursor: { active: true, x, y, label } }));
     }, []);
 
     const hideCursor = useCallback(() => {
-        setState(prev => ({
-            ...prev,
-            liveCursor: { active: false, x: 0, y: 0 },
-        }));
+        setState(prev => ({ ...prev, liveCursor: { active: false, x: 0, y: 0 } }));
     }, []);
 
-    // ── Engine bridge ────────────────────────────
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const setEngine = useCallback((e: any) => {
-        engineRef.current = e?.current ?? e;
-    }, []);
+    const setEngine = useCallback((e: any) => { engineRef.current = e?.current ?? e; }, []);
 
-    // ── Config ───────────────────────────────────
-    // ★ CRITICAL: UI-selected model ALWAYS takes priority.
-    // localStorage is used only for endpoint/maxToolRounds, never for model override.
     const getConfig = useCallback((): AiConfig => {
         const model = getModelForRole(selectedRole);
         const base: AiConfig = { endpoint: 'https://openrouter.ai/api', model: model.id, maxToolRounds: 30 };
-
-        // Merge non-model settings from localStorage (if any)
         const saved = localStorage.getItem('ace-ai-config');
-        if (saved) {
-            try {
-                const parsed = JSON.parse(saved) as Partial<AiConfig>;
-                if (parsed.endpoint) base.endpoint = parsed.endpoint;
-                if (parsed.maxToolRounds) base.maxToolRounds = parsed.maxToolRounds;
-                // ★ NEVER use parsed.model — UI selection is the source of truth
-            } catch { /* */ }
-        }
+        if (saved) { try { const p = JSON.parse(saved) as Partial<AiConfig>; if (p.endpoint) base.endpoint = p.endpoint; if (p.maxToolRounds) base.maxToolRounds = p.maxToolRounds; } catch { /* */ } }
         return base;
     }, [selectedRole]);
 
-    // ── Generate Design (template-first pipeline) ──
+    // ── Flow callbacks object (shared) ──
+    const flowCallbacks: AgentFlowCallbacks = { narrate, addCard, updateCard, moveCursor, hideCursor };
+
+    // ── Generate Design ──
     const runGenerateFlow = useCallback(async (prompt: string) => {
         const engine = engineRef.current?.current ?? engineRef.current;
         if (!engine) throw new Error('Canvas not connected.');
+        return executeGenerateFlow(prompt, engine as FlowEngine, flowCallbacks);
+    }, [flowCallbacks]);
 
-        // ── Phase 1: Canvas scan ──
-        narrate(`Starting design generation. Reading current canvas state...`);
-        addCard('context', 'Reading canvas context', 'running');
-        let elementCount = 0;
-        try {
-            const raw = engine.get_all_nodes() as string;
-            const nodes = JSON.parse(raw);
-            elementCount = Array.isArray(nodes) ? nodes.length : 0;
-        } catch { /* ok */ }
-        updateCard('context', 'done', `${elementCount} elements found`);
-        await new Promise(r => setTimeout(r, 400)); // Pacing
-
-        // Get canvas dimensions
-        let canvasW = 300, canvasH = 250;
-        try {
-            const dims = engine.get_canvas_size?.();
-            if (dims) { canvasW = dims.width ?? 300; canvasH = dims.height ?? 250; }
-        } catch { /* ok */ }
-
-        // ── Phase 1.5: Brand Cloud Scan ──
-        // Check active brand kit for relevant assets, palette, and guidelines.
-        addCard('brand-scan', 'Scanning Brand Cloud', 'running');
-        let brandContext = '';
-        let brandPaletteHint = '';
-        let brandFontHint = '';
-        let brandAssetHint = '';
-        let brandLogoUrl: string | null = null;
-        let brandLogoW = 0, brandLogoH = 0;
-        // ★ NEW: Brand vision blocks for multimodal AI
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let brandVisionBlocks: any[] = [];
-        try {
-            const { useBrandKitStore } = await resilientImport(() => import('@/stores/brandKitStore'));
-            const kit = useBrandKitStore.getState().getActiveKit();
-            if (kit) {
-                // Extract brand palette hint for color phase
-                brandPaletteHint = [
-                    `Brand colors: primary=${kit.palette.primary}, secondary=${kit.palette.secondary}`,
-                    `accent=${kit.palette.accent}, background=${kit.palette.background}, text=${kit.palette.text}`,
-                ].join(', ');
-                // Font hint for structure phase
-                brandFontHint = `Brand fonts: heading="${kit.typography.heading.family}", body="${kit.typography.body.family}", CTA="${kit.typography.cta.family}"`;
-
-                const activeAssets = kit.assets.filter(a => !a.deletedAt);
-
-                // ★ FIX: Only grab logos when brand name is relevant to the prompt.
-                const logoAssets = activeAssets.filter(a => a.category === 'logo');
-                if (logoAssets.length > 0) {
-                    const brandNameLower = (kit.guidelines?.name || kit.name || '').toLowerCase();
-                    const brandTaglineLower = (kit.guidelines?.tagline || '').toLowerCase();
-                    const promptLower2 = prompt.toLowerCase();
-                    const brandIsRelevant =
-                        promptLower2.includes(brandNameLower) ||
-                        (brandTaglineLower && promptLower2.includes(brandTaglineLower)) ||
-                        promptLower2.includes('logo') ||
-                        promptLower2.includes('brand') ||
-                        promptLower2.includes('로고') ||
-                        promptLower2.includes('브랜드');
-                    if (brandIsRelevant) {
-                        const logo = logoAssets[0]!;
-                        brandLogoUrl = logo.src;
-                        brandLogoW = logo.width;
-                        brandLogoH = logo.height;
-                    }
-                }
-
-                // Match other assets by keyword from prompt
-                const promptLower = prompt.toLowerCase();
-                const matchedAssets = activeAssets.filter(a =>
-                    a.tags.some(t => promptLower.includes(t.toLowerCase())) ||
-                    promptLower.includes(a.name.toLowerCase()) ||
-                    promptLower.includes(a.category),
-                );
-                if (matchedAssets.length > 0 || logoAssets.length > 0) {
-                    const allRelevant = [...new Set([...logoAssets, ...matchedAssets])];
-                    brandAssetHint = `Brand assets: ${allRelevant.map(a => `"${a.name}" (${a.category}, ${a.width}x${a.height})`).join(', ')}`;
-                }
-                // Guidelines
-                const g = kit.guidelines;
-                brandContext = [
-                    `Brand: ${g.name || kit.name}`,
-                    g.tagline ? `Tagline: "${g.tagline}"` : '',
-                    g.voiceTone ? `Voice: ${g.voiceTone}` : '',
-                    g.ctaPhrases.length > 0 ? `CTA phrases: ${g.ctaPhrases.join(', ')}` : '',
-                    brandPaletteHint,
-                    brandFontHint,
-                    brandAssetHint,
-                ].filter(Boolean).join('\n');
-
-                // ★ NEW: Build vision blocks so AI can SEE brand assets
-                try {
-                    const { buildBrandVisionBlocks } = await resilientImport(() => import('@/services/brandContextBuilder'));
-                    brandVisionBlocks = buildBrandVisionBlocks(kit);
-                    if (brandVisionBlocks.length > 0) {
-                        narrate(`AI can now visually see ${Math.floor(brandVisionBlocks.length / 2)} brand asset(s).`);
-                    }
-                } catch {
-                    // Vision blocks are optional — text context still works
-                }
-
-                const logoNote = logoAssets.length > 0 ? ` (${logoAssets.length} logo)` : '';
-                const assetNote = matchedAssets.length > 0
-                    ? `${matchedAssets.length} matching asset(s)${logoNote}`
-                    : `${activeAssets.length} asset(s)${logoNote}`;
-                updateCard('brand-scan', 'done', `${kit.name}: ${assetNote}`, {
-                    expandedDetail: brandContext,
-                });
-                narrate(`Brand kit "${kit.name}" loaded — ${assetNote}.`);
-            } else {
-                updateCard('brand-scan', 'done', 'No active brand kit');
-            }
-        } catch {
-            updateCard('brand-scan', 'done', 'Brand Cloud scan skipped');
-        }
-        await new Promise(r => setTimeout(r, 300));
-
-        // ── Phase 2: AI Copywriting (Content-First) ──
-        // Content comes FIRST so structure can adapt to actual text length.
-        narrate(`I'll generate the ad copy tailored for your prompt.`);
-        addCard('content', 'Generating creative copy', 'running');
-        await new Promise(r => setTimeout(r, 400));
-
-        const abort = new AbortController();
-        const { callTemplateContent } = await resilientImport(() => import('@/services/autoDesignService'));
-        const { loadUserPrefs } = await resilientImport(() => import('@/stores/userPrefs'));
-        const preferredLang = loadUserPrefs().preferredLanguage;
-        // ★ Inject brand context into content prompt if available
-        const contentPrompt = brandContext
-            ? `${prompt}\n\n[BRAND CONTEXT]\n${brandContext}`
-            : prompt;
-        const content = await callTemplateContent(contentPrompt, canvasW, canvasH, 'AI Pipeline', abort.signal, preferredLang);
-
-        const copyDetail = [
-            `Headline: "${content.headline}" (${content.headline.length} chars)`,
-            `Subheadline: "${content.subheadline}"`,
-            `CTA: "${content.cta}"`,
-            content.tag ? `Tag: "${content.tag}"` : '',
-        ].filter(Boolean).join('\n');
-        updateCard('content', 'done', 'Copy generated', { expandedDetail: copyDetail });
-        narrate(`Copy ready: "${content.headline}"`);
-        await new Promise(r => setTimeout(r, 400));
-
-        // ── Phase 3: Template Selection (AI Vision-Based) ──
-        // AI SEES rendered template previews and picks the best layout for the user's request.
-        narrate(`Analyzing layout templates for ${canvasW}x${canvasH}...`);
-        addCard('structure', 'AI selecting layout template', 'running');
-
-        let template: import('@/services/designTemplates').DesignTemplate | null = null;
-
-        try {
-            // Render template grid and send to AI for vision-based selection
-            const { renderTemplateGrid, buildTemplateSelectionPrompt, getTemplateById } =
-                await resilientImport(() => import('@/services/templatePreviewRenderer'));
-            const { callWithRole } = await resilientImport(() => import('@/services/openRouterClient'));
-
-            const gridDataUrl = renderTemplateGrid(canvasW, canvasH);
-            const selectionPrompt = buildTemplateSelectionPrompt(canvasW, canvasH);
-
-            // Extract base64 from data URL
-            const gridBase64 = gridDataUrl.split(',')[1] ?? '';
-
-            // ★ AI Vision call: send template grid image + user prompt
-            const aiResponse = await callWithRole('planner', {
-                messages: [{
-                    role: 'user',
-                    content: [
-                        { type: 'text', text: `${selectionPrompt}\n\nUser's design request: "${prompt}"` },
-                        {
-                            type: 'image',
-                            source: {
-                                type: 'base64',
-                                media_type: 'image/png',
-                                data: gridBase64,
-                            },
-                        },
-                        // Include brand vision blocks if available
-                        ...brandVisionBlocks,
-                    ],
-                }],
-                max_tokens: 200,
-            }, abort.signal) as { content?: Array<{ type: string; text?: string }> };
-
-            // Parse AI response for template ID
-            const aiText = aiResponse?.content?.find(b => b.type === 'text')?.text ?? '';
-            const jsonMatch = aiText.match(/\{[^}]+\}/);
-            if (jsonMatch) {
-                const parsed = JSON.parse(jsonMatch[0]);
-                const selectedId = parsed.templateId || parsed.template_id;
-                const reason = parsed.reason || '';
-                if (selectedId) {
-                    template = getTemplateById(selectedId) ?? null;
-                    if (template) {
-                        updateCard('structure', 'done', `${template.name} (AI selected)`, {
-                            reasoning: reason || `AI selected "${template.name}" based on visual analysis`,
-                            expandedDetail: [
-                                `Template: ${template.name}`,
-                                `ID: ${template.id}`,
-                                `Reason: ${reason}`,
-                                `Method: AI Vision-based selection`,
-                            ].join('\n'),
-                        });
-                        narrate(`AI chose "${template.name}" — ${reason}`);
-                    }
-                }
-            }
-        } catch (err) {
-            console.warn('[UnifiedAgent] AI template selection failed, falling back:', err);
-        }
-
-        // Fallback: use rotation if AI selection failed
-        if (!template) {
-            const { selectTemplate } = await resilientImport(() => import('@/services/designTemplates'));
-            template = selectTemplate(canvasW, canvasH);
-            if (!template) throw new Error('No compatible template found');
-            updateCard('structure', 'done', template.name, {
-                reasoning: `Fallback: "${template.name}" — ${template.description}`,
-                expandedDetail: [
-                    `Template: ${template.name}`,
-                    `Description: ${template.description}`,
-                    `Aspect Ratios: ${template.aspectRatios.join(', ')}`,
-                    `Method: Rotation fallback`,
-                ].join('\n'),
-            });
-        }
-        await new Promise(r => setTimeout(r, 400));
-
-        // ── Phase 4: AI Color Palette (Mood-Aware) ──
-        // Colors are chosen to complement the selected template's style.
-        narrate(`Selecting colors for the "${template.name}" layout...`);
-        addCard('palette', 'Determining color palette', 'running');
-
-        const { generateColorPalette } = await resilientImport(() => import('@/services/designStyleGuides'));
-        // ★ Include brand palette hint so AI prefers brand colors
-        const colorPrompt = brandPaletteHint
-            ? `${prompt}\n\n[BRAND PALETTE]\n${brandPaletteHint}\nPrefer these brand colors when they fit the mood.`
-            : prompt;
-        const { palette: guide, reasoning: colorReasoning, needsBackgroundImage, backgroundImagePrompt } = await generateColorPalette(colorPrompt, abort.signal);
-
-        const styleDetail = [
-            `Background: ${guide.colors.gradientStart} -> ${guide.colors.gradientEnd}`,
-            `Accent: ${guide.colors.accent}`,
-            `Text: ${guide.colors.foreground}`,
-            `Font: ${guide.typography.primaryFont} / ${guide.typography.secondaryFont}`,
-            needsBackgroundImage ? `Background Image: YES` : `Background Image: NO (gradient)`,
-        ].join('\n');
-        updateCard('palette', 'done', guide.name, { reasoning: colorReasoning, expandedDetail: styleDetail });
-        narrate(colorReasoning || `Color palette: ${guide.name}`);
-        await new Promise(r => setTimeout(r, 400));
-
-        // ── Phase 4.5: Background Image Generation (if needed) ──
-        let hasImageBackground = false;
-        let bgImageUrl: string | null = null;
-        if (needsBackgroundImage && backgroundImagePrompt) {
-            narrate(`This design needs a background image. Generating...`);
-            addCard('bg-image', 'Generating background image', 'running', {
-                reasoning: backgroundImagePrompt,
-            });
-
-            try {
-                const { generateBackgroundImage } = await resilientImport(() => import('@/services/imageGenClient'));
-
-                // ★ FIX 4: Smart image style selection based on content
-                // Detect if the prompt describes real people/products → hyper-realistic
-                // vs. abstract concepts → illustration/abstract
-                const promptLow = (backgroundImagePrompt + ' ' + prompt).toLowerCase();
-                const needsRealism = /(?:person|people|woman|man|girl|boy|model|portrait|photo|face|human|여자|남자|사람|사진|모델|얼굴|product|bottle|package|food|drink|car|building|hotel|resort)/.test(promptLow);
-                const enhancedBgPrompt = needsRealism
-                    ? `${backgroundImagePrompt}. Hyper-realistic, professional photography, 8K resolution, cinematic lighting, shallow depth of field, shot on Sony A7R IV.`
-                    : backgroundImagePrompt;
-
-                const bgResult = await generateBackgroundImage(
-                    enhancedBgPrompt,
-                    canvasW,
-                    canvasH,
-                    [guide.colors.accent, guide.colors.background, guide.colors.gradientEnd],
-                    abort.signal,
-                );
-
-                if (bgResult.success && bgResult.imageUrl) {
-                    bgImageUrl = bgResult.imageUrl;
-                    hasImageBackground = true;
-                    updateCard('bg-image', 'done', bgResult.isFallback ? 'Gradient fallback' : `Image generated (${needsRealism ? 'hyper-realistic' : 'standard'})`, {
-                        expandedDetail: bgResult.isFallback
-                            ? 'API not available — using gradient fallback.'
-                            : `Generated ${canvasW}x${canvasH} background via ${bgResult.model} (style: ${needsRealism ? 'hyper-realistic' : 'standard'})`,
-                    });
-                } else {
-                    updateCard('bg-image', 'error', bgResult.message || 'Generation failed');
-                }
-            } catch (err) {
-                console.warn('[UnifiedAgent] Background image generation failed:', err);
-                updateCard('bg-image', 'error', 'Generation failed — using gradient');
-            }
-            await new Promise(r => setTimeout(r, 300));
-        }
-
-        // ── Phase 5: Template Build + Validate ──
-        narrate(`Building the layout: ${template.name}...`);
-        addCard('build', 'Combining layout', 'running');
-
-        const { validateLayout } = await resilientImport(() => import('@/engine/layoutValidator'));
-
-        let allElements = template.build(canvasW, canvasH, guide, content);
-
-        // ★ When NanoBanana image background is active, remove the gradient rect
-        // background — the ai_background image replaces it entirely.
-        // This prevents the gradient rect from sitting on top of the image and
-        // causing z-order conflicts on save/reload.
-        if (hasImageBackground && bgImageUrl) {
-            allElements = allElements.filter(el => el.name !== 'background');
-        }
-
-        // ★ Filter out text elements with empty content — prevents Fabric.js
-        // from showing default "Text" placeholder for unfilled subheadlines.
-        allElements = allElements.filter(el => {
-            if (el.type === 'text' && (!el.content || el.content.trim() === '')) {
-                console.log(`[Pipeline] Removing empty text element: ${el.name}`);
-                return false;
-            }
-            return true;
-        });
-
-        // Math-based validation: fix overlaps, clipping, hierarchy
-        const validation = validateLayout(allElements, canvasW, canvasH);
-        allElements = validation.elements;
-
-        const elementBreakdown = allElements.map(el => {
-            const type = el.gradient_start_hex ? 'gradient' : el.type ?? 'rect';
-            const pos = `(${Math.round(el.x ?? 0)}, ${Math.round(el.y ?? 0)})`;
-            const size = `${Math.round(el.w ?? 0)}x${Math.round(el.h ?? 0)}`;
-            const extra = el.content ? ` "${el.content.slice(0, 30)}"` : el.gradient_start_hex ? ` ${el.gradient_start_hex} -> ${el.gradient_end_hex}` : '';
-            return `"${el.name}" — ${type} at ${pos} ${size}${extra}`;
-        }).join('\n');
-
-        const validationNote = validation.isClean
-            ? 'Layout validated — no issues'
-            : `Layout validated — ${validation.fixes.length} auto-fix(es)`;
-        updateCard('build', 'done', `${allElements.length} elements · ${validationNote}`, {
-            expandedDetail: elementBreakdown + (validation.fixes.length > 0 ? '\n\nFixes:\n' + validation.fixes.join('\n') : ''),
-        });
-        await new Promise(r => setTimeout(r, 400));
-
-        // ── Phase 5: Multi-pass render with live narration ──
-        // Group elements by layer
-        const structureNames = new Set(['background', 'text_overlay', 'accent_zone', 'accent_glow', 'accent_line', 'accent_diagonal', 'accent_divider', 'tag_underline', 'tag_line']);
-        const contentNames = new Set(['headline', 'subheadline', 'body_text', 'tag_text']);
-        const actionNames = new Set(['cta_button', 'cta_label']);
-
-        const layers: { name: string; elements: import('@/services/autoDesignService').RenderElement[] }[] = [
-            { name: 'Structure', elements: allElements.filter(el => structureNames.has(el.name ?? '')) },
-            { name: 'Content', elements: allElements.filter(el => contentNames.has(el.name ?? '')) },
-            { name: 'Action', elements: allElements.filter(el => actionNames.has(el.name ?? '')) },
-            { name: 'Polish', elements: allElements.filter(el => !structureNames.has(el.name ?? '') && !contentNames.has(el.name ?? '') && !actionNames.has(el.name ?? '')) },
-        ];
-
-        narrate(`Now I'll render each element onto the canvas.`);
-        await new Promise(r => setTimeout(r, 500));
-
-        // Clear scene and gradient cache
-        const { clearGradientCache, cacheGradientData } = await resilientImport(() => import('@/engine/elementConverters'));
-        clearGradientCache();
-        try { engine.clear_scene?.(); } catch { /* ok */ }
-
-        // ★ REGRESSION GUARD: Place background image AFTER clear_scene.
-        // Previously placed in Phase 2.5 but clear_scene destroyed it.
-        if (hasImageBackground && bgImageUrl) {
-            try {
-                await engine.add_image(0, 0, bgImageUrl, canvasW, canvasH, 'ai_background');
-                narrate(`Background image placed on canvas.`);
-            } catch (err) {
-                console.warn('[UnifiedAgent] Failed to place background image after clear:', err);
-            }
-        }
-
-        let rendered = 0;
-        for (const layer of layers) {
-            if (layer.elements.length === 0) continue;
-            await new Promise(r => setTimeout(r, 300)); // Pacing: pause between layers
-
-            for (const el of layer.elements) {
-                // Add per-element action card
-                const elCardId = `design-${rendered}`;
-                const elType = el.gradient_start_hex ? 'gradient' : el.type ?? 'rect';
-                const elLabel = `Design: ${el.name || elType}`;
-                addCard(elCardId, elLabel, 'running');
-
-                moveCursor(el.x ?? 0, el.y ?? 0, el.name);
-                await new Promise(r => setTimeout(r, 150));
-
-                try {
-                    let nodeId: number | null = null;
-                    if (el.type === 'text') {
-                        const hexToRgb = (hx: string): [number, number, number] => {
-                            const c = hx.replace('#', '');
-                            return [parseInt(c.slice(0, 2), 16) / 255, parseInt(c.slice(2, 4), 16) / 255, parseInt(c.slice(4, 6), 16) / 255];
-                        };
-                        const [tr, tg, tb] = el.color_hex ? hexToRgb(el.color_hex) : [1, 1, 1];
-                        nodeId = engine.add_text(el.x ?? 0, el.y ?? 0, el.content || 'Text', el.font_size ?? 18, 'Inter, system-ui, sans-serif', el.font_weight ?? '700', tr, tg, tb, 1.0, (el.w && el.w > 0) ? el.w : canvasW * 0.85, el.text_align ?? 'center', el.name, el.line_height, el.letter_spacing) as number | null;
-                    } else if (el.gradient_start_hex && el.gradient_end_hex) {
-                        nodeId = engine.add_gradient_rect(el.x ?? 0, el.y ?? 0, el.w ?? 100, el.h ?? 100, el.gradient_start_hex, el.gradient_end_hex, el.gradient_angle ?? 135, el.radius ?? 0, el.name) as number | null;
-                        // Cache gradient data by name AND node ID for save/restore
-                        cacheGradientData(el.name ?? '', el.gradient_start_hex, el.gradient_end_hex, el.gradient_angle ?? 135);
-                        if (nodeId != null) {
-                            cacheGradientData(`engine-${nodeId}`, el.gradient_start_hex, el.gradient_end_hex, el.gradient_angle ?? 135);
-                        }
-                    } else if (el.type === 'rounded_rect') {
-                        const sr = el.r ?? 0.5, sg = el.g ?? 0.5, sb = el.b ?? 0.5;
-                        nodeId = engine.add_rounded_rect(el.x ?? 0, el.y ?? 0, el.w ?? 100, el.h ?? 50, sr, sg, sb, el.a ?? 1, el.radius ?? 8, el.name) as number | null;
-                    } else if (el.type === 'ellipse') {
-                        const sr = el.r ?? 0.5, sg = el.g ?? 0.5, sb = el.b ?? 0.5;
-                        nodeId = engine.add_ellipse?.((el.x ?? 0) + (el.w ?? 50) / 2, (el.y ?? 0) + (el.h ?? 50) / 2, (el.w ?? 50) / 2, (el.h ?? 50) / 2, sr, sg, sb, el.a ?? 1) as number | null;
-                    } else {
-                        const sr = el.r ?? 0.5, sg = el.g ?? 0.5, sb = el.b ?? 0.5;
-                        nodeId = engine.add_rect(el.x ?? 0, el.y ?? 0, el.w ?? 100, el.h ?? 50, sr, sg, sb, el.a ?? 1, el.name) as number | null;
-                    }
-
-                    // Apply shadow if specified
-                    if (nodeId != null && el.shadow_blur && el.shadow_blur > 0) {
-                        try {
-                            engine.set_shadow?.(nodeId, el.shadow_offset_x ?? 2, el.shadow_offset_y ?? 4, el.shadow_blur, 0, 0, 0, el.shadow_opacity ?? 0.25);
-                        } catch { /* shadow not critical */ }
-                    }
-
-                    // Build detail for the action card
-                    const detail = el.type === 'text'
-                        ? `"${(el.content ?? '').slice(0, 25)}" ${el.font_size}px at (${Math.round(el.x ?? 0)}, ${Math.round(el.y ?? 0)})`
-                        : el.gradient_start_hex
-                            ? `${el.gradient_start_hex} -> ${el.gradient_end_hex} ${Math.round(el.w ?? 0)}x${Math.round(el.h ?? 0)}`
-                            : `${elType} at (${Math.round(el.x ?? 0)}, ${Math.round(el.y ?? 0)}) ${Math.round(el.w ?? 0)}x${Math.round(el.h ?? 0)}`;
-                    updateCard(elCardId, 'done', detail);
-                    rendered++;
-                } catch (err) {
-                    console.warn('[UnifiedAgent] Failed to render:', el.name, err);
-                    updateCard(elCardId, 'error', `Failed: ${el.name}`);
-                }
-            }
-        }
-        hideCursor();
-
-        // ── Phase 5.5: Brand Logo Auto-Placement ──
-        // ★ FIX 2 (cont): If brand kit has a logo, place it on the canvas after all template elements
-        if (brandLogoUrl) {
-            try {
-                // Size logo proportionally — max 15% of shorter canvas dimension
-                const maxLogoSize = Math.round(Math.min(canvasW, canvasH) * 0.15);
-                const logoAspect = brandLogoW > 0 && brandLogoH > 0 ? brandLogoW / brandLogoH : 1;
-                let logoPlaceW: number, logoPlaceH: number;
-                if (logoAspect >= 1) {
-                    logoPlaceW = maxLogoSize;
-                    logoPlaceH = Math.round(maxLogoSize / logoAspect);
-                } else {
-                    logoPlaceH = maxLogoSize;
-                    logoPlaceW = Math.round(maxLogoSize * logoAspect);
-                }
-                // Default placement: bottom-right with padding
-                const logoPad = Math.round(Math.min(canvasW, canvasH) * 0.04);
-                const logoX = canvasW - logoPlaceW - logoPad;
-                const logoY = canvasH - logoPlaceH - logoPad;
-
-                await engine.add_image(logoX, logoY, brandLogoUrl, logoPlaceW, logoPlaceH, 'brand_logo');
-                narrate(`Brand logo placed on canvas.`);
-            } catch (err) {
-                console.warn('[UnifiedAgent] Failed to place brand logo:', err);
-            }
-        }
-
-        // ★ FIX: After all elements + background + logo are placed,
-        // force a z-index reorder and syncState to ensure the layer panel
-        // includes ALL objects (especially the background image which was
-        // added first but could be lost in rapid Fabric state updates).
-        try {
-            engine.reorder_by_z_index?.();
-        } catch { /* ok if not available */ }
-        try {
-            // Force a Fabric renderAll + syncState to flush all pending updates
-            engine.render_all?.();
-        } catch { /* ok */ }
-
-        narrate(`Reviewing and optimizing design quality...`);
-        addCard('vision', 'Optimizing layout', 'running');
-        try {
-            const { runVisionHealingLoop } = await resilientImport(() => import('@/services/autoDesignLoop'));
-
-            const loopResult = await runVisionHealingLoop(engine, canvasW, canvasH, abort.signal, (msg: string) => {
-                updateCard('vision', 'running', msg);
-            });
-
-            const fixNote = loopResult.fixesApplied > 0 ? ` · ${loopResult.fixesApplied} fix(es)` : '';
-            const methodNote = loopResult.healingMethod === 'patch' ? ' (auto-patched)' : '';
-
-            // ★ Always show score — user wants transparency
-            if (loopResult.finalScore >= 80) {
-                updateCard('vision', 'done', `Score: ${loopResult.finalScore}/100${fixNote}${methodNote} — Approved`);
-            } else {
-                updateCard('vision', 'error', `Score: ${loopResult.finalScore}/100${fixNote}${methodNote} — Best result`);
-            }
-
-            narrate(
-                `Design quality review complete — score ${loopResult.finalScore}/100.${fixNote}${methodNote}\n` +
-                `Style: ${guide.name}\n` +
-                `Layout: ${template.name}\n` +
-                `Elements: ${rendered}\n` +
-                `Canvas: ${canvasW}x${canvasH}px`
-            );
-        } catch {
-            updateCard('vision', 'done', 'Vision check skipped');
-            narrate(`Design placed with ${rendered} elements using ${guide.name}.\nCanvas: ${canvasW}x${canvasH}px`);
-        }
-
-        // ★ Phase 8 REMOVED: No auto-propagation to other variants.
-        // All size cards are equal — no master concept.
-        // Propagation only happens via explicit Plug connections (parent→child).
-
-        return `Design generated with ${rendered} elements.`;
-    }, [addCard, updateCard, moveCursor, hideCursor, narrate]);
-
-    // ── Scan Design (via screenshotScanService) ──
+    // ── Scan Design ──
     const runScanFlow = useCallback(async (imageData: string) => {
         const engine = engineRef.current?.current ?? engineRef.current;
         if (!engine) throw new Error('Canvas not connected.');
 
         let canvasW = 300, canvasH = 250;
-        try {
-            const dims = engine.get_canvas_size?.();
-            if (dims) { canvasW = dims.width ?? 300; canvasH = dims.height ?? 250; }
-        } catch { /* ok */ }
+        try { const dims = engine.get_canvas_size?.(); if (dims) { canvasW = dims.width ?? 300; canvasH = dims.height ?? 250; } } catch { /* ok */ }
 
         narrate('I see your screenshot. Let me analyze it with Vision AI and extract the design layers.');
         addCard('scan', 'Analyzing screenshot with Vision AI', 'running');
@@ -694,7 +132,7 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         const abort = new AbortController();
         const result = await scanDesignScreenshot(imageData, canvasW, canvasH, abort.signal);
         updateCard('scan', 'done', `Found ${result.elements.length} elements`);
-        narrate(`Found ${result.elements.length} elements in the design. Now rendering them as editable layers on your canvas.`);
+        narrate(`Found ${result.elements.length} elements. Now rendering as editable layers.`);
 
         addCard('render', 'Rendering layers on canvas', 'running');
         try { engine.clear_scene?.(); } catch { /* ok */ }
@@ -703,18 +141,13 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         for (const el of result.elements) {
             moveCursor(el.x ?? 0, el.y ?? 0, el.name);
             await new Promise(r => setTimeout(r, 120));
-
             try {
                 if (el.is_complex_bg) {
-                    const r = el.r ?? 0.08, g = el.g ?? 0.08, b = el.b ?? 0.1;
-                    engine.add_rect(el.x ?? 0, el.y ?? 0, el.w ?? canvasW, el.h ?? canvasH, r, g, b, 1, `${el.name ?? 'background'} (replace with image)`);
+                    engine.add_rect(el.x ?? 0, el.y ?? 0, el.w ?? canvasW, el.h ?? canvasH, el.r ?? 0.08, el.g ?? 0.08, el.b ?? 0.1, 1, `${el.name ?? 'background'} (replace with image)`);
                 } else if (el.gradient_start_hex && el.gradient_end_hex) {
                     engine.add_gradient_rect(el.x, el.y, el.w, el.h, el.gradient_start_hex, el.gradient_end_hex, el.gradient_angle ?? 135, el.radius ?? 0, el.name);
                 } else if (el.type === 'text') {
-                    const hexToRgb = (hex: string): [number, number, number] => {
-                        const c = hex.replace('#', '');
-                        return [parseInt(c.slice(0, 2), 16) / 255, parseInt(c.slice(2, 4), 16) / 255, parseInt(c.slice(4, 6), 16) / 255];
-                    };
+                    const hexToRgb = (hex: string): [number, number, number] => { const c = hex.replace('#', ''); return [parseInt(c.slice(0, 2), 16) / 255, parseInt(c.slice(2, 4), 16) / 255, parseInt(c.slice(4, 6), 16) / 255]; };
                     const [tr, tg, tb] = el.color_hex ? hexToRgb(el.color_hex) : [1, 1, 1];
                     engine.add_text(el.x ?? 0, el.y ?? 0, el.content ?? 'Text', el.font_size ?? 18, (el as any).font_family ?? 'Inter', el.font_weight ?? '400', tr, tg, tb, 1.0, el.w ?? canvasW * 0.8, el.text_align ?? 'center', el.name, el.line_height, el.letter_spacing);
                 } else if (el.type === 'rounded_rect') {
@@ -727,45 +160,26 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         }
         hideCursor();
         updateCard('render', 'done', `${rendered} layers created`);
-        narrate(`Done — ${rendered} layers extracted and placed on canvas. Each layer is fully editable. You can select, move, resize, or restyle any element.`);
-
-        return `Scanned design: ${rendered} layers extracted and placed on canvas.`;
+        narrate(`Done — ${rendered} layers extracted. Each is fully editable.`);
+        return `Scanned design: ${rendered} layers extracted.`;
     }, [addCard, updateCard, moveCursor, hideCursor, narrate]);
 
-    // ── Chat (regular AI agent) ──────────────────
+    // ── Chat (regular AI agent) ──
     const runChatFlow = useCallback(async (msg: string, config: AiConfig) => {
-        if (!serviceRef.current) {
-            serviceRef.current = new AiService([]);
-        }
+        if (!serviceRef.current) serviceRef.current = new AiService([]);
         serviceRef.current.updateConfig(config);
 
         const dashboardOverride: ToolExecutorOverride = (toolName, params) => {
-            // ★ Intercept generate_full_design → run structured layout pipeline
             if (toolName === 'generate_full_design') {
-                const prompt = (params.prompt as string) ?? '';
-                // Run the full structured pipeline asynchronously
-                // Return a promise-like result that the chat loop can handle
-                return {
-                    success: true,
-                    message: `[GENERATE_FULL_DESIGN] Launching structured design pipeline for: "${prompt.slice(0, 80)}"`,
-                    data: { __meta_tool: 'generate_full_design', prompt },
-                };
+                return { success: true, message: `[GENERATE_FULL_DESIGN] Launching pipeline for: "${(params.prompt as string ?? '').slice(0, 80)}"`, data: { __meta_tool: 'generate_full_design', prompt: params.prompt ?? '' } };
             }
-            if (DASHBOARD_TOOL_NAMES.has(toolName)) {
-                const result = executeDashboardTool(toolName, params, navigate);
-                return { success: result.success, message: result.message, data: result.data };
-            }
+            if (DASHBOARD_TOOL_NAMES.has(toolName)) { const result = executeDashboardTool(toolName, params, navigate); return { success: result.success, message: result.message, data: result.data }; }
             return null;
         };
 
         const engine = engineRef.current?.current ?? engineRef.current;
-
-        // Inject design context
         const designState = useDesignStore.getState();
-        serviceRef.current.setDesignContext(
-            designState.creativeSet ?? null,
-            designState.creativeSet?.masterVariantId,
-        );
+        serviceRef.current.setDesignContext(designState.creativeSet ?? null, designState.creativeSet?.masterVariantId);
 
         narrate('Let me look at the current canvas and work on your request.');
         addCard('thinking', 'Processing request', 'running');
@@ -776,107 +190,65 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         await serviceRef.current.chat(msg, engine, {
             onCanvasScan: () => updateCard('thinking', 'running', 'Scanning canvas'),
             onThinking: (t: string) => {
-                // Short status → update card; long reasoning → show as thinking message
                 if (t.length > 100) {
-                    // ★ Extended thinking content — show as collapsible reasoning
                     updateCard('thinking', 'done', 'Reasoning complete');
-                    setMessages(prev => [...prev, {
-                        role: 'thinking' as AgentMessage['role'],
-                        content: t,
-                        timestamp: Date.now(),
-                    }]);
+                    setMessages(prev => [...prev, { role: 'thinking' as AgentMessage['role'], content: t, timestamp: Date.now() }]);
                 } else {
                     updateCard('thinking', 'running', t || 'Thinking...');
                 }
             },
-            onPlan: (steps: string[]) => {
-                updateCard('thinking', 'done');
-                steps.forEach((s, i) => addCard(`step-${i}`, s, 'pending'));
-            },
+            onPlan: (steps: string[]) => { updateCard('thinking', 'done'); steps.forEach((s, i) => addCard(`step-${i}`, s, 'pending')); },
             onStepStart: (idx: number, name: string) => {
                 updateCard(`step-${idx}`, 'running');
-                // Animate cursor for canvas operations
-                if (['add_rect', 'add_text', 'add_ellipse', 'move_node'].includes(name)) {
-                    moveCursor(Math.random() * 200 + 50, Math.random() * 200 + 50, name);
-                }
-                // Capture generate_full_design prompt for post-chat execution
-                if (name === 'generate_full_design') {
-                    // The prompt is already captured via the override
-                }
+                if (['add_rect', 'add_text', 'add_ellipse', 'move_node'].includes(name)) moveCursor(Math.random() * 200 + 50, Math.random() * 200 + 50, name);
             },
             onStepComplete: (idx: number, result) => {
                 updateCard(`step-${idx}`, result.success ? 'done' : 'error', result.success ? 'Done' : 'Failed');
-                // Check if this was a generate_full_design invocation
                 if (result.data && typeof result.data === 'object' && (result.data as Record<string, unknown>).__meta_tool === 'generate_full_design') {
                     pendingDesignPrompt = (result.data as Record<string, unknown>).prompt as string;
                 }
             },
             onReflection: () => updateCard('reflection', 'done'),
-            onToken: () => { /* streamed text handled by reply */ },
+            onToken: () => {},
             onComplete: () => {},
             onError: (err: string) => { hadError = err; },
         }, dashboardOverride);
 
         hideCursor();
 
-        // ★ If LLM chose generate_full_design, run the structured pipeline
         if (pendingDesignPrompt && !hadError) {
-            const designResult = await runGenerateFlow(pendingDesignPrompt);
-            return designResult || 'Design generated using structured layout pipeline.';
+            return await runGenerateFlow(pendingDesignPrompt) || 'Design generated.';
         }
-
         const reply = serviceRef.current.getLastReply();
         if (hadError) throw new Error(hadError);
         return reply || 'Request completed.';
-    }, [navigate, addCard, updateCard, moveCursor, hideCursor]);
+    }, [navigate, addCard, updateCard, moveCursor, hideCursor, narrate, runGenerateFlow]);
 
-    // ── Main Send (Single Loop) ──────────────────
+    // ── Main Send ──
     const send = useCallback(async (text?: string, imageData?: string) => {
         const msg = text ?? input.trim();
         if (!msg && !imageData) return;
-
         setInput('');
-        const userMsg: AgentMessage = { role: 'user', content: msg || 'Scan this design', timestamp: Date.now() };
-        setMessages(prev => [...prev, userMsg]);
+        setMessages(prev => [...prev, { role: 'user', content: msg || 'Scan this design', timestamp: Date.now() }]);
 
-        // SINGLE LOOP: Only image upload triggers scan.
-        // ALL text input goes to LLM agentic loop — LLM decides tools.
         const intent: AgentIntent = imageData ? 'scan' : 'agent';
         setState({ ...INITIAL_STATE, phase: 'thinking', intent });
 
         try {
             let reply = '';
-
             if (intent === 'scan' && imageData) {
                 reply = await runScanFlow(imageData);
             } else {
-                // ── SINGLE LOOP: ALL text → LLM agentic loop ──
-                // LLM decides: generate_full_design, generate_image,
-                // add_text, set_color, or any other tool.
                 const config = getConfig();
-
-                // ── Phase 0: Context Router ──
-                const currentPath = location.pathname;
-                const ctx = buildContext(currentPath);
-
-                // Enrich the message with structured context
+                const ctx = buildContext(location.pathname);
                 const enrichedMsg = enrichMessageWithContext(msg, ctx);
-
-                // Set context-aware system prompt on the service
                 const designState = useDesignStore.getState();
                 if (serviceRef.current) {
-                    // Context system prompt is available for future use:
-                    // const _contextPrompt = buildContextSystemPrompt(ctx);
-                    serviceRef.current.setDesignContext(
-                        designState.creativeSet ?? null,
-                        designState.creativeSet?.masterVariantId,
-                    );
+                    serviceRef.current.setDesignContext(designState.creativeSet ?? null, designState.creativeSet?.masterVariantId);
                     console.log(`[ContextRouter] Page: ${ctx.pageLabel}, Pipeline: ${ctx.useDesignPipeline ? 'design' : 'direct'}, Tools: ${ctx.relevantToolHint.slice(0, 60)}...`);
                 }
-
                 reply = await runChatFlow(enrichedMsg, config);
             }
-
             setMessages(prev => [...prev, { role: 'assistant', content: reply, timestamp: Date.now() }]);
             setState(prev => ({ ...prev, phase: 'done' }));
         } catch (err) {
@@ -886,42 +258,14 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         }
     }, [input, location.pathname, getConfig, runGenerateFlow, runScanFlow, runChatFlow]);
 
-    const clearChat = useCallback(() => {
-        setMessages([]);
-        setState(INITIAL_STATE);
-    }, []);
+    const clearChat = useCallback(() => { setMessages([]); setState(INITIAL_STATE); }, []);
 
-    /** Apply a gallery image as the canvas background */
     const applyGalleryImage = useCallback((imageUrl: string, canvasW: number, canvasH: number) => {
         const engine = engineRef.current;
         if (!engine?.add_image) return;
-
-        // Delete existing backgrounds
-        try {
-            const allNodes = JSON.parse(engine.get_all_nodes?.() ?? '[]');
-            for (const node of allNodes) {
-                const name = (node.name ?? node.label ?? '').toLowerCase();
-                if (name.includes('background') || name.includes('ai_background') || name.includes('bg')) {
-                    try { engine.delete_node?.(node.id); } catch { /* ok */ }
-                }
-            }
-        } catch { /* */ }
-
-        // Add new background
-        engine.add_image(0, 0, imageUrl, canvasW, canvasH, 'ai_background').then((nodeId: number) => {
-            if (engine.send_to_back) engine.send_to_back(nodeId);
-        });
+        try { const allNodes = JSON.parse(engine.get_all_nodes?.() ?? '[]'); for (const node of allNodes) { const name = (node.name ?? node.label ?? '').toLowerCase(); if (name.includes('background') || name.includes('ai_background') || name.includes('bg')) { try { engine.delete_node?.(node.id); } catch { /* ok */ } } } } catch { /* */ }
+        engine.add_image(0, 0, imageUrl, canvasW, canvasH, 'ai_background').then((nodeId: number) => { if (engine.send_to_back) engine.send_to_back(nodeId); });
     }, []);
 
-    return {
-        messages,
-        state,
-        input,
-        setInput,
-        send,
-        setEngine,
-        clearChat,
-        applyGalleryImage,
-        engineRef,
-    };
+    return { messages, state, input, setInput, send, setEngine, clearChat, applyGalleryImage, engineRef };
 }
