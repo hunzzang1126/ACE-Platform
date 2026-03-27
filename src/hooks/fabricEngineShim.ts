@@ -516,8 +516,13 @@ export function createEngineShim(
                 (a, b) => ((a as any).__glidZIndex ?? 0) - ((b as any).__glidZIndex ?? 0)
             );
             objs.forEach((o, i) => fc.moveObjectTo(o, i + 1)); // +1: artboard at 0
-            // ★ REGRESSION GUARD: moveObjectTo() does NOT update bounding rects.
-            objs.forEach(o => o.setCoords());
+            // ★ FIX: Mark ALL objects dirty to force Fabric texture cache invalidation.
+            // Without this, Fabric reuses stale cached bitmaps after z-reorder,
+            // causing elements (like headlines) to be invisible under async-loaded images.
+            objs.forEach(o => {
+                o.dirty = true;
+                o.setCoords();
+            });
             fc.renderAll();
             syncState();
         },

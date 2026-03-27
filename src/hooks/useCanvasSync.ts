@@ -573,6 +573,16 @@ export function useCanvasSync(
             engine.reorder_by_z_index();
         }
 
+        // ★ FIX: Delayed second reorder — catches Fabric texture cache staleness
+        // that occurs when async image loads trigger internal re-renders AFTER the
+        // first reorder. This is the definitive "final word" on z-order.
+        setTimeout(() => {
+            if (typeof engine.reorder_by_z_index === 'function') {
+                engine.reorder_by_z_index();
+                console.log('[useCanvasSync] Delayed z-reorder completed (cache invalidation)');
+            }
+        }, 200);
+
         // ★ FONT-AWARE BOUNDING BOX REFRESH:
         // Fabric Textbox auto-calculates height from font metrics.
         // If web fonts (Inter, etc.) haven't finished loading yet when add_text runs,
@@ -583,6 +593,11 @@ export function useCanvasSync(
             document.fonts.ready.then(() => {
                 if (typeof engine.refreshTextCoords === 'function') {
                     engine.refreshTextCoords();
+                }
+                // ★ FIX: Final reorder after fonts load — font loading can
+                // change text dimensions, triggering Fabric internal re-renders.
+                if (typeof engine.reorder_by_z_index === 'function') {
+                    engine.reorder_by_z_index();
                 }
             });
         }
