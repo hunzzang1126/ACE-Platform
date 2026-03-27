@@ -1,351 +1,64 @@
 // ─────────────────────────────────────────────────
-// Element Converters — Convert between engine/overlay ↔ designStore formats
+// Element Converters — Engine/overlay ↔ designStore
 // ─────────────────────────────────────────────────
-// Pure functions: no React hooks, no side effects
+// Constraint utils, color, fonts → constraintUtils.ts
+// ─────────────────────────────────────────────────
 
-import type { DesignElement, ShapeElement, TextElement, ImageElement, VideoElement, ElementAnimation } from '@/schema/elements.types';
-import type { ElementConstraints } from '@/schema/constraints.types';
+import type { DesignElement, ShapeElement, TextElement, ImageElement, VideoElement } from '@/schema/elements.types';
 import type { EngineNode } from '@/hooks/useCanvasEngine';
 import type { OverlayElement } from '@/hooks/useOverlayElements';
-import { useAnimPresetStore } from '@/hooks/useAnimationPresets';
 
-// ── AI Element Cache (gradient data preservation) ──
-// WASM engine's get_all_nodes() doesn't include gradient metadata.
-// When the AI generates elements, we cache gradient data here so the
-// save converter can attach it to ShapeElements.
-interface CachedGradient { startHex: string; endHex: string; angle: number; }
-const gradientCache = new Map<string, CachedGradient>();
+// Re-export all utilities for backward compatibility
+export {
+    cacheGradientData, clearGradientCache, getGradientCache,
+    absoluteToConstraints, constraintsToAbsolute,
+    rgbFloatToHex, hexToRgbFloat, resolveFontWeight,
+    nodeTypeToShapeType, getAnimationForElement,
+} from './constraintUtils';
 
-/** Cache gradient data for an AI-generated element (call after engine.add_gradient_rect) */
-export function cacheGradientData(elementName: string, startHex: string, endHex: string, angle: number): void {
-    gradientCache.set(elementName, { startHex, endHex, angle });
-}
-/** Clear gradient cache (call when clearing scene) */
-export function clearGradientCache(): void {
-    gradientCache.clear();
-}
+import {
+    absoluteToConstraints, rgbFloatToHex, resolveFontWeight,
+    nodeTypeToShapeType, getAnimationForElement, getGradientCache,
+} from './constraintUtils';
 
-// ── Constraint converters ──
+// ── Engine Node → Shape Element ──
 
-/**
- * Convert absolute position → constraint-based position.
- * Uses the canvas dimensions to calculate relative anchoring.
- */
-export function absoluteToConstraints(
-    x: number, y: number, w: number, h: number,
-    canvasW: number, canvasH: number,
-): ElementConstraints {
-    const centerX = x + w / 2;
-    const relCenterX = centerX / canvasW;
-    const centerY = y + h / 2;
-    const relCenterY = centerY / canvasH;
-
-    // ★ REGRESSION GUARD: Threshold was 0.9 — too low for text elements.
-    // A text at 270/300 = 90% was promoted to relative:1.0 (full 300px width),
-    // causing the preview to render wider than the engine → different text wrapping.
-    // Raised to 0.98 so only genuinely full-canvas elements (backgrounds) are promoted.
-    const coversWidth = w >= canvasW * 0.98;
-    const coversHeight = h >= canvasH * 0.98;
-
-    let horizontal: ElementConstraints['horizontal'];
-    let vertical: ElementConstraints['vertical'];
-    let size: ElementConstraints['size'];
-
-    // Horizontal constraint — avoid 'stretch' anchor which can produce corrupt
-    // marginLeft values after smartSizing propagation across different canvas sizes.
-    // ★ REGRESSION GUARD: Full-canvas elements use 'center' with ACTUAL offset
-    // (not 0). Forcing offset:0 lost the user's image placement on save cycle.
-    if (coversWidth) {
-        horizontal = { anchor: 'center', offset: Math.round(centerX - canvasW / 2) };
-    } else if (relCenterX > 0.35 && relCenterX < 0.65) {
-        horizontal = { anchor: 'center', offset: Math.round(centerX - canvasW / 2) };
-    } else if (relCenterX <= 0.35) {
-        horizontal = { anchor: 'left', offset: Math.round(x) };
-    } else {
-        horizontal = { anchor: 'right', offset: Math.round(canvasW - x - w) };
-    }
-
-    // Vertical constraint — same approach, no 'stretch' anchor
-    // ★ REGRESSION GUARD: Same fix as horizontal — preserve actual offset.
-    if (coversHeight) {
-        vertical = { anchor: 'center', offset: Math.round(centerY - canvasH / 2) };
-    } else if (relCenterY > 0.35 && relCenterY < 0.65) {
-        vertical = { anchor: 'center', offset: Math.round(centerY - canvasH / 2) };
-    } else if (relCenterY <= 0.35) {
-        vertical = { anchor: 'top', offset: Math.round(y) };
-    } else {
-        vertical = { anchor: 'bottom', offset: Math.round(canvasH - y - h) };
-    }
-
-    // Size constraint — relative for full-canvas, fixed otherwise
-    // ★ REGRESSION GUARD: Use actual w/canvasW ratio, NOT hardcoded 1.0.
-    // Without this, an image stretched to 378px on a 300px canvas saves as
-    // relative:1.0, restoring as 300px instead of 378px → visible width shrink.
-    if (coversWidth && coversHeight) {
-        size = { widthMode: 'relative', heightMode: 'relative', width: w / canvasW, height: h / canvasH };
-    } else if (coversWidth) {
-        size = { widthMode: 'relative', heightMode: 'fixed', width: w / canvasW, height: Math.round(h) };
-    } else if (coversHeight) {
-        size = { widthMode: 'fixed', heightMode: 'relative', width: Math.round(w), height: h / canvasH };
-    } else {
-        size = { widthMode: 'fixed', heightMode: 'fixed', width: Math.round(w), height: Math.round(h) };
-    }
-
-    return { horizontal, vertical, size, rotation: 0 };
-}
-
-/**
- * Convert constraint-based position → absolute position.
- */
-export function constraintsToAbsolute(
-    constraints: ElementConstraints,
-    canvasW: number,
-    canvasH: number,
-): { x: number; y: number; w: number; h: number } {
-    let w = constraints.size.widthMode === 'relative' ? canvasW * constraints.size.width : constraints.size.width;
-    let h = constraints.size.heightMode === 'relative' ? canvasH * constraints.size.height : constraints.size.height;
-
-    let x: number;
-    switch (constraints.horizontal.anchor) {
-        case 'left': x = constraints.horizontal.offset ?? 0; break;
-        case 'center': x = canvasW / 2 + (constraints.horizontal.offset ?? 0) - w / 2; break;
-        case 'right': x = canvasW - w - (constraints.horizontal.offset ?? 0); break;
-        case 'stretch':
-            x = constraints.horizontal.marginLeft ?? 0;
-            w = canvasW - (constraints.horizontal.marginLeft ?? 0) - (constraints.horizontal.marginRight ?? 0);
-            break;
-        default: x = 0;
-    }
-
-    let y: number;
-    switch (constraints.vertical.anchor) {
-        case 'top': y = constraints.vertical.offset ?? 0; break;
-        case 'center': y = canvasH / 2 + (constraints.vertical.offset ?? 0) - h / 2; break;
-        case 'bottom': y = canvasH - h - (constraints.vertical.offset ?? 0); break;
-        case 'stretch':
-            y = constraints.vertical.marginTop ?? 0;
-            h = canvasH - (constraints.vertical.marginTop ?? 0) - (constraints.vertical.marginBottom ?? 0);
-            break;
-        default: y = 0;
-    }
-
-    return { x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h) };
-}
-
-// ── Color converters ──
-
-export function rgbFloatToHex(r: number, g: number, b: number): string {
-    const toHex = (v: number) => Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16).padStart(2, '0');
-    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-}
-
-export function hexToRgbFloat(hex: string): [number, number, number, number] {
-    // Handle rgba() and rgb() formats
-    if (hex.startsWith('rgba') || hex.startsWith('rgb')) {
-        const m = hex.match(/rgba?\((\d+\.?\d*),\s*(\d+\.?\d*),\s*(\d+\.?\d*)(?:,\s*(\d+\.?\d*))?\)/);
-        if (m) {
-            return [
-                parseFloat(m[1]!) / 255,
-                parseFloat(m[2]!) / 255,
-                parseFloat(m[3]!) / 255,
-                m[4] !== undefined ? parseFloat(m[4]!) : 1.0,
-            ];
-        }
-    }
-    const clean = hex.replace('#', '');
-    const r = parseInt(clean.substring(0, 2), 16) / 255;
-    const g = parseInt(clean.substring(2, 4), 16) / 255;
-    const b = parseInt(clean.substring(4, 6), 16) / 255;
-    // ★ REGRESSION GUARD: Return safe values if hex parsing fails (e.g. malformed input)
-    if (isNaN(r) || isNaN(g) || isNaN(b)) return [0, 0, 0, 1.0];
-    return [r, g, b, 1.0];
-}
-
-// ── Font weight resolver ──
-/**
- * Convert any fontWeight representation to a CSS-valid number.
- * Handles: numeric strings ('400', '700'), keywords ('bold', 'normal', 'semibold', etc.)
- *
- * ★ REGRESSION GUARD: parseInt('bold', 10) = NaN → falls back to 400, silently losing
- * bold styling. This function correctly maps 'bold' → 700, 'normal' → 400, etc.
- */
-export function resolveFontWeight(fw: string | number | undefined | null): number {
-    if (fw === null || fw === undefined) return 400;
-    if (typeof fw === 'number') return fw;
-    const n = parseInt(fw, 10);
-    if (!isNaN(n)) return n;
-    // Keyword mapping
-    const kw = fw.toLowerCase().trim();
-    if (kw === 'bold') return 700;
-    if (kw === 'bolder') return 800;
-    if (kw === 'lighter') return 300;
-    if (kw === 'semibold' || kw === 'semi-bold' || kw === 'medium') return 600;
-    if (kw === 'light') return 300;
-    if (kw === 'thin' || kw === 'hairline') return 100;
-    if (kw === 'extrabold' || kw === 'extra-bold') return 800;
-    if (kw === 'black' || kw === 'heavy') return 900;
-    return 400; // normal fallback
-}
-
-
-export function nodeTypeToShapeType(type: string): 'rectangle' | 'ellipse' {
-    if (type === 'ellipse') return 'ellipse';
-    return 'rectangle';
-}
-
-export function getAnimationForElement(elementId: string): ElementAnimation | undefined {
-    const presets = useAnimPresetStore.getState().presets;
-    // ★ FIX: Check multiple key formats because different code paths use different keys:
-    //   - Layer panel / InlineAnimatePanel: String(nodeId) = "5"
-    //   - Restore / useCanvasSync: `engine-${nodeId}` = "engine-5"
-    //   - AI executor designExecutor: el.id = "uuid-xxx"
-    // Check all three formats to find the animation wherever it's stored.
-    const config = presets[elementId]
-        || (elementId.startsWith('engine-') ? presets[elementId.slice(7)] : undefined)
-        || (!elementId.startsWith('engine-') ? presets[`engine-${elementId}`] : undefined);
-    if (!config || config.anim === 'none') return undefined;
-    return { preset: config.anim, duration: config.animDuration, startTime: config.startTime };
-}
-
-// ── Element converters ──
-
-export function engineNodeToShapeElement(
-    node: EngineNode,
-    canvasW: number,
-    canvasH: number,
-): ShapeElement {
+export function engineNodeToShapeElement(node: EngineNode, canvasW: number, canvasH: number): ShapeElement {
     const constraints = absoluteToConstraints(node.x, node.y, node.w, node.h, canvasW, canvasH);
     const fill = rgbFloatToHex(node.fill_r ?? 0.5, node.fill_g ?? 0.5, node.fill_b ?? 0.5);
-
     const coverage = (node.w * node.h) / (canvasW * canvasH);
     let name = node.name || `Shape ${node.id}`;
-    if (!node.name) {
-        if (coverage > 0.7) name = 'Background';
-        else if (node.w > node.h * 3) name = 'Banner Strip';
-        else if (Math.abs(node.w - node.h) < 10) name = 'Square Shape';
-    }
-
+    if (!node.name) { if (coverage > 0.7) name = 'Background'; else if (node.w > node.h * 3) name = 'Banner Strip'; else if (Math.abs(node.w - node.h) < 10) name = 'Square Shape'; }
     const animation = getAnimationForElement(`engine-${node.id}`);
-
-    // Gradient data: prefer EngineNode fields (from fabricToEngineNode), fallback to cache
-    const gStart = node.gradient_start || gradientCache.get(name)?.startHex || gradientCache.get(`engine-${node.id}`)?.startHex;
-    const gEnd = node.gradient_end || gradientCache.get(name)?.endHex || gradientCache.get(`engine-${node.id}`)?.endHex;
-    const gAngle = node.gradient_angle ?? gradientCache.get(name)?.angle ?? gradientCache.get(`engine-${node.id}`)?.angle;
-
-    const shadow = node.shadow_color ? {
-        offsetX: node.shadow_offsetX ?? 0,
-        offsetY: node.shadow_offsetY ?? 0,
-        blur: node.shadow_blur ?? 0,
-        color: node.shadow_color,
-    } : undefined;
-
-    return {
-        id: `engine-${node.id}`,
-        name,
-        type: 'shape',
-        shapeType: nodeTypeToShapeType(node.type),
-        constraints,
-        fill,
-        gradientStart: gStart,
-        gradientEnd: gEnd,
-        gradientAngle: gAngle,
-        opacity: node.opacity ?? 1,
-        visible: node.visible !== false,
-        locked: node.locked ?? false,
-        zIndex: node.z_index ?? 0,
-        borderRadius: node.border_radius ?? 0,
-        shadow,
-        animation,
-    } as ShapeElement;
+    const gStart = node.gradient_start || getGradientCache(name)?.startHex || getGradientCache(`engine-${node.id}`)?.startHex;
+    const gEnd = node.gradient_end || getGradientCache(name)?.endHex || getGradientCache(`engine-${node.id}`)?.endHex;
+    const gAngle = node.gradient_angle ?? getGradientCache(name)?.angle ?? getGradientCache(`engine-${node.id}`)?.angle;
+    const shadow = node.shadow_color ? { offsetX: node.shadow_offsetX ?? 0, offsetY: node.shadow_offsetY ?? 0, blur: node.shadow_blur ?? 0, color: node.shadow_color } : undefined;
+    return { id: `engine-${node.id}`, name, type: 'shape', shapeType: nodeTypeToShapeType(node.type), constraints, fill, gradientStart: gStart, gradientEnd: gEnd, gradientAngle: gAngle, opacity: node.opacity ?? 1, visible: node.visible !== false, locked: node.locked ?? false, zIndex: node.z_index ?? 0, borderRadius: node.border_radius ?? 0, shadow, animation } as ShapeElement;
 }
 
-export function engineNodeToTextElement(
-    node: EngineNode,
-    canvasW: number,
-    canvasH: number,
-): TextElement {
+// ── Engine Node → Text Element ──
+
+export function engineNodeToTextElement(node: EngineNode, canvasW: number, canvasH: number): TextElement {
     const constraints = absoluteToConstraints(node.x, node.y, node.w, node.h, canvasW, canvasH);
     const animation = getAnimationForElement(`engine-${node.id}`);
-
-    const shadow = node.shadow_color ? {
-        offsetX: node.shadow_offsetX ?? 0,
-        offsetY: node.shadow_offsetY ?? 0,
-        blur: node.shadow_blur ?? 0,
-        color: node.shadow_color,
-    } : undefined;
-
-    // ★ Preserve text effect config (Canva-style: outline, neon, glitch, etc.)
-    const textEffect = (node.textEffect_type && node.textEffect_type !== 'none') ? {
-        type: node.textEffect_type,
-        intensity: node.textEffect_intensity ?? 50,
-        color: node.textEffect_color ?? '#ffffff',
-    } : undefined;
-
-    return {
-        id: `engine-${node.id}`,
-        name: node.name || `Text ${node.id}`,
-        type: 'text',
-        constraints,
-        content: node.content ?? '',
-        fontFamily: node.fontFamily ?? 'Inter',
-        fontSize: node.fontSize ?? 16,
-        fontWeight: resolveFontWeight(node.fontWeight),
-        fontStyle: (node.fontStyle as 'normal' | 'italic') ?? 'normal',
-        color: node.color ?? '#000000',
-        textAlign: node.textAlign ?? 'left',
-        lineHeight: node.lineHeight ?? 1.4,
-        letterSpacing: node.letterSpacing ?? 0,
-        autoShrink: true,
-        opacity: node.opacity ?? 1,
-        visible: node.visible !== false,
-        locked: node.locked ?? false,
-        zIndex: node.z_index ?? 1,
-        shadow,
-        textEffect,
-        animation,
-    } as TextElement;
+    const shadow = node.shadow_color ? { offsetX: node.shadow_offsetX ?? 0, offsetY: node.shadow_offsetY ?? 0, blur: node.shadow_blur ?? 0, color: node.shadow_color } : undefined;
+    const textEffect = (node.textEffect_type && node.textEffect_type !== 'none') ? { type: node.textEffect_type, intensity: node.textEffect_intensity ?? 50, color: node.textEffect_color ?? '#ffffff' } : undefined;
+    return { id: `engine-${node.id}`, name: node.name || `Text ${node.id}`, type: 'text', constraints, content: node.content ?? '', fontFamily: node.fontFamily ?? 'Inter', fontSize: node.fontSize ?? 16, fontWeight: resolveFontWeight(node.fontWeight), fontStyle: (node.fontStyle as 'normal' | 'italic') ?? 'normal', color: node.color ?? '#000000', textAlign: node.textAlign ?? 'left', lineHeight: node.lineHeight ?? 1.4, letterSpacing: node.letterSpacing ?? 0, autoShrink: true, opacity: node.opacity ?? 1, visible: node.visible !== false, locked: node.locked ?? false, zIndex: node.z_index ?? 1, shadow, textEffect, animation } as TextElement;
 }
 
-export function engineNodeToImageElement(
-    node: EngineNode,
-    canvasW: number,
-    canvasH: number,
-): ImageElement {
+// ── Engine Node → Image Element ──
+
+export function engineNodeToImageElement(node: EngineNode, canvasW: number, canvasH: number): ImageElement {
     const constraints = absoluteToConstraints(node.x, node.y, node.w, node.h, canvasW, canvasH);
     const animation = getAnimationForElement(`engine-${node.id}`);
-
-    const shadow = node.shadow_color ? {
-        offsetX: node.shadow_offsetX ?? 0,
-        offsetY: node.shadow_offsetY ?? 0,
-        blur: node.shadow_blur ?? 0,
-        color: node.shadow_color,
-    } : undefined;
-
-    return {
-        id: `engine-${node.id}`,
-        name: node.name || `Image ${node.id}`,
-        type: 'image',
-        constraints,
-        src: node.src ?? '',
-        fit: node.objectFit ?? 'cover',
-        naturalWidth: node.naturalWidth,
-        naturalHeight: node.naturalHeight,
-        opacity: node.opacity ?? 1,
-        visible: node.visible !== false,
-        locked: node.locked ?? false,
-        zIndex: node.z_index ?? 1,
-        shadow,
-        animation,
-    } as ImageElement;
+    const shadow = node.shadow_color ? { offsetX: node.shadow_offsetX ?? 0, offsetY: node.shadow_offsetY ?? 0, blur: node.shadow_blur ?? 0, color: node.shadow_color } : undefined;
+    return { id: `engine-${node.id}`, name: node.name || `Image ${node.id}`, type: 'image', constraints, src: node.src ?? '', fit: node.objectFit ?? 'cover', naturalWidth: node.naturalWidth, naturalHeight: node.naturalHeight, opacity: node.opacity ?? 1, visible: node.visible !== false, locked: node.locked ?? false, zIndex: node.z_index ?? 1, shadow, animation } as ImageElement;
 }
 
-export function overlayToDesignElement(
-    oel: OverlayElement,
-    canvasW: number,
-    canvasH: number,
-): DesignElement {
-    // ★ Clamp overlay coordinates to canvas bounds before computing constraints.
-    // Mouse coordinates from ed-canvas-area can be larger than the logical canvas size.
+// ── Overlay → Design Element ──
+
+export function overlayToDesignElement(oel: OverlayElement, canvasW: number, canvasH: number): DesignElement {
     const clampedX = Math.max(0, Math.min(oel.x, canvasW - 1));
     const clampedY = Math.max(0, Math.min(oel.y, canvasH - 1));
     const clampedW = Math.max(1, Math.min(oel.w, canvasW - clampedX));
@@ -354,68 +67,10 @@ export function overlayToDesignElement(
     const animation = getAnimationForElement(oel.id);
 
     if (oel.type === 'text') {
-        return {
-            id: oel.id,
-            name: oel.name || 'Text',
-            type: 'text',
-            constraints,
-            content: oel.content || '',
-            fontFamily: oel.fontFamily || 'Inter',
-            fontSize: oel.fontSize || 16,
-            fontWeight: resolveFontWeight((oel as any).fontWeight),
-            // ★ REGRESSION GUARD: Preserve fontStyle from overlay (was hardcoded 'normal').
-            fontStyle: ((oel as any).fontStyle as 'normal' | 'italic') ?? 'normal',
-            color: oel.color ?? '#000000',
-            textAlign: oel.textAlign || 'left',
-            lineHeight: oel.lineHeight ?? 1.4,
-            letterSpacing: oel.letterSpacing ?? 0,
-            autoShrink: true,
-            opacity: oel.opacity ?? 1,
-            visible: oel.visible !== false,
-            locked: oel.locked ?? false,
-            zIndex: oel.zIndex ?? 1,
-            animation,
-        } as TextElement;
+        return { id: oel.id, name: oel.name || 'Text', type: 'text', constraints, content: oel.content || '', fontFamily: oel.fontFamily || 'Inter', fontSize: oel.fontSize || 16, fontWeight: resolveFontWeight((oel as any).fontWeight), fontStyle: ((oel as any).fontStyle as 'normal' | 'italic') ?? 'normal', color: oel.color ?? '#000000', textAlign: oel.textAlign || 'left', lineHeight: oel.lineHeight ?? 1.4, letterSpacing: oel.letterSpacing ?? 0, autoShrink: true, opacity: oel.opacity ?? 1, visible: oel.visible !== false, locked: oel.locked ?? false, zIndex: oel.zIndex ?? 1, animation } as TextElement;
     }
-
     if (oel.type === 'image') {
-        return {
-            id: oel.id,
-            name: oel.name || 'Image',
-            type: 'image',
-            constraints,
-            src: oel.src || '',
-            fit: (oel.objectFit as 'cover' | 'contain' | 'fill') || 'cover',
-            naturalWidth: oel.naturalWidth,
-            naturalHeight: oel.naturalHeight,
-            opacity: oel.opacity ?? 1,
-            visible: oel.visible !== false,
-            locked: oel.locked ?? false,
-            zIndex: oel.zIndex ?? 1,
-            animation,
-        } as ImageElement;
+        return { id: oel.id, name: oel.name || 'Image', type: 'image', constraints, src: oel.src || '', fit: (oel.objectFit as 'cover' | 'contain' | 'fill') || 'cover', naturalWidth: oel.naturalWidth, naturalHeight: oel.naturalHeight, opacity: oel.opacity ?? 1, visible: oel.visible !== false, locked: oel.locked ?? false, zIndex: oel.zIndex ?? 1, animation } as ImageElement;
     }
-
-    // Video
-    return {
-        id: oel.id,
-        name: oel.name || 'Video',
-        type: 'video',
-        constraints,
-        // ★ Never persist blob: URLs — they expire after page reload.
-        // BannerPreviewGrid loads the actual video from IndexedDB via loadVideoBlob(el.id).
-        // posterSrc (base64) is the only persistent visual fallback.
-        videoSrc: '',
-        posterSrc: oel.posterSrc,
-        fileName: oel.fileName,
-        fit: (oel.objectFit as 'cover' | 'contain' | 'fill') || 'cover',
-        muted: oel.muted ?? true,
-        loop: oel.loop ?? true,
-        autoplay: oel.autoplay ?? true,
-        opacity: oel.opacity ?? 1,
-        visible: oel.visible !== false,
-        animation,
-        locked: oel.locked ?? false,
-        zIndex: oel.zIndex ?? 1,
-    } as VideoElement;
+    return { id: oel.id, name: oel.name || 'Video', type: 'video', constraints, videoSrc: '', posterSrc: oel.posterSrc, fileName: oel.fileName, fit: (oel.objectFit as 'cover' | 'contain' | 'fill') || 'cover', muted: oel.muted ?? true, loop: oel.loop ?? true, autoplay: oel.autoplay ?? true, opacity: oel.opacity ?? 1, visible: oel.visible !== false, animation, locked: oel.locked ?? false, zIndex: oel.zIndex ?? 1 } as VideoElement;
 }
