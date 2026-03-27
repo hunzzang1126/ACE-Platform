@@ -11,7 +11,7 @@ import { EffectsSection } from '@/components/panels/EffectsSection';
 import { Section, ScrubField, PropField, OpacitySlider } from '@/components/panels/PropertyFields';
 import type { EngineNode, CanvasEngineActions } from '@/hooks/useCanvasEngine';
 import type { OverlayElement } from '@/hooks/useOverlayElements';
-import { FONT_FAMILIES, FONT_WEIGHTS, RemoveBgButton, SmartSizingSection } from './PropertyPanelSections';
+import { FONT_FAMILIES, FONT_WEIGHTS, RemoveBgButton, FillToPageButton, SmartSizingSection } from './PropertyPanelSections';
 
 interface Props {
     nodes?: EngineNode[];
@@ -140,7 +140,22 @@ export function PropertyPanel({ nodes = [], selection = [], actions, selectedOve
                     </Section>
                 )}
                 {!isTextNode && selectedNode.type !== 'image' && (<Section label="Fill"><ColorPicker label="Color" color={currentFillHex} onChange={handleColorChange} /></Section>)}
-                {selectedNode.type === 'image' && (<RemoveBgButton imageSrc={(selectedNode as any).src || (selectedNode as any).image_url} onResult={(dataUrl) => { (actions as any).replaceImageSrc?.(selectedNode.id, dataUrl); }} />)}
+                {selectedNode.type === 'image' && (
+                    <>
+                        <FillToPageButton
+                            nodeId={selectedNode.id}
+                            nodeW={selectedNode.w}
+                            nodeH={selectedNode.h}
+                            naturalWidth={selectedNode.naturalWidth}
+                            naturalHeight={selectedNode.naturalHeight}
+                            canvasWidth={canvasWidth}
+                            canvasHeight={canvasHeight}
+                            onSetPosition={actions.setNodePosition}
+                            onSetSize={actions.setNodeSize}
+                        />
+                        <RemoveBgButton imageSrc={(selectedNode as any).src || (selectedNode as any).image_url} onResult={(dataUrl) => { (actions as any).replaceImageSrc?.(selectedNode.id, dataUrl); }} />
+                    </>
+                )}
                 <Section label="Align to Canvas">
                     <div className="pp-align-row">
                         <button className="pp-align-btn" title="Left" onClick={() => actions.alignToCanvas(selectedNode.id, 'left')}><IcAlignLeft size={14} /></button>

@@ -93,6 +93,73 @@ export function RemoveBgButton({ imageSrc, onResult }: { imageSrc?: string; onRe
     );
 }
 
+// ── Fill to Page Button ──
+
+interface FillToPageProps {
+    nodeId: number;
+    nodeW: number;
+    nodeH: number;
+    naturalWidth?: number;
+    naturalHeight?: number;
+    canvasWidth: number;
+    canvasHeight: number;
+    onSetPosition: (id: number, x: number, y: number) => void;
+    onSetSize: (id: number, w: number, h: number) => void;
+}
+
+export function FillToPageButton({ nodeId, nodeW, nodeH, naturalWidth, naturalHeight, canvasWidth, canvasHeight, onSetPosition, onSetSize }: FillToPageProps) {
+    const handleFillToPage = () => {
+        // Cover mode: scale image to fill canvas while maintaining aspect ratio
+        const imgAspect = (naturalWidth && naturalHeight && naturalWidth > 0 && naturalHeight > 0)
+            ? naturalWidth / naturalHeight
+            : nodeW / Math.max(nodeH, 1);
+        const canvasAspect = canvasWidth / canvasHeight;
+
+        let newW: number, newH: number;
+        if (imgAspect > canvasAspect) {
+            // Image is wider — fit height, overflow width
+            newH = canvasHeight;
+            newW = canvasHeight * imgAspect;
+        } else {
+            // Image is taller — fit width, overflow height
+            newW = canvasWidth;
+            newH = canvasWidth / imgAspect;
+        }
+
+        // Center on canvas
+        const newX = Math.round((canvasWidth - newW) / 2);
+        const newY = Math.round((canvasHeight - newH) / 2);
+
+        onSetPosition(nodeId, newX, newY);
+        onSetSize(nodeId, Math.round(newW), Math.round(newH));
+    };
+
+    return (
+        <Section label="Image">
+            <button
+                onClick={handleFillToPage}
+                style={{
+                    width: '100%', padding: '8px 12px',
+                    background: 'rgba(56,189,248,0.12)',
+                    border: '1px solid rgba(56,189,248,0.3)', borderRadius: 6,
+                    color: '#38bdf8', fontSize: 12, fontWeight: 600,
+                    cursor: 'pointer', transition: 'all 0.2s',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(56,189,248,0.25)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(56,189,248,0.12)'; }}
+            >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <path d="M3 9h18M9 3v18" opacity="0.4" />
+                    <path d="M15 9l-3 3-3-3" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Fill to Page
+            </button>
+        </Section>
+    );
+}
+
 // ── Smart Sizing Section ──
 
 export function SmartSizingSection({ elementId }: { elementId: string }) {

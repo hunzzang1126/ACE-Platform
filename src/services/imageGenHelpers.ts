@@ -1,8 +1,41 @@
-// ─────────────────────────────────────────────────
-// imageGenHelpers — Response parsing, resizing, fallback
-// ─────────────────────────────────────────────────
-
 import type { ImageGenRequest, ImageGenResult } from './imageGenClient';
+
+// ── Flux Optimal Resolution Table ──
+// Flux Schnell produces best quality at these standard resolutions.
+// We match the canvas aspect ratio to the closest supported size.
+// All sizes are ≥ 768px on shortest side for quality.
+
+const FLUX_RESOLUTIONS: [number, number][] = [
+    [1024, 1024],   // 1:1
+    [1024, 768],    // 4:3 landscape
+    [768, 1024],    // 3:4 portrait
+    [1024, 576],    // 16:9 landscape
+    [576, 1024],    // 9:16 portrait
+    [1280, 720],    // 16:9 HD landscape
+    [720, 1280],    // 9:16 HD portrait
+    [1024, 512],    // 2:1 wide banner
+    [512, 1024],    // 1:2 tall banner
+    [1280, 480],    // ultra-wide (728x90 type)
+    [480, 1280],    // ultra-tall (160x600 type)
+    [960, 640],     // 3:2 landscape
+    [640, 960],     // 2:3 portrait
+];
+
+/**
+ * Map any canvas dimensions to the closest Flux-optimal resolution.
+ * Flux generates significantly better images at these standard sizes
+ * vs arbitrary canvas dimensions like 300x250.
+ */
+export function snapToFluxResolution(canvasW: number, canvasH: number): { width: number; height: number } {
+    const aspect = canvasW / canvasH;
+    let bestMatch = FLUX_RESOLUTIONS[0]!;
+    let bestDiff = Infinity;
+    for (const [w, h] of FLUX_RESOLUTIONS) {
+        const diff = Math.abs((w / h) - aspect);
+        if (diff < bestDiff) { bestDiff = diff; bestMatch = [w, h]; }
+    }
+    return { width: bestMatch[0], height: bestMatch[1] };
+}
 
 /**
  * Extract image URL from various OpenRouter response formats.

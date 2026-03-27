@@ -7,7 +7,7 @@
 import { getOpenRouterKey } from '@/config/apiKeys';
 import { getOpenRouterUrl, getOpenRouterHeaders } from '@/services/openRouterClient';
 import { getModelId, type AceModelRole } from '@/services/modelRouter';
-import { extractImageUrl, resizeImageToTarget, generateFallbackImage, buildEnhancedPrompt } from './imageGenHelpers';
+import { extractImageUrl, resizeImageToTarget, generateFallbackImage, buildEnhancedPrompt, snapToFluxResolution } from './imageGenHelpers';
 
 // ═══════════════════════════════════════════════════════
 // TYPES
@@ -105,7 +105,12 @@ async function callImageGenApi(
 export async function generateBackgroundImage(
     bgPrompt: string, canvasW: number, canvasH: number, accentColors: string[], signal?: AbortSignal,
 ): Promise<ImageGenResult> {
-    const scale = (canvasW < 512 || canvasH < 512) ? 2 : 1;
+    // ★ Snap to Flux-optimal resolution for best quality output.
+    // Flux produces much better results at standard sizes (1024x768, etc.)
+    // than at arbitrary canvas dimensions (300x250, 728x90, etc.).
+    // The resizeImageToTarget in callImageGenApi will crop/fit to exact canvas size.
+    const fluxSize = snapToFluxResolution(canvasW, canvasH);
+    console.log(`[ImageGen] Canvas ${canvasW}x${canvasH} → Flux gen ${fluxSize.width}x${fluxSize.height}`);
     const enhancedBgPrompt = [bgPrompt, 'Background image for premium advertisement.', 'No text, no logos, no watermarks, no UI elements.', 'Cinematic lighting, rich tonal range, room for text overlay.', 'Ultra high resolution, magazine-quality, 8K detail.'].join('. ');
-    return generateImage({ prompt: enhancedBgPrompt, width: canvasW * scale, height: canvasH * scale, model: 'flux', colorConstraint: accentColors, style: 'photography', negativePrompt: 'text, logos, watermark, low quality, blurry, distorted' }, signal);
+    return generateImage({ prompt: enhancedBgPrompt, width: fluxSize.width, height: fluxSize.height, model: 'flux', colorConstraint: accentColors, style: 'photography', negativePrompt: 'text, logos, watermark, low quality, blurry, distorted' }, signal);
 }
