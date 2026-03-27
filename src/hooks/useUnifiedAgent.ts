@@ -473,34 +473,15 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
             allElements = allElements.filter(el => el.name !== 'background');
         }
 
-        // ★ CONTRAST GUARD: When background image is present, inject a cinematic
-        // two-layer dark overlay to guarantee text readability. Covers full canvas
-        // with lighter top (15% opacity) and darker bottom (60% opacity).
-        // ★ FIX: Insert overlays at position 0 (bottom of z-stack) since
-        // 'background' element was already removed above.
-        if (hasImageBackground) {
-            // Layer 1: light veil over top half — keeps image visible
-            const overlayTop: import('@/services/autoDesignService').RenderElement = {
-                type: 'rect',
-                name: 'contrast_overlay',
-                x: 0, y: 0,
-                w: canvasW,
-                h: Math.round(canvasH * 0.5),
-                r: 0, g: 0, b: 0, a: 0.20,
-            };
-            // Layer 2: darker veil over bottom half — text readability zone
-            const overlayBottom: import('@/services/autoDesignService').RenderElement = {
-                type: 'rect',
-                name: 'contrast_overlay_bottom',
-                x: 0, y: Math.round(canvasH * 0.5),
-                w: canvasW,
-                h: canvasH - Math.round(canvasH * 0.5),
-                r: 0, g: 0, b: 0, a: 0.65,
-            };
-            // Insert at beginning — these render first (behind text)
-            allElements.unshift(overlayTop, overlayBottom);
-            narrate(`Added contrast overlay for text readability on image background.`);
-        }
+        // ★ Filter out text elements with empty content — prevents Fabric.js
+        // from showing default "Text" placeholder for unfilled subheadlines.
+        allElements = allElements.filter(el => {
+            if (el.type === 'text' && (!el.content || el.content.trim() === '')) {
+                console.log(`[Pipeline] Removing empty text element: ${el.name}`);
+                return false;
+            }
+            return true;
+        });
 
         // Math-based validation: fix overlaps, clipping, hierarchy
         const validation = validateLayout(allElements, canvasW, canvasH);
@@ -524,7 +505,7 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
 
         // ── Phase 5: Multi-pass render with live narration ──
         // Group elements by layer
-        const structureNames = new Set(['background', 'contrast_overlay', 'contrast_overlay_bottom', 'text_overlay', 'accent_zone', 'accent_glow', 'accent_line', 'accent_diagonal', 'accent_divider', 'tag_underline', 'tag_line']);
+        const structureNames = new Set(['background', 'text_overlay', 'accent_zone', 'accent_glow', 'accent_line', 'accent_diagonal', 'accent_divider', 'tag_underline', 'tag_line']);
         const contentNames = new Set(['headline', 'subheadline', 'body_text', 'tag_text']);
         const actionNames = new Set(['cta_button', 'cta_label']);
 
