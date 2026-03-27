@@ -219,11 +219,27 @@ export function createEngineShim(
         // ── Property setters ─────────────────────────────
         send_to_front: (id: number): void => {
             const obj = findById(id);
-            if (obj) { fc.bringObjectToFront(obj); (obj as any).__glidZIndex = userObjects().length - 1; fc.renderAll(); syncState(); }
+            if (!obj) return;
+            // Set highest z-index, then full reorder to keep everything consistent
+            const maxZ = userObjects().reduce((m, o) => Math.max(m, (o as any).__glidZIndex ?? 0), 0);
+            (obj as any).__glidZIndex = maxZ + 1;
+            const sorted = userObjects().sort((a, b) => ((a as any).__glidZIndex ?? 0) - ((b as any).__glidZIndex ?? 0));
+            sorted.forEach((o, i) => { fc.moveObjectTo(o, i + 1); (o as any).__glidZIndex = i; });
+            sorted.forEach(o => { o.dirty = true; o.setCoords(); });
+            fc.renderAll(); syncState();
         },
+        // ★ REGRESSION GUARD: NEVER use fc.sendObjectToBack() — it places the object
+        // at Fabric index 0, BEHIND the artboard. This makes all elements invisible
+        // because they render outside the artboard's clipping boundary.
+        // Use moveObjectTo(obj, 1) to place just above the artboard.
         send_to_back: (id: number): void => {
             const obj = findById(id);
-            if (obj) { fc.sendObjectToBack(obj); (obj as any).__glidZIndex = 0; fc.renderAll(); syncState(); }
+            if (!obj) return;
+            (obj as any).__glidZIndex = -1;
+            const sorted = userObjects().sort((a, b) => ((a as any).__glidZIndex ?? 0) - ((b as any).__glidZIndex ?? 0));
+            sorted.forEach((o, i) => { fc.moveObjectTo(o, i + 1); (o as any).__glidZIndex = i; });
+            sorted.forEach(o => { o.dirty = true; o.setCoords(); });
+            fc.renderAll(); syncState();
         },
         remove_element: (id: number): void => {
             const obj = findById(id);

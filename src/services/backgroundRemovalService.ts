@@ -59,15 +59,62 @@ export async function removeBackground(
 
 /**
  * Remove background from an image URL.
- * Convenience wrapper that fetches the image first.
+ * Handles CORS: if direct fetch fails (AI-generated images from Flux/external CDNs),
+ * falls back to loading via HTMLImageElement with crossOrigin and converting via canvas.
  */
 export async function removeBackgroundFromUrl(
     imageUrl: string,
     onProgress?: (progress: number) => void,
 ): Promise<Blob> {
-    const response = await fetch(imageUrl);
-    const blob = await response.blob();
+    let blob: Blob;
+
+    if (imageUrl.startsWith('data:') || imageUrl.startsWith('blob:')) {
+        // Data URLs and blob URLs can be fetched directly
+        const response = await fetch(imageUrl);
+        blob = await response.blob();
+    } else {
+        // External URLs (Flux CDN, etc.) — try fetch first, fall back to canvas conversion
+        try {
+            const response = await fetch(imageUrl);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            blob = await response.blob();
+        } catch {
+            // ★ CORS fallback: load image via HTMLImageElement (which respects crossOrigin
+            // set during Fabric.js load) and convert to blob via canvas
+            blob = await imageUrlToBlob(imageUrl);
+        }
+    }
+
     return removeBackground(blob, onProgress);
+}
+
+/**
+ * Convert an external image URL to a Blob via canvas.
+ * Bypasses CORS fetch restrictions by using HTMLImageElement with crossOrigin.
+ */
+async function imageUrlToBlob(url: string): Promise<Blob> {
+    return new Promise<Blob>((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.naturalWidth;
+                canvas.height = img.naturalHeight;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) { reject(new Error('Canvas context unavailable')); return; }
+                ctx.drawImage(img, 0, 0);
+                canvas.toBlob((b) => {
+                    if (b) resolve(b);
+                    else reject(new Error('Canvas toBlob returned null'));
+                }, 'image/png');
+            } catch (err) {
+                reject(new Error(`Canvas conversion failed: ${err}`));
+            }
+        };
+        img.onerror = () => reject(new Error(`Failed to load image: ${url}`));
+        img.src = url;
+    });
 }
 
 /**

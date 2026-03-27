@@ -106,12 +106,22 @@ export function useCanvasSync(variantId: string | undefined, canvasW: number, ca
         for (const loadFn of pendingImageLoads) await loadFn();
         await Promise.all(pendingVideoLoads);
 
-        if (typeof engine.reorder_by_z_index === 'function') engine.reorder_by_z_index();
-        setTimeout(() => { if (typeof engine.reorder_by_z_index === 'function') { engine.reorder_by_z_index(); } }, 200);
+        // ★ REGRESSION GUARD: Images load asynchronously (especially AI-generated Flux images
+        // from external URLs). The Fabric stack order can desync from __glidZIndex because
+        // add_image inserts at stack position based on current stack, not final intended order.
+        // We run an immediate reorder, then two delayed passes to catch late-loading images.
+        const doReorder = () => {
+            if (typeof engine.reorder_by_z_index === 'function') {
+                engine.reorder_by_z_index();
+            }
+        };
+        doReorder();
+        setTimeout(doReorder, 300);
+        setTimeout(doReorder, 800);
         if (typeof document !== 'undefined' && document.fonts?.ready) {
             document.fonts.ready.then(() => {
                 if (typeof engine.refreshTextCoords === 'function') engine.refreshTextCoords();
-                if (typeof engine.reorder_by_z_index === 'function') engine.reorder_by_z_index();
+                doReorder();
             });
         }
 
