@@ -30,8 +30,9 @@ export async function removeBackground(
     }
 
     const result = await removeBg(imageBlob, {
-        // ★ Use unpkg CDN for WASM models to avoid Vercel static asset issues
-        publicPath: 'https://unpkg.com/@imgly/background-removal@1.7.0/dist/',
+        // ★ Use jsDelivr CDN for WASM models (more reliable than unpkg)
+        publicPath: 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.7.0/dist/',
+        model: 'isnet_fp16',
         progress: onProgress
             ? (key: string, current: number, total: number) => {
                   onProgress(total > 0 ? current / total : 0);
