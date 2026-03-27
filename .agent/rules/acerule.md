@@ -2,6 +2,34 @@
 trigger: always_on
 ---
 
+# CODE QUALITY FIRST — HIGHEST PRIORITY RULE
+
+> **Code quality is the #1 priority. Above features. Above bug fixes. Above speed.**
+> A feature added to a 500-line file is NEGATIVE progress — it creates future bugs.
+> **NEVER sacrifice structure for speed. Fix the structure FIRST, then add the feature.**
+
+**MANDATORY: Pre-Edit Line Count Check**
+> Before modifying ANY file, run `wc -l <file>` mentally or literally.
+> - If file is **350+ lines**: you MUST extract/split BEFORE adding new code.
+> - If file is **400+ lines**: this is a **HARD BLOCK** — refactor into sub-modules first. No exceptions.
+> - If your edit would push a file past 350 lines: split first, edit second.
+> **Skipping this check is a violation. Every time.**
+
+**MANDATORY: Pre-Commit Verification**
+> Before every `git commit`, verify:
+> 1. `npx tsc --noEmit` — zero type errors
+> 2. `npx vitest run` — all tests pass
+> 3. No source file exceeds 400 lines (check with `wc -l` on modified files)
+> If any check fails → fix before commit. Never commit violations.
+
+**Why This Exists:**
+> - 31 files in ACE exceeded 400 lines as of v0.0.0.281
+> - Every recurring bug (z-order, headline persistence, text placeholders) traces back to monolith files
+> - Monolith files = impossible to maintain = bugs that get "fixed" then come back
+> - This rule was added because it was written but NOT enforced. Now it IS the top rule.
+
+---
+
 # ACE PLATFORM IDENTITY — READ THIS FIRST
 
 > **ACE is a FULL CREATIVE PLATFORM — NOT a banner tool.**
