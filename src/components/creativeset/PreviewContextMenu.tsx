@@ -5,7 +5,8 @@
 import { useCallback, useEffect } from 'react';
 import type { BannerVariant } from '@/schema/design.types';
 import { useDesignStore } from '@/stores/designStore';
-import { renderVariantToCanvas, downloadDataURL } from './previewRenderer';
+import { downloadDataURL } from './previewRenderer';
+import { renderVariantWithFabric } from './fabricHeadlessRenderer';
 
 interface ContextMenuState {
     x: number;
@@ -84,7 +85,7 @@ export function PreviewContextMenu({
                             const v = variants.find(v => v.id === vid);
                             if (!v) continue;
                             try {
-                                const dataURL = await renderVariantToCanvas(v);
+                                const dataURL = await renderVariantWithFabric(v);
                                 downloadDataURL(dataURL, `banner_${v.preset.width}x${v.preset.height}.png`);
                                 if (idsToExport.length > 1) await new Promise(r => setTimeout(r, 300));
                             } catch { /* skip */ }
@@ -113,7 +114,7 @@ export function PreviewContextMenu({
                         const toExport = variants.filter(v => selectedIds.has(v.id));
                         for (const variant of toExport) {
                             try {
-                                const dataURL = await renderVariantToCanvas(variant);
+                                const dataURL = await renderVariantWithFabric(variant);
                                 downloadDataURL(dataURL, `banner_${variant.preset.width}x${variant.preset.height}.png`);
                                 await new Promise(r => setTimeout(r, 300));
                             } catch { /* skip */ }
@@ -127,7 +128,7 @@ export function PreviewContextMenu({
                 onClose();
                 for (const variant of variants) {
                     try {
-                        const dataURL = await renderVariantToCanvas(variant);
+                        const dataURL = await renderVariantWithFabric(variant);
                         downloadDataURL(dataURL, `banner_${variant.preset.width}x${variant.preset.height}.png`);
                         await new Promise(r => setTimeout(r, 300));
                     } catch { /* skip */ }
