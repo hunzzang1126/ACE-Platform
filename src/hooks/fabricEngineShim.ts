@@ -6,7 +6,7 @@
 // ─────────────────────────────────────────────────
 
 import {
-    Canvas, Shadow, Group, type FabricObject,
+    Canvas, Shadow, Group, ActiveSelection, type FabricObject,
 } from 'fabric';
 import {
     nextId, rgbToHex, isArtboard, fabricToEngineNode, GLID_CUSTOM_PROPS,
@@ -42,7 +42,22 @@ export function createEngineShim(
         // ── Query ────────────────────────────────────────
         // ★ _findById: internal — used by restoreImage to set __glidPersistSrc
         _findById: findById,
-        get_all_nodes: () => JSON.stringify(userObjects().map(fabricToEngineNode)),
+        get_all_nodes: () => {
+            // ★ FIX: Fabric.js objects inside an ActiveSelection have their
+            // left/top temporarily offset to be relative to the selection center.
+            // We must discard the selection before reading positions, then re-select.
+            const activeObjs = fc.getActiveObjects();
+            const hadMultiSelect = activeObjs.length > 1;
+            if (hadMultiSelect) fc.discardActiveObject();
+            const result = JSON.stringify(userObjects().map(fabricToEngineNode));
+            // Re-select after reading (UX: save doesn't visually deselect)
+            if (hadMultiSelect && activeObjs.length > 1) {
+                const sel = new ActiveSelection(activeObjs, { canvas: fc });
+                fc.setActiveObject(sel);
+                fc.renderAll();
+            }
+            return result;
+        },
         get_canvas_size: () => ({ width: artboardW, height: artboardH }),
         getCanvasJSON: (): string => JSON.stringify(fc.toObject(GLID_CUSTOM_PROPS)),
         loadCanvasJSON: async (jsonStr: string): Promise<void> => {
