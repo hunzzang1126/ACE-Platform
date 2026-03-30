@@ -11,13 +11,14 @@ export function SidebarProjectsTab() {
     const getAllCreativeSets = useDesignStore((s) => s.getAllCreativeSets);
     const openCreativeSet = useDesignStore((s) => s.openCreativeSet);
     const activeId = useDesignStore((s) => s.activeCreativeSetId);
-    const trashedIds = useProjectStore((s) => new Set(s.trash.map((t) => t.item.id)));
+    const trash = useProjectStore((s) => s.trash);
     const navigate = useNavigate();
 
     // Filter out trashed items — they exist in designStore but should not show
     const sets = useMemo(() => {
+        const trashedIds = new Set(trash.map((t) => t.item.id));
         return getAllCreativeSets().filter((cs) => !trashedIds.has(cs.id));
-    }, [getAllCreativeSets, trashedIds]);
+    }, [getAllCreativeSets, trash]);
 
     const handleSwitch = useCallback((id: string) => {
         const ok = openCreativeSet(id);
