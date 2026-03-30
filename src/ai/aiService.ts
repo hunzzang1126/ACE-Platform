@@ -228,7 +228,14 @@ export class AiService {
         try {
             const { saveAiMemory, extractFacts } = await import('@/services/aiMemoryService');
             const facts = extractFacts(userMessage, this.getLastReply());
-            if (Object.keys(facts).length > 0) await saveAiMemory(facts);
-        } catch { /* Memory save is optional */ }
+            if (Object.keys(facts).length > 0) {
+                await saveAiMemory(facts);
+                console.info('[AiMemory] Chat facts saved:', Object.keys(facts));
+            } else {
+                console.info('[AiMemory] No extractable facts from this message');
+            }
+        } catch (err) {
+            console.warn('[AiMemory] Chat memory save failed:', err);
+        }
     }
 }

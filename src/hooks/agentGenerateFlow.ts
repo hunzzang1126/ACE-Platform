@@ -77,6 +77,24 @@ export async function executeGenerateFlow(
     // ── Phase 6: Vision QA ──
     await runVisionQA(engine, canvasW, canvasH, guide, template, rendered, abort, cb);
 
+    // ── Phase 7: Save to AI Memory ──
+    // Records this design in Supabase ai_memory for cross-session learning
+    try {
+        const { addDesignEntry, extractFacts, saveAiMemory } = await import('@/services/aiMemoryService');
+        await addDesignEntry({
+            prompt,
+            bgPrompt: backgroundImagePrompt || undefined,
+            style: guide.name,
+            colorGuide: `${guide.colors.gradientStart} → ${guide.colors.gradientEnd}`,
+        });
+        // Also extract any user preferences from the prompt
+        const facts = extractFacts(prompt, '');
+        if (Object.keys(facts).length > 0) await saveAiMemory(facts);
+        console.info('[AiMemory] Design entry saved to Supabase');
+    } catch (err) {
+        console.warn('[AiMemory] Failed to save design entry:', err);
+    }
+
     return `Design generated with ${rendered} elements.`;
 }
 
