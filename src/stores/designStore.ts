@@ -244,9 +244,10 @@ export const useDesignStore = create<DesignState>()(
                 onRehydrateStorage: () => (state) => {
                     if (!state) { _resolveDesignHydration(); return; }
                     for (const cs of Object.values(state.allCreativeSets)) {
+                        // ★ REGRESSION GUARD: Only initialize to empty object if missing.
+                        // NEVER auto-plug all variants — this overrides explicit unplug actions.
                         if (!cs.plugConnections) {
                             cs.plugConnections = {};
-                            for (const v of cs.variants) { if (v.id !== cs.masterVariantId) cs.plugConnections[v.id] = cs.masterVariantId; }
                         }
                     }
                     if (state.activeCreativeSetId) state.creativeSet = state.allCreativeSets[state.activeCreativeSetId] ?? null;
