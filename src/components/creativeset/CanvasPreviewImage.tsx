@@ -22,7 +22,7 @@ interface Props {
 /**
  * Renders a BannerVariant using Canvas2D and displays as an <img>.
  * This ensures Size Dashboard preview matches PNG export exactly,
- * since both use renderVariantToCanvas().
+ * since both use renderVariantWithFabric().
  */
 export const CanvasPreviewImage = memo(function CanvasPreviewImage({ variant, resolvedImageUrls, scale }: Props) {
     const [dataUrl, setDataUrl] = useState<string | null>(null);

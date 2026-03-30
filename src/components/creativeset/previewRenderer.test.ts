@@ -57,9 +57,7 @@ describe('getTextEffectCSS — text effect to CSS property mapping', () => {
 });
 
 describe('★ REGRESSION: Unified Fabric Rendering Pipeline', () => {
-    it('renderVariantWithFabric is available as the unified renderer', async () => {
-        // Both Size Dashboard preview (CanvasPreviewImage) and export (handleExportPNG)
-        // use renderVariantWithFabric from fabricHeadlessRenderer.ts
+    it('renderVariantWithFabric is the unified renderer', async () => {
         const mod = await import('@/components/creativeset/fabricHeadlessRenderer');
         expect(typeof mod.renderVariantWithFabric).toBe('function');
     });
@@ -79,14 +77,100 @@ describe('★ REGRESSION: Unified Fabric Rendering Pipeline', () => {
     });
 });
 
-describe('★ REGRESSION: BannerPreviewGrid uses Fabric.js (not CSS DOM)', () => {
-    it('CanvasPreviewImage component module is importable', async () => {
+describe('★ REGRESSION: CanvasPreviewImage uses Fabric.js', () => {
+    it('CanvasPreviewImage component is importable', async () => {
         const mod = await import('@/components/creativeset/CanvasPreviewImage');
         expect(mod.CanvasPreviewImage).toBeDefined();
     });
 
-    it('CanvasPreviewImage is a React component (memo)', async () => {
+    it('CanvasPreviewImage is a React memo component', async () => {
         const mod = await import('@/components/creativeset/CanvasPreviewImage');
         expect(typeof mod.CanvasPreviewImage).toBe('object');
     });
 });
+
+// ──────────────────────────────────────────────────────
+// ★ SOURCE FILE GUARDS — Prevent rendering pipeline regressions
+// These tests read the actual source code to verify import paths.
+// If someone changes an import back to Canvas2D, these tests FAIL.
+// ──────────────────────────────────────────────────────
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+
+const CREATIVESET_DIR = resolve(__dirname);
+
+describe('★ REGRESSION GUARD: ALL export paths use Fabric.js renderer', () => {
+    it('BannerPreviewGrid imports renderVariantWithFabric (not Canvas2D)', () => {
+        const src = readFileSync(resolve(CREATIVESET_DIR, 'BannerPreviewGrid.tsx'), 'utf-8');
+        expect(src).toContain("import { renderVariantWithFabric } from './fabricHeadlessRenderer'");
+        // Must NOT import the Canvas2D renderer for export
+        expect(src).not.toMatch(/import.*renderVariantToCanvas.*from.*previewRenderer/);
+    });
+
+    it('BannerPreviewGrid uses renderVariantWithFabric for ALL export calls', () => {
+        const src = readFileSync(resolve(CREATIVESET_DIR, 'BannerPreviewGrid.tsx'), 'utf-8');
+        const fabricCalls = (src.match(/renderVariantWithFabric/g) || []).length;
+        const canvas2dCalls = (src.match(/renderVariantToCanvas/g) || []).length;
+        expect(fabricCalls).toBeGreaterThanOrEqual(3); // handleExportPNG + handleExportAll + handleExportSelected
+        expect(canvas2dCalls).toBe(0);
+    });
+
+    it('PreviewContextMenu imports renderVariantWithFabric (not Canvas2D)', () => {
+        const src = readFileSync(resolve(CREATIVESET_DIR, 'PreviewContextMenu.tsx'), 'utf-8');
+        expect(src).toContain("import { renderVariantWithFabric } from './fabricHeadlessRenderer'");
+        expect(src).not.toMatch(/import.*renderVariantToCanvas.*from.*previewRenderer/);
+    });
+
+    it('PreviewContextMenu uses renderVariantWithFabric for ALL export calls', () => {
+        const src = readFileSync(resolve(CREATIVESET_DIR, 'PreviewContextMenu.tsx'), 'utf-8');
+        const fabricCalls = (src.match(/renderVariantWithFabric/g) || []).length;
+        const canvas2dCalls = (src.match(/renderVariantToCanvas/g) || []).length;
+        expect(fabricCalls).toBeGreaterThanOrEqual(3); // PNG export + Export Selected + Export All
+        expect(canvas2dCalls).toBe(0);
+    });
+
+    it('CanvasPreviewImage imports renderVariantWithFabric (not Canvas2D)', () => {
+        const src = readFileSync(resolve(CREATIVESET_DIR, 'CanvasPreviewImage.tsx'), 'utf-8');
+        expect(src).toContain("import { renderVariantWithFabric } from './fabricHeadlessRenderer'");
+        expect(src).not.toMatch(/import.*renderVariantToCanvas.*from.*previewRenderer/);
+    });
+
+    it('CanvasPreviewImage calls renderVariantWithFabric', () => {
+        const src = readFileSync(resolve(CREATIVESET_DIR, 'CanvasPreviewImage.tsx'), 'utf-8');
+        expect(src).toContain('renderVariantWithFabric(');
+        expect(src).not.toContain('renderVariantToCanvas(');
+    });
+});
+
+describe('★ REGRESSION GUARD: fabricHeadlessRenderer uses same Fabric classes as editor', () => {
+    it('imports Fabric.js Textbox, Rect, Ellipse, FabricImage, Gradient', () => {
+        const src = readFileSync(resolve(CREATIVESET_DIR, 'fabricHeadlessRenderer.ts'), 'utf-8');
+        expect(src).toContain('Textbox');
+        expect(src).toContain('Rect');
+        expect(src).toContain('Ellipse');
+        expect(src).toContain('FabricImage');
+        expect(src).toContain('Gradient');
+    });
+
+    it('uses constraintsToAbsolute for position resolution', () => {
+        const src = readFileSync(resolve(CREATIVESET_DIR, 'fabricHeadlessRenderer.ts'), 'utf-8');
+        expect(src).toContain('constraintsToAbsolute');
+    });
+
+    it('exports renderVariantWithFabric as async function', () => {
+        const src = readFileSync(resolve(CREATIVESET_DIR, 'fabricHeadlessRenderer.ts'), 'utf-8');
+        expect(src).toMatch(/export\s+async\s+function\s+renderVariantWithFabric/);
+    });
+
+    it('creates a Canvas instance and calls toDataURL', () => {
+        const src = readFileSync(resolve(CREATIVESET_DIR, 'fabricHeadlessRenderer.ts'), 'utf-8');
+        expect(src).toContain('new Canvas(');
+        expect(src).toContain('toDataURL(');
+    });
+
+    it('disposes the headless canvas after rendering', () => {
+        const src = readFileSync(resolve(CREATIVESET_DIR, 'fabricHeadlessRenderer.ts'), 'utf-8');
+        expect(src).toContain('fc.dispose()');
+    });
+});
+
