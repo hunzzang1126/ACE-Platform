@@ -2,7 +2,7 @@
 // DashboardPage – Figma-inspired Project Dashboard
 // ─────────────────────────────────────────────────
 import { useCallback, useMemo, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useProjectStore } from '@/stores/projectStore';
 import { useDesignStore } from '@/stores/designStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -27,8 +27,21 @@ function getGreeting(): string {
 
 export function DashboardPage() {
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
     const [searchQuery, setSearchQuery] = useState('');
     const [newlyCreatedId, setNewlyCreatedId] = useState<string | null>(null);
+
+    // ★ Auto-refresh session after Stripe checkout success
+    const syncSession = useAuthStore(s => s.syncSessionFromSupabase);
+    useEffect(() => {
+        if (searchParams.get('checkout') === 'success') {
+            console.log('[dashboard] Checkout success detected — re-syncing plan from DB');
+            syncSession();
+            // Clean up URL param
+            searchParams.delete('checkout');
+            setSearchParams(searchParams, { replace: true });
+        }
+    }, [searchParams, setSearchParams, syncSession]);
 
 
     // Auth store — dynamic user name
