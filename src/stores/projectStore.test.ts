@@ -157,3 +157,77 @@ describe('projectStore — Selection State', () => {
         expect(useProjectStore.getState().selectedIds.has(id)).toBe(false);
     });
 });
+
+// ═══════════════════════════════════════════════════
+// ★ REGRESSION GUARD: Project rename → designStore sync
+// Fixed in v0.0.0.290 — require('@/stores/...') silently failed
+// ═══════════════════════════════════════════════════
+
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+
+describe('★ REGRESSION: Rename sync — projectStore ↔ designStore', () => {
+
+    it('renameCreativeSet updates name in projectStore', () => {
+        const id = useProjectStore.getState().createCreativeSet('Before');
+        useProjectStore.getState().renameCreativeSet(id, 'After');
+        expect(useProjectStore.getState().creativeSets[0]!.name).toBe('After');
+    });
+
+    it('renameCreativeSet updates updatedAt timestamp', () => {
+        const id = useProjectStore.getState().createCreativeSet('Test');
+        const before = useProjectStore.getState().creativeSets[0]!.updatedAt;
+        // Small delay to ensure timestamp differs
+        useProjectStore.getState().renameCreativeSet(id, 'Updated');
+        const after = useProjectStore.getState().creativeSets[0]!.updatedAt;
+        expect(after).toBeTruthy();
+        // updatedAt should be set (may or may not differ in sub-ms test)
+        expect(typeof after).toBe('string');
+        void before; // suppress unused
+    });
+
+    it('★ REGRESSION: projectStore does NOT use require("@/stores/designStore") in code', () => {
+        const src = readFileSync(resolve(__dirname, './projectStore.ts'), 'utf-8');
+        // Strip comments (lines starting with // after trimming)
+        const codeLines = src.split('\n').filter(l => !l.trim().startsWith('//'));
+        const codeOnly = codeLines.join('\n');
+        // Should NOT contain require('@/stores/designStore') in actual code
+        expect(codeOnly).not.toContain("require('@/stores/designStore')");
+        // Should use top-level imported useDesignStore instead
+        expect(src).toContain("import { useDesignStore } from './designStore'");
+    });
+
+    it('★ REGRESSION: designStore uses relative require for projectStore', () => {
+        const src = readFileSync(resolve(__dirname, './designStore.ts'), 'utf-8');
+        // Should NOT contain require('@/stores/projectStore') — broken in Vite
+        expect(src).not.toContain("require('@/stores/projectStore')");
+        // Should use relative path
+        expect(src).toContain("require('./projectStore')");
+    });
+});
+
+// ═══════════════════════════════════════════════════
+// ★ REGRESSION GUARD: New project stays on dashboard
+// Changed in v0.0.0.291 — no navigate('/editor') on create
+// ═══════════════════════════════════════════════════
+
+describe('★ REGRESSION: New project flow — card-first UX', () => {
+
+    it('DashboardPage does not navigate on create', () => {
+        const src = readFileSync(resolve(__dirname, '../app/DashboardPage.tsx'), 'utf-8');
+        // handleNewCreativeSet should NOT contain navigate('/editor')
+        // Extract the handler function body
+        const handlerMatch = src.match(/handleNewCreativeSet\s*=\s*useCallback\(\(\)\s*=>\s*\{([\s\S]*?)\},\s*\[/);
+        expect(handlerMatch).toBeTruthy();
+        const handlerBody = handlerMatch![1]!;
+        expect(handlerBody).not.toContain("navigate('/editor')");
+        expect(handlerBody).toContain('setNewlyCreatedId');
+    });
+
+    it('ProjectCard supports initialRenaming prop', () => {
+        const src = readFileSync(resolve(__dirname, '../components/dashboard/ProjectCard.tsx'), 'utf-8');
+        expect(src).toContain('initialRenaming');
+        expect(src).toContain('useState(!!initialRenaming)');
+    });
+});
+

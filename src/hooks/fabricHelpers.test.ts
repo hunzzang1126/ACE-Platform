@@ -125,3 +125,89 @@ describe('nextColor — pastel color cycle', () => {
         expect(c1).not.toBe(c2);
     });
 });
+
+// ═══════════════════════════════════════════════════
+// ★ REGRESSION GUARD: __glidPersistSrc image persistence
+// Fixed in v0.0.0.288 — blob: URLs caused image loss on reload
+// ═══════════════════════════════════════════════════
+
+import { GLID_CUSTOM_PROPS } from './fabricHelpers';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+
+describe('★ REGRESSION: __glidPersistSrc — image data integrity', () => {
+
+    it('GLID_CUSTOM_PROPS includes __glidPersistSrc', () => {
+        expect(GLID_CUSTOM_PROPS).toContain('__glidPersistSrc');
+    });
+
+    it('fabricToEngineNode prefers __glidPersistSrc over _element.src', () => {
+        const src = readFileSync(resolve(__dirname, './fabricHelpers.ts'), 'utf-8');
+        // __glidPersistSrc should be checked BEFORE _element.src
+        const persistIdx = src.indexOf('__glidPersistSrc');
+        const elementSrcIdx = src.indexOf('imgEl?.src');
+        expect(persistIdx).toBeGreaterThan(-1);
+        expect(elementSrcIdx).toBeGreaterThan(-1);
+        expect(persistIdx).toBeLessThan(elementSrcIdx);
+    });
+
+    it('shimCreators sets __glidPersistSrc for data: URLs', () => {
+        const src = readFileSync(resolve(__dirname, './shimCreators.ts'), 'utf-8');
+        expect(src).toContain('__glidPersistSrc');
+        expect(src).toContain("src.startsWith('data:')");
+        expect(src).toContain("src.startsWith('idb://')");
+    });
+
+    it('useCanvasSync restoreImage sets __glidPersistSrc on fabric object', () => {
+        const src = readFileSync(resolve(__dirname, './useCanvasSync.ts'), 'utf-8');
+        expect(src).toContain('__glidPersistSrc = stableSrc');
+        expect(src).toContain('_findById');
+    });
+
+    it('fabricEngineShim exposes _findById for restoreImage', () => {
+        const src = readFileSync(resolve(__dirname, './fabricEngineShim.ts'), 'utf-8');
+        expect(src).toContain('_findById: findById');
+    });
+});
+
+// ═══════════════════════════════════════════════════
+// ★ REGRESSION GUARD: restoreIdbRefs — blob → idb recovery
+// ═══════════════════════════════════════════════════
+
+describe('★ REGRESSION: canvasSyncSave — restoreIdbRefs', () => {
+
+    it('restoreIdbRefs only processes blob: URLs', () => {
+        const src = readFileSync(resolve(__dirname, './canvasSyncSave.ts'), 'utf-8');
+        expect(src).toContain("img.src.startsWith('blob:')");
+    });
+
+    it('restoreIdbRefs looks up by both name and id', () => {
+        const src = readFileSync(resolve(__dirname, './canvasSyncSave.ts'), 'utf-8');
+        expect(src).toContain('storedSrcByName');
+        expect(src).toContain('storedSrcById');
+    });
+
+    it('asyncExtractAssets logs failures (not silently swallowed)', () => {
+        const src = readFileSync(resolve(__dirname, './canvasSyncSave.ts'), 'utf-8');
+        expect(src).toContain('Asset extraction failed');
+    });
+});
+
+// ═══════════════════════════════════════════════════
+// ★ REGRESSION GUARD: Upload Library — AI images saved
+// Added in v0.0.0.289
+// ═══════════════════════════════════════════════════
+
+describe('★ REGRESSION: AI images → Upload Library integration', () => {
+
+    it('agentGenerateFlow imports saveToUploadLibrary', () => {
+        const src = readFileSync(resolve(__dirname, '../hooks/agentGenerateFlow.ts'), 'utf-8');
+        expect(src).toContain('saveToUploadLibrary');
+    });
+
+    it('saveToUploadLibrary stores with source ai', () => {
+        const src = readFileSync(resolve(__dirname, '../hooks/agentGenerateFlow.ts'), 'utf-8');
+        expect(src).toMatch(/saveToUploadLibrary\(.*'ai'\)/s);
+    });
+});
+
