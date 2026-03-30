@@ -4,6 +4,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { detectPage, buildContext, enrichMessageWithContext, buildContextSystemPrompt } from './contextRouter';
+import { getToolsForPage } from './agentTools';
 
 describe('contextRouter', () => {
     // ── detectPage ──
@@ -91,6 +92,19 @@ describe('contextRouter', () => {
             expect(prompt).toContain('execute_dynamic_action');
         });
 
+        it('★ dashboard prompt does NOT mention generate_full_design', () => {
+            const ctx = buildContext('/');
+            const prompt = buildContextSystemPrompt(ctx);
+            expect(prompt).not.toContain('generate_full_design');
+        });
+
+        it('★ dashboard prompt explains NO canvas and correct workflow', () => {
+            const ctx = buildContext('/');
+            const prompt = buildContextSystemPrompt(ctx);
+            expect(prompt).toContain('NO canvas');
+            expect(prompt).toContain('navigate_to');
+        });
+
         it('returns size-specific prompt with common sizes', () => {
             const ctx = buildContext('/editor');
             const prompt = buildContextSystemPrompt(ctx);
@@ -142,5 +156,64 @@ describe('contextRouter', () => {
             const prompt = buildContextSystemPrompt(ctx);
             expect(prompt).toContain('analyze_scene');
         });
+    });
+});
+
+// ═══════════════════════════════════════════════════
+// ★ Page-Aware Tool Filtering — prevents canvas ops on dashboard
+// Fixed in v0.0.0.307
+// ═══════════════════════════════════════════════════
+
+describe('getToolsForPage — page-aware tool filtering', () => {
+    const canvasOnlyTools = [
+        'generate_full_design',
+        'replace_background_image',
+        'generate_image',
+        'add_text',
+        'add_button',
+        'analyze_scene',
+    ];
+
+    it('★ dashboard: NO canvas tools (engine does not exist)', () => {
+        const tools = getToolsForPage('dashboard');
+        const names = tools.map(t => t.name);
+        for (const tool of canvasOnlyTools) {
+            expect(names).not.toContain(tool);
+        }
+    });
+
+    it('★ dashboard: includes execute_dynamic_action', () => {
+        const tools = getToolsForPage('dashboard');
+        const names = tools.map(t => t.name);
+        expect(names).toContain('execute_dynamic_action');
+    });
+
+    it('size-dashboard: no generate_full_design or replace_background_image', () => {
+        const tools = getToolsForPage('size-dashboard');
+        const names = tools.map(t => t.name);
+        expect(names).not.toContain('generate_full_design');
+        expect(names).not.toContain('replace_background_image');
+    });
+
+    it('size-dashboard: allows add_text and analyze_scene', () => {
+        const tools = getToolsForPage('size-dashboard');
+        const names = tools.map(t => t.name);
+        expect(names).toContain('add_text');
+        expect(names).toContain('analyze_scene');
+    });
+
+    it('canvas-editor: has ALL tools including generate_full_design', () => {
+        const tools = getToolsForPage('canvas-editor');
+        const names = tools.map(t => t.name);
+        expect(names).toContain('generate_full_design');
+        expect(names).toContain('replace_background_image');
+        expect(names).toContain('execute_dynamic_action');
+        expect(names).toContain('analyze_scene');
+    });
+
+    it('canvas-editor tool count >= dashboard tool count', () => {
+        const dashTools = getToolsForPage('dashboard');
+        const canvasTools = getToolsForPage('canvas-editor');
+        expect(canvasTools.length).toBeGreaterThan(dashTools.length);
     });
 });

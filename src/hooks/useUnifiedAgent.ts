@@ -217,6 +217,11 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         hideCursor();
 
         if (pendingDesignPrompt && !hadError) {
+            const engine = engineRef.current?.current ?? engineRef.current;
+            if (!engine) {
+                // No engine (e.g. dashboard) — tell user to navigate to editor
+                return 'I need a canvas to create designs. Please open a creative set in the editor first, then I can design for you.';
+            }
             return await runGenerateFlow(pendingDesignPrompt) || 'Design generated.';
         }
         const reply = serviceRef.current.getLastReply();

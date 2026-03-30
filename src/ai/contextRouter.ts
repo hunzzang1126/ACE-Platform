@@ -153,8 +153,10 @@ export function buildContextSystemPrompt(ctx: ContextInfo): string {
         case 'dashboard':
             return `${header}
 ${snapshot}
-Tools: execute_dynamic_action (JS eval on stores), generate_full_design
-For CRUD: use execute_dynamic_action. Use analyze_scene to inspect state.${mem}`;
+Tools: execute_dynamic_action (JS eval on stores)
+Dashboard has NO canvas. You CANNOT design here.
+Workflow: 1) create_creative_set → 2) navigate_to editor → 3) THEN design.
+For project CRUD: use execute_dynamic_action with useProjectStore/useDesignStore.${mem}`;
 
         case 'size-dashboard':
             return `${header}

@@ -5,7 +5,7 @@
 // ─────────────────────────────────────────────────
 
 import { AgentContext, type AgentMessage, type ToolCallRecord, type SceneNodeInfo } from './agentContext';
-import { ALL_TOOLS } from './agentTools';
+import { getToolsForPage } from './agentTools';
 import { toClaudeTools } from './aceToolDef';
 import { executeToolCall, type ExecutionResult } from './commandExecutor';
 import { buildContext, buildContextSystemPrompt, enrichMessageWithContext } from './contextRouter';
@@ -63,14 +63,14 @@ export class AiService {
         progress.onThinking('Analyzing your request...');
         await nextFrame();
 
-        try { await this.agenticLoop(engine, systemPrompt, enrichedMessage, progress, executorOverride); }
+        try { await this.agenticLoop(engine, systemPrompt, enrichedMessage, progress, ctx.page, executorOverride); }
         catch (err) { progress.onError(`AI Error: ${err}`); }
         this.saveInteractionMemory(userMessage).catch(() => {});
     }
 
-    private async agenticLoop(engine: Engine, systemPrompt: string, enrichedUserMessage: string, progress: LiveProgress, executorOverride?: ToolExecutorOverride): Promise<void> {
+    private async agenticLoop(engine: Engine, systemPrompt: string, enrichedUserMessage: string, progress: LiveProgress, page: import('./contextRouter').PageContext, executorOverride?: ToolExecutorOverride): Promise<void> {
         const messages = this.buildClaudeMessages(enrichedUserMessage);
-        const tools = toClaudeTools(ALL_TOOLS);
+        const tools = toClaudeTools(getToolsForPage(page));
         let rounds = 0, finished = false;
         const allToolRecords: ToolCallRecord[] = [];
         await nextFrame();

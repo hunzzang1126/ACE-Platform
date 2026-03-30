@@ -5,6 +5,8 @@
 // execute_dynamic_action is the PRIMARY tool.
 // Only tools that need async APIs or special orchestration remain.
 
+import type { PageContext } from './contextRouter';
+
 export interface ToolDefinition {
     name: string;
     description: string;
@@ -201,4 +203,43 @@ export function getToolsForApi(): Array<{
  */
 export function getToolByName(name: string): ToolDefinition | undefined {
     return ALL_TOOLS.find(t => t.name === name);
+}
+
+// ── Page-Filtered Tools ──────────────────────────
+// Dashboard: NO canvas tools (engine doesn't exist)
+// Size-dashboard: store tools + element tools, no generate_full_design
+// Canvas-editor: full set
+
+/** Canvas tools that REQUIRE an engine instance. */
+const CANVAS_ONLY_TOOLS = new Set([
+    'generate_full_design',
+    'replace_background_image',
+    'generate_image',
+    'add_text',
+    'add_button',
+    'analyze_scene',
+]);
+
+/**
+ * Return only the tools that are valid for the given page context.
+ * Prevents AI from calling canvas tools when no engine is connected.
+ */
+export function getToolsForPage(page: PageContext): ToolDefinition[] {
+    switch (page) {
+        case 'dashboard':
+            // Dashboard: only execute_dynamic_action (for store CRUD)
+            // Canvas tools are blocked — engine doesn't exist on this page
+            return ALL_TOOLS.filter(t => !CANVAS_ONLY_TOOLS.has(t.name));
+
+        case 'size-dashboard':
+            // Size dashboard: store tools + element tools, no design generation
+            return ALL_TOOLS.filter(t => t.name !== 'generate_full_design' && t.name !== 'replace_background_image');
+
+        case 'canvas-editor':
+            // Full access
+            return ALL_TOOLS;
+
+        default:
+            return ALL_TOOLS;
+    }
 }
