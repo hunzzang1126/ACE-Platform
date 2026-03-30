@@ -175,10 +175,11 @@ export function GeneralEditorPage() {
                         width: v.preset.width,
                         height: v.preset.height,
                     }))}
-                    onExportVariant={async (_variantId: string) => {
-                        // TODO: Wire to actual canvas export (renderVariantToCanvas)
-                        // For now return a placeholder — will connect to export engine
-                        return 'data:image/png;base64,placeholder';
+                    onExportVariant={async (variantId: string) => {
+                        const variant = creativeSet.variants.find(v => v.id === variantId);
+                        if (!variant) return 'data:image/png;base64,';
+                        const { renderVariantToCanvas } = await import('@/components/creativeset/previewRenderer');
+                        return renderVariantToCanvas(variant);
                     }}
                 />
             )}
