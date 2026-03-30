@@ -61,7 +61,8 @@ export const useDesignStore = create<DesignState>()(
                         if (cs) { cs.name = name; cs.updatedAt = new Date().toISOString(); if (state.activeCreativeSetId === id) state.creativeSet = cs; }
                     });
                     // ★ REGRESSION GUARD: Cross-store sync AFTER set()
-                    try { const { useProjectStore } = require('@/stores/projectStore'); const ps = useProjectStore.getState(); const match = ps.creativeSets.find((s: { id: string }) => s.id === id); if (match && match.name !== name) useProjectStore.getState().renameCreativeSet(id, name); } catch { /* */ }
+                    // ★ FIX (v0.0.0.290): Use relative path — Vite's @/ alias doesn't work with CJS require()
+                    try { const { useProjectStore } = require('./projectStore'); const ps = useProjectStore.getState(); const match = ps.creativeSets.find((s: { id: string }) => s.id === id); if (match && match.name !== name) useProjectStore.getState().renameCreativeSet(id, name); } catch { /* */ }
                 },
 
                 addElementToMaster: (element) => {

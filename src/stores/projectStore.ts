@@ -144,11 +144,12 @@ export const useProjectStore = create<ProjectState>()(
                     const s = state.creativeSets.find((s) => s.id === id);
                     if (s) { s.name = name; s.updatedAt = new Date().toISOString(); }
                 });
-                // ★ Cross-store sync: also update designStore so name persists on reload.
+                // ★ Cross-store sync: update designStore so name persists on reload.
                 // Called AFTER set() to avoid Zustand deadlock (REGRESSION GUARD).
-                // Guard: only sync if name actually differs (prevents infinite loop).
+                // ★ FIX (v0.0.0.290): Use top-level imported useDesignStore directly.
+                // Previous code used require('@/stores/designStore') which silently failed
+                // because Vite's @ alias doesn't work with CJS require().
                 try {
-                    const { useDesignStore } = require('@/stores/designStore');
                     const ds = useDesignStore.getState();
                     const designCS = ds.allCreativeSets[id];
                     if (designCS && designCS.name !== name) {
