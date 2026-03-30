@@ -57,6 +57,8 @@ export interface EngineNode {
     locked?: boolean;
     // Name (for layer panel display)
     name?: string;
+    // Rotation angle (degrees, from Fabric.js)
+    angle?: number;
 }
 
 export interface CanvasEngineState {

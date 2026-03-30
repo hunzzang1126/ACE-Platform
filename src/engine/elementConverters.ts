@@ -24,7 +24,7 @@ import {
 // ── Engine Node → Shape Element ──
 
 export function engineNodeToShapeElement(node: EngineNode, canvasW: number, canvasH: number): ShapeElement {
-    const constraints = absoluteToConstraints(node.x, node.y, node.w, node.h, canvasW, canvasH);
+    const constraints = absoluteToConstraints(node.x, node.y, node.w, node.h, canvasW, canvasH, node.angle ?? 0);
     const fill = rgbFloatToHex(node.fill_r ?? 0.5, node.fill_g ?? 0.5, node.fill_b ?? 0.5);
     const coverage = (node.w * node.h) / (canvasW * canvasH);
     let name = node.name || `Shape ${node.id}`;
@@ -40,7 +40,7 @@ export function engineNodeToShapeElement(node: EngineNode, canvasW: number, canv
 // ── Engine Node → Text Element ──
 
 export function engineNodeToTextElement(node: EngineNode, canvasW: number, canvasH: number): TextElement {
-    const constraints = absoluteToConstraints(node.x, node.y, node.w, node.h, canvasW, canvasH);
+    const constraints = absoluteToConstraints(node.x, node.y, node.w, node.h, canvasW, canvasH, node.angle ?? 0);
     const animation = getAnimationForElement(`engine-${node.id}`);
     const shadow = node.shadow_color ? { offsetX: node.shadow_offsetX ?? 0, offsetY: node.shadow_offsetY ?? 0, blur: node.shadow_blur ?? 0, color: node.shadow_color } : undefined;
     const textEffect = (node.textEffect_type && node.textEffect_type !== 'none') ? { type: node.textEffect_type, intensity: node.textEffect_intensity ?? 50, color: node.textEffect_color ?? '#ffffff' } : undefined;
@@ -50,7 +50,7 @@ export function engineNodeToTextElement(node: EngineNode, canvasW: number, canva
 // ── Engine Node → Image Element ──
 
 export function engineNodeToImageElement(node: EngineNode, canvasW: number, canvasH: number): ImageElement {
-    const constraints = absoluteToConstraints(node.x, node.y, node.w, node.h, canvasW, canvasH);
+    const constraints = absoluteToConstraints(node.x, node.y, node.w, node.h, canvasW, canvasH, node.angle ?? 0);
     const animation = getAnimationForElement(`engine-${node.id}`);
     const shadow = node.shadow_color ? { offsetX: node.shadow_offsetX ?? 0, offsetY: node.shadow_offsetY ?? 0, blur: node.shadow_blur ?? 0, color: node.shadow_color } : undefined;
     return { id: `engine-${node.id}`, name: node.name || `Image ${node.id}`, type: 'image', constraints, src: node.src ?? '', fit: node.objectFit ?? 'cover', naturalWidth: node.naturalWidth, naturalHeight: node.naturalHeight, opacity: node.opacity ?? 1, visible: node.visible !== false, locked: node.locked ?? false, zIndex: node.z_index ?? 1, shadow, animation } as ImageElement;

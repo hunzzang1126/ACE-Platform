@@ -144,6 +144,7 @@ export function fabricToEngineNode(obj: FabricObject): EngineNode {
         gradient_start: gradientStart,
         gradient_end: gradientEnd,
         gradient_angle: gradientAngle,
+        angle: obj.angle ?? 0,
     };
 
     // Text-specific properties

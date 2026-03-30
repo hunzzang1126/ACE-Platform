@@ -23,6 +23,7 @@ export function getGradientCache(key: string): CachedGradient | undefined { retu
 
 export function absoluteToConstraints(
     x: number, y: number, w: number, h: number, canvasW: number, canvasH: number,
+    angle: number = 0,
 ): ElementConstraints {
     const centerX = x + w / 2, relCenterX = centerX / canvasW;
     const centerY = y + h / 2, relCenterY = centerY / canvasH;
@@ -48,10 +49,8 @@ export function absoluteToConstraints(
     else { size = { widthMode: 'fixed', heightMode: 'fixed', width: Math.round(w), height: Math.round(h) }; }
 
     // ★ Cache original absolute position for perfect roundtrip on same-size canvas.
-    // When constraintsToAbsolute is called with the SAME canvasW/canvasH, it returns
-    // these exact values — eliminating Math.round drift from anchor conversions.
     return {
-        horizontal, vertical, size, rotation: 0,
+        horizontal, vertical, size, rotation: angle,
         _absOrigin: { x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h), cw: canvasW, ch: canvasH },
     };
 }

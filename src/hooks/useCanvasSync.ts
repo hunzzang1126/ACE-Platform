@@ -171,6 +171,7 @@ function restoreShape(engine: Engine, shape: ShapeElement, canvasW: number, canv
     if (shape.shadow) { try { const [sr, sg, sb, sa] = parseShadow(shape.shadow.color); engine.set_shadow(nodeId, shape.shadow.offsetX, shape.shadow.offsetY, shape.shadow.blur, sr, sg, sb, sa); } catch { /* ok */ } }
     if (shape.visible === false) try { engine.set_visible?.(nodeId, false); } catch { /* ok */ }
     if (typeof engine.set_z_index === 'function') engine.set_z_index(nodeId, shape.zIndex ?? 0);
+    if (shape.constraints.rotation && typeof engine.set_angle === 'function') try { engine.set_angle(nodeId, shape.constraints.rotation); } catch { /* ok */ }
 }
 
 function restoreText(engine: Engine, text: TextElement, canvasW: number, canvasH: number, parseShadow: typeof parseShadowColor): void {
@@ -186,6 +187,7 @@ function restoreText(engine: Engine, text: TextElement, canvasW: number, canvasH
     if (text.textEffect && text.textEffect.type !== 'none') { try { engine.set_text_effect(nodeId, text.textEffect.type, text.textEffect.intensity ?? 50, text.textEffect.color ?? '#ffffff'); } catch { /* ok */ } }
     if (text.visible === false) try { engine.set_visible?.(nodeId, false); } catch { /* ok */ }
     if (typeof engine.set_z_index === 'function') engine.set_z_index(nodeId, text.zIndex ?? 1);
+    if (text.constraints.rotation && typeof engine.set_angle === 'function') try { engine.set_angle(nodeId, text.constraints.rotation); } catch { /* ok */ }
 }
 
 function restoreImage(engine: Engine, img: ImageElement, canvasW: number, canvasH: number, parseShadow: typeof parseShadowColor, pendingLoads: (() => Promise<void>)[]): void {
@@ -210,6 +212,7 @@ function restoreImage(engine: Engine, img: ImageElement, canvasW: number, canvas
             }
             if (ci.opacity !== undefined && ci.opacity !== 1) try { engine.set_opacity(nodeId, ci.opacity); } catch { /* ok */ }
             if (ci.shadow) { try { const [sr, sg, sb, sa] = parseShadow(ci.shadow.color); engine.set_shadow(nodeId, ci.shadow.offsetX, ci.shadow.offsetY, ci.shadow.blur, sr, sg, sb, sa); } catch { /* ok */ } }
+            if (ci.constraints.rotation && typeof engine.set_angle === 'function') try { engine.set_angle(nodeId, ci.constraints.rotation); } catch { /* ok */ }
         });
     }
 }

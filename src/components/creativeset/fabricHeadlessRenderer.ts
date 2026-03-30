@@ -73,6 +73,7 @@ function addShapeToFabric(fc: Canvas, el: ShapeElement, abs: AbsRect): void {
             left: x, top: y, rx: w / 2, ry: h / 2,
             fill: `rgb(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)})`,
             opacity: el.opacity ?? 1,
+            angle: el.constraints.rotation ?? 0,
         });
         fc.add(ellipse);
         return;
@@ -83,6 +84,7 @@ function addShapeToFabric(fc: Canvas, el: ShapeElement, abs: AbsRect): void {
         opacity: el.opacity ?? 1,
         rx: el.borderRadius ?? 0,
         ry: el.borderRadius ?? 0,
+        angle: el.constraints.rotation ?? 0,
     };
 
     if (el.gradientStart && el.gradientEnd) {
@@ -122,6 +124,7 @@ function addTextToFabric(fc: Canvas, el: TextElement, abs: AbsRect): void {
         lineHeight: el.lineHeight ?? 1.4,
         charSpacing: (el.letterSpacing ?? 0) * 10,
         opacity: el.opacity ?? 1,
+        angle: el.constraints.rotation ?? 0,
     });
     fc.add(tb);
 }
@@ -144,6 +147,7 @@ async function addImageToFabric(fc: Canvas, el: ImageElement, abs: AbsRect): Pro
             scaleX: w / Math.max(natW, 1),
             scaleY: h / Math.max(natH, 1),
             opacity: el.opacity ?? 1,
+            angle: el.constraints.rotation ?? 0,
         });
         fc.add(img);
     } catch {
@@ -159,6 +163,7 @@ function addButtonToFabric(fc: Canvas, el: any, abs: AbsRect): void {
         fill: el.backgroundColor || '#2563eb',
         rx: el.borderRadius ?? 6, ry: el.borderRadius ?? 6,
         opacity: el.opacity ?? 1,
+        angle: el.constraints?.rotation ?? 0,
     });
     fc.add(bg);
 

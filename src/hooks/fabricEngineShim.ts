@@ -280,6 +280,10 @@ export function createEngineShim(
             const obj = findById(id);
             if (obj) { obj.set({ left: x, top: y }); obj.setCoords(); fc.renderAll(); }
         },
+        set_angle: (id: number, angle: number) => {
+            const obj = findById(id);
+            if (obj) { obj.set({ angle }); obj.setCoords(); fc.renderAll(); }
+        },
         set_size: (id: number, w: number, h: number) => {
             const obj = findById(id);
             if (!obj) return;
