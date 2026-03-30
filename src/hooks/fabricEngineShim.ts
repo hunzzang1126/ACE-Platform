@@ -40,6 +40,8 @@ export function createEngineShim(
         ...createAnimationMethods(fc, userObjects),
 
         // ── Query ────────────────────────────────────────
+        // ★ _findById: internal — used by restoreImage to set __glidPersistSrc
+        _findById: findById,
         get_all_nodes: () => JSON.stringify(userObjects().map(fabricToEngineNode)),
         get_canvas_size: () => ({ width: artboardW, height: artboardH }),
         getCanvasJSON: (): string => JSON.stringify(fc.toObject(GLID_CUSTOM_PROPS)),

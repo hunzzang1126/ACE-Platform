@@ -193,10 +193,21 @@ function restoreImage(engine: Engine, img: ImageElement, canvasW: number, canvas
     const isOut = w <= 0 || h <= 0 || x >= canvasW || y >= canvasH || x + w <= 0 || y + h <= 0;
     if (isOut) { w = Math.min(canvasW * 0.5, img.naturalWidth ?? canvasW * 0.5); h = Math.min(canvasH * 0.5, img.naturalHeight ?? canvasH * 0.5); x = Math.round((canvasW - w) / 2); y = Math.round((canvasH - h) / 2); }
     if (img.src) {
+        // ★ DATA INTEGRITY: Remember the stored src (idb:// or data:) BEFORE resolving.
+        // After resolve, the blob: URL is transient and session-scoped.
+        // __glidPersistSrc preserves the stable ref for subsequent saves.
+        const stableSrc = img.src;
         const cx = x, cy = y, cw = w, ch = h, ci = img;
         pendingLoads.push(async () => {
             const resolved = isAssetRef(ci.src!) ? await resolveAsset(ci.src!) : ci.src!;
             const nodeId = await engine.add_image(cx, cy, resolved, cw, ch, ci.name, ci.zIndex, ci.naturalWidth, ci.naturalHeight);
+            // ★ Set persistent src on the Fabric object so save reads idb:// not blob:
+            if (nodeId != null && engine._findById) {
+                try {
+                    const fabricObj = engine._findById(nodeId);
+                    if (fabricObj) (fabricObj as any).__glidPersistSrc = stableSrc;
+                } catch { /* ok */ }
+            }
             if (ci.opacity !== undefined && ci.opacity !== 1) try { engine.set_opacity(nodeId, ci.opacity); } catch { /* ok */ }
             if (ci.shadow) { try { const [sr, sg, sb, sa] = parseShadow(ci.shadow.color); engine.set_shadow(nodeId, ci.shadow.offsetX, ci.shadow.offsetY, ci.shadow.blur, sr, sg, sb, sa); } catch { /* ok */ } }
         });

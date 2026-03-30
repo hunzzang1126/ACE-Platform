@@ -165,8 +165,14 @@ export function fabricToEngineNode(obj: FabricObject): EngineNode {
 
     // Image-specific properties
     if (aceType === 'image') {
+        // ★ DATA INTEGRITY: Prefer __glidPersistSrc (set during restore) over _element.src.
+        // _element.src is a transient blob: URL that dies when the session ends.
+        // __glidPersistSrc holds the stable idb:// or data: URL that survives persist cycles.
+        const persistSrc = (obj as any).__glidPersistSrc;
         const imgEl = (obj as any)._element;
-        if (imgEl?.src) {
+        if (persistSrc) {
+            node.src = persistSrc;
+        } else if (imgEl?.src) {
             node.src = imgEl.src;
         }
         // ★ REGRESSION GUARD: SVGs without explicit width/height attributes report
@@ -226,7 +232,7 @@ export function fabricToEngineNode(obj: FabricObject): EngineNode {
 }
 
 // ── Custom properties to include in serialization ──
-export const GLID_CUSTOM_PROPS = ['__glidId', '__glidZIndex', '__glidArtboard', '__glidName', '__glidGradientStart', '__glidGradientEnd', '__glidGradientAngle', '__glidCustomStyles', '__glidTextEffectType', '__glidTextEffectIntensity', '__glidTextEffectColor', '__glidOriginalFill'];
+export const GLID_CUSTOM_PROPS = ['__glidId', '__glidZIndex', '__glidArtboard', '__glidName', '__glidGradientStart', '__glidGradientEnd', '__glidGradientAngle', '__glidCustomStyles', '__glidTextEffectType', '__glidTextEffectIntensity', '__glidTextEffectColor', '__glidOriginalFill', '__glidPersistSrc'];
 
 // Patch a Fabric object to include Glid custom props in toObject()
 export function patchAceProps(obj: FabricObject): void {

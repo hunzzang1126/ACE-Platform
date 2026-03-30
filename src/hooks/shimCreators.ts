@@ -168,6 +168,11 @@ export function createCreatorMethods(ctx: ShimContext) {
                 img.set({ left: x, top: y, scaleX, scaleY });
                 (img as any).__glidId = id;
                 (img as any).__glidName = name || `Image #${id}`;
+                // ★ DATA INTEGRITY: Capture original src before any blob: conversion.
+                // data: URLs and http(s): URLs are stable, blob: URLs are not.
+                if (src.startsWith('data:') || src.startsWith('idb://')) {
+                    (img as any).__glidPersistSrc = src;
+                }
                 const targetZIndex = zIndex ?? userObjects().length;
                 (img as any).__glidZIndex = targetZIndex;
                 patchAceProps(img);
