@@ -165,28 +165,33 @@ describe('contextRouter', () => {
 // ═══════════════════════════════════════════════════
 
 describe('getToolsForPage — page-aware tool filtering', () => {
-    const canvasOnlyTools = [
+    // These tools ONLY exist in ALL_TOOLS and require an engine.
+    // add_text, add_button have DASHBOARD_TOOLS equivalents — not listed here.
+    const engineExclusiveTools = [
         'generate_full_design',
         'replace_background_image',
         'generate_image',
-        'add_text',
-        'add_button',
-        'analyze_scene',
     ];
 
-    it('★ dashboard: NO canvas tools (engine does not exist)', () => {
+    it('★ dashboard: NO canvas-engine tools', () => {
         const tools = getToolsForPage('dashboard');
         const names = tools.map(t => t.name);
-        for (const tool of canvasOnlyTools) {
+        for (const tool of engineExclusiveTools) {
             expect(names).not.toContain(tool);
         }
     });
 
-    it('★ dashboard: includes execute_dynamic_action', () => {
+    it('★ dashboard: includes DASHBOARD_TOOLS (CRUD, sizes, navigation)', () => {
         const tools = getToolsForPage('dashboard');
         const names = tools.map(t => t.name);
         expect(names).toContain('execute_dynamic_action');
+        expect(names).toContain('create_creative_set');
+        expect(names).toContain('delete_creative_set');
+        expect(names).toContain('navigate_to');
+        expect(names).toContain('add_size');
+        expect(names).toContain('list_creative_sets');
     });
+
 
     it('size-dashboard: no generate_full_design or replace_background_image', () => {
         const tools = getToolsForPage('size-dashboard');
@@ -195,11 +200,13 @@ describe('getToolsForPage — page-aware tool filtering', () => {
         expect(names).not.toContain('replace_background_image');
     });
 
-    it('size-dashboard: allows add_text and analyze_scene', () => {
+    it('size-dashboard: has add_size, add_text, add_shape', () => {
         const tools = getToolsForPage('size-dashboard');
         const names = tools.map(t => t.name);
         expect(names).toContain('add_text');
-        expect(names).toContain('analyze_scene');
+        expect(names).toContain('add_size');
+        expect(names).toContain('add_shape');
+        expect(names).toContain('navigate_to');
     });
 
     it('canvas-editor: has ALL tools including generate_full_design', () => {

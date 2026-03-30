@@ -206,9 +206,11 @@ export function getToolByName(name: string): ToolDefinition | undefined {
 }
 
 // ── Page-Filtered Tools ──────────────────────────
-// Dashboard: NO canvas tools (engine doesn't exist)
-// Size-dashboard: store tools + element tools, no generate_full_design
-// Canvas-editor: full set
+// Merges ALL_TOOLS (canvas) + DASHBOARD_TOOLS (store/CRUD) per page.
+// Dashboard & Size-dashboard: DASHBOARD_TOOLS primary, no canvas-engine tools.
+// Canvas-editor: ALL_TOOLS primary + DASHBOARD_TOOLS overlay for store ops.
+
+import { DASHBOARD_TOOLS } from './dashboardTools';
 
 /** Canvas tools that REQUIRE an engine instance. */
 const CANVAS_ONLY_TOOLS = new Set([
@@ -220,26 +222,44 @@ const CANVAS_ONLY_TOOLS = new Set([
     'analyze_scene',
 ]);
 
+/** Merge two tool arrays, deduplicating by name (first wins). */
+function mergeTools(...arrays: ToolDefinition[][]): ToolDefinition[] {
+    const seen = new Set<string>();
+    const result: ToolDefinition[] = [];
+    for (const arr of arrays) {
+        for (const tool of arr) {
+            if (!seen.has(tool.name)) {
+                seen.add(tool.name);
+                result.push(tool);
+            }
+        }
+    }
+    return result;
+}
+
 /**
  * Return only the tools that are valid for the given page context.
- * Prevents AI from calling canvas tools when no engine is connected.
+ * Merges DASHBOARD_TOOLS (store CRUD, sizes, navigation) with
+ * the appropriate subset of ALL_TOOLS (canvas-engine tools).
  */
 export function getToolsForPage(page: PageContext): ToolDefinition[] {
     switch (page) {
         case 'dashboard':
-            // Dashboard: only execute_dynamic_action (for store CRUD)
-            // Canvas tools are blocked — engine doesn't exist on this page
-            return ALL_TOOLS.filter(t => !CANVAS_ONLY_TOOLS.has(t.name));
+            // DASHBOARD_TOOLS only — no canvas tools (engine doesn't exist)
+            return DASHBOARD_TOOLS;
 
         case 'size-dashboard':
-            // Size dashboard: store tools + element tools, no design generation
-            return ALL_TOOLS.filter(t => t.name !== 'generate_full_design' && t.name !== 'replace_background_image');
+            // DASHBOARD_TOOLS + canvas read/element tools (no full design gen)
+            return mergeTools(
+                DASHBOARD_TOOLS,
+                ALL_TOOLS.filter(t => !CANVAS_ONLY_TOOLS.has(t.name)),
+            );
 
         case 'canvas-editor':
-            // Full access
-            return ALL_TOOLS;
+            // ALL canvas tools + DASHBOARD_TOOLS for store ops
+            return mergeTools(ALL_TOOLS, DASHBOARD_TOOLS);
 
         default:
-            return ALL_TOOLS;
+            return mergeTools(ALL_TOOLS, DASHBOARD_TOOLS);
     }
 }

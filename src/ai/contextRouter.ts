@@ -153,26 +153,26 @@ export function buildContextSystemPrompt(ctx: ContextInfo): string {
         case 'dashboard':
             return `${header}
 ${snapshot}
-Tools: execute_dynamic_action (JS eval on stores)
-Dashboard has NO canvas. You CANNOT design here.
-Workflow: 1) create_creative_set → 2) navigate_to editor → 3) THEN design.
-For project CRUD: use execute_dynamic_action with useProjectStore/useDesignStore.${mem}`;
+Tools: create_creative_set, delete_creative_set, rename_creative_set, list_creative_sets, navigate_to, execute_dynamic_action
+Dashboard has NO canvas. You CANNOT design or add elements here.
+Workflow: 1) create_creative_set(name, width, height) → 2) navigate_to(page:"editor") → user enters editor → THEN design.
+For bulk ops: use execute_dynamic_action with useProjectStore/useDesignStore.${mem}`;
 
         case 'size-dashboard':
             return `${header}
 ${snapshot}
-Tools: execute_dynamic_action, add_text, add_button, analyze_scene
-For variants: useDesignStore.getState().addVariant({ width, height, label })
+Tools: add_size, remove_size, navigate_to, add_text, add_button, add_shape, update_element_text, update_element_property, set_animation, execute_dynamic_action, analyze_scene
+For adding sizes: add_size(width, height). For editing: navigate_to(page:"detail", variant_query:"300x250").
 Common sizes: 300x250, 728x90, 160x600, 320x50, 970x250, 300x600${mem}`;
 
         case 'canvas-editor': {
             const empty = ctx.elementCount === 0;
             return `${header}
 ${snapshot}
-Tools: generate_full_design, replace_background_image, generate_image, add_text, add_button, execute_dynamic_action, analyze_scene
+Tools: generate_full_design, replace_background_image, generate_image, add_text, add_button, execute_dynamic_action, analyze_scene, add_size, navigate_to
 ${empty ? 'Canvas empty → generate_full_design for new designs.' : 'For modifications → execute_dynamic_action. For redesign → generate_full_design.'}
-For background → replace_background_image. Use analyze_scene to read store API.
-Write real marketing copy. No placeholder text.${mem}`;
+For background → replace_background_image. For standalone images → generate_image (returns URL, then use execute_dynamic_action + engine.add_image to place).
+Use analyze_scene to read store API. Write real marketing copy. No placeholder text.${mem}`;
         }
     }
 }
