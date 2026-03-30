@@ -195,7 +195,7 @@ const styles: Record<string, React.CSSProperties> = {
         fontFamily: 'Inter, system-ui, sans-serif',
     },
     header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-    title: { fontSize: 18, fontWeight: 700, color: '#fff', letterSpacing: -0.5 },
+    title: { fontSize: 18, fontWeight: 700, color: '#1a1a2e', letterSpacing: -0.5 },
     closeBtn: {
         background: 'none', border: 'none', color: '#888', cursor: 'pointer',
         fontSize: 18, padding: '2px 6px',
@@ -203,7 +203,7 @@ const styles: Record<string, React.CSSProperties> = {
     form: { display: 'flex', flexDirection: 'column', gap: 10 },
     input: {
         padding: '10px 14px', background: '#f5f5f7', border: '1px solid #e2e8f0',
-        borderRadius: 6, color: '#e0e0e0', fontSize: 13, outline: 'none',
+        borderRadius: 6, color: '#1a1a2e', fontSize: 13, outline: 'none',
         transition: 'border-color 0.15s',
     },
     error: {
@@ -224,7 +224,7 @@ const styles: Record<string, React.CSSProperties> = {
     },
     googleBtn: {
         padding: '10px 0', background: '#ffffff10', border: '1px solid #e2e8f0',
-        borderRadius: 6, color: '#ccc', fontSize: 12, fontWeight: 500, cursor: 'pointer',
+        borderRadius: 6, color: '#333', fontSize: 12, fontWeight: 500, cursor: 'pointer',
         transition: 'all 0.15s',
     },
     switchRow: {
@@ -244,7 +244,7 @@ const styles: Record<string, React.CSSProperties> = {
         fontSize: 18, fontWeight: 700, color: '#fff',
     },
     profileInfo: { display: 'flex', flexDirection: 'column', gap: 2 },
-    profileEmail: { fontSize: 13, fontWeight: 500, color: '#e0e0e0' },
+    profileEmail: { fontSize: 14, fontWeight: 700, color: '#1a1a2e' },
     profileMeta: { fontSize: 10, color: '#888' },
     signOutBtn: {
         padding: '8px 0', background: 'transparent', border: '1px solid #ef4444',

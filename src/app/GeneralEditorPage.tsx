@@ -121,7 +121,6 @@ export function GeneralEditorPage() {
         <div className="cs-layout">
             <CreativeSetTopBar
                 setName={creativeSet.name}
-                variantCount={creativeSet.variants.length}
                 onPublish={() => setShowPublishModal(true)}
             />
             <div className="cs-body">
