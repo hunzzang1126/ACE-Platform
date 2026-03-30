@@ -20,12 +20,12 @@ export function ProtectedRoute({ children, adminOnly = false }: ProtectedRoutePr
     const syncSession = useAuthStore((s) => s.syncSessionFromSupabase);
     const signOut = useAuthStore((s) => s.signOut);
 
-    // Auto-sync session on mount if user exists but role is missing
+    // ★ Always re-sync session on mount to pick up plan changes (e.g., after Stripe checkout)
     useEffect(() => {
-        if (user && !role) {
+        if (user) {
             syncSession();
         }
-    }, [user, role, syncSession]);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps — intentional mount-only
 
     // Check 24h TTL on mount — force re-auth if stale
     useEffect(() => {
