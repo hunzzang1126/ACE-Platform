@@ -23,7 +23,16 @@ export async function removeBackground(
         const mod = await import('@imgly/background-removal');
         removeBg = mod.removeBackground;
     } catch {
-        // ★ Stale chunk hash after Vercel redeploy — tell user to refresh
+        // ★ Stale chunk hash after Vercel redeploy — auto-reload once
+        const reloadKey = 'bgRemovalReloadAttempt';
+        const lastAttempt = sessionStorage.getItem(reloadKey);
+        const now = Date.now();
+        if (!lastAttempt || now - parseInt(lastAttempt, 10) > 30000) {
+            sessionStorage.setItem(reloadKey, String(now));
+            window.location.reload();
+            // Return a promise that never resolves (page is reloading)
+            return new Promise<Blob>(() => {});
+        }
         throw new Error(
             'Background removal module failed to load. Please refresh the page (Cmd+Shift+R) and try again.',
         );
