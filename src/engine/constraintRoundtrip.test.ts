@@ -3,8 +3,8 @@
 import { describe, it, expect } from 'vitest';
 import { absoluteToConstraints, constraintsToAbsolute } from '@/engine/constraintUtils';
 
-function roundtrip(x: number, y: number, w: number, h: number, canvasW: number, canvasH: number) {
-    const constraints = absoluteToConstraints(x, y, w, h, canvasW, canvasH);
+function roundtrip(x: number, y: number, w: number, h: number, canvasW: number, canvasH: number, angle = 0) {
+    const constraints = absoluteToConstraints(x, y, w, h, canvasW, canvasH, angle);
     const result = constraintsToAbsolute(constraints, canvasW, canvasH);
     return { input: { x, y, w, h }, constraints, output: result };
 }
@@ -47,4 +47,44 @@ describe('Constraint roundtrip fidelity', () => {
             }
         });
     }
+});
+
+// ── Rotation persistence tests ──────────────────
+
+describe('Rotation roundtrip', () => {
+    const angles = [0, 15, 30, 45, 90, 135, 180, 270, 359, -45, 12.5];
+
+    it('rotation is stored in constraints', () => {
+        const constraints = absoluteToConstraints(50, 50, 100, 100, 300, 250, 45);
+        expect(constraints.rotation).toBe(45);
+    });
+
+    it('rotation: 0 is default when angle not provided', () => {
+        const constraints = absoluteToConstraints(50, 50, 100, 100, 300, 250);
+        expect(constraints.rotation).toBe(0);
+    });
+
+    for (const angle of angles) {
+        it(`angle ${angle} survives roundtrip`, () => {
+            const constraints = absoluteToConstraints(50, 100, 200, 80, 1000, 1800, angle);
+            expect(constraints.rotation).toBe(angle);
+            // Position should still roundtrip perfectly
+            const result = constraintsToAbsolute(constraints, 1000, 1800);
+            expect(result.x).toBe(50);
+            expect(result.y).toBe(100);
+        });
+    }
+
+    it('rotation preserved across multiple canvas sizes', () => {
+        const sizes = [
+            { cw: 300, ch: 250 },
+            { cw: 728, ch: 90 },
+            { cw: 160, ch: 600 },
+            { cw: 1080, ch: 1080 },
+        ];
+        for (const { cw, ch } of sizes) {
+            const c = absoluteToConstraints(10, 10, 80, 40, cw, ch, 33);
+            expect(c.rotation).toBe(33);
+        }
+    });
 });
