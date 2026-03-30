@@ -157,6 +157,14 @@ export const useDesignStore = create<DesignState>()(
                     set((state) => {
                         const cs = getActiveCS(state); if (!cs) return;
                         const variant = cs.variants.find((v) => v.id === variantId); if (!variant) return;
+
+                        // ★ DATA LOSS GUARD (store-level): Never overwrite N>0 elements with empty array.
+                        // Double-safety: even if hook-level guard is bypassed, the store blocks it.
+                        if (elements.length === 0 && variant.elements.length > 0) {
+                            console.error(`[designStore] ★ BLOCKED empty replaceVariantElements: variant has ${variant.elements.length} elements. Refusing to overwrite with 0.`);
+                            return;
+                        }
+
                         variant.elements = elements;
                         if (fabricJSON) variant.fabricJSON = fabricJSON;
 

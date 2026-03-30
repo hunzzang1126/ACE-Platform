@@ -44,6 +44,17 @@ export function useCanvasSync(variantId: string | undefined, canvasW: number, ca
         let elements: DesignElement[] = [];
         try { elements = readNodesFromEngine(engine, canvasW, canvasH); } catch (err) { console.warn('[useCanvasSync] Failed:', err); }
         addOverlaysAndSort(elements, overlayElements, canvasW, canvasH);
+
+        // ★ DATA LOSS GUARD: Never overwrite existing data with empty elements.
+        // If the engine returns 0 elements but the store already has data,
+        // something went wrong (engine destroyed, hot reload, etc.) — ABORT.
+        const existingVariant = cs.variants.find(v => v.id === variantId);
+        const existingCount = existingVariant?.elements?.length ?? 0;
+        if (elements.length === 0 && existingCount > 0) {
+            console.warn(`[useCanvasSync] ★ BLOCKED empty save: store has ${existingCount} elements, engine returned 0. Data preserved.`);
+            return { success: false, message: 'Blocked: would overwrite existing data with empty state.' };
+        }
+
         preserveCustomStyles(elements, variantId);
         restoreIdbRefs(elements, variantId);
         replaceVariantElements(variantId, elements);
@@ -62,6 +73,15 @@ export function useCanvasSync(variantId: string | undefined, canvasW: number, ca
         if (!variantId || !cs) return { success: false, message: 'No variant or creative set active.' };
         const elements = convertNodesToElements(cachedNodes, canvasW, canvasH);
         addOverlaysAndSort(elements, overlayElements, canvasW, canvasH);
+
+        // ★ DATA LOSS GUARD: Never overwrite existing data with empty elements.
+        const existingVariant = cs.variants.find(v => v.id === variantId);
+        const existingCount = existingVariant?.elements?.length ?? 0;
+        if (elements.length === 0 && existingCount > 0) {
+            console.warn(`[useCanvasSync] ★ BLOCKED empty save (cached): store has ${existingCount} elements, cache returned 0. Data preserved.`);
+            return { success: false, message: 'Blocked: would overwrite existing data with empty state.' };
+        }
+
         restoreIdbRefs(elements, variantId);
         replaceVariantElements(variantId, elements);
 
