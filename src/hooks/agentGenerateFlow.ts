@@ -275,7 +275,15 @@ async function buildAndRender(
     try { engine.clear_scene?.(); } catch { /* ok */ }
 
     if (bgResult.hasImage && bgResult.url) {
-        try { await engine.add_image(0, 0, bgResult.url, canvasW, canvasH, 'ai_background'); cb.narrate('Background image placed on canvas.'); } catch (err) { console.warn('[UnifiedAgent] Failed to place bg image:', err); }
+        try {
+            await engine.add_image(0, 0, bgResult.url, canvasW, canvasH, 'ai_background');
+            cb.narrate('Background image placed on canvas.');
+            // ★ Register AI image in Upload Library for persistence + reuse
+            try {
+                const { saveToUploadLibrary } = await resilientImport(() => import('@/stores/uploadStore'));
+                await saveToUploadLibrary(bgResult.url, `AI: ${content?.headline?.slice(0, 40) ?? 'Background'}`, canvasW, canvasH, 'ai');
+            } catch (libErr) { console.warn('[UnifiedAgent] Upload library save failed:', libErr); }
+        } catch (err) { console.warn('[UnifiedAgent] Failed to place bg image:', err); }
     }
 
     let rendered = 0;

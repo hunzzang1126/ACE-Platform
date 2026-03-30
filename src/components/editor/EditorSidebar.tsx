@@ -191,6 +191,11 @@ export function EditorSidebar({ actions, nodes = [], selection = [], onTriggerIm
                             <SidebarUploadsTab
                                 onTriggerImageUpload={onTriggerImageUpload}
                                 onTriggerVideoUpload={onTriggerVideoUpload}
+                                onImageSelect={(blobUrl, entry) => {
+                                    if (actions?.addImage) {
+                                        actions.addImage(0, 0, blobUrl, entry.width, entry.height);
+                                    }
+                                }}
                             />
                         )}
                         {!activeInlinePanel && activeTab === 'brand' && (
