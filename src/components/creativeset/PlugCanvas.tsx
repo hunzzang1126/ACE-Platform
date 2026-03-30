@@ -177,17 +177,19 @@ export function PlugCanvas({ variants, cardRefs, containerRef }: PlugCanvasProps
                     top: 0,
                     left: 0,
                     pointerEvents: 'none',
-                    zIndex: 5,
+                    zIndex: 50,
                     overflow: 'visible',
                 }}
             >
                 <defs>
-                    <linearGradient id="plug-cable-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    {/* ★ gradientUnits='userSpaceOnUse': gradient applies in SVG coordinate space,
+                        not the path bounding box. Fixes invisible cables when path is vertical or short. */}
+                    <linearGradient id="plug-cable-grad" x1="0" y1="0" x2={svgW || 1000} y2="0" gradientUnits="userSpaceOnUse">
                         <stop offset="0%" stopColor="#4a9eff" />
                         <stop offset="50%" stopColor="#6c63ff" />
                         <stop offset="100%" stopColor="#a855f7" />
                     </linearGradient>
-                    <linearGradient id="plug-cable-active" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <linearGradient id="plug-cable-active" x1="0" y1="0" x2={svgW || 1000} y2="0" gradientUnits="userSpaceOnUse">
                         <stop offset="0%" stopColor="#60b4ff" />
                         <stop offset="100%" stopColor="#c084fc" />
                     </linearGradient>
