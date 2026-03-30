@@ -45,6 +45,14 @@ export function useCanvasSync(variantId: string | undefined, canvasW: number, ca
         try { elements = readNodesFromEngine(engine, canvasW, canvasH); } catch (err) { console.warn('[useCanvasSync] Failed:', err); }
         addOverlaysAndSort(elements, overlayElements, canvasW, canvasH);
 
+        // ★ DEBUG: Log CTA/button constraint roundtrip
+        for (const el of elements) {
+            if (el.name?.match(/button|cta|shop/i) || el.type === 'button') {
+                const c = el.constraints;
+                console.info(`[useCanvasSync] SAVE CTA "${el.name}" → H:${c.horizontal.anchor}(${c.horizontal.offset}) V:${c.vertical.anchor}(${c.vertical.offset}) Size:${c.size.width}x${c.size.height} Canvas:${canvasW}x${canvasH}`);
+            }
+        }
+
         // ★ DATA LOSS GUARD: Never overwrite existing data with empty elements.
         // If the engine returns 0 elements but the store already has data,
         // something went wrong (engine destroyed, hot reload, etc.) — ABORT.
@@ -156,6 +164,10 @@ export function useCanvasSync(variantId: string | undefined, canvasW: number, ca
 
 function restoreShape(engine: Engine, shape: ShapeElement, canvasW: number, canvasH: number, parseShadow: typeof parseShadowColor): void {
     const { x, y, w, h } = constraintsToAbsolute(shape.constraints, canvasW, canvasH);
+    if (shape.name?.match(/button|cta|shop/i)) {
+        const c = shape.constraints;
+        console.info(`[useCanvasSync] RESTORE CTA "${shape.name}" → x:${x} y:${y} w:${w} h:${h} | H:${c.horizontal.anchor}(${c.horizontal.offset}) V:${c.vertical.anchor}(${c.vertical.offset}) Canvas:${canvasW}x${canvasH}`);
+    }
     let nodeId: number;
     if (shape.gradientStart && shape.gradientEnd) {
         try { nodeId = engine.add_gradient_rect(x, y, w, h, shape.gradientStart, shape.gradientEnd, shape.gradientAngle ?? 135, shape.borderRadius ?? 0, shape.name); }
