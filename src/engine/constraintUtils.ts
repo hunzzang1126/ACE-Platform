@@ -47,12 +47,25 @@ export function absoluteToConstraints(
     else if (coversHeight) { size = { widthMode: 'fixed', heightMode: 'relative', width: Math.round(w), height: h / canvasH }; }
     else { size = { widthMode: 'fixed', heightMode: 'fixed', width: Math.round(w), height: Math.round(h) }; }
 
-    return { horizontal, vertical, size, rotation: 0 };
+    // ★ Cache original absolute position for perfect roundtrip on same-size canvas.
+    // When constraintsToAbsolute is called with the SAME canvasW/canvasH, it returns
+    // these exact values — eliminating Math.round drift from anchor conversions.
+    return {
+        horizontal, vertical, size, rotation: 0,
+        _absOrigin: { x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h), cw: canvasW, ch: canvasH },
+    };
 }
 
 export function constraintsToAbsolute(
     constraints: ElementConstraints, canvasW: number, canvasH: number,
 ): { x: number; y: number; w: number; h: number } {
+    // ★ Fast path: if cached origin matches this canvas size, return exact values.
+    // This eliminates Math.round drift from anchor conversions on same-size canvas.
+    const origin = constraints._absOrigin;
+    if (origin && origin.cw === canvasW && origin.ch === canvasH) {
+        return { x: origin.x, y: origin.y, w: origin.w, h: origin.h };
+    }
+
     let w = constraints.size.widthMode === 'relative' ? canvasW * constraints.size.width : constraints.size.width;
     let h = constraints.size.heightMode === 'relative' ? canvasH * constraints.size.height : constraints.size.height;
     let x: number;

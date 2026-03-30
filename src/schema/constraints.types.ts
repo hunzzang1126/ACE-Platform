@@ -45,6 +45,8 @@ export interface ElementConstraints {
     size: SizeConstraint;
     /** 회전 (deg) */
     rotation: number;
+    /** ★ Cached absolute position for perfect same-size roundtrip (set by absoluteToConstraints) */
+    _absOrigin?: { x: number; y: number; w: number; h: number; cw: number; ch: number };
 }
 
 /**
