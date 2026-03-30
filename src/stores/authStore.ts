@@ -127,6 +127,7 @@ export const useAuthStore = create<AuthState>()(
             },
 
             syncSessionFromSupabase: async () => {
+                set({ isLoading: true }); // ★ Prevent ProtectedRoute /pending flash
                 const sb = getSupabase();
                 if (!sb) {
                     console.warn('[syncSession] Supabase not configured');
