@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────
 // ProjectCard — Card-based project display (Figma-inspired)
 // ─────────────────────────────────────────────────
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useProjectStore } from '@/stores/projectStore';
 
 interface ProjectCardProps {
@@ -12,6 +12,8 @@ interface ProjectCardProps {
     createdBy: string;
     type: 'set' | 'folder';
     onOpen: (id: string) => void;
+    /** Start in rename mode (for newly created cards) */
+    initialRenaming?: boolean;
 }
 
 function formatDate(iso: string): string {
@@ -19,12 +21,17 @@ function formatDate(iso: string): string {
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-export function ProjectCard({ id, name, variantCount, createdAt, createdBy, type, onOpen }: ProjectCardProps) {
+export function ProjectCard({ id, name, variantCount, createdAt, createdBy, type, onOpen, initialRenaming }: ProjectCardProps) {
     const [menuOpen, setMenuOpen] = useState(false);
     const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
-    const [renaming, setRenaming] = useState(false);
+    const [renaming, setRenaming] = useState(!!initialRenaming);
     const [renameName, setRenameName] = useState(name);
     const renameRef = useRef<HTMLInputElement>(null);
+
+    // Auto-focus rename input when created in rename mode
+    useEffect(() => {
+        if (initialRenaming) setTimeout(() => renameRef.current?.select(), 100);
+    }, [initialRenaming]);
 
     const renameCreativeSet = useProjectStore(s => s.renameCreativeSet);
     const renameFolder = useProjectStore(s => s.renameFolder);

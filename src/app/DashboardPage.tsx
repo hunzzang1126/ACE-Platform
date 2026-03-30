@@ -28,6 +28,7 @@ function getGreeting(): string {
 export function DashboardPage() {
     const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('');
+    const [newlyCreatedId, setNewlyCreatedId] = useState<string | null>(null);
 
 
     // Auth store — dynamic user name
@@ -135,11 +136,6 @@ export function DashboardPage() {
             return;
         }
         const defaultPreset = BANNER_PRESETS[0]!;
-        // ★ ARCHITECTURAL FIX: Use ONE ID for both stores.
-        // Previously: createCreativeSet → id-A, createCreativeSetProject → id-B,
-        // then patched B→A. Cloud sync subscriber saw B as new, pushed to Supabase.
-        // Race: trashProject(B) might not complete before next syncOnLogin pull.
-        // Result: both A and B exist in cloud → phantom CS on refresh.
         const csId = createCreativeSet('Untitled Creative Set', defaultPreset);
         const now = new Date().toISOString();
         useProjectStore.setState((state) => {
@@ -153,8 +149,10 @@ export function DashboardPage() {
                 createdBy: displayName || 'User',
             });
         });
-        navigate('/editor');
-    }, [createCreativeSet, navigate, canCreateSet, displayName]);
+        // ★ UX FIX: Stay on dashboard, show card in rename mode.
+        // User names the project first, then clicks to enter editor.
+        setNewlyCreatedId(csId);
+    }, [createCreativeSet, canCreateSet, displayName]);
 
     const handleOpenSet = useCallback((id: string) => {
         const opened = openCreativeSet(id);
@@ -314,6 +312,7 @@ export function DashboardPage() {
                                         createdBy={set.createdBy}
                                         type="set"
                                         onOpen={handleOpenSet}
+                                        initialRenaming={set.id === newlyCreatedId}
                                     />
                                 ))}
                             </div>
