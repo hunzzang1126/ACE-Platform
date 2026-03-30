@@ -1015,38 +1015,39 @@
     white-space: nowrap;
 }
 
-/* ── Plug Connection System ── */
+/* ── Plug Connection System (v2 — Minimal Animated Dots) ── */
 
-/* Plug port base (deprecated — ports now in SVG) */
-.plug-port {
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    cursor: grab;
-    transition: transform 0.15s, box-shadow 0.2s, background 0.2s;
+/* Flowing animation for connected cables */
+@keyframes plug-flow {
+    0% { stroke-dashoffset: 0; }
+    100% { stroke-dashoffset: -20; }
 }
 
-.plug-port:active { cursor: grabbing; transform: scale(1.3); }
+.plug-cable-flow {
+    animation: plug-flow 1s linear infinite;
+}
 
-/* Disconnect button appears on cable hover */
-.plug-disconnect-btn,
-.plug-disconnect-x {
+/* Disconnect hint — hidden by default, shown on cable hover */
+.plug-disconnect-hint {
+    opacity: 0;
     transition: opacity 0.2s ease;
 }
 
-g:hover > .plug-disconnect-btn { opacity: 1 !important; }
-g:hover > .plug-disconnect-x { opacity: 1 !important; }
+/* Show disconnect on the hit-area's parent group hover */
+g:hover > .plug-disconnect-hint {
+    opacity: 1;
+}
 
 /* Origin badge on card header */
 .banner-card-origin {
-    color: #4a9eff;
+    color: #6366f1;
     font-weight: 700;
     font-size: 10px;
     letter-spacing: 0.5px;
 }
 
 .banner-card-plugged {
-    color: #a855f7;
+    color: #a78bfa;
     font-weight: 600;
     font-size: 10px;
     letter-spacing: 0.3px;
