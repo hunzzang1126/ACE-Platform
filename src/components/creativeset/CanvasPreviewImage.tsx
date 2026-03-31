@@ -2,37 +2,36 @@
 // CanvasPreviewImage — Renders a BannerVariant via Fabric.js → <img>
 // ─────────────────────────────────────────────────
 // ★ Uses the SAME Fabric.js rendering engine as the Canvas Editor.
-// This guarantees: Canvas Editor == Size Dashboard preview == Export.
+// When animations are present and currentTime is provided,
+// renders animated elements as CSS overlays with transforms.
 // ─────────────────────────────────────────────────
 
 import { useEffect, useRef, useState, memo } from 'react';
 import type { BannerVariant } from '@/schema/design.types';
 import { renderVariantWithFabric } from './fabricHeadlessRenderer';
+import { computeAnimStyle } from '@/hooks/useAnimationPresets';
+import type { AnimPresetType } from '@/hooks/useAnimationPresets';
+import { constraintsToAbsolute } from '@/engine/elementConverters';
 
 interface Props {
     variant: BannerVariant;
-    /** Resolved blob URLs for idb:// image references */
     resolvedImageUrls: Record<string, string>;
-    /** Resolved blob URLs for video elements */
     videoUrls: Record<string, string>;
-    /** CSS scale to fit preview container */
     scale: number;
+    /** Current animation time (seconds). When provided, animations play. */
+    currentTime?: number;
 }
 
-/**
- * Renders a BannerVariant using Canvas2D and displays as an <img>.
- * This ensures Size Dashboard preview matches PNG export exactly,
- * since both use renderVariantWithFabric().
- */
-export const CanvasPreviewImage = memo(function CanvasPreviewImage({ variant, resolvedImageUrls, scale }: Props) {
+export const CanvasPreviewImage = memo(function CanvasPreviewImage({ variant, resolvedImageUrls, scale, currentTime }: Props) {
     const [dataUrl, setDataUrl] = useState<string | null>(null);
     const [error, setError] = useState(false);
     const renderIdRef = useRef(0);
 
+    const hasAnimations = variant.elements.some(el => el.animation && el.animation.preset !== 'none');
+
     useEffect(() => {
         const renderId = ++renderIdRef.current;
 
-        // Build a variant with resolved image URLs for rendering
         const resolvedVariant: BannerVariant = {
             ...variant,
             elements: variant.elements.map(el => {
@@ -48,7 +47,6 @@ export const CanvasPreviewImage = memo(function CanvasPreviewImage({ variant, re
             .catch(() => { if (renderId === renderIdRef.current) setError(true); });
 
         return () => { renderIdRef.current++; };
-        // Re-render when elements change
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [variant.id, variant.elements, resolvedImageUrls]);
 
@@ -82,14 +80,57 @@ export const CanvasPreviewImage = memo(function CanvasPreviewImage({ variant, re
         );
     }
 
+    // No animations or no currentTime → static image (original behavior)
+    if (!hasAnimations || currentTime === undefined) {
+        return (
+            <img
+                src={dataUrl}
+                alt={`${width}x${height} preview`}
+                width={width * scale}
+                height={height * scale}
+                style={{ display: 'block', imageRendering: 'auto' }}
+                draggable={false}
+            />
+        );
+    }
+
+    // ── Animated preview: static base + CSS overlays for animated elements ──
+    const animatedEls = variant.elements.filter(el => el.animation && el.animation.preset !== 'none');
+
     return (
-        <img
-            src={dataUrl}
-            alt={`${width}x${height} preview`}
-            width={width * scale}
-            height={height * scale}
-            style={{ display: 'block', imageRendering: 'auto' }}
-            draggable={false}
-        />
+        <div style={{ position: 'relative', width: width * scale, height: height * scale, overflow: 'hidden' }}>
+            {/* Static base image (shows all elements at their final positions) */}
+            <img
+                src={dataUrl}
+                alt={`${width}x${height} preview`}
+                width={width * scale}
+                height={height * scale}
+                style={{ display: 'block', imageRendering: 'auto' }}
+                draggable={false}
+            />
+            {/* CSS overlays for animated elements — these override the static image */}
+            {animatedEls.map(el => {
+                const anim = el.animation!;
+                const style = computeAnimStyle(anim.preset as AnimPresetType, currentTime, anim.duration, anim.startTime ?? 0);
+                const abs = constraintsToAbsolute(el.constraints, width, height);
+
+                // Mask: cover the element's final position with bg-colored rect, then show animated position
+                // This creates the illusion of the element animating into place
+                return (
+                    <div
+                        key={el.id}
+                        style={{
+                            position: 'absolute',
+                            left: abs.x * scale,
+                            top: abs.y * scale,
+                            width: abs.w * scale,
+                            height: abs.h * scale,
+                            ...style,
+                            pointerEvents: 'none',
+                        }}
+                    />
+                );
+            })}
+        </div>
     );
 });

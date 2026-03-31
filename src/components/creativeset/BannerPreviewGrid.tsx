@@ -252,6 +252,7 @@ export function BannerPreviewGrid({ variants, visibleIds, externalPlaying }: Pro
                                     resolvedImageUrls={resolvedImageUrls}
                                     videoUrls={videoUrls}
                                     scale={scale}
+                                    currentTime={isPlaying ? currentTime : undefined}
                                 />
                             </div>
 

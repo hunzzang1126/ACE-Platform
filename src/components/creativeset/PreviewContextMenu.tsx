@@ -7,6 +7,8 @@ import type { BannerVariant } from '@/schema/design.types';
 import { useDesignStore } from '@/stores/designStore';
 import { downloadDataURL } from './previewRenderer';
 import { renderVariantWithFabric } from './fabricHeadlessRenderer';
+import { exportVariantToMp4, downloadBlob } from '@/engine/fabricVideoExporter';
+import { useAnimPresetStore } from '@/hooks/useAnimationPresets';
 
 interface ContextMenuState {
     x: number;
@@ -96,8 +98,31 @@ export function PreviewContextMenu({
                     <button className="banner-ctx-item" onClick={() => { onClose(); alert('GIF export coming soon'); }}>
                         GIF (Animated)
                     </button>
-                    <button className="banner-ctx-item" onClick={() => { onClose(); alert('MP4 export coming soon'); }}>
-                        MP4 (Video)
+                    <button className="banner-ctx-item" onClick={async () => {
+                        onClose();
+                        const idsToExport = selectedIds.size > 0 ? Array.from(selectedIds) : [ctxMenu.variantId];
+                        // Calculate duration from the max endTime across all element presets
+                        const presets = useAnimPresetStore.getState().presets;
+                        let maxEnd = 5;
+                        for (const [, cfg] of Object.entries(presets)) {
+                            const et = cfg.endTime < 0 ? 5 : cfg.endTime;
+                            if (et > maxEnd) maxEnd = et;
+                        }
+                        const duration = Math.ceil(maxEnd);
+                        for (const vid of idsToExport) {
+                            const v = variants.find(v => v.id === vid);
+                            if (!v) continue;
+                            const hasAnim = v.elements.some(el => el.animation && el.animation.preset !== 'none');
+                            if (!hasAnim) { alert('No animations on this size. Add animations in the editor first.'); continue; }
+                            try {
+                                const buffer = await exportVariantToMp4(v, duration, { fps: 30 }, (p) => {
+                                    if (p.phase === 'error') { alert('MP4 export failed: ' + p.error); }
+                                });
+                                downloadBlob(buffer, `banner_${v.preset.width}x${v.preset.height}.mp4`);
+                            } catch (err) { alert('MP4 export failed: ' + String(err)); }
+                        }
+                    }}>
+                        MP4 (Video){selectedIds.size > 1 ? ` (${selectedIds.size})` : ''}
                     </button>
                     <button className="banner-ctx-item" onClick={() => { onClose(); alert('JS bundle export coming soon'); }}>
                         JS (Interactive Bundle)
