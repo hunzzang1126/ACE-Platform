@@ -1,68 +1,53 @@
 // ─────────────────────────────────────────────────
-// LandingPage — frame.io-inspired premium marketing page
+// LandingPage — Framer Motion-powered cinematic landing
 // ─────────────────────────────────────────────────
-// Pricing → LandingPricing.tsx
-// How It Works → HowItWorks.tsx
+// Pricing → LandingPricing.tsx | Workflow → HowItWorks.tsx
 // ─────────────────────────────────────────────────
 
 import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, useScroll, useTransform } from 'framer-motion';
 import { useAuthStore } from '@/stores/authStore';
 import { GlidLogo } from '@/components/brand/GlidLogo';
 import { HowItWorks } from './HowItWorks';
 import { LandingPricing } from './LandingPricing';
 import './landing.css';
 
-const ArrowRight = () => (
+const Arrow = () => (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>
 );
 
+// Scroll-reveal wrapper
+const Reveal = ({ children, delay = 0, className = '' }: { children: React.ReactNode; delay?: number; className?: string }) => (
+    <motion.div
+        initial={{ opacity: 0, y: 40 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, amount: 0.15 }}
+        transition={{ duration: 0.7, delay, ease: [0.16, 1, 0.3, 1] }}
+        className={className}
+    >
+        {children}
+    </motion.div>
+);
+
 const FEATURES = [
-    {
-        label: 'Design Engine',
-        title: 'GPU-Accelerated Canvas',
-        description: 'A Fabric.js-powered rendering engine that delivers 60fps interactions — even on complex multi-layer compositions with animations, effects, and high-res images.',
-        icon: (
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" /><rect x="9" y="9" width="6" height="6" /><line x1="9" y1="1" x2="9" y2="4" /><line x1="15" y1="1" x2="15" y2="4" /><line x1="9" y1="20" x2="9" y2="23" /><line x1="15" y1="20" x2="15" y2="23" /><line x1="20" y1="9" x2="23" y2="9" /><line x1="20" y1="14" x2="23" y2="14" /><line x1="1" y1="9" x2="4" y2="9" /><line x1="1" y1="14" x2="4" y2="14" /></svg>
-        ),
-    },
-    {
-        label: 'Smart Sizing',
-        title: 'Design Once, Deploy Everywhere',
-        description: 'Create a single master design and auto-propagate to every ad format — 300x250, 728x90, 160x600, social stories, and beyond. One click, infinite sizes.',
-        icon: (
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></svg>
-        ),
-    },
-    {
-        label: 'AI Agent',
-        title: 'Your Creative Co-Pilot',
-        description: 'An embedded AI assistant that understands your canvas. Generate layouts, swap colors, add elements, remove backgrounds — all through natural conversation.',
-        icon: (
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 4V2" /><path d="M15 16v-2" /><path d="M8 9h2" /><path d="M20 9h2" /><path d="M17.8 11.8 19 13" /><path d="M15 9h0" /><path d="M17.8 6.2 19 5" /><path d="m3 21 9-9" /><path d="M12.2 6.2 11 5" /></svg>
-        ),
-    },
-    {
-        label: 'Animation',
-        title: 'Bring Creatives to Life',
-        description: 'Timeline-based animation presets with custom easing, stagger, and sequencing. Preview in real-time and export as video, GIF, or interactive HTML5.',
-        icon: (
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>
-        ),
-    },
+    { label: 'Design Engine', title: 'GPU-Accelerated Canvas', desc: 'A Fabric.js rendering engine delivering 60fps interactions — even on complex multi-layer compositions with animations, effects, and high-res images.', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#818cf8" strokeWidth="1.5"><rect x="4" y="4" width="16" height="16" rx="2" /><rect x="9" y="9" width="6" height="6" /></svg> },
+    { label: 'Smart Sizing', title: 'Design Once, Deploy Everywhere', desc: 'Create a single master design and auto-propagate to every ad format — 300x250, 728x90, 160x600, social stories, and beyond.', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#818cf8" strokeWidth="1.5"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></svg> },
+    { label: 'AI Agent', title: 'Your Creative Co-Pilot', desc: 'An embedded AI assistant that understands your canvas. Generate layouts, swap colors, add elements, remove backgrounds — through natural conversation.', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#818cf8" strokeWidth="1.5"><path d="M15 4V2M15 16v-2M8 9h2M20 9h2M17.8 11.8 19 13M15 9h0M17.8 6.2 19 5M3 21l9-9M12.2 6.2 11 5" /></svg> },
+    { label: 'Animation', title: 'Bring Creatives to Life', desc: 'Timeline-based animation presets with custom easing, stagger, and sequencing. Preview in real-time and export as video, GIF, or HTML5.', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#818cf8" strokeWidth="1.5"><polygon points="5 3 19 12 5 21 5 3" /></svg> },
 ];
 
 export function LandingPage() {
     const navigate = useNavigate();
     const { isAuthenticated, isApproved } = useAuthStore();
+    const heroRef = useRef<HTMLDivElement>(null);
     const sectionsRef = useRef<HTMLDivElement[]>([]);
 
     useEffect(() => {
-        if (isAuthenticated() && isApproved()) {
-            navigate('/dashboard', { replace: true });
-        }
+        if (isAuthenticated() && isApproved()) navigate('/dashboard', { replace: true });
     }, [isAuthenticated, isApproved, navigate]);
 
+    // Intersection observer for legacy HowItWorks sections
     useEffect(() => {
         const observer = new IntersectionObserver(
             (entries) => { entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); }); },
@@ -71,15 +56,20 @@ export function LandingPage() {
         sectionsRef.current.forEach(el => { if (el) observer.observe(el); });
         return () => observer.disconnect();
     }, []);
-
     const addRef = (el: HTMLDivElement | null) => {
         if (el && !sectionsRef.current.includes(el)) sectionsRef.current.push(el);
     };
 
+    // ── Parallax scroll values ──
+    const { scrollYProgress } = useScroll({ target: heroRef, offset: ['start start', 'end start'] });
+    const heroY = useTransform(scrollYProgress, [0, 1], [0, 200]);
+    const heroOpacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
+    const imgScale = useTransform(scrollYProgress, [0, 1], [1, 0.92]);
+
     return (
         <div className="lp">
             {/* ── Nav ── */}
-            <nav className="lp-nav">
+            <motion.nav className="lp-nav" initial={{ y: -80 }} animate={{ y: 0 }} transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}>
                 <div className="lp-nav-inner">
                     <GlidLogo size={22} variant="white" className="lp-nav-logo" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} />
                     <div className="lp-nav-links">
@@ -92,81 +82,91 @@ export function LandingPage() {
                         <button className="lp-nav-cta" onClick={() => navigate('/login')}>Get Started Free</button>
                     </div>
                 </div>
-            </nav>
+            </motion.nav>
 
             {/* ── Hero ── */}
-            <section className="lp-hero">
+            <section className="lp-hero" ref={heroRef}>
                 <div className="lp-hero-glow lp-hero-glow-1" />
                 <div className="lp-hero-glow lp-hero-glow-2" />
-                <div className="lp-hero-content">
-                    <div className="lp-hero-badge">
+
+                <motion.div className="lp-hero-content" style={{ y: heroY, opacity: heroOpacity }}>
+                    <motion.div className="lp-hero-badge" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3, duration: 0.5 }}>
                         <span className="lp-hero-badge-dot" />
                         AI-Native Creative Platform
-                    </div>
-                    <h1 className="lp-hero-title">
+                    </motion.div>
+
+                    <motion.h1 className="lp-hero-title" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}>
                         Create at the<br />
                         <span className="lp-gradient-text">Speed of Thought</span>
-                    </h1>
-                    <p className="lp-hero-sub">
+                    </motion.h1>
+
+                    <motion.p className="lp-hero-sub" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7, duration: 0.7 }}>
                         Glid is the creative platform for performance marketing teams.
-                        Design, animate, and deploy ad creatives across every channel
-                        — powered by AI and an intelligent design agent.
-                    </p>
-                    <div className="lp-hero-actions">
+                        Design, animate, and deploy ad creatives across every channel.
+                    </motion.p>
+
+                    <motion.div className="lp-hero-actions" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.9, duration: 0.6 }}>
                         <button className="lp-btn-primary" onClick={() => navigate('/login')}>
-                            Get Started Free <ArrowRight />
+                            Get Started Free <Arrow />
                         </button>
                         <button className="lp-btn-ghost" onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}>
                             See How It Works
                         </button>
-                    </div>
-                </div>
-                <div className="lp-hero-visual fade-in-section" ref={addRef}>
+                    </motion.div>
+                </motion.div>
+
+                <motion.div className="lp-hero-visual" style={{ scale: imgScale }} initial={{ opacity: 0, y: 60 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.1, duration: 1, ease: [0.16, 1, 0.3, 1] }}>
                     <img src="/hero-mockup.png" alt="Glid Creative Platform" className="lp-hero-img" />
                     <div className="lp-hero-img-glow" />
-                </div>
+                </motion.div>
             </section>
 
+            {/* ── Video Showcase ── */}
+            <Reveal className="lp-video-section">
+                <div className="lp-video-wrapper">
+                    <video className="lp-video" autoPlay muted loop playsInline poster="/hero-mockup.png">
+                        <source src="https://cdn.coverr.co/videos/coverr-a-man-working-on-a-laptop-5494/1080p.mp4" type="video/mp4" />
+                    </video>
+                    <div className="lp-video-overlay" />
+                    <div className="lp-video-text">
+                        <div className="lp-section-label">See It In Action</div>
+                        <h2 className="lp-section-title">From concept to campaign<br /><span className="lp-gradient-text">in minutes, not days.</span></h2>
+                    </div>
+                </div>
+            </Reveal>
+
             {/* ── Metrics ── */}
-            <div className="lp-metrics fade-in-section" ref={addRef}>
-                <div className="lp-metric">
-                    <div className="lp-metric-value">60fps</div>
-                    <div className="lp-metric-label">GPU-Accelerated Rendering</div>
+            <Reveal className="lp-metrics-wrap">
+                <div className="lp-metrics">
+                    {[
+                        { value: '60fps', label: 'GPU-Accelerated Rendering' },
+                        { value: '15+', label: 'Ad Sizes, One Click' },
+                        { value: 'AI', label: 'Built-in Creative Agent' },
+                        { value: '<1s', label: 'Export Latency' },
+                    ].map((m, i) => (
+                        <motion.div key={i} className="lp-metric" initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.1, duration: 0.5 }}>
+                            <div className="lp-metric-value">{m.value}</div>
+                            <div className="lp-metric-label">{m.label}</div>
+                        </motion.div>
+                    ))}
                 </div>
-                <div className="lp-metric-divider" />
-                <div className="lp-metric">
-                    <div className="lp-metric-value">15+</div>
-                    <div className="lp-metric-label">Ad Sizes, One Click</div>
-                </div>
-                <div className="lp-metric-divider" />
-                <div className="lp-metric">
-                    <div className="lp-metric-value">AI</div>
-                    <div className="lp-metric-label">Built-in Creative Agent</div>
-                </div>
-                <div className="lp-metric-divider" />
-                <div className="lp-metric">
-                    <div className="lp-metric-value">&lt;1s</div>
-                    <div className="lp-metric-label">Export Latency</div>
-                </div>
-            </div>
+            </Reveal>
 
             {/* ── Features ── */}
             <section id="features" className="lp-features">
-                <div className="lp-features-header fade-in-section" ref={addRef}>
+                <Reveal className="lp-features-header">
                     <div className="lp-section-label">Platform</div>
                     <h2 className="lp-section-title">Everything you need.<br />Nothing you don't.</h2>
-                    <p className="lp-section-sub">
-                        A complete creative platform that replaces your entire tool stack.
-                    </p>
-                </div>
+                    <p className="lp-section-sub">A complete creative platform that replaces your entire tool stack.</p>
+                </Reveal>
                 <div className="lp-features-grid">
                     {FEATURES.map((f, i) => (
-                        <div key={i} className="lp-feature-card fade-in-section" ref={addRef} style={{ transitionDelay: `${i * 100}ms` }}>
+                        <motion.div key={i} className="lp-feature-card" initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.2 }} transition={{ delay: i * 0.12, duration: 0.6, ease: [0.16, 1, 0.3, 1] }} whileHover={{ y: -4, transition: { duration: 0.25 } }}>
                             <div className="lp-feature-icon">{f.icon}</div>
                             <div className="lp-feature-label">{f.label}</div>
                             <h3 className="lp-feature-title">{f.title}</h3>
-                            <p className="lp-feature-desc">{f.description}</p>
-                        </div>
+                            <p className="lp-feature-desc">{f.desc}</p>
+                        </motion.div>
                     ))}
                 </div>
             </section>
@@ -178,14 +178,16 @@ export function LandingPage() {
             <LandingPricing addRef={addRef} />
 
             {/* ── CTA ── */}
-            <section className="lp-cta fade-in-section" ref={addRef}>
-                <div className="lp-cta-glow" />
-                <h2 className="lp-cta-title">Ready to create?</h2>
-                <p className="lp-cta-sub">Start building production-ready creatives in minutes. No credit card required.</p>
-                <button className="lp-btn-primary lp-btn-lg" onClick={() => navigate('/login')}>
-                    Get Started Free <ArrowRight />
-                </button>
-            </section>
+            <Reveal>
+                <section className="lp-cta">
+                    <div className="lp-cta-glow" />
+                    <h2 className="lp-cta-title">Ready to create?</h2>
+                    <p className="lp-cta-sub">Start building production-ready creatives in minutes. No credit card required.</p>
+                    <motion.button className="lp-btn-primary lp-btn-lg" onClick={() => navigate('/login')} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.98 }}>
+                        Get Started Free <Arrow />
+                    </motion.button>
+                </section>
+            </Reveal>
 
             {/* ── Footer ── */}
             <footer className="lp-footer">
