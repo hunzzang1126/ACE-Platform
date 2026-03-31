@@ -8,7 +8,7 @@ import { useCallback } from 'react';
 import { isAssetRef, resolveAsset } from '@/services/assetService';
 import { useDesignStore } from '@/stores/designStore';
 import { loadVideoBlob } from '@/stores/videoStorage';
-import type { DesignElement, ShapeElement, TextElement, ImageElement, VideoElement } from '@/schema/elements.types';
+import type { DesignElement, ShapeElement, TextElement, ImageElement, VideoElement, ElementAnimation } from '@/schema/elements.types';
 import type { EngineNode } from './useCanvasEngine';
 import type { OverlayElement } from './useOverlayElements';
 import { useAnimPresetStore } from './useAnimationPresets';
@@ -112,24 +112,26 @@ export function useCanvasSync(variantId: string | undefined, canvasW: number, ca
         const sortedElements = [...variant.elements].map(el => ({ ...el, locked: false })).sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
 
         for (const el of sortedElements) {
+            let newNodeId: number | null = null;
+
             if (el.type === 'shape') {
-                restoreShape(engine, el as ShapeElement, canvasW, canvasH, parseShadowColor);
+                newNodeId = restoreShape(engine, el as ShapeElement, canvasW, canvasH, parseShadowColor);
                 restoredShapes++;
             } else if (el.type === 'text') {
-                restoreText(engine, el as TextElement, canvasW, canvasH, parseShadowColor);
+                newNodeId = restoreText(engine, el as TextElement, canvasW, canvasH, parseShadowColor);
                 restoredShapes++;
             } else if (el.type === 'image') {
-                restoreImage(engine, el as ImageElement, canvasW, canvasH, parseShadowColor, pendingImageLoads);
+                newNodeId = restoreImage(engine, el as ImageElement, canvasW, canvasH, parseShadowColor, pendingImageLoads, el.animation);
                 restoredShapes++;
             } else if (el.type === 'video') {
                 restoreVideo(el as VideoElement, canvasW, canvasH, overlayElements, pendingVideoLoads);
             }
 
-            if (el.animation && el.animation.preset !== 'none') {
-                // ★ REGRESSION GUARD: shimAnimation.ts looks up presets by String(__glidId)
-                // where __glidId is a raw number (e.g. 42 → "42").
-                // el.id from elementConverters is "engine-42", so we MUST strip the prefix.
-                const key = el.id.startsWith('engine-') ? el.id.slice(7) : el.id;
+            if (el.animation && el.animation.preset !== 'none' && newNodeId != null) {
+                // ★ REGRESSION GUARD: Use the NEW nodeId returned by engine.add_text/add_rect/add_image,
+                // NOT the old saved el.id ("engine-42"). The shimAnimation.ts playback looks up
+                // presets by String(__glidId), which is the new ID assigned during restore.
+                const key = String(newNodeId);
                 useAnimPresetStore.getState().setPreset(key, { anim: el.animation.preset, animDuration: el.animation.duration, startTime: el.animation.startTime });
             }
         }
@@ -165,7 +167,7 @@ export function useCanvasSync(variantId: string | undefined, canvasW: number, ca
 
 // ── Restore Helpers (private) ──
 
-function restoreShape(engine: Engine, shape: ShapeElement, canvasW: number, canvasH: number, parseShadow: typeof parseShadowColor): void {
+function restoreShape(engine: Engine, shape: ShapeElement, canvasW: number, canvasH: number, parseShadow: typeof parseShadowColor): number {
     const { x, y, w, h } = constraintsToAbsolute(shape.constraints, canvasW, canvasH);
     if (shape.name?.match(/button|cta|shop/i)) {
         const c = shape.constraints;
@@ -187,9 +189,10 @@ function restoreShape(engine: Engine, shape: ShapeElement, canvasW: number, canv
     if (shape.visible === false) try { engine.set_visible?.(nodeId, false); } catch { /* ok */ }
     if (typeof engine.set_z_index === 'function') engine.set_z_index(nodeId, shape.zIndex ?? 0);
     if (shape.constraints.rotation && typeof engine.set_angle === 'function') try { engine.set_angle(nodeId, shape.constraints.rotation); } catch { /* ok */ }
+    return nodeId;
 }
 
-function restoreText(engine: Engine, text: TextElement, canvasW: number, canvasH: number, parseShadow: typeof parseShadowColor): void {
+function restoreText(engine: Engine, text: TextElement, canvasW: number, canvasH: number, parseShadow: typeof parseShadowColor): number {
     let { x, y, w, h } = constraintsToAbsolute(text.constraints, canvasW, canvasH);
     const textH = h > 0 ? h : (text.fontSize || 16) * 2;
     if (x < -w) x = 0; if (y < -textH) y = 0;
@@ -203,9 +206,10 @@ function restoreText(engine: Engine, text: TextElement, canvasW: number, canvasH
     if (text.visible === false) try { engine.set_visible?.(nodeId, false); } catch { /* ok */ }
     if (typeof engine.set_z_index === 'function') engine.set_z_index(nodeId, text.zIndex ?? 1);
     if (text.constraints.rotation && typeof engine.set_angle === 'function') try { engine.set_angle(nodeId, text.constraints.rotation); } catch { /* ok */ }
+    return nodeId;
 }
 
-function restoreImage(engine: Engine, img: ImageElement, canvasW: number, canvasH: number, parseShadow: typeof parseShadowColor, pendingLoads: (() => Promise<void>)[]): void {
+function restoreImage(engine: Engine, img: ImageElement, canvasW: number, canvasH: number, parseShadow: typeof parseShadowColor, pendingLoads: (() => Promise<void>)[], animation?: ElementAnimation): number {
     let { x, y, w, h } = constraintsToAbsolute(img.constraints, canvasW, canvasH);
     const isOut = w <= 0 || h <= 0 || x >= canvasW || y >= canvasH || x + w <= 0 || y + h <= 0;
     if (isOut) { w = Math.min(canvasW * 0.5, img.naturalWidth ?? canvasW * 0.5); h = Math.min(canvasH * 0.5, img.naturalHeight ?? canvasH * 0.5); x = Math.round((canvasW - w) / 2); y = Math.round((canvasH - h) / 2); }
@@ -228,8 +232,13 @@ function restoreImage(engine: Engine, img: ImageElement, canvasW: number, canvas
             if (ci.opacity !== undefined && ci.opacity !== 1) try { engine.set_opacity(nodeId, ci.opacity); } catch { /* ok */ }
             if (ci.shadow) { try { const [sr, sg, sb, sa] = parseShadow(ci.shadow.color); engine.set_shadow(nodeId, ci.shadow.offsetX, ci.shadow.offsetY, ci.shadow.blur, sr, sg, sb, sa); } catch { /* ok */ } }
             if (ci.constraints.rotation && typeof engine.set_angle === 'function') try { engine.set_angle(nodeId, ci.constraints.rotation); } catch { /* ok */ }
+            // ★ Animation for images must be set HERE because nodeId is only known after async load
+            if (animation && animation.preset !== 'none' && nodeId != null) {
+                useAnimPresetStore.getState().setPreset(String(nodeId), { anim: animation.preset, animDuration: animation.duration, startTime: animation.startTime });
+            }
         });
     }
+    return -1; // Image loads async, animation handled inside pending load
 }
 
 function restoreVideo(vid: VideoElement, canvasW: number, canvasH: number, overlayElements: OverlayElement[], pendingLoads: Promise<void>[]): void {
