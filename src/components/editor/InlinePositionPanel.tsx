@@ -159,17 +159,7 @@ export function InlinePositionPanel({ selectedNode, actions, onClose }: Props) {
                     </div>
                 </div>
 
-                {/* Remove Background — image nodes only */}
-                {selectedNode.type === 'image' && selectedNode.src && (
-                    <>
-                        <RemoveBgInline
-                            nodeId={selectedNode.id}
-                            imageSrc={selectedNode.src}
-                            actions={actions}
-                        />
-                        <FillToPageInline nodeId={selectedNode.id} actions={actions} />
-                    </>
-                )}
+
             </div>
         </div>
     );
