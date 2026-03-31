@@ -142,7 +142,7 @@ async function addImageToFabric(fc: Canvas, el: ImageElement, abs: AbsRect): Pro
     const { x, y, w, h } = abs;
     try {
         let src = el.src;
-        if (src.startsWith('idb://')) {
+        if (src.startsWith('idb://') || src.startsWith('storage://')) {
             const { resolveAsset } = await import('@/services/assetService');
             src = await resolveAsset(src);
         }

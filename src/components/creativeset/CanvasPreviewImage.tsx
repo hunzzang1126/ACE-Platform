@@ -59,11 +59,11 @@ export const CanvasPreviewImage = memo(function CanvasPreviewImage({ variant, re
     const hasTimeCtrl = timeCtrlEls.length > 0;
     const isAnimating = hasTimeCtrl && currentTime !== undefined;
 
-    // Resolve idb:// URLs in elements
+    // Resolve idb:// and storage:// URLs in elements
     const resolvedVariant: BannerVariant = {
         ...variant,
         elements: variant.elements.map(el => {
-            if (el.type === 'image' && el.src?.startsWith('idb://') && resolvedImageUrls[el.id]) {
+            if (el.type === 'image' && el.src && (el.src.startsWith('idb://') || el.src.startsWith('storage://')) && resolvedImageUrls[el.id]) {
                 return { ...el, src: resolvedImageUrls[el.id]! } as typeof el;
             }
             return el;
