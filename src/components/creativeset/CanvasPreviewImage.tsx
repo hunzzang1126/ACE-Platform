@@ -142,14 +142,14 @@ export const CanvasPreviewImage = memo(function CanvasPreviewImage({ variant, re
     }
 
     // ── Not animating: show full static image ──
-    if (!isAnimating || !baseUrl) {
+    if (!isAnimating) {
         return <img src={staticUrl} alt={`${width}x${height}`} width={width * scale} height={height * scale} style={{ display: 'block' }} draggable={false} />;
     }
 
-    // ── Animating: base image + animated sprite overlays with CSS transforms ──
+    // ── Animating: use full static as base (guarantees all elements visible) + sprite overlays ──
     return (
         <div style={{ position: 'relative', width: width * scale, height: height * scale, overflow: 'hidden' }}>
-            <img src={baseUrl} alt="base" width={width * scale} height={height * scale} style={{ display: 'block' }} draggable={false} />
+            <img src={baseUrl || staticUrl} alt="base" width={width * scale} height={height * scale} style={{ display: 'block' }} draggable={false} />
             {sprites.map(sprite => {
                 const animStyle = computeAnimStyle(sprite.preset as AnimPresetType, currentTime, sprite.duration, sprite.startTime);
                 // Scale transform pixel values to match preview size

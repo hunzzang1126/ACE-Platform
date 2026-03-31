@@ -18,7 +18,8 @@ export function useBottomPanelState(
     const [playing, setPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
     const MAX_DURATION = 20;
-    const [duration, setDuration] = useState(5.0);
+    const DEFAULT_DURATION = 5;
+    const [duration, setDuration] = useState(DEFAULT_DURATION);
     const [looping, setLooping] = useState(false);
     const [speed, setSpeed] = useState(1.0);
     const rafRef = useRef<number>(0);
@@ -57,7 +58,11 @@ export function useBottomPanelState(
         if (localX <= EDGE_PX) mode = 'resize-left';
         else if (localX >= rect.width - EDGE_PX) mode = 'resize-right';
         const config = animPresets.getPreset(elementId);
-        setBarDrag({ elementId, mode, startX: e.clientX, origStart: config.startTime, origEnd: config.endTime < 0 ? duration : config.endTime });
+        // ★ Resolve -1 to DEFAULT_DURATION, not current dynamic duration
+        const resolvedEnd = config.endTime < 0 ? DEFAULT_DURATION : config.endTime;
+        // Write explicit value to store so -1 sentinel is gone
+        if (config.endTime < 0) animPresets.setTiming(elementId, config.startTime, resolvedEnd);
+        setBarDrag({ elementId, mode, startX: e.clientX, origStart: config.startTime, origEnd: resolvedEnd });
     }, [animPresets, duration]);
 
     useEffect(() => {
@@ -85,11 +90,19 @@ export function useBottomPanelState(
                 newEnd = Math.min(MAX_DURATION, Math.max(barDrag.origStart + MIN_BAR, barDrag.origEnd + dt));
             }
             animPresets.setTiming(barDrag.elementId, newStart, newEnd);
-            // Auto-extend duration in real-time during drag
-            if (newEnd > duration && newEnd <= MAX_DURATION) {
-                const expanded = Math.ceil(newEnd);
-                setDuration(expanded);
-                try { engine?.set_duration(expanded); } catch { /* ok */ }
+            // Auto-extend/shrink duration in real-time during drag
+            const store = useAnimPresetStore.getState();
+            const allBarIds = [...overlayElements.map(el => el.id), ...nodes.map(n => String(n.id))];
+            let maxEnd = 0.5;
+            for (const id of allBarIds) {
+                const cfg = id === barDrag.elementId ? { endTime: newEnd } : store.getPreset(id);
+                const et = cfg.endTime < 0 ? DEFAULT_DURATION : cfg.endTime;
+                if (et > maxEnd) maxEnd = et;
+            }
+            const targetDur = Math.min(MAX_DURATION, Math.max(1, Math.ceil(maxEnd)));
+            if (Math.abs(targetDur - duration) > 0.01) {
+                setDuration(targetDur);
+                try { engine?.set_duration(targetDur); } catch { /* ok */ }
             }
         };
         const handleUp = () => { setBarDrag(null); document.body.style.cursor = ''; document.body.style.userSelect = ''; recalcDuration(); };

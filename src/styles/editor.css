@@ -1633,6 +1633,7 @@
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
     bottom: 0;
+    transition: left 0.2s ease-out;
 }
 
 .bp-playhead {

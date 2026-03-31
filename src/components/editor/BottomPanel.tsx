@@ -138,7 +138,7 @@ export function BottomPanel({ variant, engine, nodes, selection, actions, overla
                         const barColor = BAR_COLORS[idx % BAR_COLORS.length] ?? '#4a9eff';
                         const config = animPresets.getPreset(layer.id);
                         const stTime = config.startTime;
-                        const etTime = config.endTime < 0 ? duration : config.endTime;
+                        const etTime = config.endTime < 0 ? 5 : config.endTime;
                         const barLeft = `${(stTime / duration) * 100}%`;
                         const barWidth = `${((etTime - stTime) / duration) * 100}%`;
                         const elId = layer.kind === 'overlay' ? layer.overlay?.id ?? '' : String(layer.node?.id ?? '');
