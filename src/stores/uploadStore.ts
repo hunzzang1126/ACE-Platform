@@ -71,8 +71,9 @@ export const useUploadStore = create<UploadState>()(
 // ── Helpers ──
 
 /**
- * Save a data URL to IndexedDB assets AND register in upload library.
- * Returns the idb:// reference.
+ * Save a data URL to storage (Supabase first, IndexedDB fallback)
+ * AND register in upload library.
+ * Returns the asset URL (https:// or idb://).
  */
 export async function saveToUploadLibrary(
     dataUrl: string,
@@ -81,20 +82,25 @@ export async function saveToUploadLibrary(
     height: number,
     source: 'user' | 'ai',
 ): Promise<string> {
-    const idbRef = await storeAsset(dataUrl);
+    // storeAsset now tries Supabase first, falls back to IndexedDB
+    const assetUrl = await storeAsset(dataUrl);
 
-    // Extract hash from idb:// ref for unique ID
-    const id = idbRef.startsWith('idb://') ? idbRef.slice(6) : crypto.randomUUID();
+    // Generate a stable ID from the URL
+    const id = assetUrl.startsWith('idb://')
+        ? assetUrl.slice(6)
+        : assetUrl.startsWith('https://')
+            ? assetUrl.split('/').pop()?.replace(/\.[^.]+$/, '') ?? crypto.randomUUID()
+            : crypto.randomUUID();
 
     useUploadStore.getState().addUpload({
         id,
         name,
-        idbRef,
+        idbRef: assetUrl, // backwards compat field name — holds idb:// OR https://
         width,
         height,
         source,
         createdAt: new Date().toISOString(),
     });
 
-    return idbRef;
+    return assetUrl;
 }

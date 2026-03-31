@@ -14,50 +14,56 @@
 
 import { aceDB } from '@/stores/aceDB';
 import type { DesignElement, ImageElement } from '@/schema/elements.types';
+import { uploadToCloud, isCloudUrl, getCurrentUserId } from './cloudStorageService';
 
 const IDB_PREFIX = 'idb://';
 
 // ── Core API ────────────────────────────────────
 
 /**
- * Store a data URL as a blob in IndexedDB. Returns an `idb://{hash}` ref.
- * Dedup: if the same hash already exists, skips the write.
+ * Store a data URL — tries Supabase Storage first, falls back to IndexedDB.
+ * Returns https:// URL (cloud) or idb://{hash} (local fallback).
  */
 export async function storeAsset(dataUrl: string): Promise<string> {
-    // Skip if already an idb:// reference or non-data URL
+    // Skip if already a cloud URL, idb:// ref, or non-data URL
     if (!dataUrl.startsWith('data:')) return dataUrl;
 
+    // ★ Try Supabase Storage first
+    const userId = await getCurrentUserId();
+    if (userId) {
+        const cloudUrl = await uploadToCloud(dataUrl, 'designs', userId);
+        if (cloudUrl) return cloudUrl;
+    }
+
+    // Fallback: IndexedDB
     const blob = dataUrlToBlob(dataUrl);
     const hash = await computeSha256(blob);
     const ref = `${IDB_PREFIX}${hash}`;
-
-    // Dedup — check if already stored
     const existing = await aceDB.assets.get(hash);
     if (!existing) {
         const buffer = await blob.arrayBuffer();
-        await aceDB.assets.put({
-            id: hash,
-            buffer,
-            mimeType: blob.type,
-            savedAt: Date.now(),
-        });
+        await aceDB.assets.put({ id: hash, buffer, mimeType: blob.type, savedAt: Date.now() });
     }
-
     return ref;
 }
 
 /**
- * Resolve an `idb://{hash}` reference back to a usable blob URL.
- * Returns the input unchanged if it's not an idb:// reference.
+ * Resolve an asset reference to a usable URL.
+ * - https:// → returned as-is (Supabase Storage)
+ * - idb://{hash} → resolved from IndexedDB to blob: URL
+ * - anything else → returned as-is
  */
 export async function resolveAsset(ref: string): Promise<string> {
+    // Cloud URLs are directly usable
+    if (isCloudUrl(ref) || ref.startsWith('https://') || ref.startsWith('http://')) return ref;
+
     if (!ref.startsWith(IDB_PREFIX)) return ref;
 
     const hash = ref.slice(IDB_PREFIX.length);
     const entry = await aceDB.assets.get(hash);
     if (!entry) {
         console.warn(`[assetService] Asset not found: ${ref}`);
-        return ref; // return broken ref — UI can show placeholder
+        return ref;
     }
 
     const blob = new Blob([entry.buffer], { type: entry.mimeType });
@@ -150,7 +156,9 @@ export function revokeAssetCache(): void {
 // ── Helpers ─────────────────────────────────────
 
 function dataUrlToBlob(dataUrl: string): Blob {
-    const [header, base64] = dataUrl.split(',');
+    const parts = dataUrl.split(',');
+    const header = parts[0] ?? '';
+    const base64 = parts[1] ?? '';
     const mimeMatch = header.match(/:(.*?);/);
     const mime = mimeMatch?.[1] ?? 'image/png';
     const binary = atob(base64);

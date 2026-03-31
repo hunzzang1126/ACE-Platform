@@ -8,6 +8,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useUploadStore, type UploadEntry } from '@/stores/uploadStore';
 import { resolveAsset, isAssetRef } from '@/services/assetService';
+import { saveToBrandKit } from '@/stores/brandKitHelpers';
 
 interface Props {
     onTriggerImageUpload?: () => void;
@@ -146,16 +147,31 @@ export function SidebarUploadsTab({ onTriggerImageUpload, onTriggerVideoUpload, 
                                         <span className="uploads-ai-tag">AI</span>
                                     )}
                                     {isHovered && (
-                                        <button
-                                            className="uploads-delete-btn"
-                                            onClick={(e) => handleDelete(e, entry.id)}
-                                            title="Remove from library"
-                                        >
-                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                                <line x1="18" y1="6" x2="6" y2="18" />
-                                                <line x1="6" y1="6" x2="18" y2="18" />
-                                            </svg>
-                                        </button>
+                                        <div className="uploads-hover-actions">
+                                            <button
+                                                className="uploads-brand-btn"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    saveToBrandKit(entry.idbRef, entry.name, entry.width, entry.height)
+                                                        .then(() => console.log('[Uploads] Saved to Brand Kit:', entry.name));
+                                                }}
+                                                title="Save to Brand Kit"
+                                            >
+                                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z" />
+                                                </svg>
+                                            </button>
+                                            <button
+                                                className="uploads-delete-btn"
+                                                onClick={(e) => handleDelete(e, entry.id)}
+                                                title="Remove from library"
+                                            >
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                                    <line x1="18" y1="6" x2="6" y2="18" />
+                                                    <line x1="6" y1="6" x2="18" y2="18" />
+                                                </svg>
+                                            </button>
+                                        </div>
                                     )}
                                 </div>
                             );

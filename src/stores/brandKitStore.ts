@@ -353,3 +353,7 @@ export const useBrandKitStore = create<BrandKitState>()(
         { name: 'glid-brand-kits', storage: createJSONStorage(() => idbStorage) },
     ),
 );
+
+// ── Re-export cloud helpers for backward compat ──
+export { saveToBrandKit } from './brandKitHelpers';
+
