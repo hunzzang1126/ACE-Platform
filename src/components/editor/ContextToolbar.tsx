@@ -160,11 +160,7 @@ function FillToPageToolbarBtn({ nodeId, actions }: { nodeId: number; actions: Ca
             title="Scale image to fill the entire canvas"
             style={{ color: '#22c55e', fontWeight: 600, cursor: 'pointer' }}
         >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: 3 }}>
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <path d="M15 3h6v6M9 21H3v-6" />
-            </svg>
-            Fill
+            Fill to Page
         </button>
     );
 }
