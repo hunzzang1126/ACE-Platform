@@ -6,7 +6,7 @@
 // ─────────────────────────────────────────────────
 
 import { useBrandKitStore, type AssetCategory, type AssetFormat } from './brandKitStore';
-import { uploadToCloud, getCurrentUserId, isCloudUrl } from '@/services/cloudStorageService';
+import { uploadToCloud, getCurrentUserId, isStorageRef } from '@/services/cloudStorageService';
 import { resolveAsset, isAssetRef } from '@/services/assetService';
 
 /**
@@ -41,8 +41,8 @@ export async function saveToBrandKit(
     if (userId && (uploadSrc.startsWith('blob:') || uploadSrc.startsWith('data:'))) {
         const result = await uploadToCloud(uploadSrc, 'brand', userId);
         if (result) cloudSrc = result;
-    } else if (isCloudUrl(src)) {
-        cloudSrc = src; // already a cloud URL
+    } else if (isStorageRef(src)) {
+        cloudSrc = src; // already a storage:// ref
     }
 
     // Generate a lightweight thumbnail

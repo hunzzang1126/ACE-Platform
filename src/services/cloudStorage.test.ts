@@ -15,12 +15,19 @@ describe('cloudStorageService', () => {
         expect(typeof mod.isCloudUrl).toBe('function');
     });
 
-    it('isCloudUrl correctly identifies Supabase URLs', async () => {
+    it('isCloudUrl correctly identifies Supabase signed URLs', async () => {
         const { isCloudUrl } = await import('@/services/cloudStorageService');
-        expect(isCloudUrl('https://foo.supabase.co/storage/v1/object/public/ace-assets/id/uploads/hash.png')).toBe(true);
+        expect(isCloudUrl('https://foo.supabase.co/storage/v1/object/sign/ace-assets/id/uploads/hash.png?token=xyz')).toBe(true);
         expect(isCloudUrl('https://example.com/image.png')).toBe(false);
         expect(isCloudUrl('idb://abc123')).toBe(false);
-        expect(isCloudUrl('data:image/png;base64,AAAA')).toBe(false);
+        expect(isCloudUrl('storage://uid/uploads/hash.png')).toBe(false);
+    });
+
+    it('isStorageRef identifies storage:// refs', async () => {
+        const { isStorageRef } = await import('@/services/cloudStorageService');
+        expect(isStorageRef('storage://uid/uploads/hash.png')).toBe(true);
+        expect(isStorageRef('idb://abc123')).toBe(false);
+        expect(isStorageRef('https://example.com')).toBe(false);
     });
 
     it('exports getCurrentUserId function', async () => {

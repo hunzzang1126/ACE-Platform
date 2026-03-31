@@ -1,25 +1,33 @@
 // ─────────────────────────────────────────────────
-// cloudStorageService — Supabase Storage Upload/Resolve
+// cloudStorageService — Supabase Storage (PRIVATE bucket)
 // ─────────────────────────────────────────────────
-// Central service for uploading blobs to Supabase Storage.
-// Falls back to IndexedDB (idb://) when Supabase is unavailable.
+// PRIVATE bucket: no public URLs. Uses signed URLs for access.
+// User A CANNOT see User B's files.
+// Path format: {userId}/{folder}/{hash}.{ext}
 // ─────────────────────────────────────────────────
 
 import { getSupabase } from '@/services/supabaseClient';
 
 const BUCKET = 'ace-assets';
+// Signed URLs expire after 1 hour — re-resolve on each session
+const SIGNED_URL_EXPIRY = 3600;
 
 export type StorageFolder = 'uploads' | 'brand' | 'designs';
 
+// ★ Storage path prefix — used to identify cloud-stored assets
+// Format: "storage://{userId}/{folder}/{hash}.{ext}"
+// Unlike public URLs, these are stable refs resolved to signed URLs at runtime.
+const STORAGE_PREFIX = 'storage://';
+
 /**
- * Upload a data URL or Blob to Supabase Storage.
- * Returns a public https:// URL on success, or falls back to null.
+ * Upload a data URL or Blob to Supabase Storage (PRIVATE).
+ * Returns a stable storage:// ref on success, null on failure.
  */
 export async function uploadToCloud(
     input: string | Blob,
     folder: StorageFolder,
     userId: string,
-    fileName?: string,
+    _fileName?: string,
 ): Promise<string | null> {
     const sb = getSupabase();
     if (!sb) return null;
@@ -29,53 +37,58 @@ export async function uploadToCloud(
     const ext = mimeToExt(blob.type);
     const path = `${userId}/${folder}/${hash}.${ext}`;
 
-    // ★ Check if already exists (dedup by hash)
-    const { data: existing } = sb.storage.from(BUCKET).getPublicUrl(path);
-    if (existing?.publicUrl) {
-        // Verify file actually exists by HEAD request
-        try {
-            const resp = await fetch(existing.publicUrl, { method: 'HEAD' });
-            if (resp.ok) return existing.publicUrl;
-        } catch { /* file doesn't exist yet, continue upload */ }
-    }
-
-    // Upload
+    // Upload (upsert = skip if same hash already exists)
     const { error } = await sb.storage.from(BUCKET).upload(path, blob, {
         contentType: blob.type,
         upsert: true,
     });
 
     if (error) {
-        console.error('[cloudStorage] Upload failed:', error.message);
+        // "already exists" is fine — dedup success
+        if (error.message?.includes('already exists') || error.message?.includes('Duplicate')) {
+            console.log(`[cloudStorage] Dedup hit: ${path}`);
+        } else {
+            console.error('[cloudStorage] Upload failed:', error.message);
+            return null;
+        }
+    }
+
+    const ref = `${STORAGE_PREFIX}${path}`;
+    console.log(`[cloudStorage] Stored: ${ref}`);
+    return ref;
+}
+
+/**
+ * Resolve a storage:// ref to a signed URL for display.
+ * Returns a time-limited URL (1 hour). Re-resolve on each session.
+ */
+export async function resolveCloudUrl(ref: string): Promise<string | null> {
+    if (!isStorageRef(ref)) return null;
+
+    const sb = getSupabase();
+    if (!sb) return null;
+
+    const path = ref.slice(STORAGE_PREFIX.length);
+    const { data, error } = await sb.storage.from(BUCKET).createSignedUrl(path, SIGNED_URL_EXPIRY);
+
+    if (error || !data?.signedUrl) {
+        console.warn('[cloudStorage] Failed to create signed URL:', error?.message);
         return null;
     }
 
-    const { data: urlData } = sb.storage.from(BUCKET).getPublicUrl(path);
-    console.log(`[cloudStorage] Uploaded: ${folder}/${hash}.${ext}`);
-    return urlData?.publicUrl ?? null;
+    return data.signedUrl;
 }
 
 /**
- * Upload a Blob to cloud storage (convenience wrapper).
+ * Delete a file from Supabase Storage by storage:// ref.
  */
-export async function uploadBlobToCloud(
-    blob: Blob,
-    folder: StorageFolder,
-    userId: string,
-): Promise<string | null> {
-    return uploadToCloud(blob, folder, userId);
-}
+export async function deleteFromCloud(ref: string): Promise<boolean> {
+    if (!isStorageRef(ref)) return false;
 
-/**
- * Delete a file from Supabase Storage by full URL.
- */
-export async function deleteFromCloud(publicUrl: string): Promise<boolean> {
     const sb = getSupabase();
     if (!sb) return false;
 
-    const path = extractPathFromUrl(publicUrl);
-    if (!path) return false;
-
+    const path = ref.slice(STORAGE_PREFIX.length);
     const { error } = await sb.storage.from(BUCKET).remove([path]);
     if (error) {
         console.error('[cloudStorage] Delete failed:', error.message);
@@ -85,7 +98,14 @@ export async function deleteFromCloud(publicUrl: string): Promise<boolean> {
 }
 
 /**
- * Check if a URL is a Supabase Storage URL.
+ * Check if a ref is a cloud storage reference.
+ */
+export function isStorageRef(ref: string): boolean {
+    return ref.startsWith(STORAGE_PREFIX);
+}
+
+/**
+ * Check if a URL is a Supabase signed URL (resolved from storage://).
  */
 export function isCloudUrl(url: string): boolean {
     return url.includes('supabase.co/storage/v1/object');
@@ -127,9 +147,4 @@ function mimeToExt(mime: string): string {
         'image/svg+xml': 'svg', 'image/gif': 'gif', 'image/avif': 'avif',
     };
     return map[mime] ?? 'png';
-}
-
-function extractPathFromUrl(url: string): string | null {
-    const match = url.match(/\/object\/public\/ace-assets\/(.+)$/);
-    return match?.[1] ?? null;
 }

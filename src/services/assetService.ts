@@ -14,7 +14,7 @@
 
 import { aceDB } from '@/stores/aceDB';
 import type { DesignElement, ImageElement } from '@/schema/elements.types';
-import { uploadToCloud, isCloudUrl, getCurrentUserId } from './cloudStorageService';
+import { uploadToCloud, isStorageRef, isCloudUrl, getCurrentUserId, resolveCloudUrl } from './cloudStorageService';
 
 const IDB_PREFIX = 'idb://';
 
@@ -22,17 +22,17 @@ const IDB_PREFIX = 'idb://';
 
 /**
  * Store a data URL — tries Supabase Storage first, falls back to IndexedDB.
- * Returns https:// URL (cloud) or idb://{hash} (local fallback).
+ * Returns storage:// ref (cloud) or idb://{hash} (local fallback).
  */
 export async function storeAsset(dataUrl: string): Promise<string> {
-    // Skip if already a cloud URL, idb:// ref, or non-data URL
+    // Skip if already a cloud ref, idb:// ref, or non-data URL
     if (!dataUrl.startsWith('data:')) return dataUrl;
 
     // ★ Try Supabase Storage first
     const userId = await getCurrentUserId();
     if (userId) {
-        const cloudUrl = await uploadToCloud(dataUrl, 'designs', userId);
-        if (cloudUrl) return cloudUrl;
+        const cloudRef = await uploadToCloud(dataUrl, 'designs', userId);
+        if (cloudRef) return cloudRef;
     }
 
     // Fallback: IndexedDB
@@ -49,14 +49,23 @@ export async function storeAsset(dataUrl: string): Promise<string> {
 
 /**
  * Resolve an asset reference to a usable URL.
- * - https:// → returned as-is (Supabase Storage)
- * - idb://{hash} → resolved from IndexedDB to blob: URL
- * - anything else → returned as-is
+ * - storage:// → signed URL via Supabase (private, 1hr expiry)
+ * - idb://{hash} → blob: URL from IndexedDB
+ * - https:// / blob: / data: → returned as-is
  */
 export async function resolveAsset(ref: string): Promise<string> {
-    // Cloud URLs are directly usable
-    if (isCloudUrl(ref) || ref.startsWith('https://') || ref.startsWith('http://')) return ref;
+    // ★ Cloud storage refs → signed URL
+    if (isStorageRef(ref)) {
+        const signedUrl = await resolveCloudUrl(ref);
+        if (signedUrl) return signedUrl;
+        console.warn(`[assetService] Cloud asset unreachable: ${ref}`);
+        return ref;
+    }
 
+    // Already-signed or external URLs — pass through
+    if (isCloudUrl(ref) || ref.startsWith('https://') || ref.startsWith('http://') || ref.startsWith('blob:')) return ref;
+
+    // idb:// → IndexedDB
     if (!ref.startsWith(IDB_PREFIX)) return ref;
 
     const hash = ref.slice(IDB_PREFIX.length);
