@@ -58,12 +58,15 @@ export function useBottomPanelState(
         if (localX <= EDGE_PX) mode = 'resize-left';
         else if (localX >= rect.width - EDGE_PX) mode = 'resize-right';
         const config = animPresets.getPreset(elementId);
-        // ★ Resolve -1 to DEFAULT_DURATION, not current dynamic duration
+        // ★ Resolve ALL bars' -1 to DEFAULT_DURATION so timeline can shrink
+        const allIds = [...overlayElements.map(el => el.id), ...nodes.map(n => String(n.id))];
+        for (const id of allIds) {
+            const cfg = animPresets.getPreset(id);
+            if (cfg.endTime < 0) animPresets.setTiming(id, cfg.startTime, DEFAULT_DURATION);
+        }
         const resolvedEnd = config.endTime < 0 ? DEFAULT_DURATION : config.endTime;
-        // Write explicit value to store so -1 sentinel is gone
-        if (config.endTime < 0) animPresets.setTiming(elementId, config.startTime, resolvedEnd);
         setBarDrag({ elementId, mode, startX: e.clientX, origStart: config.startTime, origEnd: resolvedEnd });
-    }, [animPresets, duration]);
+    }, [animPresets, duration, overlayElements, nodes, DEFAULT_DURATION]);
 
     useEffect(() => {
         if (!barDrag) return;
@@ -100,10 +103,14 @@ export function useBottomPanelState(
                 if (et > maxEnd) maxEnd = et;
             }
             const targetDur = Math.min(MAX_DURATION, Math.max(1, Math.ceil(maxEnd)));
-            if (Math.abs(targetDur - duration) > 0.01) {
-                setDuration(targetDur);
-                try { engine?.set_duration(targetDur); } catch { /* ok */ }
-            }
+            // Use functional setState to avoid stale closure — always compare latest
+            setDuration(prev => {
+                if (Math.abs(targetDur - prev) > 0.01) {
+                    try { engine?.set_duration(targetDur); } catch { /* ok */ }
+                    return targetDur;
+                }
+                return prev;
+            });
         };
         const handleUp = () => { setBarDrag(null); document.body.style.cursor = ''; document.body.style.userSelect = ''; recalcDuration(); };
         document.body.style.cursor = barDrag.mode === 'move' ? 'grabbing' : 'ew-resize';
