@@ -299,3 +299,107 @@ describe('★ REGRESSION: PlugCanvas v2 — no SVG gradient bugs', () => {
         expect(parseInt(match![1]!)).toBeGreaterThanOrEqual(50);
     });
 });
+
+// ═══════════════════════════════════════════════════
+// ★ REGRESSION GUARD: ActiveSelection save coords (v0.0.0.311)
+// Bug: Fabric.js objects inside ActiveSelection have left/top relative
+// to group center → negative coords → CTA jumps to (0,0) on save.
+// Fix: get_all_nodes() discards selection before reading positions.
+// ═══════════════════════════════════════════════════
+
+describe('★ REGRESSION: ActiveSelection — save must use absolute coords', () => {
+
+    it('fabricEngineShim imports ActiveSelection from fabric', () => {
+        const src = readFileSync(resolve(__dirname, './fabricEngineShim.ts'), 'utf-8');
+        expect(src).toContain('ActiveSelection');
+        // Must be a top-level import, not dynamic
+        expect(src).toMatch(/import\s*\{[^}]*ActiveSelection[^}]*\}\s*from\s*'fabric'/);
+    });
+
+    it('get_all_nodes discards active selection before reading positions', () => {
+        const src = readFileSync(resolve(__dirname, './fabricEngineShim.ts'), 'utf-8');
+        // Must call discardActiveObject BEFORE fabricToEngineNode
+        const discardIdx = src.indexOf('fc.discardActiveObject()');
+        const mapIdx = src.indexOf('userObjects().map(fabricToEngineNode)');
+        expect(discardIdx).toBeGreaterThan(-1);
+        expect(mapIdx).toBeGreaterThan(-1);
+        expect(discardIdx).toBeLessThan(mapIdx);
+    });
+
+    it('get_all_nodes checks for multi-select (length > 1), not any selection', () => {
+        const src = readFileSync(resolve(__dirname, './fabricEngineShim.ts'), 'utf-8');
+        // Single-select should NOT trigger discard (no coordinate issue)
+        expect(src).toContain('activeObjs.length > 1');
+    });
+
+    it('get_all_nodes re-creates ActiveSelection after reading', () => {
+        const src = readFileSync(resolve(__dirname, './fabricEngineShim.ts'), 'utf-8');
+        const discardIdx = src.indexOf('fc.discardActiveObject()');
+        const reSelectIdx = src.indexOf('new ActiveSelection(activeObjs');
+        expect(reSelectIdx).toBeGreaterThan(-1);
+        // Re-select must happen AFTER discard
+        expect(reSelectIdx).toBeGreaterThan(discardIdx);
+        // Must set it as active and render
+        expect(src).toContain('fc.setActiveObject(sel)');
+        expect(src.indexOf('fc.renderAll()', reSelectIdx)).toBeGreaterThan(reSelectIdx);
+    });
+
+    it('fabricToEngineNode reads obj.left/obj.top directly (relies on upstream fix)', () => {
+        const src = readFileSync(resolve(__dirname, './fabricHelpers.ts'), 'utf-8');
+        // Must use obj.left and obj.top (not getX/getY or transform matrix)
+        // because the upstream get_all_nodes ensures absolute coords
+        expect(src).toContain('x: obj.left ?? 0');
+        expect(src).toContain('y: obj.top ?? 0');
+    });
+});
+
+// ═══════════════════════════════════════════════════
+// ★ REGRESSION GUARD: Save roundtrip coordinate sanity
+// Ensures constraint conversion never produces negative offsets
+// for elements visually inside the canvas bounds.
+// ═══════════════════════════════════════════════════
+
+import { absoluteToConstraints, constraintsToAbsolute } from '../engine/constraintUtils';
+
+describe('★ REGRESSION: Constraint roundtrip — no negative drift', () => {
+
+    const canvasW = 1920, canvasH = 1080;
+
+    it('CTA at right-center saves and restores to same position', () => {
+        // CTA positioned at right side of 1920×1080 canvas
+        const x = 1600, y = 500, w = 200, h = 60;
+        const constraints = absoluteToConstraints(x, y, w, h, canvasW, canvasH);
+        const restored = constraintsToAbsolute(constraints, canvasW, canvasH);
+        expect(restored.x).toBeCloseTo(x, 0);
+        expect(restored.y).toBeCloseTo(y, 0);
+        expect(restored.w).toBe(w);
+        expect(restored.h).toBe(h);
+    });
+
+    it('element at canvas center survives roundtrip', () => {
+        const x = 800, y = 490, w = 320, h = 100;
+        const constraints = absoluteToConstraints(x, y, w, h, canvasW, canvasH);
+        const restored = constraintsToAbsolute(constraints, canvasW, canvasH);
+        expect(restored.x).toBeCloseTo(x, 0);
+        expect(restored.y).toBeCloseTo(y, 0);
+    });
+
+    it('negative x/y input produces constraint that restores to same negative position (off-canvas)', () => {
+        // This simulates the buggy scenario — if we get -160,-50 as input
+        // the constraint system should faithfully store and restore it
+        const x = -160, y = -50, w = 320, h = 99;
+        const constraints = absoluteToConstraints(x, y, w, h, canvasW, canvasH);
+        const restored = constraintsToAbsolute(constraints, canvasW, canvasH);
+        // The constraint system is correct — the BUG was in reading wrong coords
+        expect(restored.x).toBeCloseTo(x, 0);
+        expect(restored.y).toBeCloseTo(y, 0);
+    });
+
+    it('small canvas (300x250) CTA survives roundtrip', () => {
+        const x = 180, y = 200, w = 100, h = 35;
+        const c = absoluteToConstraints(x, y, w, h, 300, 250);
+        const r = constraintsToAbsolute(c, 300, 250);
+        expect(r.x).toBeCloseTo(x, 0);
+        expect(r.y).toBeCloseTo(y, 0);
+    });
+});
