@@ -80,10 +80,11 @@ export async function resolveAsset(ref: string): Promise<string> {
 }
 
 /**
- * Check if a string is an idb:// asset reference.
+ * Check if a string is an asset reference that needs resolving.
+ * Recognizes both idb:// (IndexedDB) and storage:// (Supabase) refs.
  */
 export function isAssetRef(src: string): boolean {
-    return src.startsWith(IDB_PREFIX);
+    return src.startsWith(IDB_PREFIX) || isStorageRef(src);
 }
 
 /**
@@ -122,8 +123,8 @@ export async function extractAssets(
 }
 
 /**
- * Resolve all `idb://` references in elements to usable blob URLs.
- * Returns a new elements array with blob URLs.
+ * Resolve all asset references (idb:// and storage://) in elements to usable URLs.
+ * Returns a new elements array with resolved URLs.
  */
 export async function resolveAssets(
     elements: DesignElement[],
@@ -132,14 +133,15 @@ export async function resolveAssets(
 
     for (const el of elements) {
         if (el.type === 'image' && isAssetRef(el.src)) {
-            const hash = el.src.slice(IDB_PREFIX.length);
+            // Use full ref as cache key (works for both idb:// and storage://)
+            const cacheKey = el.src;
 
             // Check cache first
-            let blobUrl = _blobUrlCache.get(hash);
+            let blobUrl = _blobUrlCache.get(cacheKey);
             if (!blobUrl) {
                 blobUrl = await resolveAsset(el.src);
                 if (blobUrl !== el.src) {
-                    _blobUrlCache.set(hash, blobUrl);
+                    _blobUrlCache.set(cacheKey, blobUrl);
                 }
             }
 

@@ -64,10 +64,13 @@ describe('assetService Supabase-first migration', () => {
         expect(result).toBe(url);
     });
 
-    it('isAssetRef still works for idb:// refs', async () => {
+    it('isAssetRef recognizes both idb:// and storage:// refs', async () => {
         const { isAssetRef } = await import('@/services/assetService');
         expect(isAssetRef('idb://abc123')).toBe(true);
+        expect(isAssetRef('storage://uid/uploads/hash.png')).toBe(true);
         expect(isAssetRef('https://example.com')).toBe(false);
+        expect(isAssetRef('data:image/png;base64,AAA')).toBe(false);
+        expect(isAssetRef('blob:http://localhost/xyz')).toBe(false);
     });
 
     it('storeAsset skips non-data URLs', async () => {

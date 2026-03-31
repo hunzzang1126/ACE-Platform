@@ -148,11 +148,11 @@ export function BannerPreviewGrid({ variants, visibleIds, externalPlaying }: Pro
         return () => { cancelled = true; };
     }, [visibleVariants]);
 
-    // Resolve idb:// image URLs
+    // Resolve idb:// and storage:// image URLs
     useEffect(() => {
         let cancelled = false;
         const toResolve: { elId: string; src: string }[] = [];
-        for (const v of visibleVariants) for (const el of v.elements) if (el.type === 'image' && el.src?.startsWith('idb://')) toResolve.push({ elId: el.id, src: el.src });
+        for (const v of visibleVariants) for (const el of v.elements) if (el.type === 'image' && el.src && (el.src.startsWith('idb://') || el.src.startsWith('storage://'))) toResolve.push({ elId: el.id, src: el.src });
         if (toResolve.length === 0) return;
         (async () => {
             const { resolveAsset } = await import('@/services/assetService');

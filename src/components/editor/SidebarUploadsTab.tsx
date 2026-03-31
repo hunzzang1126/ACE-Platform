@@ -33,13 +33,14 @@ export function SidebarUploadsTab({ onTriggerImageUpload, onTriggerVideoUpload, 
                 if (isAssetRef(u.idbRef)) {
                     try {
                         const blobUrl = await resolveAsset(u.idbRef);
-                        if (blobUrl === u.idbRef) {
-                            // ★ Asset not found in IndexedDB — ghost entry
+                        if (blobUrl === u.idbRef && u.idbRef.startsWith('idb://')) {
+                            // ★ Only idb:// refs are ghosts when unresolvable.
+                            // storage:// refs may just be temporarily unreachable.
                             ghostIds.push(u.id);
                         } else if (!cancelled) {
                             newUrls[u.id] = blobUrl;
                         }
-                    } catch { ghostIds.push(u.id); }
+                    } catch { if (u.idbRef.startsWith('idb://')) ghostIds.push(u.id); }
                 } else {
                     newUrls[u.id] = u.idbRef;
                 }
