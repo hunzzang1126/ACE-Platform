@@ -7,7 +7,7 @@
 // ★ Inline panels (Effects/Animate/Position) override the sidebar panel when active.
 // ─────────────────────────────────────────────────
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useUIStore } from '@/stores/uiStore';
 import { SidebarTemplateTab } from './SidebarTemplateTab';
 import { SidebarElementsTab } from './SidebarElementsTab';
@@ -18,6 +18,8 @@ import { SidebarProjectsTab } from './SidebarProjectsTab';
 import { InlineEffectsPanel } from './InlineEffectsPanel';
 import { InlineAnimatePanel } from './InlineAnimatePanel';
 import { InlinePositionPanel } from './InlinePositionPanel';
+import { UpgradeModal } from '@/components/billing/UpgradeModal';
+import { usePlanLimits } from '@/hooks/usePlanLimits';
 import type { CanvasEngineActions, EngineNode } from '@/hooks/canvasTypes';
 
 import type { ReactNode } from 'react';
@@ -110,6 +112,9 @@ export function EditorSidebar({ actions, nodes = [], selection = [], onTriggerIm
     const toggleTab = useUIStore((s) => s.toggleSidebarTab);
     const activeInlinePanel = useUIStore((s) => s.activeInlinePanel);
     const setInlinePanel = useUIStore((s) => s.setInlinePanel);
+    const { limits } = usePlanLimits();
+    const brandCloudEnabled = limits.brandCloudEnabled;
+    const [showUpgrade, setShowUpgrade] = useState(false);
 
     const handleTabClick = useCallback((tabId: string) => {
         toggleTab(tabId);
@@ -199,8 +204,11 @@ export function EditorSidebar({ actions, nodes = [], selection = [], onTriggerIm
                             />
                         )}
                         {!activeInlinePanel && activeTab === 'brand' && (
-                            <SidebarBrandTab actions={actions} />
+                            brandCloudEnabled
+                                ? <SidebarBrandTab actions={actions} />
+                                : <BrandLockedPlaceholder onUpgrade={() => setShowUpgrade(true)} />
                         )}
+                        <UpgradeModal isOpen={showUpgrade} onClose={() => setShowUpgrade(false)} reason="brand_cloud" />
                         {!activeInlinePanel && activeTab === 'projects' && <SidebarProjectsTab />}
                         {!activeInlinePanel && activeTab === 'ai' && (
                             <div className="sidebar-placeholder">
@@ -211,6 +219,41 @@ export function EditorSidebar({ actions, nodes = [], selection = [], onTriggerIm
                     </div>
                 </aside>
             )}
+        </div>
+    );
+}
+
+// ── Brand Kit locked placeholder for non-enterprise users ──
+function BrandLockedPlaceholder({ onUpgrade }: { onUpgrade: () => void }) {
+    return (
+        <div style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            justifyContent: 'center', gap: 12, padding: '40px 20px', textAlign: 'center',
+        }}>
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted, #71717a)" strokeWidth="1.2" strokeLinecap="round" opacity="0.4">
+                <rect x="3" y="11" width="18" height="11" rx="2" />
+                <path d="M7 11V7a5 5 0 0110 0v4" />
+            </svg>
+            <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary, #e4e4e7)', margin: 0 }}>
+                Brand Kit
+            </p>
+            <p style={{ fontSize: 11, color: 'var(--text-muted, #71717a)', margin: 0, lineHeight: 1.5 }}>
+                Brand Kit is available on Enterprise plans. Upload logos, set brand colors, fonts, and guidelines for AI-powered design.
+            </p>
+            <button
+                onClick={onUpgrade}
+                style={{
+                    marginTop: 4, padding: '8px 20px',
+                    background: 'linear-gradient(135deg, #818cf8, #6366f1)',
+                    color: '#fff', border: 'none', borderRadius: 8,
+                    fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                    transition: 'opacity 0.2s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+                onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+            >
+                Upgrade to Enterprise
+            </button>
         </div>
     );
 }
