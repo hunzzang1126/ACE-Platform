@@ -126,10 +126,10 @@ export function useCanvasSync(variantId: string | undefined, canvasW: number, ca
             }
 
             if (el.animation && el.animation.preset !== 'none') {
-                // ★ REGRESSION GUARD: el.id is already "engine-{num}" from elementConverters.
-                // Do NOT double-prefix with `engine-${el.id}` — that creates "engine-engine-123"
-                // and the animPresetStore can never match the key during playback.
-                const key = el.id;
+                // ★ REGRESSION GUARD: shimAnimation.ts looks up presets by String(__glidId)
+                // where __glidId is a raw number (e.g. 42 → "42").
+                // el.id from elementConverters is "engine-42", so we MUST strip the prefix.
+                const key = el.id.startsWith('engine-') ? el.id.slice(7) : el.id;
                 useAnimPresetStore.getState().setPreset(key, { anim: el.animation.preset, animDuration: el.animation.duration, startTime: el.animation.startTime });
             }
         }

@@ -68,12 +68,6 @@ const EFFECT_PRESETS: EffectPreset[] = [
         defaultColor: '#ff0055',
         previewCSS: { textShadow: '-3px 0 #00ffff, 3px 0 #ff0000', color: '#ff0055' },
     },
-    // ── Shape section ──
-    {
-        type: 'curve', label: 'Curve', section: 'shape',
-        defaultColor: '#f59e0b',
-        previewCSS: { textShadow: '0 2px 4px rgba(245,158,11,0.3)', fontStyle: 'italic' },
-    },
     // ── Advanced section ──
     {
         type: '70s', label: '70s', section: 'advanced',
@@ -177,7 +171,6 @@ export function InlineEffectsPanel({ selectedNode, actions, onClose }: Props) {
 
     const shadowPresets = EFFECT_PRESETS.filter(p => p.section === 'shadow');
     const stylePresets = EFFECT_PRESETS.filter(p => p.section === 'style');
-    const shapePresets = EFFECT_PRESETS.filter(p => p.section === 'shape');
     const advancedPresets = EFFECT_PRESETS.filter(p => p.section === 'advanced');
 
     return (
@@ -195,8 +188,6 @@ export function InlineEffectsPanel({ selectedNode, actions, onClose }: Props) {
                 {renderSection('shadow', 'Shadow', shadowPresets)}
                 <div style={S.divider} />
                 {renderSection('style', 'Style', stylePresets)}
-                <div style={S.divider} />
-                {renderSection('shape', 'Shape', shapePresets)}
                 <div style={S.divider} />
                 {renderSection('advanced', 'Advanced', advancedPresets)}
 
@@ -285,6 +276,7 @@ const S: Record<string, React.CSSProperties> = {
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
         padding: 6, background: 'rgba(255,255,255,0.03)', border: '1.5px solid transparent',
         borderRadius: 8, cursor: 'pointer', transition: 'all 0.15s',
+        outline: 'none',  // ★ Prevent browser focus ring from creating ghost selections
     },
     presetBtnActive: {
         borderColor: 'var(--accent, #818cf8)', background: 'rgba(129,140,248,0.08)',

@@ -87,17 +87,13 @@ export function TimelineBar({
                 }}
             >
                 <div className="bp-bar-handle bp-bar-handle-left" title="Drag to resize start" />
-                <button
-                    className="bp-bar-anim-btn"
-                    title="Click to set animation"
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onAnimClick(e, elementId, nodeId);
-                    }}
+                <span
+                    className="bp-bar-anim-label"
+                    title={hasAnim ? 'Animation applied (edit in Animate panel)' : label}
                 >
                     {hasAnim && <span className="bp-anim-dot" />}
                     {label}
-                </button>
+                </span>
 
                 {/* Keyframe diamond markers */}
                 {keyframes.map((kf) => {

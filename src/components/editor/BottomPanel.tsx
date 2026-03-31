@@ -13,7 +13,6 @@ import { useLayerDrag } from '@/hooks/useLayerDrag';
 import { type Engine, type UnifiedLayer, BAR_COLORS, nodeLabel } from './bottomPanelHelpers';
 import { OverlayLayerRow, EngineLayerRow } from './LayerRow';
 import { TimelineBar } from './TimelineBar';
-import { AnimDropdown } from './AnimDropdown';
 import { useBottomPanelState } from './useBottomPanelState';
 
 interface Props {
@@ -40,7 +39,6 @@ export function BottomPanel({ variant, engine, nodes, selection, actions, overla
     const [renamingId, setRenamingId] = useState<string | null>(null);
     const [renameValue, setRenameValue] = useState('');
     const [collapsed, setCollapsed] = useState(false);
-    const [animDropdown, setAnimDropdown] = useState<{ elementId: string; nodeId: number; x: number; y: number } | null>(null);
     const layerScrollRef = useRef<HTMLDivElement>(null);
     const timelineScrollRef = useRef<HTMLDivElement>(null);
 
@@ -92,7 +90,7 @@ export function BottomPanel({ variant, engine, nodes, selection, actions, overla
     const isDragOver = (idx: number) => dragState?.active && dragState.overIdx === idx && dragState.srcIdx !== idx;
     const isDraggingFn = (id: string) => dragState?.active && dragState.srcId === id;
 
-    const openAnimDropdown = (e: React.MouseEvent, elId: string, nId: number) => { const rect = e.currentTarget.getBoundingClientRect(); setAnimDropdown({ elementId: elId, nodeId: nId, x: rect.left, y: rect.top }); };
+
 
     return (
         <div className="bp-root">
@@ -145,13 +143,13 @@ export function BottomPanel({ variant, engine, nodes, selection, actions, overla
                         const label = getBarLabel(layer.id, layer.kind === 'overlay' ? (layer.overlay?.type === 'text' ? 'Text' : 'Image') : nodeLabel(layer.node!));
                         const isSelected = layer.kind === 'overlay' ? layer.overlay?.id === selectedOverlayId : selection.includes(layer.node?.id ?? -1);
                         const nodeId = layer.kind === 'engine' ? (layer.node?.id ?? -1) : -1;
-                        return (<TimelineBar key={`tl-${layer.id}`} elementId={elId} label={label} isSelected={!!isSelected} draggedClass={dc} dropTargetClass={dtc} barLeft={barLeft} barWidth={barWidth} barColor={barColor} currentTime={currentTime} duration={duration} hasAnim={config.anim !== 'none'} opacityStyle={layer.kind === 'overlay' ? 0.7 : undefined} justDragged={justDragged} onSelect={() => layer.kind === 'overlay' ? onOverlaySelect?.(elId) : handleSelect(layer.node!.id)} onBarMouseDown={st.handleBarMouseDown} onBarCursor={getBarCursor} onAnimClick={openAnimDropdown} nodeId={nodeId} />);
+                        return (<TimelineBar key={`tl-${layer.id}`} elementId={elId} label={label} isSelected={!!isSelected} draggedClass={dc} dropTargetClass={dtc} barLeft={barLeft} barWidth={barWidth} barColor={barColor} currentTime={currentTime} duration={duration} hasAnim={config.anim !== 'none'} opacityStyle={layer.kind === 'overlay' ? 0.7 : undefined} justDragged={justDragged} onSelect={() => layer.kind === 'overlay' ? onOverlaySelect?.(elId) : handleSelect(layer.node!.id)} onBarMouseDown={st.handleBarMouseDown} onBarCursor={getBarCursor} onAnimClick={() => {}} nodeId={nodeId} />);
                     })}
                     {unifiedLayers.length === 0 && <div className="bp-empty">Press R, E, T, or I to add elements</div>}
                 </div>
             </div>
 
-            {animDropdown && (<AnimDropdown dropdown={animDropdown} engine={engine} getPreset={animPresets.getPreset} setPreset={animPresets.setPreset} onClose={() => setAnimDropdown(null)} />)}
+
         </div>
     );
 }
