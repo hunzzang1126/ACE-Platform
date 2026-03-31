@@ -39,13 +39,13 @@ const FEATURES = [
 
 export function LandingPage() {
     const navigate = useNavigate();
-    const { isAuthenticated, isApproved } = useAuthStore();
+    const { isAuthenticated } = useAuthStore();
     const heroRef = useRef<HTMLDivElement>(null);
     const sectionsRef = useRef<HTMLDivElement[]>([]);
 
     useEffect(() => {
-        if (isAuthenticated() && isApproved()) navigate('/dashboard', { replace: true });
-    }, [isAuthenticated, isApproved, navigate]);
+        if (isAuthenticated()) navigate('/dashboard', { replace: true });
+    }, [isAuthenticated, navigate]);
 
     // Intersection observer for legacy HowItWorks sections
     useEffect(() => {

@@ -53,10 +53,7 @@ export function ProtectedRoute({ children, adminOnly = false }: ProtectedRoutePr
         return <Navigate to="/login" replace />;
     }
 
-    // Logged in but not approved → pending page
-    if (role !== 'admin' && role !== 'user') {
-        return <Navigate to="/pending" replace />;
-    }
+    // ★ Pending approval gate REMOVED — all authenticated users pass through
 
     // Admin route but not admin → dashboard
     if (adminOnly && role !== 'admin') {
