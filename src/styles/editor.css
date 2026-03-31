@@ -1013,6 +1013,17 @@
     font-weight: 500;
 }
 
+.ctx-delete-btn {
+    color: var(--text-muted, #71717a);
+    padding: 0 6px;
+    transition: color 0.15s ease;
+}
+
+.ctx-delete-btn:hover {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.08);
+}
+
 .ctx-label-btn:hover {
     background: var(--bg-hover);
 }
