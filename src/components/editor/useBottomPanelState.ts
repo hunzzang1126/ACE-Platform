@@ -17,6 +17,7 @@ export function useBottomPanelState(
     const animPresets = useAnimPresetStore();
     const [playing, setPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
+    const MAX_DURATION = 20;
     const [duration, setDuration] = useState(5.0);
     const [looping, setLooping] = useState(false);
     const [speed, setSpeed] = useState(1.0);
@@ -29,15 +30,22 @@ export function useBottomPanelState(
     } | null>(null);
     const timelineBarsRef = useRef<HTMLDivElement>(null);
 
-    // ── Auto-duration ──
+    // ── Auto-duration: expand/contract based on furthest bar end (max 20s) ──
     const recalcDuration = useCallback(() => {
         const store = useAnimPresetStore.getState();
         const allIds = [...overlayElements.map(el => el.id), ...nodes.map(n => String(n.id))];
         let maxEnd = 0.5;
-        for (const id of allIds) { const cfg = store.getPreset(id); const et = cfg.endTime < 0 ? duration : cfg.endTime; if (et > maxEnd) maxEnd = et; }
-        const newDuration = Math.round(maxEnd * 10) / 10;
-        if (Math.abs(newDuration - duration) > 0.05) { setDuration(newDuration); try { engine?.set_duration(newDuration); } catch { /* ok */ } }
-    }, [overlayElements, nodes, duration, engine]);
+        for (const id of allIds) {
+            const cfg = store.getPreset(id);
+            const et = cfg.endTime < 0 ? 5 : cfg.endTime; // -1 default = 5s, NOT current duration
+            if (et > maxEnd) maxEnd = et;
+        }
+        const newDuration = Math.min(MAX_DURATION, Math.max(1, Math.ceil(maxEnd)));
+        if (Math.abs(newDuration - duration) > 0.01) {
+            setDuration(newDuration);
+            try { engine?.set_duration(newDuration); } catch { /* ok */ }
+        }
+    }, [overlayElements, nodes, duration, engine, MAX_DURATION]);
 
     // ── Bar drag handlers ──
     const handleBarMouseDown = useCallback((e: React.MouseEvent, elementId: string, barEl: HTMLElement) => {
@@ -63,10 +71,26 @@ export function useBottomPanelState(
             const dx = e.clientX - barDrag.startX;
             const dt = pxToTime(dx);
             let newStart = barDrag.origStart, newEnd = barDrag.origEnd;
-            if (barDrag.mode === 'move') { const barLen = barDrag.origEnd - barDrag.origStart; newStart = Math.max(0, barDrag.origStart + dt); newEnd = newStart + barLen; if (newEnd > duration) { newEnd = duration; newStart = newEnd - barLen; } if (newStart < 0) { newStart = 0; newEnd = barLen; } }
+            if (barDrag.mode === 'move') {
+                const barLen = barDrag.origEnd - barDrag.origStart;
+                newStart = Math.max(0, barDrag.origStart + dt);
+                newEnd = newStart + barLen;
+                // Allow moving past current duration up to MAX_DURATION
+                if (newEnd > MAX_DURATION) { newEnd = MAX_DURATION; newStart = newEnd - barLen; }
+                if (newStart < 0) { newStart = 0; newEnd = barLen; }
+            }
             else if (barDrag.mode === 'resize-left') { newStart = Math.max(0, Math.min(barDrag.origStart + dt, barDrag.origEnd - MIN_BAR)); }
-            else if (barDrag.mode === 'resize-right') { newEnd = Math.max(barDrag.origStart + MIN_BAR, barDrag.origEnd + dt); }
+            else if (barDrag.mode === 'resize-right') {
+                // Allow extending past current duration up to MAX_DURATION
+                newEnd = Math.min(MAX_DURATION, Math.max(barDrag.origStart + MIN_BAR, barDrag.origEnd + dt));
+            }
             animPresets.setTiming(barDrag.elementId, newStart, newEnd);
+            // Auto-extend duration in real-time during drag
+            if (newEnd > duration && newEnd <= MAX_DURATION) {
+                const expanded = Math.ceil(newEnd);
+                setDuration(expanded);
+                try { engine?.set_duration(expanded); } catch { /* ok */ }
+            }
         };
         const handleUp = () => { setBarDrag(null); document.body.style.cursor = ''; document.body.style.userSelect = ''; recalcDuration(); };
         document.body.style.cursor = barDrag.mode === 'move' ? 'grabbing' : 'ew-resize';
@@ -74,7 +98,7 @@ export function useBottomPanelState(
         document.addEventListener('mousemove', handleMove);
         document.addEventListener('mouseup', handleUp);
         return () => { document.removeEventListener('mousemove', handleMove); document.removeEventListener('mouseup', handleUp); };
-    }, [barDrag, duration, animPresets]);
+    }, [barDrag, duration, animPresets, MAX_DURATION, engine, recalcDuration]);
 
     // ── Engine sync ──
     const syncTime = useCallback(() => {
@@ -99,7 +123,7 @@ export function useBottomPanelState(
     const handlePause = useCallback(() => { if (!engine) return; try { engine.anim_pause(); setPlaying(false); } catch { /* */ } }, [engine]);
     const handleStop = useCallback(() => { if (!engine) return; try { engine.anim_stop(); setPlaying(false); setCurrentTime(0); animPresets.setCurrentTime(0); animPresets.setIsPlaying(false); } catch { /* */ } }, [engine]);
     const handleSeek = useCallback((time: number) => { if (!engine) return; try { engine.anim_seek(time); setCurrentTime(time); animPresets.setCurrentTime(time); } catch { /* */ } }, [engine]);
-    const handleDurationChange = useCallback((d: number) => { if (!engine) return; try { engine.set_duration(d); setDuration(d); } catch { /* */ } }, [engine]);
+    const handleDurationChange = useCallback((d: number) => { const clamped = Math.min(MAX_DURATION, Math.max(0.5, d)); if (!engine) return; try { engine.set_duration(clamped); setDuration(clamped); } catch { /* */ } }, [engine, MAX_DURATION]);
     const handleToggleLoop = useCallback(() => { if (!engine) return; const next = !looping; try { engine.set_looping(next); setLooping(next); } catch { /* */ } }, [engine, looping]);
     const handleSpeedChange = useCallback((s: number) => { if (!engine) return; try { engine.anim_set_speed(s); setSpeed(s); } catch { /* */ } }, [engine]);
 

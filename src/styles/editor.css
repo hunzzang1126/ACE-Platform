@@ -1618,21 +1618,21 @@
 
 .bp-ruler {
     flex: 1;
-    display: flex;
     position: relative;
     overflow: hidden;
     cursor: pointer;
     height: 100%;
-    align-items: flex-end;
 }
 
 .bp-ruler-tick {
-    flex: 1;
     font-size: 8px;
     color: var(--text-muted);
     border-left: 1px solid var(--border-editor, rgba(0, 0, 0, 0.06));
     padding-left: 3px;
+    padding-bottom: 2px;
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    bottom: 0;
 }
 
 .bp-playhead {

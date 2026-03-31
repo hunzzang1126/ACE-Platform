@@ -104,15 +104,17 @@ export function BottomPanel({ variant, engine, nodes, selection, actions, overla
                     </div>
                     <span className="bp-time">{currentTime.toFixed(2)} / {duration.toFixed(2)}s</span>
                     <div className="bp-speed-group"><span>Speed:</span>{[0.5, 1, 2].map(s => (<button key={s} className="bp-play-btn" style={{ fontSize: 10, padding: '1px 4px', ...(speed === s ? { color: '#4a9eff' } : {}) }} onClick={() => st.handleSpeedChange(s)}>{s}x</button>))}</div>
-                    <div className="bp-dur-group"><span>Dur:</span><input type="number" className="bp-dur-input" min="0.1" max="30" step="0.5" value={duration} onChange={e => st.handleDurationChange(parseFloat(e.target.value) || 5)} /></div>
+                    <div className="bp-dur-group"><span>Dur:</span><input type="number" className="bp-dur-input" min="0.5" max="20" step="0.5" value={duration} onChange={e => st.handleDurationChange(parseFloat(e.target.value) || 5)} /></div>
                     <button className="bp-collapse-btn" onClick={() => setCollapsed(true)} title="Collapse">▼</button>
                 </div>
             </div>
 
             <div className="bp-ruler-row">
                 <div className="bp-ruler-spacer" />
-                <div className="bp-ruler" onClick={(e) => { const rect = e.currentTarget.getBoundingClientRect(); st.handleSeek(((e.clientX - rect.left) / rect.width) * duration); }}>
-                    {Array.from({ length: Math.ceil(duration) + 1 }, (_, i) => (<span key={i} className="bp-ruler-tick">{i}.0</span>))}
+                <div className="bp-ruler" style={{ position: 'relative' }} onClick={(e) => { const rect = e.currentTarget.getBoundingClientRect(); st.handleSeek(((e.clientX - rect.left) / rect.width) * duration); }}>
+                    {Array.from({ length: Math.ceil(duration) + 1 }, (_, i) => (
+                        <span key={i} className="bp-ruler-tick" style={{ position: 'absolute', left: `${(i / duration) * 100}%`, transform: 'translateX(-50%)' }}>{i}.0</span>
+                    ))}
                     <div className="bp-playhead" style={{ left: `${(currentTime / duration) * 100}%` }} />
                 </div>
             </div>
