@@ -333,6 +333,17 @@ export function useFabricCanvas(width: number, height: number, _addDemoShapes = 
         ungroupSelected: () => { const fc = fabricRef.current; if (!fc) return; const active = fc.getActiveObject(); if (!active) return; const id = (active as any).__glidId; if (id) engineRef.current?.ungroup(id); },
         undo, redo, alignToCanvas,
         replaceImageSrc: async (id: number, newSrc: string) => { await engineRef.current?.replace_image_src(id, newSrc); },
+        fillToPage: (id: number) => {
+            const obj = findById(id); if (!obj) return;
+            const natW = (obj as any).width ?? 200;
+            const natH = (obj as any).height ?? 200;
+            // ★ Cover mode: uniform scale so image covers entire canvas
+            const scale = Math.max(width / natW, height / natH);
+            const finalW = natW * scale;
+            const finalH = natH * scale;
+            obj.set({ left: (width - finalW) / 2, top: (height - finalH) / 2, scaleX: scale, scaleY: scale });
+            obj.setCoords(); fabricRef.current?.renderAll(); pushUndo('Fill to Page'); syncState();
+        },
         canvasWidth: width, canvasHeight: height,
     };
 

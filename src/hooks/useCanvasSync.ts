@@ -221,7 +221,7 @@ function restoreImage(engine: Engine, img: ImageElement, canvasW: number, canvas
         const cx = x, cy = y, cw = w, ch = h, ci = img;
         pendingLoads.push(async () => {
             const resolved = isAssetRef(ci.src!) ? await resolveAsset(ci.src!) : ci.src!;
-            const nodeId = await engine.add_image(cx, cy, resolved, cw, ch, ci.name, ci.zIndex, ci.naturalWidth, ci.naturalHeight);
+            const nodeId = await engine.add_image(cx, cy, resolved, cw, ch, ci.name, ci.zIndex, ci.naturalWidth, ci.naturalHeight, ci.fit);
             // ★ Set persistent src on the Fabric object so save reads idb:// not blob:
             if (nodeId != null && engine._findById) {
                 try {

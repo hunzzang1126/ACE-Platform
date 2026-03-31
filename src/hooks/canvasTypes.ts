@@ -134,6 +134,8 @@ export interface CanvasEngineActions {
     alignToCanvas: (id: number, alignment: 'left' | 'center-h' | 'right' | 'top' | 'center-v' | 'bottom') => void;
     // Image manipulation
     replaceImageSrc: (id: number, newSrc: string) => Promise<void>;
+    /** Scale image to fill the entire canvas (cover mode, centered) */
+    fillToPage: (id: number) => void;
     // Canvas dimensions (for alignment)
     canvasWidth: number;
     canvasHeight: number;

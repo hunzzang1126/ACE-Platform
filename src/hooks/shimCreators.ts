@@ -119,7 +119,7 @@ export function createCreatorMethods(ctx: ShimContext) {
             return id;
         },
 
-        add_image: async (x: number, y: number, src: string, w?: number, h?: number, name?: string, zIndex?: number, storedNatW?: number, storedNatH?: number): Promise<number> => {
+        add_image: async (x: number, y: number, src: string, w?: number, h?: number, name?: string, zIndex?: number, storedNatW?: number, storedNatH?: number, fit?: 'cover' | 'contain' | 'fill'): Promise<number> => {
             const id = nextId();
             try {
                 const isDataUrl = src.startsWith('data:');
@@ -156,8 +156,18 @@ export function createCreatorMethods(ctx: ShimContext) {
 
                 let scaleX: number, scaleY: number;
                 if (w != null && h != null) {
-                    scaleX = w / Math.max(natW, 1);
-                    scaleY = h / Math.max(natH, 1);
+                    // ★ REGRESSION GUARD: Preserve aspect ratio unless fit='fill'.
+                    // 'cover' (default): uniform scale to cover target area — NO distortion.
+                    // 'fill': stretch independently — matches what Fabric saved.
+                    if (fit === 'fill') {
+                        scaleX = w / Math.max(natW, 1);
+                        scaleY = h / Math.max(natH, 1);
+                    } else {
+                        // Uniform scale (cover mode) — preserve aspect ratio
+                        const uniformScale = Math.max(w / Math.max(natW, 1), h / Math.max(natH, 1));
+                        scaleX = uniformScale;
+                        scaleY = uniformScale;
+                    }
                 } else if (w != null) {
                     scaleX = scaleY = w / Math.max(natW, 1);
                 } else {

@@ -161,11 +161,14 @@ export function InlinePositionPanel({ selectedNode, actions, onClose }: Props) {
 
                 {/* Remove Background — image nodes only */}
                 {selectedNode.type === 'image' && selectedNode.src && (
-                    <RemoveBgInline
-                        nodeId={selectedNode.id}
-                        imageSrc={selectedNode.src}
-                        actions={actions}
-                    />
+                    <>
+                        <RemoveBgInline
+                            nodeId={selectedNode.id}
+                            imageSrc={selectedNode.src}
+                            actions={actions}
+                        />
+                        <FillToPageInline nodeId={selectedNode.id} actions={actions} />
+                    </>
                 )}
             </div>
         </div>
@@ -231,6 +234,35 @@ function RemoveBgInline({ nodeId, imageSrc, actions }: { nodeId: number; imageSr
                 )}
             </button>
         </>
+    );
+}
+
+// ── Fill to Page inline button (image nodes only) ──
+function FillToPageInline({ nodeId, actions }: { nodeId: number; actions: CanvasEngineActions }) {
+    return (
+        <button
+            onClick={() => actions.fillToPage(nodeId)}
+            className="inline-arrange-btn"
+            style={{
+                width: '100%',
+                padding: '8px 12px',
+                justifyContent: 'center',
+                gap: 8,
+                background: 'rgba(34,197,94,0.08)',
+                border: '1px solid rgba(34,197,94,0.25)',
+                color: '#22c55e',
+                fontWeight: 600,
+                cursor: 'pointer',
+                marginTop: 4,
+            }}
+        >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <path d="M3 3l8 8M21 21l-8-8" />
+                <path d="M15 3h6v6M9 21H3v-6" />
+            </svg>
+            Fill to Page
+        </button>
     );
 }
 

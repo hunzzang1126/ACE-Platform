@@ -21,23 +21,37 @@ export function SidebarUploadsTab({ onTriggerImageUpload, onTriggerVideoUpload, 
     const [hoveredId, setHoveredId] = useState<string | null>(null);
     const [resolvedUrls, setResolvedUrls] = useState<Record<string, string>>({});
 
-    // Resolve idb:// refs to blob URLs for display
+    // Resolve idb:// refs to blob URLs for display + clean up ghost entries
     useEffect(() => {
         let cancelled = false;
         const resolve = async () => {
             const newUrls: Record<string, string> = {};
+            const ghostIds: string[] = [];
             for (const u of uploads) {
                 if (resolvedUrls[u.id]) { newUrls[u.id] = resolvedUrls[u.id]!; continue; }
                 if (isAssetRef(u.idbRef)) {
                     try {
                         const blobUrl = await resolveAsset(u.idbRef);
-                        if (!cancelled) newUrls[u.id] = blobUrl;
-                    } catch { /* skip broken refs */ }
+                        if (blobUrl === u.idbRef) {
+                            // ★ Asset not found in IndexedDB — ghost entry
+                            ghostIds.push(u.id);
+                        } else if (!cancelled) {
+                            newUrls[u.id] = blobUrl;
+                        }
+                    } catch { ghostIds.push(u.id); }
                 } else {
                     newUrls[u.id] = u.idbRef;
                 }
             }
-            if (!cancelled) setResolvedUrls(newUrls);
+            if (!cancelled) {
+                setResolvedUrls(newUrls);
+                // Auto-remove ghost entries (lost after browser clear / re-login)
+                if (ghostIds.length > 0) {
+                    const { removeUpload } = useUploadStore.getState();
+                    for (const gid of ghostIds) removeUpload(gid);
+                    console.warn(`[Uploads] Cleaned ${ghostIds.length} ghost entries (idb:// assets not found)`);
+                }
+            }
         };
         resolve();
         return () => { cancelled = true; };

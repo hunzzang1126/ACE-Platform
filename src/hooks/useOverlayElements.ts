@@ -4,6 +4,7 @@
 // ─────────────────────────────────────────────────
 import { useState, useCallback, useRef } from 'react';
 import { saveVideoBlob } from '@/stores/videoStorage';
+import { saveToUploadLibrary } from '@/stores/uploadStore';
 
 export interface OverlayElement {
     id: string;
@@ -115,6 +116,8 @@ export function useOverlayElements(canvasWidth = 300, canvasHeight = 250) {
                 };
                 setElements((prev) => [...prev, newEl]);
                 setSelectedOverlayId(id);
+                // ★ Register in upload library so it appears in Uploads panel
+                saveToUploadLibrary(src, file.name, img.width, img.height, 'user').catch(console.error);
             };
             img.src = src;
         };
