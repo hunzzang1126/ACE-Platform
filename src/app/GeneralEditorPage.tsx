@@ -13,6 +13,7 @@ import type { BannerPreset } from '@/schema/design.types';
 import { v4 as uuid } from 'uuid';
 import type { DesignElement } from '@/schema/elements.types';
 import { PublishModal } from '@/components/publish/PublishModal';
+import { LocaleBar } from '@/components/creativeset/LocaleBar';
 import '@/styles/visionqa.css';
 
 export function GeneralEditorPage() {
@@ -133,6 +134,8 @@ export function GeneralEditorPage() {
                     onTogglePlay={togglePreviewPlay}
                 />
                 <main className="cs-main">
+                    {/* ★ Locale Bar — language switcher pills */}
+                    <LocaleBar />
                     {/* Quick action bar */}
                     {masterHasElements === 0 && (
                         <div className="cs-empty-banner">

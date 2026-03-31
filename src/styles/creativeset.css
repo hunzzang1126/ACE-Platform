@@ -1053,3 +1053,155 @@ g:hover > .plug-disconnect-hint {
     letter-spacing: 0.3px;
 }
 
+/* ── Locale Bar ── */
+.locale-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 4px 12px;
+    position: relative;
+}
+
+.locale-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: var(--bg-surface);
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.locale-pill:hover {
+    border-color: var(--accent);
+    color: var(--text-primary);
+    background: rgba(99, 102, 241, 0.06);
+}
+
+.locale-pill--active {
+    border-color: var(--accent);
+    background: rgba(99, 102, 241, 0.12);
+    color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+}
+
+.locale-pill-code {
+    font-weight: 700;
+    letter-spacing: 1px;
+}
+
+.locale-pill-tag {
+    font-size: 9px;
+    font-weight: 500;
+    opacity: 0.5;
+    letter-spacing: 0.3px;
+    text-transform: lowercase;
+}
+
+.locale-add-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    border: 1px dashed var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.locale-add-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(99, 102, 241, 0.04);
+}
+
+/* ── Locale Picker Popover ── */
+.locale-picker {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 200;
+    width: 420px;
+    max-height: 360px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    overflow: hidden;
+    margin-top: 4px;
+}
+
+.locale-picker-header {
+    padding: 12px 16px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border);
+}
+
+.locale-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+    padding: 8px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.locale-picker-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 10px 6px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.locale-picker-item:hover {
+    background: rgba(99, 102, 241, 0.1);
+    border-color: rgba(99, 102, 241, 0.3);
+    color: var(--text-primary);
+}
+
+.locale-picker-code {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: var(--text-secondary);
+}
+
+.locale-picker-item:hover .locale-picker-code {
+    color: var(--accent);
+}
+
+.locale-picker-native {
+    font-size: 10px;
+    font-weight: 500;
+    text-align: center;
+}
+
+.locale-picker-empty {
+    grid-column: 1 / -1;
+    padding: 24px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-muted);
+}

@@ -16,39 +16,30 @@ import {
 } from '@/stores/userPrefs';
 import './landing.css';
 
-// ── Language metadata (flag + native name) ──
+// ── Language metadata (2-letter code + native name) ──
 
-const LANG_META: Record<string, { flag: string; native: string }> = {
-    'English':               { flag: 'GB', native: 'English' },
-    'Korean':                { flag: 'KR', native: '\ud55c\uad6d\uc5b4' },
-    'Japanese':              { flag: 'JP', native: '\u65e5\u672c\u8a9e' },
-    'Chinese (Simplified)':  { flag: 'CN', native: '\u4e2d\u6587(\u7b80\u4f53)' },
-    'Chinese (Traditional)': { flag: 'TW', native: '\u4e2d\u6587(\u7e41\u9ad4)' },
-    'French':                { flag: 'FR', native: 'Fran\u00e7ais' },
-    'Spanish':               { flag: 'ES', native: 'Espa\u00f1ol' },
-    'German':                { flag: 'DE', native: 'Deutsch' },
-    'Portuguese':            { flag: 'PT', native: 'Portugu\u00eas' },
-    'Italian':               { flag: 'IT', native: 'Italiano' },
-    'Dutch':                 { flag: 'NL', native: 'Nederlands' },
-    'Russian':               { flag: 'RU', native: '\u0420\u0443\u0441\u0441\u043a\u0438\u0439' },
-    'Arabic':                { flag: 'SA', native: '\u0627\u0644\u0639\u0631\u0628\u064a\u0629' },
-    'Hindi':                 { flag: 'IN', native: '\u0939\u093f\u0928\u094d\u0926\u0940' },
-    'Thai':                  { flag: 'TH', native: '\u0e44\u0e17\u0e22' },
-    'Vietnamese':            { flag: 'VN', native: 'Ti\u1ebfng Vi\u1ec7t' },
-    'Indonesian':            { flag: 'ID', native: 'Bahasa' },
-    'Turkish':               { flag: 'TR', native: 'T\u00fcrk\u00e7e' },
-    'Polish':                { flag: 'PL', native: 'Polski' },
-    'Swedish':               { flag: 'SE', native: 'Svenska' },
+const LANG_META: Record<string, { code: string; native: string }> = {
+    'English':               { code: 'EN', native: 'English' },
+    'Korean':                { code: 'KO', native: '\ud55c\uad6d\uc5b4' },
+    'Japanese':              { code: 'JA', native: '\u65e5\u672c\u8a9e' },
+    'Chinese (Simplified)':  { code: 'ZH', native: '\u4e2d\u6587(\u7b80\u4f53)' },
+    'Chinese (Traditional)': { code: 'ZH', native: '\u4e2d\u6587(\u7e41\u9ad4)' },
+    'French':                { code: 'FR', native: 'Fran\u00e7ais' },
+    'Spanish':               { code: 'ES', native: 'Espa\u00f1ol' },
+    'German':                { code: 'DE', native: 'Deutsch' },
+    'Portuguese':            { code: 'PT', native: 'Portugu\u00eas' },
+    'Italian':               { code: 'IT', native: 'Italiano' },
+    'Dutch':                 { code: 'NL', native: 'Nederlands' },
+    'Russian':               { code: 'RU', native: '\u0420\u0443\u0441\u0441\u043a\u0438\u0439' },
+    'Arabic':                { code: 'SA', native: '\u0627\u0644\u0639\u0631\u0628\u064a\u0629' },
+    'Hindi':                 { code: 'HI', native: '\u0939\u093f\u0928\u094d\u0926\u0940' },
+    'Thai':                  { code: 'TH', native: '\u0e44\u0e17\u0e22' },
+    'Vietnamese':            { code: 'VI', native: 'Ti\u1ebfng Vi\u1ec7t' },
+    'Indonesian':            { code: 'ID', native: 'Bahasa' },
+    'Turkish':               { code: 'TR', native: 'T\u00fcrk\u00e7e' },
+    'Polish':                { code: 'PL', native: 'Polski' },
+    'Swedish':               { code: 'SE', native: 'Svenska' },
 };
-
-/** Country code → flag emoji */
-function flagEmoji(code: string): string {
-    return code
-        .toUpperCase()
-        .split('')
-        .map(c => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65))
-        .join('');
-}
 
 /** Detect default language from browser locale */
 function detectBrowserLanguage(): SupportedLanguage {
@@ -196,8 +187,15 @@ export function OnboardingPage() {
                                             color: isSelected ? '#c4b5fd' : '#999',
                                         }}
                                     >
-                                        <span style={{ fontSize: 20 }}>
-                                            {meta ? flagEmoji(meta.flag) : ''}
+                                        <span style={{
+                                            fontSize: 13, fontWeight: 700, letterSpacing: 1,
+                                            width: 32, height: 32, borderRadius: '50%',
+                                            background: isSelected ? 'rgba(139, 92, 246, 0.2)' : 'rgba(255, 255, 255, 0.06)',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            color: isSelected ? '#c4b5fd' : '#888',
+                                            transition: 'all 0.2s',
+                                        }}>
+                                            {meta?.code ?? ''}
                                         </span>
                                         <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: 0.3 }}>
                                             {meta?.native ?? lang}
@@ -231,9 +229,11 @@ export function OnboardingPage() {
                             width: 64, height: 64, borderRadius: '50%',
                             background: 'linear-gradient(135deg, rgba(139,92,246,0.2), rgba(59,130,246,0.2))',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            margin: '0 auto 20px', fontSize: 28,
+                            margin: '0 auto 20px',
                         }}>
-                            {flagEmoji(LANG_META[selected]?.flag ?? 'GB')}
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#c4b5fd" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg>
                         </div>
                         <div style={{ fontSize: 24, fontWeight: 700, color: '#f5f5f7', marginBottom: 8 }}>
                             You're all set

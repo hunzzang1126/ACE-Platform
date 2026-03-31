@@ -42,6 +42,18 @@ export interface BannerVariant {
     fabricJSON?: string;
 }
 
+/** Per-locale translated content map: elementName → translated text */
+export type LocaleContent = Record<string, string>;
+
+/** Locale metadata stored on the creative set */
+export interface LocaleData {
+    /** Locale code → element content map (elementName → translated text) */
+    locales: Record<string, LocaleContent>;
+    /** Currently active locale code (e.g., "en", "ko"). Null = original content. */
+    activeLocale: string | null;
+    /** The original content language (auto-detected or user-set) */
+    originalLocale: string;
+}
 
 /** 크리에이티브 셋 (오리진 + 플러그 연결된 변형들) */
 export interface CreativeSet {
@@ -72,7 +84,10 @@ export interface CreativeSet {
     masterLabel?: string;
     /** Persisted card positions in size dashboard (variantId → {x,y}) */
     cardPositions?: Record<string, { x: number; y: number }>;
+    /** ★ Locale Layer — multi-language content switching (optional, backward-compat) */
+    localeData?: LocaleData;
 }
+
 
 /** 대시보드용 크리에이티브 셋 요약 (가벼운 리스트 아이템) */
 export interface CreativeSetSummary {

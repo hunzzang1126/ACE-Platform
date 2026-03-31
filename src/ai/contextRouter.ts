@@ -163,7 +163,10 @@ For project CRUD: use execute_dynamic_action with useProjectStore/useDesignStore
 ${snapshot}
 Tools: execute_dynamic_action, add_text, add_button, analyze_scene
 For variants: useDesignStore.getState().addVariant({ width, height, label })
-Common sizes: 300x250, 728x90, 160x600, 320x50, 970x250, 300x600${mem}`;
+Common sizes: 300x250, 728x90, 160x600, 320x50, 970x250, 300x600
+Localization: To translate text to another language, read all text/button elements from cs.variants, translate content (marketing-appropriate, not literal), then call:
+  useDesignStore.getState().setLocaleData({ locales: { originalCode: {elementName: originalText, ...}, targetCode: {elementName: translatedText, ...} }, activeLocale: targetCode, originalLocale: originalCode })
+  useDesignStore.getState().switchLocale(targetCode)${mem}`;
 
         case 'canvas-editor': {
             const empty = ctx.elementCount === 0;

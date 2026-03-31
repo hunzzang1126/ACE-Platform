@@ -236,6 +236,43 @@ export const useDesignStore = create<DesignState>()(
                 // ── Master Label (cosmetic) ──
                 setMasterLabel: (variantId) => { set((state) => { const cs = getActiveCS(state); if (!cs) return; cs.masterLabel = variantId; cs.updatedAt = new Date().toISOString(); state.creativeSet = cs; }); },
                 clearMasterLabel: () => { set((state) => { const cs = getActiveCS(state); if (!cs) return; cs.masterLabel = undefined; cs.updatedAt = new Date().toISOString(); state.creativeSet = cs; }); },
+
+                // ── Locale Layer ──
+                setLocaleData: (data) => {
+                    set((state) => {
+                        const cs = getActiveCS(state);
+                        if (!cs) return;
+                        cs.localeData = data;
+                        cs.updatedAt = new Date().toISOString();
+                        state.creativeSet = cs;
+                    });
+                },
+
+                switchLocale: (localeCode) => {
+                    set((state) => {
+                        const cs = getActiveCS(state);
+                        if (!cs || !cs.localeData) return;
+                        const ld = cs.localeData;
+                        const targetMap = localeCode ? ld.locales[localeCode] : ld.locales[ld.originalLocale];
+                        if (!targetMap) return;
+
+                        // Apply translated content across ALL variants
+                        for (const variant of cs.variants) {
+                            for (const el of variant.elements) {
+                                const key = el.name;
+                                if (!key || !(key in targetMap)) continue;
+                                if (el.type === 'text' && 'content' in el) {
+                                    (el as any).content = targetMap[key];
+                                } else if (el.type === 'button' && 'label' in el) {
+                                    (el as any).label = targetMap[key];
+                                }
+                            }
+                        }
+                        ld.activeLocale = localeCode;
+                        cs.updatedAt = new Date().toISOString();
+                        state.creativeSet = cs;
+                    });
+                },
             })),
             {
                 name: 'glid-design-store',

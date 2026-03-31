@@ -2,7 +2,7 @@
 // designStoreTypes — Types + helpers for designStore
 // ─────────────────────────────────────────────────
 
-import type { CreativeSet, BannerPreset } from '@/schema/design.types';
+import type { CreativeSet, BannerPreset, LocaleData } from '@/schema/design.types';
 import type { DesignElement } from '@/schema/elements.types';
 import { smartSizeElements } from '@/engine/smartSizing';
 
@@ -40,6 +40,10 @@ export interface DesignState {
     // ── Master Label (cosmetic) ──
     setMasterLabel: (variantId: string) => void;
     clearMasterLabel: () => void;
+
+    // ── Locale Layer ──
+    setLocaleData: (data: LocaleData) => void;
+    switchLocale: (localeCode: string | null) => void;
 }
 
 // ── Helper: get the active creative set from state ──
