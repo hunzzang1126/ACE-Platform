@@ -21,7 +21,7 @@ function getElements(ctx: ToolContext): DesignElement[] {
 function hexToRgb(hex: string): [number, number, number] | null {
     const m = hex.match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
     if (!m) return null;
-    return [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)];
+    return [parseInt(m[1]!, 16), parseInt(m[2]!, 16), parseInt(m[3]!, 16)];
 }
 
 function luminance(r: number, g: number, b: number): number {
@@ -29,7 +29,7 @@ function luminance(r: number, g: number, b: number): number {
         v /= 255;
         return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
     });
-    return a[0] * 0.2126 + a[1] * 0.7152 + a[2] * 0.0722;
+    return a[0]! * 0.2126 + a[1]! * 0.7152 + a[2]! * 0.0722;
 }
 
 function contrastRatio(hex1: string, hex2: string): number {
@@ -78,9 +78,9 @@ export const analyzeColors: AceTool = {
         const contrastMatrix: { color1: string; color2: string; ratio: number; wcagAA: boolean }[] = [];
         for (let i = 0; i < topColors.length; i++) {
             for (let j = i + 1; j < topColors.length; j++) {
-                const ratio = contrastRatio(topColors[i], topColors[j]);
+                const ratio = contrastRatio(topColors[i]!, topColors[j]!);
                 contrastMatrix.push({
-                    color1: topColors[i], color2: topColors[j],
+                    color1: topColors[i]!, color2: topColors[j]!,
                     ratio: Math.round(ratio * 100) / 100,
                     wcagAA: ratio >= 4.5,
                 });
@@ -155,7 +155,7 @@ export const analyzeSpacing: AceTool = {
         const overlaps: { el1: string; el2: string }[] = [];
         for (let i = 0; i < bounds.length; i++) {
             for (let j = i + 1; j < bounds.length; j++) {
-                const a = bounds[i], b = bounds[j];
+                const a = bounds[i]!, b = bounds[j]!;
                 if (a.x < b.x + b.width && a.x + a.width > b.x &&
                     a.y < b.y + b.height && a.y + a.height > b.y) {
                     overlaps.push({ el1: a.name, el2: b.name });

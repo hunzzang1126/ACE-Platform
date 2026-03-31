@@ -85,7 +85,7 @@ export function runStructuralCritic(
     if (textEls.length >= 2) {
         const sorted = [...textEls].sort((a, b) => (b.style.fontSize ?? 0) - (a.style.fontSize ?? 0));
         const headline = sorted[0];
-        if (headline.role !== 'headline' && headline.role !== null) {
+        if (headline && headline.role !== 'headline' && headline.role !== null) {
             issues.push({
                 type: 'hierarchy',
                 severity: 'warning',

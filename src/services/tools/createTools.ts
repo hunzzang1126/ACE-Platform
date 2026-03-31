@@ -274,7 +274,7 @@ export const duplicateNode: AceTool = {
         const variant = cs.variants.find((v: { id: string }) => v.id === ctx.activeVariantId);
         if (!variant) return { success: false, message: 'Variant not found' };
 
-        const original = variant.elements.find((e: { id: string }) => (e as { id: string }).id === params.id) as Record<string, unknown> | undefined;
+        const original = (variant.elements as Array<Record<string, unknown>>).find((e) => e.id === params.id);
         if (!original) return { success: false, message: `Element "${params.id}" not found` };
 
         const newId = generateId();

@@ -152,9 +152,9 @@ function convertAnthropicToOpenRouter(body: Record<string, unknown>): Record<str
             // Anthropic: { type: 'tool', name: 'render_banner' }
             // OpenAI:    { type: 'function', function: { name: 'render_banner' } }
             result.tool_choice = { type: 'function', function: { name: tc.name } };
-        } else if (tc.type === 'auto' || tc === 'auto') {
+        } else if (tc.type === 'auto' || (tc as unknown) === 'auto') {
             result.tool_choice = 'auto';
-        } else if (tc.type === 'none' || tc === 'none') {
+        } else if (tc.type === 'none' || (tc as unknown) === 'none') {
             result.tool_choice = 'none';
         } else if (tc.type === 'any') {
             // Anthropic 'any' → OpenAI 'required'

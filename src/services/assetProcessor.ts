@@ -133,9 +133,9 @@ async function extractDominantColors(src: string, count: number): Promise<string
         // Simple histogram-based extraction
         const colorMap = new Map<string, number>();
         for (let i = 0; i < data.length; i += 16) { // sample every 4th pixel
-            const r = Math.round(data[i] / 32) * 32;
-            const g = Math.round(data[i + 1] / 32) * 32;
-            const b = Math.round(data[i + 2] / 32) * 32;
+            const r = Math.round((data[i] ?? 0) / 32) * 32;
+            const g = Math.round((data[i + 1] ?? 0) / 32) * 32;
+            const b = Math.round((data[i + 2] ?? 0) / 32) * 32;
             const hex = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
             colorMap.set(hex, (colorMap.get(hex) ?? 0) + 1);
         }
@@ -189,10 +189,10 @@ function cleanFileName(name: string): string {
 }
 
 function autoGenerateTags(name: string, category: AssetCategory): string[] {
-    const tags = [category];
+    const tags: string[] = [category as string];
     const n = name.toLowerCase();
     // Extract meaningful words
     const words = n.replace(/\.[^/.]+$/, '').split(/[-_\s]+/).filter(w => w.length > 2);
-    tags.push(...words);
-    return [...new Set(tags)];
+    tags.push(...words.filter((w): w is string => typeof w === 'string'));
+    return [...new Set(tags)] as string[];
 }
