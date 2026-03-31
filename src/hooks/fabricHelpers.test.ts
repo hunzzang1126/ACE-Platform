@@ -436,3 +436,42 @@ describe('★ REGRESSION: replaceImageSrc — updates __glidPersistSrc', () => {
         expect(renderIdx).toBeGreaterThan(persistIdx);
     });
 });
+
+// ═══════════════════════════════════════════════════
+// ★ REGRESSION GUARD: Fill to Page + Remove BG placement
+// Fixed in v0.0.0.336 — moved from Position panel to inline toolbar.
+// ═══════════════════════════════════════════════════
+
+describe('★ REGRESSION: Fill to Page is in inline toolbar, NOT Position panel', () => {
+
+    it('ContextToolbar has FillToPageToolbarBtn component', () => {
+        const src = readFileSync(resolve(__dirname, '../components/editor/ContextToolbar.tsx'), 'utf-8');
+        expect(src).toContain('FillToPageToolbarBtn');
+        expect(src).toContain('actions.fillToPage(nodeId)');
+    });
+
+    it('ContextToolbar has RemoveBgToolbarBtn for images', () => {
+        const src = readFileSync(resolve(__dirname, '../components/editor/ContextToolbar.tsx'), 'utf-8');
+        expect(src).toContain('RemoveBgToolbarBtn');
+        expect(src).toContain('removeBackgroundFromUrl');
+    });
+
+    it('ContextToolbar renders both buttons for image type', () => {
+        const src = readFileSync(resolve(__dirname, '../components/editor/ContextToolbar.tsx'), 'utf-8');
+        const removeBgIdx = src.indexOf('RemoveBgToolbarBtn');
+        const fillIdx = src.indexOf('FillToPageToolbarBtn');
+        // Both should be present
+        expect(removeBgIdx).toBeGreaterThan(-1);
+        expect(fillIdx).toBeGreaterThan(-1);
+        // Fill should come after Remove BG
+        expect(fillIdx).toBeGreaterThan(removeBgIdx);
+    });
+
+    it('InlinePositionPanel does NOT contain RemoveBgInline or FillToPageInline in render', () => {
+        const src = readFileSync(resolve(__dirname, '../components/editor/InlinePositionPanel.tsx'), 'utf-8');
+        // The render method should NOT reference these components
+        const renderSection = src.slice(0, src.indexOf('function RemoveBgInline') > -1 ? src.indexOf('function RemoveBgInline') : src.length);
+        expect(renderSection).not.toContain('<RemoveBgInline');
+        expect(renderSection).not.toContain('<FillToPageInline');
+    });
+});
