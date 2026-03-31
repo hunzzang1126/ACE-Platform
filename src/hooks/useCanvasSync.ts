@@ -126,7 +126,10 @@ export function useCanvasSync(variantId: string | undefined, canvasW: number, ca
             }
 
             if (el.animation && el.animation.preset !== 'none') {
-                const key = el.type === 'image' || el.type === 'video' ? el.id : `engine-${el.id}`;
+                // ★ REGRESSION GUARD: el.id is already "engine-{num}" from elementConverters.
+                // Do NOT double-prefix with `engine-${el.id}` — that creates "engine-engine-123"
+                // and the animPresetStore can never match the key during playback.
+                const key = el.id;
                 useAnimPresetStore.getState().setPreset(key, { anim: el.animation.preset, animDuration: el.animation.duration, startTime: el.animation.startTime });
             }
         }

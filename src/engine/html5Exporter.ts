@@ -231,16 +231,20 @@ function generateKeyframes(cssId: string, config: AnimPresetConfig): string | nu
             return `@keyframes ${name} { from { opacity: 0; } to { opacity: 1; } }`;
 
         case 'slide-left':
-            return `@keyframes ${name} { from { transform: translateX(-100%); } to { transform: translateX(0); } }`;
-
-        case 'slide-right':
+            // Enters from right → slides leftward to position
             return `@keyframes ${name} { from { transform: translateX(100%); } to { transform: translateX(0); } }`;
 
+        case 'slide-right':
+            // Enters from left → slides rightward to position
+            return `@keyframes ${name} { from { transform: translateX(-100%); } to { transform: translateX(0); } }`;
+
         case 'slide-up':
-            return `@keyframes ${name} { from { transform: translateY(-100%); } to { transform: translateY(0); } }`;
+            // Enters from below → slides upward to position
+            return `@keyframes ${name} { from { transform: translateY(100%); } to { transform: translateY(0); } }`;
 
         case 'slide-down':
-            return `@keyframes ${name} { from { transform: translateY(100%); } to { transform: translateY(0); } }`;
+            // Enters from above → slides downward to position
+            return `@keyframes ${name} { from { transform: translateY(-100%); } to { transform: translateY(0); } }`;
 
         case 'scale':
             return `@keyframes ${name} { from { transform: scale(0); } to { transform: scale(1); } }`;

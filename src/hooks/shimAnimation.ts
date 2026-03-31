@@ -64,16 +64,20 @@ export function createAnimationMethods(
                     obj.set({ opacity: t * orig.opacity });
                     break;
                 case 'slide-left':
-                    obj.set({ left: orig.left + (-300 * (1 - t)) });
-                    break;
-                case 'slide-right':
+                    // "Slide to Left" = enters from right → slides leftward to position
                     obj.set({ left: orig.left + (300 * (1 - t)) });
                     break;
+                case 'slide-right':
+                    // "Slide to Right" = enters from left → slides rightward to position
+                    obj.set({ left: orig.left + (-300 * (1 - t)) });
+                    break;
                 case 'slide-up':
-                    obj.set({ top: orig.top + (-300 * (1 - t)) });
+                    // "Slide to Top" = enters from below → slides upward to position
+                    obj.set({ top: orig.top + (300 * (1 - t)) });
                     break;
                 case 'slide-down':
-                    obj.set({ top: orig.top + (300 * (1 - t)) });
+                    // "Slide to Bottom" = enters from above → slides downward to position
+                    obj.set({ top: orig.top + (-300 * (1 - t)) });
                     break;
                 case 'scale':
                     obj.set({ scaleX: orig.scaleX * t, scaleY: orig.scaleY * t });

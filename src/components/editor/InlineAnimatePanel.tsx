@@ -88,6 +88,27 @@ export function InlineAnimatePanel({ selectedNode, onClose }: Props) {
                         </div>
                     </>
                 )}
+
+                {/* Duration always visible as read-only hint when no preset selected */}
+                {currentPreset === 'none' && (
+                    <>
+                        <div className="inline-divider" />
+                        <p className="sidebar-section-label">Duration</p>
+                        <div className="inline-slider-row">
+                            <input
+                                type="range"
+                                className="inline-slider"
+                                min={0.1}
+                                max={2.0}
+                                step={0.1}
+                                value={duration}
+                                onChange={(e) => handleDuration(Number(e.target.value))}
+                                style={{ opacity: 0.4 }}
+                            />
+                            <span className="inline-slider-value" style={{ opacity: 0.4 }}>{duration.toFixed(1)}s</span>
+                        </div>
+                    </>
+                )}
             </div>
         </div>
     );

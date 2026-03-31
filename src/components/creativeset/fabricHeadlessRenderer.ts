@@ -113,19 +113,62 @@ function addTextToFabric(fc: Canvas, el: TextElement, abs: AbsRect): void {
     const [r, g, b] = hexToRgbFloat(el.color || '#ffffff');
     const fillColor = `rgb(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)})`;
 
-    const tb = new Textbox(el.content || '', {
+    const opts: Record<string, unknown> = {
         left: x, top: y, width: w > 0 ? w : 200,
         fontSize: el.fontSize || 16,
         fontFamily: el.fontFamily || 'Inter, system-ui, sans-serif',
         fontWeight: el.fontWeight || '400',
-        fontStyle: (el.fontStyle === 'italic' ? 'italic' : 'normal') as any,
+        fontStyle: (el.fontStyle === 'italic' ? 'italic' : 'normal'),
         fill: fillColor,
-        textAlign: (el.textAlign as any) || 'left',
+        textAlign: (el.textAlign) || 'left',
         lineHeight: el.lineHeight ?? 1.4,
         charSpacing: (el.letterSpacing ?? 0) * 10,
         opacity: el.opacity ?? 1,
         angle: el.constraints.rotation ?? 0,
-    });
+    };
+
+    // ★ Apply textEffect (Drop shadow, Glow, Outline, Neon, Splice, etc.)
+    const fx = el.textEffect;
+    if (fx && fx.type !== 'none') {
+        const fxScale = (fx.intensity ?? 50) / 50;
+        const fxColor = fx.color || '#ffffff';
+        switch (fx.type) {
+            case 'drop':
+                opts.shadow = `${Math.round(4 * fxScale)}px ${Math.round(4 * fxScale)}px ${Math.round(8 * fxScale)}px ${fxColor}cc`;
+                break;
+            case 'glow':
+                opts.shadow = `0px 0px ${Math.round(20 * fxScale)}px ${fxColor}80`;
+                break;
+            case 'echo':
+                opts.shadow = `${Math.round(6 * fxScale)}px ${Math.round(6 * fxScale)}px 0px ${fxColor}40`;
+                break;
+            case 'neon':
+                opts.shadow = `0px 0px ${Math.round(12 * fxScale)}px ${fxColor}`;
+                break;
+            case 'glitch':
+                opts.shadow = `-3px 0px 0px #00ffff`;
+                break;
+            case 'curve':
+                opts.shadow = `0px ${Math.round(2 * fxScale)}px ${Math.round(4 * fxScale)}px ${fxColor}30`;
+                break;
+            case 'outline':
+                opts.stroke = fxColor;
+                opts.strokeWidth = Math.max(1, 2 * fxScale);
+                break;
+            case 'splice':
+                opts.fill = 'transparent';
+                opts.stroke = fxColor;
+                opts.strokeWidth = Math.max(2, 3 * fxScale);
+                break;
+            case '70s':
+                opts.stroke = fxColor;
+                opts.strokeWidth = Math.max(3, 5 * fxScale);
+                opts.shadow = `${Math.round(4 * fxScale)}px ${Math.round(4 * fxScale)}px 0px ${fxColor}40`;
+                break;
+        }
+    }
+
+    const tb = new Textbox(el.content || '', opts as any);
     fc.add(tb);
 }
 
