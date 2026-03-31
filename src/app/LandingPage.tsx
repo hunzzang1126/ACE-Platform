@@ -1,5 +1,8 @@
 // ─────────────────────────────────────────────────
-// LandingPage — Apple-style marketing page for Glid
+// LandingPage — frame.io-inspired premium marketing page
+// ─────────────────────────────────────────────────
+// Pricing → LandingPricing.tsx
+// How It Works → HowItWorks.tsx
 // ─────────────────────────────────────────────────
 
 import { useEffect, useRef } from 'react';
@@ -7,61 +10,45 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import { GlidLogo } from '@/components/brand/GlidLogo';
 import { HowItWorks } from './HowItWorks';
+import { LandingPricing } from './LandingPricing';
 import './landing.css';
 
-// SVG icons as inline components (no emoji, no external deps)
-const IconBolt = () => (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-);
-const IconLayers = () => (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
-);
-const IconCpu = () => (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
-);
-const IconGrid = () => (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-);
-const IconWand = () => (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 4V2"/><path d="M15 16v-2"/><path d="M8 9h2"/><path d="M20 9h2"/><path d="M17.8 11.8 19 13"/><path d="M15 9h0"/><path d="M17.8 6.2 19 5"/><path d="m3 21 9-9"/><path d="M12.2 6.2 11 5"/></svg>
-);
-const IconZap = () => (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
-);
-const IconArrow = () => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+const ArrowRight = () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>
 );
 
 const FEATURES = [
     {
-        icon: <IconCpu />,
-        title: 'WebGPU Rendering Engine',
-        description: 'Hardware-accelerated canvas powered by a custom Rust/WASM engine. 60fps interactions with zero jank, even on complex multi-layer compositions.',
+        label: 'Design Engine',
+        title: 'GPU-Accelerated Canvas',
+        description: 'A Fabric.js-powered rendering engine that delivers 60fps interactions — even on complex multi-layer compositions with animations, effects, and high-res images.',
+        icon: (
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" /><rect x="9" y="9" width="6" height="6" /><line x1="9" y1="1" x2="9" y2="4" /><line x1="15" y1="1" x2="15" y2="4" /><line x1="9" y1="20" x2="9" y2="23" /><line x1="15" y1="20" x2="15" y2="23" /><line x1="20" y1="9" x2="23" y2="9" /><line x1="20" y1="14" x2="23" y2="14" /><line x1="1" y1="9" x2="4" y2="9" /><line x1="1" y1="14" x2="4" y2="14" /></svg>
+        ),
     },
     {
-        icon: <IconGrid />,
-        title: 'Smart Multi-Size System',
-        description: 'Design once, deploy everywhere. Edit the master variant and auto-propagate changes to every ad size — 300x250, 970x250, 160x600, and beyond.',
+        label: 'Smart Sizing',
+        title: 'Design Once, Deploy Everywhere',
+        description: 'Create a single master design and auto-propagate to every ad format — 300x250, 728x90, 160x600, social stories, and beyond. One click, infinite sizes.',
+        icon: (
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></svg>
+        ),
     },
     {
-        icon: <IconWand />,
-        title: 'AI Creative Agent',
-        description: 'An embedded AI assistant that understands your design. Generate layouts, swap colors, add elements, and iterate — all through natural conversation.',
+        label: 'AI Agent',
+        title: 'Your Creative Co-Pilot',
+        description: 'An embedded AI assistant that understands your canvas. Generate layouts, swap colors, add elements, remove backgrounds — all through natural conversation.',
+        icon: (
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 4V2" /><path d="M15 16v-2" /><path d="M8 9h2" /><path d="M20 9h2" /><path d="M17.8 11.8 19 13" /><path d="M15 9h0" /><path d="M17.8 6.2 19 5" /><path d="m3 21 9-9" /><path d="M12.2 6.2 11 5" /></svg>
+        ),
     },
     {
-        icon: <IconLayers />,
-        title: 'Full Creative Toolkit',
-        description: 'Shapes, text, images, videos, gradients, animations, and effects. Everything you need to build production-ready creatives without switching tools.',
-    },
-    {
-        icon: <IconBolt />,
-        title: 'Animation Engine',
+        label: 'Animation',
+        title: 'Bring Creatives to Life',
         description: 'Timeline-based animation presets with custom easing, stagger, and sequencing. Preview in real-time and export as video, GIF, or interactive HTML5.',
-    },
-    {
-        icon: <IconZap />,
-        title: 'Brand Compliance',
-        description: 'Upload your brand kit — logos, colors, fonts, guidelines. The platform enforces consistency across every creative automatically.',
+        icon: (
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>
+        ),
     },
 ];
 
@@ -70,116 +57,115 @@ export function LandingPage() {
     const { isAuthenticated, isApproved } = useAuthStore();
     const sectionsRef = useRef<HTMLDivElement[]>([]);
 
-    // If already logged in, redirect
     useEffect(() => {
         if (isAuthenticated() && isApproved()) {
             navigate('/dashboard', { replace: true });
         }
     }, [isAuthenticated, isApproved, navigate]);
 
-    // Intersection Observer for scroll animations
     useEffect(() => {
         const observer = new IntersectionObserver(
-            (entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        entry.target.classList.add('visible');
-                    }
-                });
-            },
-            { threshold: 0.15 },
+            (entries) => { entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); }); },
+            { threshold: 0.1 },
         );
-
         sectionsRef.current.forEach(el => { if (el) observer.observe(el); });
         return () => observer.disconnect();
     }, []);
 
     const addRef = (el: HTMLDivElement | null) => {
-        if (el && !sectionsRef.current.includes(el)) {
-            sectionsRef.current.push(el);
-        }
+        if (el && !sectionsRef.current.includes(el)) sectionsRef.current.push(el);
     };
 
     return (
-        <div className="landing-page">
-            {/* ── Navigation ── */}
-            <nav className="landing-nav">
-                <GlidLogo size={24} variant="white" className="landing-nav-logo" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} />
-                <div className="landing-nav-links">
-                    <button className="landing-nav-link" onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}>Features</button>
-                    <button className="landing-nav-link" onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}>How It Works</button>
-                    <button className="landing-nav-link" onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}>Pricing</button>
-                    <button className="landing-nav-link" onClick={() => document.getElementById('showcase')?.scrollIntoView({ behavior: 'smooth' })}>Platform</button>
-                    <button className="landing-nav-cta" onClick={() => navigate('/login')}>Sign In</button>
+        <div className="lp">
+            {/* ── Nav ── */}
+            <nav className="lp-nav">
+                <div className="lp-nav-inner">
+                    <GlidLogo size={22} variant="white" className="lp-nav-logo" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} />
+                    <div className="lp-nav-links">
+                        <button className="lp-nav-link" onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}>Features</button>
+                        <button className="lp-nav-link" onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}>Workflow</button>
+                        <button className="lp-nav-link" onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}>Pricing</button>
+                    </div>
+                    <div className="lp-nav-actions">
+                        <button className="lp-nav-link" onClick={() => navigate('/login')}>Sign In</button>
+                        <button className="lp-nav-cta" onClick={() => navigate('/login')}>Get Started Free</button>
+                    </div>
                 </div>
             </nav>
 
             {/* ── Hero ── */}
-            <section className="landing-hero">
-                <div className="landing-hero-glow landing-hero-glow-1" />
-                <div className="landing-hero-glow landing-hero-glow-2" />
-
-                <div className="landing-hero-badge">
-                    <span className="landing-hero-badge-dot" />
-                    Autonomous Creative Engine
+            <section className="lp-hero">
+                <div className="lp-hero-glow lp-hero-glow-1" />
+                <div className="lp-hero-glow lp-hero-glow-2" />
+                <div className="lp-hero-content">
+                    <div className="lp-hero-badge">
+                        <span className="lp-hero-badge-dot" />
+                        AI-Native Creative Platform
+                    </div>
+                    <h1 className="lp-hero-title">
+                        Create at the<br />
+                        <span className="lp-gradient-text">Speed of Thought</span>
+                    </h1>
+                    <p className="lp-hero-sub">
+                        Glid is the creative platform for performance marketing teams.
+                        Design, animate, and deploy ad creatives across every channel
+                        — powered by AI and an intelligent design agent.
+                    </p>
+                    <div className="lp-hero-actions">
+                        <button className="lp-btn-primary" onClick={() => navigate('/login')}>
+                            Get Started Free <ArrowRight />
+                        </button>
+                        <button className="lp-btn-ghost" onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}>
+                            See How It Works
+                        </button>
+                    </div>
                 </div>
-
-                <h1>
-                    Create at the<br />
-                    <span className="gradient-text">Speed of Thought</span>
-                </h1>
-
-                <p className="landing-hero-sub">
-                    Glid is the AI-native creative platform for performance marketing.
-                    Design, animate, and deploy ad creatives across every channel
-                    — powered by WebGPU and an intelligent design agent.
-                </p>
-
-                <div className="landing-hero-actions">
-                    <button className="landing-btn-primary" onClick={() => navigate('/login')}>
-                        Get Started <IconArrow />
-                    </button>
-                    <button className="landing-btn-secondary" onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}>
-                        Learn More
-                    </button>
+                <div className="lp-hero-visual fade-in-section" ref={addRef}>
+                    <img src="/hero-mockup.png" alt="Glid Creative Platform" className="lp-hero-img" />
+                    <div className="lp-hero-img-glow" />
                 </div>
             </section>
 
-            {/* ── Stats ── */}
-            <div className="landing-stats fade-in-section" ref={addRef}>
-                <div className="landing-stat">
-                    <div className="landing-stat-value">60fps</div>
-                    <div className="landing-stat-label">GPU-Accelerated Rendering</div>
+            {/* ── Metrics ── */}
+            <div className="lp-metrics fade-in-section" ref={addRef}>
+                <div className="lp-metric">
+                    <div className="lp-metric-value">60fps</div>
+                    <div className="lp-metric-label">GPU-Accelerated Rendering</div>
                 </div>
-                <div className="landing-stat">
-                    <div className="landing-stat-value">15+</div>
-                    <div className="landing-stat-label">Ad Sizes, One Click</div>
+                <div className="lp-metric-divider" />
+                <div className="lp-metric">
+                    <div className="lp-metric-value">15+</div>
+                    <div className="lp-metric-label">Ad Sizes, One Click</div>
                 </div>
-                <div className="landing-stat">
-                    <div className="landing-stat-value">AI</div>
-                    <div className="landing-stat-label">Built-in Creative Agent</div>
+                <div className="lp-metric-divider" />
+                <div className="lp-metric">
+                    <div className="lp-metric-value">AI</div>
+                    <div className="lp-metric-label">Built-in Creative Agent</div>
                 </div>
-                <div className="landing-stat">
-                    <div className="landing-stat-value">0ms</div>
-                    <div className="landing-stat-label">Export Latency</div>
+                <div className="lp-metric-divider" />
+                <div className="lp-metric">
+                    <div className="lp-metric-value">&lt;1s</div>
+                    <div className="lp-metric-label">Export Latency</div>
                 </div>
             </div>
 
             {/* ── Features ── */}
-            <section id="features" className="landing-features fade-in-section" ref={addRef}>
-                <div className="landing-section-label">Capabilities</div>
-                <h2 className="landing-section-title">Everything You Need.<br />Nothing You Don't.</h2>
-                <p className="landing-section-sub">
-                    A complete creative platform that replaces your entire tool stack.
-                    From concept to production in a single workflow.
-                </p>
-
-                <div className="landing-features-grid">
+            <section id="features" className="lp-features">
+                <div className="lp-features-header fade-in-section" ref={addRef}>
+                    <div className="lp-section-label">Platform</div>
+                    <h2 className="lp-section-title">Everything you need.<br />Nothing you don't.</h2>
+                    <p className="lp-section-sub">
+                        A complete creative platform that replaces your entire tool stack.
+                    </p>
+                </div>
+                <div className="lp-features-grid">
                     {FEATURES.map((f, i) => (
-                        <div key={i} className="landing-feature-card">
-                            <div className="landing-feature-icon">{f.icon}</div>
-                            <h3>{f.title}</h3>
-                            <p>{f.description}</p>
+                        <div key={i} className="lp-feature-card fade-in-section" ref={addRef} style={{ transitionDelay: `${i * 100}ms` }}>
+                            <div className="lp-feature-icon">{f.icon}</div>
+                            <div className="lp-feature-label">{f.label}</div>
+                            <h3 className="lp-feature-title">{f.title}</h3>
+                            <p className="lp-feature-desc">{f.description}</p>
                         </div>
                     ))}
                 </div>
@@ -188,128 +174,43 @@ export function LandingPage() {
             {/* ── How It Works ── */}
             <HowItWorks addRef={addRef} />
 
-            {/* ── Showcase ── */}
-            <section id="showcase" className="landing-showcase fade-in-section" ref={addRef}>
-                <div className="landing-section-label">Platform</div>
-                <h2 className="landing-section-title">Built for Scale</h2>
-                <p className="landing-section-sub">
-                    From solo designers to enterprise teams. Glid adapts to your workflow
-                    with cloud sync, version history, and role-based access.
-                </p>
-
-                <div className="landing-showcase-window">
-                    <div className="landing-showcase-bar">
-                        <div className="landing-showcase-dot" />
-                        <div className="landing-showcase-dot" />
-                        <div className="landing-showcase-dot" />
-                    </div>
-                    <div className="landing-showcase-content">
-                        <span className="landing-showcase-label">Glid Creative Workspace</span>
-                    </div>
-                </div>
-            </section>
-
             {/* ── Pricing ── */}
-            <section id="pricing" className="fade-in-section" ref={addRef} style={{
-                padding: '100px 20px 60px', maxWidth: 1100, margin: '0 auto',
-            }}>
-                <div className="landing-section-label">Pricing</div>
-                <h2 className="landing-section-title">Simple, Transparent Pricing</h2>
-                <p className="landing-section-sub">Start free. Upgrade when you need more power.</p>
-
-                <div style={{
-                    display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
-                    gap: 24, marginTop: 48,
-                }}>
-                    {/* Starter */}
-                    <div style={{
-                        background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
-                        borderRadius: 16, padding: 32,
-                    }}>
-                        <h3 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 6px', color: '#e2e8f0' }}>Starter</h3>
-                        <p style={{ color: '#94a3b8', fontSize: 13, margin: '0 0 20px' }}>Perfect for trying out Glid</p>
-                        <div style={{ fontSize: 42, fontWeight: 800, color: '#f1f5f9', marginBottom: 24 }}>Free</div>
-                        <button onClick={() => navigate('/login')} style={{
-                            width: '100%', padding: '12px 0', borderRadius: 10,
-                            background: 'rgba(255,255,255,0.08)', border: 'none',
-                            color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer',
-                        }}>Get Started</button>
-                        <ul style={{ marginTop: 24, padding: 0, listStyle: 'none', fontSize: 13, color: '#94a3b8' }}>
-                            <li style={{ padding: '6px 0' }}>3 Creative Sets</li>
-                            <li style={{ padding: '6px 0' }}>10 AI Generations / month</li>
-                            <li style={{ padding: '6px 0' }}>PNG Export</li>
-                        </ul>
-                    </div>
-
-                    {/* Pro */}
-                    <div style={{
-                        background: 'linear-gradient(135deg, rgba(129,140,248,0.12), rgba(192,132,252,0.08))',
-                        border: '1px solid rgba(129,140,248,0.3)', borderRadius: 16, padding: 32,
-                        position: 'relative',
-                    }}>
-                        <div style={{
-                            position: 'absolute', top: 16, right: 16,
-                            background: 'linear-gradient(135deg, #818cf8, #c084fc)',
-                            color: '#fff', fontSize: 11, fontWeight: 700,
-                            padding: '4px 10px', borderRadius: 20,
-                            letterSpacing: '0.5px', textTransform: 'uppercase',
-                        }}>Most Popular</div>
-                        <h3 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 6px', color: '#e2e8f0' }}>Pro</h3>
-                        <p style={{ color: '#94a3b8', fontSize: 13, margin: '0 0 20px' }}>For professional creators and teams</p>
-                        <div style={{ marginBottom: 24 }}>
-                            <span style={{ fontSize: 42, fontWeight: 800, color: '#f1f5f9' }}>$49</span>
-                            <span style={{ color: '#64748b', fontSize: 14, marginLeft: 4 }}>/month</span>
-                        </div>
-                        <button onClick={() => navigate('/login')} style={{
-                            width: '100%', padding: '12px 0', borderRadius: 10,
-                            background: 'linear-gradient(135deg, #818cf8, #6366f1)', border: 'none',
-                            color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer',
-                        }}>Get Started</button>
-                        <ul style={{ marginTop: 24, padding: 0, listStyle: 'none', fontSize: 13, color: '#94a3b8' }}>
-                            <li style={{ padding: '6px 0' }}>Unlimited Creative Sets</li>
-                            <li style={{ padding: '6px 0' }}>1,000 AI Generations / month</li>
-                            <li style={{ padding: '6px 0' }}>PNG, JPG, HTML5 Export</li>
-                            <li style={{ padding: '6px 0' }}>AI Vision QA</li>
-                        </ul>
-                    </div>
-
-                    {/* Enterprise */}
-                    <div style={{
-                        background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
-                        borderRadius: 16, padding: 32,
-                    }}>
-                        <h3 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 6px', color: '#e2e8f0' }}>Enterprise</h3>
-                        <p style={{ color: '#94a3b8', fontSize: 13, margin: '0 0 20px' }}>Brand Cloud + unlimited team seats</p>
-                        <div style={{ fontSize: 42, fontWeight: 800, color: '#f1f5f9', marginBottom: 24 }}>Custom</div>
-                        <button onClick={() => window.open('mailto:sales@glid.ai?subject=Enterprise Plan Inquiry', '_blank')} style={{
-                            width: '100%', padding: '12px 0', borderRadius: 10,
-                            background: 'rgba(255,255,255,0.08)', border: 'none',
-                            color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer',
-                        }}>Contact Sales</button>
-                        <ul style={{ marginTop: 24, padding: 0, listStyle: 'none', fontSize: 13, color: '#94a3b8' }}>
-                            <li style={{ padding: '6px 0' }}>5,000 AI Generations / month</li>
-                            <li style={{ padding: '6px 0' }}>All export formats</li>
-                            <li style={{ padding: '6px 0' }}>Brand Cloud integration</li>
-                            <li style={{ padding: '6px 0' }}>Unlimited team seats</li>
-                        </ul>
-                    </div>
-                </div>
-            </section>
+            <LandingPricing addRef={addRef} />
 
             {/* ── CTA ── */}
-            <section className="landing-cta fade-in-section" ref={addRef}>
-                <div className="landing-cta-glow" />
-                <h2>Ready to Create?</h2>
-                <p>Start building production-ready creatives in minutes.</p>
-                <button className="landing-btn-primary" onClick={() => navigate('/login')}>
-                    Get Started Free <IconArrow />
+            <section className="lp-cta fade-in-section" ref={addRef}>
+                <div className="lp-cta-glow" />
+                <h2 className="lp-cta-title">Ready to create?</h2>
+                <p className="lp-cta-sub">Start building production-ready creatives in minutes. No credit card required.</p>
+                <button className="lp-btn-primary lp-btn-lg" onClick={() => navigate('/login')}>
+                    Get Started Free <ArrowRight />
                 </button>
             </section>
 
             {/* ── Footer ── */}
-            <footer className="landing-footer">
-                <span className="landing-footer-text">Glid — Global Intelligence Design</span>
-                <span className="landing-footer-text">&copy; {new Date().getFullYear()} All rights reserved.</span>
+            <footer className="lp-footer">
+                <div className="lp-footer-inner">
+                    <div className="lp-footer-brand">
+                        <GlidLogo size={20} variant="white" />
+                        <span className="lp-footer-tagline">Global Intelligence Design</span>
+                    </div>
+                    <div className="lp-footer-cols">
+                        <div className="lp-footer-col">
+                            <h4>Product</h4>
+                            <button onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}>Features</button>
+                            <button onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}>Pricing</button>
+                            <button onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}>Workflow</button>
+                        </div>
+                        <div className="lp-footer-col">
+                            <h4>Company</h4>
+                            <a href="mailto:hello@glid.ai">Contact</a>
+                            <a href="mailto:sales@glid.ai">Sales</a>
+                        </div>
+                    </div>
+                </div>
+                <div className="lp-footer-bottom">
+                    <span>&copy; {new Date().getFullYear()} Glid. All rights reserved.</span>
+                </div>
             </footer>
         </div>
     );
