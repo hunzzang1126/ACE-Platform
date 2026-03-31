@@ -403,3 +403,36 @@ describe('★ REGRESSION: Constraint roundtrip — no negative drift', () => {
         expect(r.y).toBeCloseTo(y, 0);
     });
 });
+
+// ═══════════════════════════════════════════════════
+// ★ REGRESSION GUARD: Replace image src updates __glidPersistSrc
+// Fixed in v0.0.0.332 — Remove BG results lost on save because
+// __glidPersistSrc still pointed to the original (pre-BG-removal) image.
+// ═══════════════════════════════════════════════════
+
+describe('★ REGRESSION: replaceImageSrc — updates __glidPersistSrc', () => {
+
+    it('replace_image_src sets __glidPersistSrc to new source', () => {
+        const src = readFileSync(resolve(__dirname, './shimCreators.ts'), 'utf-8');
+        // The line that updates __glidPersistSrc must be INSIDE replace_image_src
+        const replaceBlock = src.slice(
+            src.indexOf('replace_image_src:'),
+            src.indexOf('},', src.indexOf('replace_image_src:'))
+        );
+        expect(replaceBlock).toContain('__glidPersistSrc = newSrc');
+    });
+
+    it('__glidPersistSrc update happens AFTER _element swap, BEFORE renderAll', () => {
+        const src = readFileSync(resolve(__dirname, './shimCreators.ts'), 'utf-8');
+        const replaceBlock = src.slice(
+            src.indexOf('replace_image_src:'),
+            src.indexOf('},', src.indexOf('replace_image_src:'))
+        );
+        const elementIdx = replaceBlock.indexOf('_element');
+        const persistIdx = replaceBlock.indexOf('__glidPersistSrc = newSrc');
+        const renderIdx = replaceBlock.indexOf('fc.renderAll()');
+        expect(elementIdx).toBeGreaterThan(-1);
+        expect(persistIdx).toBeGreaterThan(elementIdx);
+        expect(renderIdx).toBeGreaterThan(persistIdx);
+    });
+});

@@ -210,6 +210,9 @@ export function createCreatorMethods(ctx: ShimContext) {
                 const newImg = await FabricImage.fromURL(newSrc, imgOptions);
                 (obj as any)._element = (newImg as any)._element;
                 (obj as any)._originalElement = (newImg as any)._originalElement;
+                // ★ CRITICAL: Update stable ref so save persists the NEW image,
+                // not the original. Without this, Remove BG results are lost on save.
+                (obj as any).__glidPersistSrc = newSrc;
                 obj.dirty = true;
                 fc.renderAll(); syncState();
             } catch (err) {
