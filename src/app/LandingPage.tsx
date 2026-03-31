@@ -47,6 +47,22 @@ export function LandingPage() {
         if (isAuthenticated()) navigate('/dashboard', { replace: true });
     }, [isAuthenticated, navigate]);
 
+    // ★ Force scroll on landing page — override global overflow:hidden
+    useEffect(() => {
+        const html = document.documentElement;
+        const body = document.body;
+        html.style.overflow = 'auto';
+        html.style.height = 'auto';
+        body.style.overflow = 'auto';
+        body.style.height = 'auto';
+        return () => {
+            html.style.overflow = '';
+            html.style.height = '';
+            body.style.overflow = '';
+            body.style.height = '';
+        };
+    }, []);
+
     // Intersection observer for legacy HowItWorks sections
     useEffect(() => {
         const observer = new IntersectionObserver(

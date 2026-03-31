@@ -3,12 +3,7 @@
    ═══════════════════════════════════════════════════ */
 
 /* ── Reset / Base ── */
-/* Override global overflow:hidden when landing page is mounted */
-html:has(.lp),
-html:has(.lp) body {
-    overflow: visible !important;
-    height: auto !important;
-}
+/* Scroll override handled via JS in LandingPage.tsx useEffect */
 
 .lp {
     background: #08080c;
