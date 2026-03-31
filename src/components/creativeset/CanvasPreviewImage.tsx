@@ -2,16 +2,14 @@
 // CanvasPreviewImage — Renders a BannerVariant via Fabric.js → <img>
 // ─────────────────────────────────────────────────
 // ★ Uses the SAME Fabric.js rendering engine as the Canvas Editor.
-// When animations are present and currentTime is provided,
-// renders animated elements as CSS overlays with transforms.
+// When animations are playing, re-renders at ~10fps with animation
+// offsets applied to produce a live animated preview.
 // ─────────────────────────────────────────────────
 
 import { useEffect, useRef, useState, memo } from 'react';
 import type { BannerVariant } from '@/schema/design.types';
 import { renderVariantWithFabric } from './fabricHeadlessRenderer';
-import { computeAnimStyle } from '@/hooks/useAnimationPresets';
-import type { AnimPresetType } from '@/hooks/useAnimationPresets';
-import { constraintsToAbsolute } from '@/engine/elementConverters';
+import { renderVariantAtTime } from '@/engine/fabricVideoExporter';
 
 interface Props {
     variant: BannerVariant;
@@ -22,13 +20,20 @@ interface Props {
     currentTime?: number;
 }
 
+/** Throttle interval for animated preview (ms). ~10fps is smooth enough. */
+const ANIM_RENDER_INTERVAL = 100;
+
 export const CanvasPreviewImage = memo(function CanvasPreviewImage({ variant, resolvedImageUrls, scale, currentTime }: Props) {
     const [dataUrl, setDataUrl] = useState<string | null>(null);
     const [error, setError] = useState(false);
     const renderIdRef = useRef(0);
+    const lastAnimRenderRef = useRef(0);
+    const animRenderingRef = useRef(false);
 
     const hasAnimations = variant.elements.some(el => el.animation && el.animation.preset !== 'none');
+    const isAnimating = hasAnimations && currentTime !== undefined;
 
+    // ── Static render (no animation or resting state) ──
     useEffect(() => {
         const renderId = ++renderIdRef.current;
 
@@ -49,6 +54,33 @@ export const CanvasPreviewImage = memo(function CanvasPreviewImage({ variant, re
         return () => { renderIdRef.current++; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [variant.id, variant.elements, resolvedImageUrls]);
+
+    // ── Animated render: throttled re-render at ~10fps ──
+    useEffect(() => {
+        if (!isAnimating || currentTime === undefined) return;
+
+        const now = performance.now();
+        if (now - lastAnimRenderRef.current < ANIM_RENDER_INTERVAL) return;
+        if (animRenderingRef.current) return; // skip if previous render still in progress
+
+        lastAnimRenderRef.current = now;
+        animRenderingRef.current = true;
+
+        const resolvedVariant: BannerVariant = {
+            ...variant,
+            elements: variant.elements.map(el => {
+                if (el.type === 'image' && el.src?.startsWith('idb://') && resolvedImageUrls[el.id]) {
+                    return { ...el, src: resolvedImageUrls[el.id]! } as typeof el;
+                }
+                return el;
+            }),
+        };
+
+        renderVariantAtTime(resolvedVariant, currentTime)
+            .then(url => { setDataUrl(url); })
+            .catch(() => { /* keep last frame */ })
+            .finally(() => { animRenderingRef.current = false; });
+    }, [isAnimating, currentTime, variant, resolvedImageUrls]);
 
     const { width, height } = variant.preset;
 
@@ -80,57 +112,14 @@ export const CanvasPreviewImage = memo(function CanvasPreviewImage({ variant, re
         );
     }
 
-    // No animations or no currentTime → static image (original behavior)
-    if (!hasAnimations || currentTime === undefined) {
-        return (
-            <img
-                src={dataUrl}
-                alt={`${width}x${height} preview`}
-                width={width * scale}
-                height={height * scale}
-                style={{ display: 'block', imageRendering: 'auto' }}
-                draggable={false}
-            />
-        );
-    }
-
-    // ── Animated preview: static base + CSS overlays for animated elements ──
-    const animatedEls = variant.elements.filter(el => el.animation && el.animation.preset !== 'none');
-
     return (
-        <div style={{ position: 'relative', width: width * scale, height: height * scale, overflow: 'hidden' }}>
-            {/* Static base image (shows all elements at their final positions) */}
-            <img
-                src={dataUrl}
-                alt={`${width}x${height} preview`}
-                width={width * scale}
-                height={height * scale}
-                style={{ display: 'block', imageRendering: 'auto' }}
-                draggable={false}
-            />
-            {/* CSS overlays for animated elements — these override the static image */}
-            {animatedEls.map(el => {
-                const anim = el.animation!;
-                const style = computeAnimStyle(anim.preset as AnimPresetType, currentTime, anim.duration, anim.startTime ?? 0);
-                const abs = constraintsToAbsolute(el.constraints, width, height);
-
-                // Mask: cover the element's final position with bg-colored rect, then show animated position
-                // This creates the illusion of the element animating into place
-                return (
-                    <div
-                        key={el.id}
-                        style={{
-                            position: 'absolute',
-                            left: abs.x * scale,
-                            top: abs.y * scale,
-                            width: abs.w * scale,
-                            height: abs.h * scale,
-                            ...style,
-                            pointerEvents: 'none',
-                        }}
-                    />
-                );
-            })}
-        </div>
+        <img
+            src={dataUrl}
+            alt={`${width}x${height} preview`}
+            width={width * scale}
+            height={height * scale}
+            style={{ display: 'block', imageRendering: 'auto' }}
+            draggable={false}
+        />
     );
 });

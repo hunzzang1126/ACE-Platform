@@ -140,9 +140,35 @@ export async function exportVariantToMp4(
 }
 
 /**
+ * Render a BannerVariant at a given animation time → data URL.
+ * Convenience wrapper for the preview grid (handles image loading internally).
+ */
+export async function renderVariantAtTime(variant: BannerVariant, time: number): Promise<string> {
+    const { width: w, height: h } = variant.preset;
+    const sorted = [...variant.elements].sort((a, b) => a.zIndex - b.zIndex);
+
+    // Load images inline (preview only renders ~10fps, so this is acceptable)
+    const imageCache: Record<string, HTMLImageElement> = {};
+    for (const el of sorted) {
+        if (el.type !== 'image' || !el.src) continue;
+        let src = el.src;
+        if (src.startsWith('idb://')) {
+            try { const { resolveAsset } = await import('@/services/assetService'); src = await resolveAsset(src); } catch { continue; }
+        }
+        try {
+            const img = new Image(); img.crossOrigin = 'anonymous';
+            await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = () => rej(); img.src = src; });
+            imageCache[el.id] = img;
+        } catch { /* skip */ }
+    }
+
+    return renderFrameAtTime(sorted, w, h, time, variant.backgroundColor, imageCache, {});
+}
+
+/**
  * Render a single frame at a given time, applying animation offsets.
  */
-async function renderFrameAtTime(
+export async function renderFrameAtTime(
     elements: DesignElement[],
     w: number, h: number,
     time: number,
