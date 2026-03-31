@@ -165,7 +165,7 @@ export function BannerPreviewGrid({ variants, visibleIds, externalPlaying }: Pro
     }, [visibleVariants]);
 
     // ── Animation loop ──
-    const hasAnyAnimation = useMemo(() => visibleVariants.some(v => v.elements.some(el => el.animation && el.animation.preset !== 'none')), [visibleVariants]);
+    const hasAnyAnimation = useMemo(() => visibleVariants.some(v => v.elements.some(el => (el.animation && el.animation.preset !== 'none') || (el.animation && (el.animation.startTime ?? 0) > 0))), [visibleVariants]);
     const isPlaying = externalPlaying ?? hasAnyAnimation;
 
     useEffect(() => {

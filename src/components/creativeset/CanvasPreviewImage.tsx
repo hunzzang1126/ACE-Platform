@@ -50,9 +50,14 @@ export const CanvasPreviewImage = memo(function CanvasPreviewImage({ variant, re
     const [error, setError] = useState(false);
     const renderIdRef = useRef(0);
 
-    const animEls = variant.elements.filter(el => el.animation && el.animation.preset !== 'none');
-    const hasAnimations = animEls.length > 0;
-    const isAnimating = hasAnimations && currentTime !== undefined;
+    // ★ Time-controlled elements: have animation OR non-zero startTime
+    const timeCtrlEls = variant.elements.filter(el => {
+        const hasAnim = el.animation && el.animation.preset !== 'none';
+        const hasDelay = el.animation && (el.animation.startTime ?? 0) > 0;
+        return hasAnim || hasDelay;
+    });
+    const hasTimeCtrl = timeCtrlEls.length > 0;
+    const isAnimating = hasTimeCtrl && currentTime !== undefined;
 
     // Resolve idb:// URLs in elements
     const resolvedVariant: BannerVariant = {
@@ -77,17 +82,17 @@ export const CanvasPreviewImage = memo(function CanvasPreviewImage({ variant, re
 
     // ── Render base (non-animated) + sprites (animated elements individually) ──
     useEffect(() => {
-        if (!hasAnimations) return;
+        if (!hasTimeCtrl) return;
         let cancelled = false;
 
         (async () => {
             const { width: w, height: h } = variant.preset;
-            const animIds = new Set(animEls.map(el => el.id));
+            const ctrlIds = new Set(timeCtrlEls.map(el => el.id));
 
             // Base: variant without animated elements
             const baseVariant: BannerVariant = {
                 ...resolvedVariant,
-                elements: resolvedVariant.elements.filter(el => !animIds.has(el.id)),
+                elements: resolvedVariant.elements.filter(el => !ctrlIds.has(el.id)),
             };
             try {
                 const bUrl = await renderVariantWithFabric(baseVariant);
@@ -96,7 +101,7 @@ export const CanvasPreviewImage = memo(function CanvasPreviewImage({ variant, re
 
             // Sprites: each animated element alone on transparent bg
             const newSprites: SpriteData[] = [];
-            for (const el of animEls) {
+            for (const el of timeCtrlEls) {
                 if (cancelled) break;
                 const resolvedEl = resolvedVariant.elements.find(e => e.id === el.id) ?? el;
                 const spriteVariant: BannerVariant = {
@@ -110,9 +115,9 @@ export const CanvasPreviewImage = memo(function CanvasPreviewImage({ variant, re
                     newSprites.push({
                         elId: el.id, dataUrl: sUrl,
                         x: abs.x, y: abs.y, w: abs.w, h: abs.h,
-                        preset: el.animation!.preset,
-                        duration: el.animation!.duration ?? 0.6,
-                        startTime: el.animation!.startTime ?? 0,
+                        preset: el.animation?.preset ?? 'none',
+                        duration: el.animation?.duration ?? 0.6,
+                        startTime: el.animation?.startTime ?? 0,
                     });
                 } catch { /* skip */ }
             }
@@ -121,7 +126,7 @@ export const CanvasPreviewImage = memo(function CanvasPreviewImage({ variant, re
 
         return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [variant.id, variant.elements, resolvedImageUrls, hasAnimations]);
+    }, [variant.id, variant.elements, resolvedImageUrls, hasTimeCtrl]);
 
     const { width, height } = variant.preset;
 

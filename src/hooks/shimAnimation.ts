@@ -45,9 +45,30 @@ export function createAnimationMethods(
             const aceId = (obj as any).__glidId;
             if (!aceId) continue;
             const config = presets[String(aceId)];
-            if (!config || config.anim === 'none') continue;
             const orig = (obj as any).__aceOrigPos;
             if (!orig) continue;
+
+            const st = config?.startTime ?? 0;
+            const et = config?.endTime ?? -1;
+
+            // ★ Element visibility: hidden before startTime, hidden after endTime
+            if (currentTime < st) {
+                obj.set({ opacity: 0 });
+                needsRender = true;
+                continue;
+            }
+            if (et > 0 && currentTime > et) {
+                obj.set({ opacity: 0 });
+                needsRender = true;
+                continue;
+            }
+
+            // No animation — just restore original position (visible)
+            if (!config || config.anim === 'none') {
+                obj.set({ left: orig.left, top: orig.top, opacity: orig.opacity, scaleX: orig.scaleX, scaleY: orig.scaleY });
+                needsRender = true;
+                continue;
+            }
 
             const animStart = config.startTime ?? 0;
             const animEnd = animStart + (config.animDuration ?? 0.3);

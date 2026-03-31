@@ -79,7 +79,16 @@ export function computeAnimStyle(
     currentTime: number,
     animDuration: number,
     startTime: number,
+    /** Optional endTime — if provided, element hidden after this time */
+    endTime?: number,
 ): CSSProperties {
+    // ★ Element visibility: hidden before startTime, hidden after endTime
+    if (currentTime < startTime) return { opacity: 0, pointerEvents: 'none' };
+    if (endTime !== undefined && endTime > 0 && currentTime > endTime) {
+        return { opacity: 0, pointerEvents: 'none' };
+    }
+
+    // No animation preset — just visible within time range
     if (preset === 'none') return {};
 
     // Animation runs from startTime to startTime+animDuration

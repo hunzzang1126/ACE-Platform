@@ -139,6 +139,50 @@ describe('computeAnimStyle', () => {
             expect(typeof style).toBe('object');
         }
     });
+
+    // ── Visibility based on startTime/endTime ──
+
+    it('★ REGRESSION: none preset hides element before startTime', () => {
+        const style = computeAnimStyle('none', 0.2, 0.6, 0.5);
+        // currentTime=0.2, startTime=0.5 → should be hidden
+        expect(style.opacity).toBe(0);
+    });
+
+    it('none preset shows element at startTime', () => {
+        const style = computeAnimStyle('none', 0.5, 0.6, 0.5);
+        // currentTime >= startTime → visible, no animation → empty
+        expect(style).toEqual({});
+    });
+
+    it('none preset shows element after startTime', () => {
+        const style = computeAnimStyle('none', 2.0, 0.6, 0.5);
+        expect(style).toEqual({});
+    });
+
+    it('hides element after endTime', () => {
+        const style = computeAnimStyle('none', 4.0, 0.6, 0, 3.0);
+        expect(style.opacity).toBe(0);
+    });
+
+    it('shows element before endTime', () => {
+        const style = computeAnimStyle('none', 2.0, 0.6, 0, 3.0);
+        expect(style).toEqual({});
+    });
+
+    it('hides fade element before startTime', () => {
+        const style = computeAnimStyle('fade', 0.1, 0.6, 0.5);
+        expect(style.opacity).toBe(0);
+    });
+
+    it('hides slide-left element before startTime', () => {
+        const style = computeAnimStyle('slide-left', 0.1, 0.6, 0.5);
+        expect(style.opacity).toBe(0);
+    });
+
+    it('hides any preset after endTime', () => {
+        const style = computeAnimStyle('fade', 5.0, 0.6, 0, 3.0);
+        expect(style.opacity).toBe(0);
+    });
 });
 
 // ═══════════════════════════════════════════════════
