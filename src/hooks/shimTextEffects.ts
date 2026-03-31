@@ -10,7 +10,8 @@ import type { ShimContext } from './shimTypes';
 
 // ── Text Effect CSS Application ──────────────────
 // Uses ONLY Fabric-native APIs that serialize correctly.
-function applyTextEffectCSS(
+// ★ Exported so fabricHeadlessRenderer can reuse the SAME logic.
+export function applyTextEffectCSS(
     obj: FabricObject,
     effectType: string,
     intensity: number,
