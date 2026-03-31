@@ -181,8 +181,9 @@ export function GeneralEditorPage() {
                     onExportVariant={async (variantId: string) => {
                         const variant = creativeSet.variants.find(v => v.id === variantId);
                         if (!variant) return 'data:image/png;base64,';
-                        const { renderVariantToCanvas } = await import('@/components/creativeset/previewRenderer');
-                        return renderVariantToCanvas(variant);
+                        // ★ Use SAME Fabric.js headless renderer as preview grid
+                        const { renderVariantWithFabric } = await import('@/components/creativeset/fabricHeadlessRenderer');
+                        return renderVariantWithFabric(variant);
                     }}
                 />
             )}
