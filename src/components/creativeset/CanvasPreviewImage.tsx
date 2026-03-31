@@ -8,7 +8,7 @@
 //   3. Apply computeAnimStyle() CSS transforms per frame — GPU-accelerated
 // ─────────────────────────────────────────────────
 
-import { useEffect, useRef, useState, memo } from 'react';
+import React, { useEffect, useRef, useState, memo } from 'react';
 import type { BannerVariant } from '@/schema/design.types';
 import { renderVariantWithFabric } from './fabricHeadlessRenderer';
 import { computeAnimStyle } from '@/hooks/useAnimationPresets';
@@ -30,6 +30,17 @@ interface SpriteData {
     preset: string;
     duration: number;
     startTime: number;
+}
+
+/** Scale CSS transform pixel values for preview size */
+function scaleAnimStyle(style: React.CSSProperties, s: number): React.CSSProperties {
+    const result = { ...style };
+    if (result.transform && typeof result.transform === 'string') {
+        result.transform = result.transform
+            .replace(/translateX\(([^)]+)px\)/g, (_, v) => `translateX(${parseFloat(v) * s}px)`)
+            .replace(/translateY\(([^)]+)px\)/g, (_, v) => `translateY(${parseFloat(v) * s}px)`);
+    }
+    return result;
 }
 
 export const CanvasPreviewImage = memo(function CanvasPreviewImage({ variant, resolvedImageUrls, scale, currentTime }: Props) {
@@ -141,6 +152,8 @@ export const CanvasPreviewImage = memo(function CanvasPreviewImage({ variant, re
             <img src={baseUrl} alt="base" width={width * scale} height={height * scale} style={{ display: 'block' }} draggable={false} />
             {sprites.map(sprite => {
                 const animStyle = computeAnimStyle(sprite.preset as AnimPresetType, currentTime, sprite.duration, sprite.startTime);
+                // Scale transform pixel values to match preview size
+                const scaledStyle = scaleAnimStyle(animStyle, scale);
                 return (
                     <img
                         key={sprite.elId}
@@ -151,7 +164,7 @@ export const CanvasPreviewImage = memo(function CanvasPreviewImage({ variant, re
                         style={{
                             position: 'absolute', left: 0, top: 0,
                             width: width * scale, height: height * scale,
-                            ...animStyle,
+                            ...scaledStyle,
                             pointerEvents: 'none',
                             willChange: 'transform, opacity',
                         }}
