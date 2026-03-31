@@ -3,19 +3,20 @@
    ═══════════════════════════════════════════════════ */
 
 /* ── Reset / Base ── */
+/* Override global overflow:hidden when landing page is mounted */
+html:has(.lp),
+html:has(.lp) body {
+    overflow: visible !important;
+    height: auto !important;
+}
+
 .lp {
     background: #08080c;
     color: #e2e8f0;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     overflow-x: hidden;
-    overflow-y: auto;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    scroll-behavior: smooth;
-    /* Override global html/body overflow:hidden for scrollable landing */
-    position: fixed;
-    inset: 0;
-    z-index: 0;
 }
 
 /* ── Video Showcase ── */
