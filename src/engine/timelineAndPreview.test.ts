@@ -1,0 +1,293 @@
+// ─────────────────────────────────────────────────
+// timelineAndPreview.test.ts — Tests for dynamic timeline,
+// animation preview, and MP4 export pipeline
+// ─────────────────────────────────────────────────
+// Covers: computeAnimStyle, scaleAnimStyle, endTime=-1 resolution,
+// timeline duration calc, renderVariantAtTime export
+// ─────────────────────────────────────────────────
+
+import { describe, it, expect } from 'vitest';
+import { computeAnimStyle } from '@/hooks/useAnimationPresets';
+import type { AnimPresetType } from '@/hooks/useAnimationPresets';
+
+// ── scaleAnimStyle (extracted for testing) ──
+function scaleAnimStyle(style: Record<string, unknown>, s: number): Record<string, unknown> {
+    const result = { ...style };
+    if (result.transform && typeof result.transform === 'string') {
+        result.transform = result.transform
+            .replace(/translateX\(([^)]+)px\)/g, (_: string, v: string) => `translateX(${parseFloat(v) * s}px)`)
+            .replace(/translateY\(([^)]+)px\)/g, (_: string, v: string) => `translateY(${parseFloat(v) * s}px)`);
+    }
+    return result;
+}
+
+// ── endTime=-1 resolution logic (extracted for testing) ──
+function resolveEndTime(endTime: number, defaultDuration: number): number {
+    return endTime < 0 ? defaultDuration : endTime;
+}
+
+function calcTimelineDuration(
+    barEndTimes: number[],
+    defaultDuration: number,
+    maxDuration: number,
+): number {
+    let maxEnd = 0.5;
+    for (const et of barEndTimes) {
+        const resolved = resolveEndTime(et, defaultDuration);
+        if (resolved > maxEnd) maxEnd = resolved;
+    }
+    return Math.min(maxDuration, Math.max(1, Math.ceil(maxEnd)));
+}
+
+// ═══════════════════════════════════════════════════
+// computeAnimStyle tests
+// ═══════════════════════════════════════════════════
+
+describe('computeAnimStyle', () => {
+    it('returns empty object for "none" preset', () => {
+        const style = computeAnimStyle('none', 0, 0.6, 0);
+        expect(style).toEqual({});
+    });
+
+    it('returns opacity 0 for fade at progress=0', () => {
+        const style = computeAnimStyle('fade', 0, 0.6, 0);
+        expect(style.opacity).toBeCloseTo(0, 1);
+    });
+
+    it('returns opacity ~1 for fade at progress=1 (after animation ends)', () => {
+        const style = computeAnimStyle('fade', 1.0, 0.6, 0);
+        expect(style.opacity).toBeCloseTo(1, 1);
+    });
+
+    it('returns opacity between 0 and 1 for fade at mid-progress', () => {
+        const style = computeAnimStyle('fade', 0.3, 0.6, 0);
+        const op = style.opacity as number;
+        expect(op).toBeGreaterThan(0);
+        expect(op).toBeLessThan(1);
+    });
+
+    it('slide-left starts off-screen right at progress=0', () => {
+        const style = computeAnimStyle('slide-left', 0, 0.6, 0);
+        expect(style.transform).toContain('translateX');
+        const match = (style.transform as string).match(/translateX\(([^)]+)px\)/);
+        expect(match).toBeTruthy();
+        expect(parseFloat(match![1])).toBeGreaterThan(0);
+    });
+
+    it('slide-left is at 0 (resting) at progress=1', () => {
+        const style = computeAnimStyle('slide-left', 1.0, 0.6, 0);
+        expect(style.transform).toContain('translateX(0px)');
+    });
+
+    it('slide-right starts off-screen left at progress=0', () => {
+        const style = computeAnimStyle('slide-right', 0, 0.6, 0);
+        const match = (style.transform as string).match(/translateX\(([^)]+)px\)/);
+        expect(parseFloat(match![1])).toBeLessThan(0);
+    });
+
+    it('slide-up starts off-screen below at progress=0', () => {
+        const style = computeAnimStyle('slide-up', 0, 0.6, 0);
+        const match = (style.transform as string).match(/translateY\(([^)]+)px\)/);
+        expect(parseFloat(match![1])).toBeGreaterThan(0);
+    });
+
+    it('slide-down starts off-screen above at progress=0', () => {
+        const style = computeAnimStyle('slide-down', 0, 0.6, 0);
+        const match = (style.transform as string).match(/translateY\(([^)]+)px\)/);
+        expect(parseFloat(match![1])).toBeLessThan(0);
+    });
+
+    it('scale starts at 0 at progress=0', () => {
+        const style = computeAnimStyle('scale', 0, 0.6, 0);
+        expect(style.transform).toBe('scale(0)');
+    });
+
+    it('scale is at 1 at progress=1', () => {
+        const style = computeAnimStyle('scale', 1.0, 0.6, 0);
+        expect(style.transform).toBe('scale(1)');
+    });
+
+    it('ascend has both opacity and translateY', () => {
+        const style = computeAnimStyle('ascend', 0, 0.6, 0);
+        expect(style.opacity).toBeDefined();
+        expect(style.transform).toContain('translateY');
+    });
+
+    it('descend has both opacity and translateY', () => {
+        const style = computeAnimStyle('descend', 0, 0.6, 0);
+        expect(style.opacity).toBeDefined();
+        expect(style.transform).toContain('translateY');
+    });
+
+    it('respects startTime — before startTime, progress is 0', () => {
+        const style = computeAnimStyle('fade', 1.0, 0.6, 2.0);
+        // currentTime=1.0, startTime=2.0 → animation hasn't started
+        expect(style.opacity).toBeCloseTo(0, 1);
+    });
+
+    it('respects startTime — at startTime + duration, progress is 1', () => {
+        const style = computeAnimStyle('fade', 2.6, 0.6, 2.0);
+        // currentTime=2.6, startTime=2.0, duration=0.6 → animation ended
+        expect(style.opacity).toBeCloseTo(1, 1);
+    });
+
+    it('all presets return valid styles', () => {
+        const presets: AnimPresetType[] = ['none', 'fade', 'slide-left', 'slide-right', 'slide-up', 'slide-down', 'scale', 'ascend', 'descend'];
+        for (const preset of presets) {
+            const style = computeAnimStyle(preset, 0.3, 0.6, 0);
+            expect(style).toBeDefined();
+            expect(typeof style).toBe('object');
+        }
+    });
+});
+
+// ═══════════════════════════════════════════════════
+// scaleAnimStyle tests
+// ═══════════════════════════════════════════════════
+
+describe('scaleAnimStyle', () => {
+    it('scales translateX by scale factor', () => {
+        const input = { transform: 'translateX(1000px)' };
+        const result = scaleAnimStyle(input, 0.3);
+        expect(result.transform).toBe('translateX(300px)');
+    });
+
+    it('scales translateY by scale factor', () => {
+        const input = { transform: 'translateY(500px)' };
+        const result = scaleAnimStyle(input, 0.5);
+        expect(result.transform).toBe('translateY(250px)');
+    });
+
+    it('scales negative translate values', () => {
+        const input = { transform: 'translateX(-1000px)' };
+        const result = scaleAnimStyle(input, 0.3);
+        expect(result.transform).toBe('translateX(-300px)');
+    });
+
+    it('handles combined translateX + translateY', () => {
+        const input = { transform: 'translateX(100px) translateY(200px)' };
+        const result = scaleAnimStyle(input, 0.5);
+        expect(result.transform).toBe('translateX(50px) translateY(100px)');
+    });
+
+    it('does not modify scale() transforms', () => {
+        const input = { transform: 'scale(0.5)' };
+        const result = scaleAnimStyle(input, 0.3);
+        expect(result.transform).toBe('scale(0.5)');
+    });
+
+    it('preserves non-transform properties', () => {
+        const input = { opacity: 0.5, transform: 'translateX(100px)' };
+        const result = scaleAnimStyle(input, 0.5);
+        expect(result.opacity).toBe(0.5);
+        expect(result.transform).toBe('translateX(50px)');
+    });
+
+    it('returns unchanged style when no transform', () => {
+        const input = { opacity: 0.8 };
+        const result = scaleAnimStyle(input, 0.3);
+        expect(result).toEqual({ opacity: 0.8 });
+    });
+
+    it('handles scale factor of 1 (no change)', () => {
+        const input = { transform: 'translateX(500px)' };
+        const result = scaleAnimStyle(input, 1);
+        expect(result.transform).toBe('translateX(500px)');
+    });
+
+    it('handles scale factor of 0', () => {
+        const input = { transform: 'translateX(500px)' };
+        const result = scaleAnimStyle(input, 0);
+        expect(result.transform).toBe('translateX(0px)');
+    });
+});
+
+// ═══════════════════════════════════════════════════
+// endTime resolution + timeline duration tests
+// ═══════════════════════════════════════════════════
+
+describe('endTime resolution', () => {
+    it('resolves -1 to default duration', () => {
+        expect(resolveEndTime(-1, 5)).toBe(5);
+    });
+
+    it('resolves -2 to default duration', () => {
+        expect(resolveEndTime(-2, 5)).toBe(5);
+    });
+
+    it('keeps explicit positive endTime unchanged', () => {
+        expect(resolveEndTime(3.5, 5)).toBe(3.5);
+    });
+
+    it('keeps 0 as 0', () => {
+        expect(resolveEndTime(0, 5)).toBe(0);
+    });
+});
+
+describe('calcTimelineDuration', () => {
+    const DEFAULT = 5;
+    const MAX = 20;
+
+    it('returns 5s when all bars have endTime=-1', () => {
+        expect(calcTimelineDuration([-1, -1, -1], DEFAULT, MAX)).toBe(5);
+    });
+
+    it('returns max bar end when one bar is extended', () => {
+        expect(calcTimelineDuration([-1, 8.5, -1], DEFAULT, MAX)).toBe(9);
+    });
+
+    it('★ REGRESSION: shrinks when all bars are under 5s', () => {
+        expect(calcTimelineDuration([3, 2.5, 4], DEFAULT, MAX)).toBe(4);
+    });
+
+    it('★ REGRESSION: shrinks to 1s minimum', () => {
+        expect(calcTimelineDuration([0.3, 0.5, 0.8], DEFAULT, MAX)).toBe(1);
+    });
+
+    it('★ REGRESSION: does NOT shrink if one bar still has -1 sentinel', () => {
+        // -1 resolves to 5, so timeline stays at 5
+        expect(calcTimelineDuration([3, -1, 2], DEFAULT, MAX)).toBe(5);
+    });
+
+    it('caps at MAX_DURATION', () => {
+        expect(calcTimelineDuration([25, 30], DEFAULT, MAX)).toBe(20);
+    });
+
+    it('handles empty array', () => {
+        expect(calcTimelineDuration([], DEFAULT, MAX)).toBe(1);
+    });
+
+    it('handles single bar exactly at default', () => {
+        expect(calcTimelineDuration([5], DEFAULT, MAX)).toBe(5);
+    });
+
+    it('ceils to next integer', () => {
+        expect(calcTimelineDuration([4.1], DEFAULT, MAX)).toBe(5);
+        expect(calcTimelineDuration([6.01], DEFAULT, MAX)).toBe(7);
+    });
+
+    it('handles float precision edge case', () => {
+        expect(calcTimelineDuration([3.0000001], DEFAULT, MAX)).toBe(4);
+    });
+});
+
+// ═══════════════════════════════════════════════════
+// fabricVideoExporter export tests
+// ═══════════════════════════════════════════════════
+
+describe('fabricVideoExporter exports', () => {
+    it('exports renderVariantAtTime function', async () => {
+        const mod = await import('@/engine/fabricVideoExporter');
+        expect(typeof mod.renderVariantAtTime).toBe('function');
+    });
+
+    it('exports renderFrameAtTime function', async () => {
+        const mod = await import('@/engine/fabricVideoExporter');
+        expect(typeof mod.renderFrameAtTime).toBe('function');
+    });
+
+    it('exports exportVariantToMp4 function', async () => {
+        const mod = await import('@/engine/fabricVideoExporter');
+        expect(typeof mod.exportVariantToMp4).toBe('function');
+    });
+});
