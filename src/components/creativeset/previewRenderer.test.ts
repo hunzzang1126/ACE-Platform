@@ -174,3 +174,64 @@ describe('★ REGRESSION GUARD: fabricHeadlessRenderer uses same Fabric classes 
     });
 });
 
+// ═══════════════════════════════════════════════════
+// ★ REGRESSION GUARD: storage:// resolve pipeline
+// Fixed in v0.0.0.334 — storage:// refs were passed raw to Fabric.js
+// causing ERR_UNKNOWN_URL_SCHEME and blank previews.
+// Every rendering path must resolve storage:// before rendering.
+// ═══════════════════════════════════════════════════
+
+describe('★ REGRESSION: storage:// refs resolved in ALL rendering paths', () => {
+
+    it('fabricHeadlessRenderer resolves storage:// refs (not just idb://)', () => {
+        const src = readFileSync(resolve(CREATIVESET_DIR, 'fabricHeadlessRenderer.ts'), 'utf-8');
+        expect(src).toContain("src.startsWith('storage://')");
+        expect(src).toContain('resolveAsset');
+    });
+
+    it('CanvasPreviewImage resolves storage:// refs in variant elements', () => {
+        const src = readFileSync(resolve(CREATIVESET_DIR, 'CanvasPreviewImage.tsx'), 'utf-8');
+        expect(src).toContain("startsWith('storage://')");
+    });
+
+    it('BannerPreviewGrid resolves storage:// refs (not just idb://)', () => {
+        const src = readFileSync(resolve(CREATIVESET_DIR, 'BannerPreviewGrid.tsx'), 'utf-8');
+        expect(src).toContain("startsWith('storage://')");
+        expect(src).toContain('resolveAsset');
+    });
+});
+
+describe('★ REGRESSION: isAssetRef recognizes storage:// (assetService)', () => {
+
+    it('isAssetRef checks for both idb:// and storage:// (via isStorageRef)', () => {
+        const src = readFileSync(resolve(__dirname, '../../services/assetService.ts'), 'utf-8');
+        expect(src).toContain('isStorageRef(src)');
+        expect(src).toContain('IDB_PREFIX');
+    });
+
+    it('resolveAssets uses full ref as cache key (not IDB_PREFIX slice)', () => {
+        const src = readFileSync(resolve(__dirname, '../../services/assetService.ts'), 'utf-8');
+        // Must NOT slice by IDB_PREFIX — that breaks storage:// cache keys
+        const resolveBlock = src.slice(src.indexOf('async function resolveAssets'));
+        expect(resolveBlock).not.toContain('slice(IDB_PREFIX.length)');
+        expect(resolveBlock).toContain('cacheKey');
+    });
+});
+
+describe('★ REGRESSION: replaceImageSrc updates __glidPersistSrc (shimCreators)', () => {
+
+    it('replace_image_src updates __glidPersistSrc after pixel swap', () => {
+        const src = readFileSync(resolve(__dirname, '../../hooks/shimCreators.ts'), 'utf-8');
+        const block = src.slice(src.indexOf('replace_image_src:'), src.indexOf('},', src.indexOf('replace_image_src:')));
+        expect(block).toContain('__glidPersistSrc = newSrc');
+    });
+});
+
+describe('★ REGRESSION: SidebarUploadsTab ghost detection is idb-only', () => {
+
+    it('ghost detection only applies to idb:// refs (not storage://)', () => {
+        const src = readFileSync(resolve(__dirname, '../../components/editor/SidebarUploadsTab.tsx'), 'utf-8');
+        // Ghost detection must check .startsWith('idb://') specifically
+        expect(src).toContain("u.idbRef.startsWith('idb://')");
+    });
+});
