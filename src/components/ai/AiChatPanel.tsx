@@ -84,10 +84,13 @@ export default function AiChatPanel({ aiService, engine, trackedNodes, onSendMes
             onComplete: (assistantMsg) => {
                 setMessages(prev => [...prev, assistantMsg]);
                 setLive(prev => ({ ...prev, phase: 'done' }));
-                recordAIUsage(1);
             },
             onError: (e) => setLive(prev => ({ ...prev, phase: 'error', error: e })),
         });
+
+        // ★ Always record AI usage after chat completes (regardless of success/error path)
+        console.log('[AiChatPanel] AI chat completed — recording usage');
+        recordAIUsage(1);
     }, [input, aiService, engine, onSendMessage, canUseAI, recordAIUsage]);
 
     useEffect(() => {
