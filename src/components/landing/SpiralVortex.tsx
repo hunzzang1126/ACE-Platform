@@ -47,6 +47,17 @@ const fragmentShader = /* glsl */ `
     return exp(-d * d * spread);
   }
 
+  // Hash for pseudo-random (particles)
+  float hash(float n) { return fract(sin(n) * 43758.5453123); }
+  float hash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+
+  // Traveling light dot on a ring path
+  float ringDot(vec2 p, vec2 center, float radius, float angle, float size) {
+    vec2 dotPos = center + vec2(cos(angle), sin(angle)) * radius;
+    float d = length(p - dotPos);
+    return exp(-d * d / (size * size));
+  }
+
   void main() {
     vec2 uv = vUv;
     float aspect = uResolution.x / uResolution.y;
@@ -109,9 +120,48 @@ const fragmentShader = /* glsl */ `
       color += col * glow2 * 0.12 * brightness;
     }
 
+    // ── Traveling light dots on each ring ──
+    // Variant dims these for mid-page subtlety
+    float dotBright = 1.0 - uVariant * 0.6;
+    for (int i = 0; i < 5; i++) {
+      float fi = float(i);
+      float r = baseRadius + spacing * fi;
+      vec2 c = center;
+
+      // 2 dots per ring, different speeds
+      float speed1 = 0.2 + fi * 0.05;
+      float speed2 = 0.15 + fi * 0.04;
+      float angle1 = t * speed1 + fi * 1.3;
+      float angle2 = t * speed2 + fi * 2.7 + 3.14159;
+
+      float dot1 = ringDot(p, c, r, angle1, 0.012);
+      float dot2 = ringDot(p, c, r, angle2, 0.009);
+
+      vec3 dotCol = vec3(0.25, 0.55, 0.75);
+      color += dotCol * dot1 * 0.5 * dotBright;
+      color += dotCol * dot2 * 0.3 * dotBright;
+    }
+
+    // ── Floating micro particles (cosmic dust) ──
+    for (int i = 0; i < 12; i++) {
+      float fi = float(i);
+      float px = hash(fi * 13.7) * aspect * 2.0 - aspect;
+      float py = hash(fi * 17.3) * 2.0 - 1.0;
+      // Slow drift
+      px += sin(t * 0.05 + fi * 2.1) * 0.04;
+      py += cos(t * 0.04 + fi * 1.8) * 0.03;
+      float pd = length(p - vec2(px, py));
+      float sparkle = exp(-pd * pd * 800.0) * (0.3 + 0.2 * sin(t * 0.3 + fi * 5.0));
+      color += vec3(0.20, 0.35, 0.50) * sparkle * (1.0 - uVariant * 0.5);
+    }
+
     // ── Ambient center glow (follows ring center) ──
     float cDist = length(p - center);
     color += vec3(0.14, 0.08, 0.28) * exp(-cDist * 2.0) * 0.12;
+
+    // ── Variant dimming for mid-page accent ──
+    float variantDim = 1.0 - uVariant * 0.35;
+    color *= variantDim;
 
     // ── Soft vignette ──
     float vig = 1.0 - smoothstep(0.4, 1.2, length(p) * 0.85);
@@ -210,13 +260,11 @@ export function SpiralVortex() {
 export function OrbitalAccent() {
     return (
         <div style={{
-            position: 'relative',
-            width: '100%',
-            height: '500px',
-            marginTop: '-100px',
-            marginBottom: '-100px',
+            position: 'absolute',
+            inset: 0,
             zIndex: 0,
             pointerEvents: 'none',
+            opacity: 0.7,
         }}>
             <Canvas
                 style={{ width: '100%', height: '100%' }}

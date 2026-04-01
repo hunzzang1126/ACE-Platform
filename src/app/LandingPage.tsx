@@ -187,8 +187,13 @@ function LandingPageContent() {
                 </motion.div>
             </section>
 
-            {/* ── Bento Grid ── */}
-            <BentoGrid />
+            {/* ── Bento Grid with Orbital Accent behind ── */}
+            <div style={{ position: 'relative' }}>
+                <Suspense fallback={null}>
+                    <OrbitalAccent />
+                </Suspense>
+                <BentoGrid />
+            </div>
 
             {/* ── Smart Sizing ── */}
             <div id="smart-sizing">
@@ -197,11 +202,6 @@ function LandingPageContent() {
 
             {/* ── Pricing ── */}
             <LandingPricing addRef={() => {}} />
-
-            {/* ── Orbital Accent (mid-page visual continuity) ── */}
-            <Suspense fallback={null}>
-                <OrbitalAccent />
-            </Suspense>
 
             {/* ── CTA ── */}
             <motion.section
