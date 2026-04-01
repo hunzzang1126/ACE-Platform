@@ -100,24 +100,31 @@ export function OnboardingPage() {
     }, [selected, navigate, userId]);
 
     return (
-        <div className="landing-page" style={{
+        <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            minHeight: '100vh',
+            minHeight: '100vh', position: 'relative', overflow: 'hidden',
+            background: 'linear-gradient(135deg, #08080c 0%, #0f0f1a 40%, #131328 100%)',
+            fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
         }}>
-            {/* Background glow */}
+            {/* Background glows */}
             <div style={{
                 position: 'absolute', width: 600, height: 600, borderRadius: '50%',
-                background: 'var(--landing-gradient-1)', filter: 'blur(200px)',
+                background: '#818cf8', filter: 'blur(200px)',
                 opacity: 0.06, top: '20%', left: '30%', pointerEvents: 'none',
+            }} />
+            <div style={{
+                position: 'absolute', width: 400, height: 400, borderRadius: '50%',
+                background: '#c084fc', filter: 'blur(180px)',
+                opacity: 0.05, bottom: '10%', right: '20%', pointerEvents: 'none',
             }} />
 
             <div style={{
                 width: '100%', maxWidth: step === 'language' ? 640 : 440,
                 padding: step === 'language' ? '36px 40px' : 40,
-                background: 'var(--landing-card)',
-                border: '1px solid var(--landing-card-border)',
+                background: 'rgba(255, 255, 255, 0.03)',
+                border: '1px solid rgba(255, 255, 255, 0.06)',
                 borderRadius: 20, backdropFilter: 'blur(40px)',
-                position: 'relative',
+                position: 'relative', zIndex: 1,
                 opacity: animating ? 0 : 1,
                 transform: animating ? 'translateY(10px)' : 'translateY(0)',
                 transition: 'all 0.3s ease',
@@ -127,13 +134,13 @@ export function OnboardingPage() {
                     <div style={{ textAlign: 'center' }}>
                         <div style={{
                             fontSize: 32, fontWeight: 700, letterSpacing: -1,
-                            background: 'linear-gradient(135deg, var(--landing-gradient-1), var(--landing-gradient-2))',
+                            background: 'linear-gradient(135deg, #818cf8, #c084fc)',
                             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
                             marginBottom: 12,
                         }}>
                             Welcome, {displayName}
                         </div>
-                        <p style={{ fontSize: 15, color: 'var(--landing-text-muted)', lineHeight: 1.6, margin: '0 0 32px' }}>
+                        <p style={{ fontSize: 15, color: '#94a3b8', lineHeight: 1.6, margin: '0 0 32px' }}>
                             Let's personalize Glid for you.<br />
                             This takes about 10 seconds.
                         </p>
@@ -147,10 +154,10 @@ export function OnboardingPage() {
                 {step === 'language' && (
                     <div>
                         <div style={{ textAlign: 'center', marginBottom: 24 }}>
-                            <div style={{ fontSize: 22, fontWeight: 700, color: '#f5f5f7', marginBottom: 6 }}>
+                            <div style={{ fontSize: 22, fontWeight: 700, color: '#f1f5f9', marginBottom: 6 }}>
                                 Choose your content language
                             </div>
-                            <p style={{ fontSize: 13, color: 'var(--landing-text-muted)', margin: 0 }}>
+                            <p style={{ fontSize: 13, color: '#94a3b8', margin: 0 }}>
                                 AI-generated copy will be written in this language by default
                             </p>
                         </div>
@@ -184,7 +191,7 @@ export function OnboardingPage() {
                                                 : '1px solid rgba(255, 255, 255, 0.06)',
                                             cursor: 'pointer',
                                             transition: 'all 0.2s',
-                                            color: isSelected ? '#c4b5fd' : '#999',
+                                            color: isSelected ? '#c4b5fd' : '#94a3b8',
                                         }}
                                     >
                                         <span style={{
@@ -192,15 +199,15 @@ export function OnboardingPage() {
                                             width: 32, height: 32, borderRadius: '50%',
                                             background: isSelected ? 'rgba(139, 92, 246, 0.2)' : 'rgba(255, 255, 255, 0.06)',
                                             display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                            color: isSelected ? '#c4b5fd' : '#888',
+                                            color: isSelected ? '#c4b5fd' : '#94a3b8',
                                             transition: 'all 0.2s',
                                         }}>
                                             {meta?.code ?? ''}
                                         </span>
-                                        <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: 0.3 }}>
+                                        <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: 0.3, color: isSelected ? '#e2e8f0' : '#94a3b8' }}>
                                             {meta?.native ?? lang}
                                         </span>
-                                        <span style={{ fontSize: 9, opacity: 0.5 }}>
+                                        <span style={{ fontSize: 9, color: '#64748b' }}>
                                             {lang}
                                         </span>
                                     </button>
@@ -235,13 +242,13 @@ export function OnboardingPage() {
                                 <polyline points="20 6 9 17 4 12" />
                             </svg>
                         </div>
-                        <div style={{ fontSize: 24, fontWeight: 700, color: '#f5f5f7', marginBottom: 8 }}>
+                        <div style={{ fontSize: 24, fontWeight: 700, color: '#f1f5f9', marginBottom: 8 }}>
                             You're all set
                         </div>
-                        <p style={{ fontSize: 14, color: 'var(--landing-text-muted)', lineHeight: 1.5, margin: '0 0 8px' }}>
+                        <p style={{ fontSize: 14, color: '#94a3b8', lineHeight: 1.5, margin: '0 0 8px' }}>
                             Content language: <strong style={{ color: '#c4b5fd' }}>{selected}</strong>
                         </p>
-                        <p style={{ fontSize: 12, color: 'var(--landing-text-muted)', margin: '0 0 28px' }}>
+                        <p style={{ fontSize: 12, color: '#64748b', margin: '0 0 28px' }}>
                             You can change this anytime in Settings
                         </p>
                         <button onClick={handleFinish} style={primaryBtnStyle}>
@@ -259,7 +266,7 @@ export function OnboardingPage() {
                         <div key={i} style={{
                             width: step === s ? 20 : 6, height: 6, borderRadius: 3,
                             background: step === s
-                                ? 'var(--landing-gradient-1)'
+                                ? 'linear-gradient(135deg, #818cf8, #c084fc)'
                                 : 'rgba(255,255,255,0.12)',
                             transition: 'all 0.3s ease',
                         }} />
@@ -274,7 +281,7 @@ export function OnboardingPage() {
 
 const primaryBtnStyle: React.CSSProperties = {
     padding: '12px 32px', borderRadius: 12,
-    background: 'linear-gradient(135deg, var(--landing-gradient-1), var(--landing-accent-2))',
+    background: 'linear-gradient(135deg, #818cf8, #6366f1)',
     color: '#fff', border: 'none', fontSize: 14, fontWeight: 600,
     cursor: 'pointer', transition: 'all 0.2s', letterSpacing: 0.3,
 };
@@ -282,7 +289,7 @@ const primaryBtnStyle: React.CSSProperties = {
 const ghostBtnStyle: React.CSSProperties = {
     padding: '10px 20px', borderRadius: 10,
     background: 'transparent',
-    color: 'var(--landing-text-muted)',
+    color: '#94a3b8',
     border: '1px solid rgba(255,255,255,0.08)',
     fontSize: 13, fontWeight: 500, cursor: 'pointer',
     transition: 'all 0.2s',
