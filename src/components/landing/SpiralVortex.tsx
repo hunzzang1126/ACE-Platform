@@ -53,67 +53,69 @@ const fragmentShader = /* glsl */ `
     vec2 p = uv - 0.5;
     p.x *= aspect;
 
-    vec2 mouse = uMouse * 0.02;
+    vec2 mouse = uMouse * 0.025;
     float t = uTime;
     float sv = clamp(uScrollVelocity, 0.0, 2.0);
     float vs = uVariant * 0.35;
 
     // Deep dark base
-    vec3 color = vec3(0.018, 0.022, 0.048);
+    vec3 color = vec3(0.02, 0.025, 0.055);
 
-    // ── Single center that auto-orbits slowly ──
+    // ── Center positioned BELOW viewport center ──
+    // This naturally keeps text area clear while rings stay bright
     float orbitSpeed = 0.08 + sv * 0.03;
     vec2 center = vec2(
-      0.0 + sin(t * orbitSpeed) * 0.06 + mouse.x,
-      -0.12 - vs + cos(t * orbitSpeed * 0.7) * 0.04 + mouse.y
+      0.0 + sin(t * orbitSpeed) * 0.08 + mouse.x,
+      -0.35 - vs + cos(t * orbitSpeed * 0.7) * 0.06 + mouse.y
     );
 
     // ── 5 concentric rings with even spacing ──
-    float baseRadius = 0.16;
-    float spacing = 0.135;
+    float baseRadius = 0.18;
+    float spacing = 0.14;
 
-    // Muted deep palette — barely lifted from background
+    // Vibrant palette
     vec3 colors[5];
-    colors[0] = vec3(0.08, 0.22, 0.35);  // deep cyan
-    colors[1] = vec3(0.07, 0.20, 0.32);  // dark teal
-    colors[2] = vec3(0.12, 0.10, 0.30);  // deep indigo
-    colors[3] = vec3(0.12, 0.08, 0.28);  // deep violet
-    colors[4] = vec3(0.06, 0.18, 0.30);  // muted blue
+    colors[0] = vec3(0.14, 0.40, 0.55);  // bright cyan
+    colors[1] = vec3(0.11, 0.34, 0.50);  // teal
+    colors[2] = vec3(0.16, 0.18, 0.48);  // indigo
+    colors[3] = vec3(0.18, 0.12, 0.42);  // violet
+    colors[4] = vec3(0.09, 0.28, 0.48);  // teal-blue
 
     for (int i = 0; i < 5; i++) {
       float fi = float(i);
-      float r = baseRadius + spacing * fi;
 
-      // Subtle individual wobble
+      // ── Breathing / pulsing radius — each ring breathes at different phase ──
+      float breathSpeed = 0.15 + fi * 0.03;
+      float breathAmp = 0.012 + fi * 0.005;
+      float breath = sin(t * breathSpeed + fi * 1.2) * breathAmp;
+      float r = baseRadius + spacing * fi + breath;
+
+      // Subtle individual wobble (wider orbit for dynamic feel)
       vec2 c = center + vec2(
-        sin(t * 0.1 + fi * 1.3) * 0.008,
-        cos(t * 0.12 + fi * 1.7) * 0.006
+        sin(t * 0.12 + fi * 1.5) * (0.015 + fi * 0.005),
+        cos(t * 0.10 + fi * 1.9) * (0.012 + fi * 0.004)
       );
 
-      float crisp = ring(p, c, r, 0.0018);
-      float glow  = ringGlow(p, c, r, 60.0);
-      float glow2 = ringGlow(p, c, r, 12.0);
+      float crisp = ring(p, c, r, 0.002);
+      float glow  = ringGlow(p, c, r, 45.0);
+      float glow2 = ringGlow(p, c, r, 8.0);
 
-      // Outer rings dimmer
-      float brightness = 0.6 - fi * 0.06;
+      // Outer rings slightly dimmer
+      float brightness = 1.0 - fi * 0.08;
 
       vec3 col = colors[i];
-      color += col * crisp * 0.5 * brightness;
-      color += col * glow * 0.2 * brightness;
-      color += col * glow2 * 0.06 * brightness;
+      color += col * crisp * 0.8 * brightness;
+      color += col * glow * 0.32 * brightness;
+      color += col * glow2 * 0.12 * brightness;
     }
 
-    // ── Very subtle center ambient glow ──
-    float cDist = length(p - vec2(mouse.x * 0.08, -0.1 - vs * 0.5 + mouse.y * 0.08));
-    color += vec3(0.10, 0.06, 0.18) * exp(-cDist * 2.5) * 0.08;
-
-    // ── Center text readability zone — dim rings near center ──
-    float textZone = smoothstep(0.15, 0.45, length(p - vec2(0.0, 0.0)));
-    color *= 0.4 + textZone * 0.6;
+    // ── Ambient center glow (follows ring center) ──
+    float cDist = length(p - center);
+    color += vec3(0.14, 0.08, 0.28) * exp(-cDist * 2.0) * 0.12;
 
     // ── Soft vignette ──
-    float vig = 1.0 - smoothstep(0.35, 1.1, length(p) * 0.85);
-    color *= 0.5 + vig * 0.5;
+    float vig = 1.0 - smoothstep(0.4, 1.2, length(p) * 0.85);
+    color *= 0.55 + vig * 0.45;
 
     gl_FragColor = vec4(color, 1.0);
   }
