@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────
-// LandingPage — GSAP ScrollTrigger + R3F Vortex
+// LandingPage — Frame.io-inspired cinematic landing
 // ─────────────────────────────────────────────────
-// Pricing → LandingPricing.tsx | Workflow → HowItWorks.tsx
+// Hero → BentoGrid → SmartSizing → Pricing → CTA
 // ─────────────────────────────────────────────────
 
 import { useEffect, useRef, lazy, Suspense } from 'react';
@@ -12,45 +12,35 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import Lenis from 'lenis';
 import { useAuthStore } from '@/stores/authStore';
 import { GlidLogo } from '@/components/brand/GlidLogo';
-import { HowItWorks } from './HowItWorks';
+import { BentoGrid } from '@/components/landing/BentoGrid';
+import { SmartSizingShowcase } from '@/components/landing/SmartSizingShowcase';
 import { LandingPricing } from './LandingPricing';
 import { setScrollVelocity } from '@/components/landing/SpiralVortex';
 import './landing.css';
 
 gsap.registerPlugin(ScrollTrigger);
 
-const SpiralVortex = lazy(() => import('@/components/landing/SpiralVortex').then(m => ({ default: m.SpiralVortex })));
-
-const Arrow = () => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>
+const SpiralVortex = lazy(() =>
+    import('@/components/landing/SpiralVortex').then(m => ({ default: m.SpiralVortex })),
 );
 
-const FEATURES = [
-    { label: 'Design Engine', title: 'GPU-Accelerated Canvas', desc: 'A Fabric.js rendering engine delivering 60fps interactions — even on complex multi-layer compositions with animations, effects, and high-res images.', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#818cf8" strokeWidth="1.5"><rect x="4" y="4" width="16" height="16" rx="2" /><rect x="9" y="9" width="6" height="6" /></svg> },
-    { label: 'Smart Sizing', title: 'Design Once, Deploy Everywhere', desc: 'Create a single master design and auto-propagate to every ad format — 300x250, 728x90, 160x600, social stories, and beyond.', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#818cf8" strokeWidth="1.5"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></svg> },
-    { label: 'AI Agent', title: 'Your Creative Co-Pilot', desc: 'An embedded AI assistant that understands your canvas. Generate layouts, swap colors, add elements, remove backgrounds — through natural conversation.', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#818cf8" strokeWidth="1.5"><path d="M15 4V2M15 16v-2M8 9h2M20 9h2M17.8 11.8 19 13M15 9h0M17.8 6.2 19 5M3 21l9-9M12.2 6.2 11 5" /></svg> },
-    { label: 'Animation', title: 'Bring Creatives to Life', desc: 'Timeline-based animation presets with custom easing, stagger, and sequencing. Preview in real-time and export as video, GIF, or HTML5.', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#818cf8" strokeWidth="1.5"><polygon points="5 3 19 12 5 21 5 3" /></svg> },
-];
-
-const METRICS = [
-    { value: '60fps', label: 'GPU-Accelerated Rendering' },
-    { value: '15+', label: 'Ad Sizes, One Click' },
-    { value: 'AI', label: 'Built-in Creative Agent' },
-    { value: '<1s', label: 'Export Latency' },
-];
+const Arrow = () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
+    </svg>
+);
 
 export function LandingPage() {
     const navigate = useNavigate();
     const { isAuthenticated } = useAuthStore();
     const heroRef = useRef<HTMLDivElement>(null);
-    const sectionsRef = useRef<HTMLDivElement[]>([]);
     const lpRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         if (isAuthenticated()) navigate('/dashboard', { replace: true });
     }, [isAuthenticated, navigate]);
 
-    // ★ Lenis smooth scroll + sync with GSAP ScrollTrigger
+    // ★ Lenis smooth scroll
     useEffect(() => {
         const html = document.documentElement;
         const body = document.body;
@@ -64,8 +54,6 @@ export function LandingPage() {
             easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
             smoothWheel: true,
         });
-
-        // Sync Lenis → GSAP ScrollTrigger
         lenis.on('scroll', ScrollTrigger.update);
         gsap.ticker.add((time) => lenis.raf(time * 1000));
         gsap.ticker.lagSmoothing(0);
@@ -79,125 +67,29 @@ export function LandingPage() {
         };
     }, []);
 
-    // ★ GSAP ScrollTrigger — stagger reveals + scroll velocity → vortex
+    // ★ GSAP — scroll velocity → vortex
     useEffect(() => {
         const ctx = gsap.context(() => {
-            // ── Scroll velocity tracker → feeds SpiralVortex ──
             let lastScroll = window.scrollY;
-            let velocity = 0;
             const velocityTicker = () => {
                 const cur = window.scrollY;
-                velocity = Math.abs(cur - lastScroll) / 16; // px per frame → normalized
+                setScrollVelocity(Math.abs(cur - lastScroll) / 16);
                 lastScroll = cur;
-                setScrollVelocity(velocity);
             };
             gsap.ticker.add(velocityTicker);
-
-            // ── Stagger reveal: Metrics ──
-            gsap.utils.toArray<HTMLElement>('.gsap-metric').forEach((el, i) => {
-                gsap.from(el, {
-                    y: 60,
-                    opacity: 0,
-                    duration: 0.8,
-                    delay: i * 0.12,
-                    ease: 'power3.out',
-                    scrollTrigger: {
-                        trigger: el,
-                        start: 'top 88%',
-                        once: true,
-                    },
-                });
-            });
-
-            // ── Stagger reveal: Feature cards ──
-            gsap.utils.toArray<HTMLElement>('.gsap-feature').forEach((el, i) => {
-                gsap.from(el, {
-                    y: 80,
-                    opacity: 0,
-                    duration: 0.9,
-                    delay: i * 0.15,
-                    ease: 'power3.out',
-                    scrollTrigger: {
-                        trigger: el,
-                        start: 'top 88%',
-                        once: true,
-                    },
-                });
-            });
-
-            // ── 3D Grid perspective warp on scroll ──
-            const grid = document.querySelector('.lp-cyber-grid');
-            if (grid) {
-                gsap.to(grid, {
-                    rotateX: -25,
-                    scale: 1.15,
-                    opacity: 0.12,
-                    ease: 'none',
-                    scrollTrigger: {
-                        trigger: '#features',
-                        start: 'top bottom',
-                        end: 'bottom top',
-                        scrub: 1.5,
-                    },
-                });
-            }
-
-            // ── Section headers ──
-            gsap.utils.toArray<HTMLElement>('.gsap-reveal').forEach((el) => {
-                gsap.from(el, {
-                    y: 50,
-                    opacity: 0,
-                    duration: 0.8,
-                    ease: 'power3.out',
-                    scrollTrigger: {
-                        trigger: el,
-                        start: 'top 85%',
-                        once: true,
-                    },
-                });
-            });
-
-            // ── CTA section ──
-            const ctaEl = document.querySelector('.gsap-cta');
-            if (ctaEl) {
-                gsap.from(ctaEl, {
-                    y: 60,
-                    opacity: 0,
-                    duration: 1,
-                    ease: 'power3.out',
-                    scrollTrigger: {
-                        trigger: ctaEl,
-                        start: 'top 85%',
-                        once: true,
-                    },
-                });
-            }
-
-            return () => {
-                gsap.ticker.remove(velocityTicker);
-            };
+            return () => gsap.ticker.remove(velocityTicker);
         }, lpRef);
-
         return () => ctx.revert();
     }, []);
 
-    // Intersection observer for HowItWorks
-    useEffect(() => {
-        const observer = new IntersectionObserver(
-            (entries) => { entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); }); },
-            { threshold: 0.1 },
-        );
-        sectionsRef.current.forEach(el => { if (el) observer.observe(el); });
-        return () => observer.disconnect();
-    }, []);
-    const addRef = (el: HTMLDivElement | null) => {
-        if (el && !sectionsRef.current.includes(el)) sectionsRef.current.push(el);
-    };
-
-    // ── Parallax (hero only — Framer Motion) ──
+    // ── Hero parallax ──
     const { scrollYProgress } = useScroll({ target: heroRef, offset: ['start start', 'end start'] });
     const heroY = useTransform(scrollYProgress, [0, 1], [0, 200]);
     const heroOpacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
+    // 3D canvas element scales down on scroll
+    const canvasScale = useTransform(scrollYProgress, [0, 1], [1, 0.6]);
+    const canvasY = useTransform(scrollYProgress, [0, 1], [0, 120]);
+    const canvasRotateX = useTransform(scrollYProgress, [0, 1], [0, 15]);
 
     return (
         <div className="lp" ref={lpRef}>
@@ -207,7 +99,7 @@ export function LandingPage() {
                     <GlidLogo size={22} variant="white" className="lp-nav-logo" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} />
                     <div className="lp-nav-links">
                         <button className="lp-nav-link" onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}>Features</button>
-                        <button className="lp-nav-link" onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}>Workflow</button>
+                        <button className="lp-nav-link" onClick={() => document.getElementById('smart-sizing')?.scrollIntoView({ behavior: 'smooth' })}>Smart Sizing</button>
                         <button className="lp-nav-link" onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}>Pricing</button>
                     </div>
                     <div className="lp-nav-actions">
@@ -222,13 +114,11 @@ export function LandingPage() {
                 <Suspense fallback={null}>
                     <SpiralVortex />
                 </Suspense>
-                <div className="lp-hero-glow lp-hero-glow-1" />
-                <div className="lp-hero-glow lp-hero-glow-2" />
 
                 <motion.div className="lp-hero-content" style={{ y: heroY, opacity: heroOpacity }}>
                     <motion.div className="lp-hero-badge" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3, duration: 0.5 }}>
                         <span className="lp-hero-badge-dot" />
-                        AI-Native Creative Platform
+                        AI-Native Creative Engine
                     </motion.div>
 
                     <motion.h1 className="lp-hero-title" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}>
@@ -237,72 +127,80 @@ export function LandingPage() {
                     </motion.h1>
 
                     <motion.p className="lp-hero-sub" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7, duration: 0.7 }}>
-                        Glid is the creative platform for performance marketing teams.
-                        Design, animate, and deploy ad creatives across every channel.
+                        The creative engine for performance marketing teams.
+                        Design, animate, and deploy across every channel.
                     </motion.p>
 
                     <motion.div className="lp-hero-actions" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.9, duration: 0.6 }}>
                         <button className="lp-btn-primary" onClick={() => navigate('/login')}>
                             Get Started Free <Arrow />
                         </button>
-                        <button className="lp-btn-ghost" onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}>
-                            See How It Works
+                        <button className="lp-btn-ghost" onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}>
+                            Explore Features
                         </button>
                     </motion.div>
                 </motion.div>
+
+                {/* 3D Floating Canvas Preview */}
+                <motion.div
+                    className="hero-canvas-3d"
+                    style={{ scale: canvasScale, y: canvasY, rotateX: canvasRotateX }}
+                    initial={{ opacity: 0, y: 80 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 1.1, duration: 1, ease: [0.16, 1, 0.3, 1] }}
+                >
+                    <div className="hero-canvas-frame">
+                        <div className="hero-canvas-toolbar">
+                            <div className="hero-canvas-dots"><span /><span /><span /></div>
+                            <div className="hero-canvas-tabs">
+                                <span className="active">Canvas</span>
+                                <span>Layers</span>
+                                <span>AI</span>
+                            </div>
+                        </div>
+                        <div className="hero-canvas-body">
+                            <div className="hero-canvas-sidebar">
+                                <div className="hc-layer" /><div className="hc-layer" /><div className="hc-layer short" />
+                            </div>
+                            <div className="hero-canvas-main">
+                                <div className="hc-shape hc-rect" />
+                                <div className="hc-shape hc-circle" />
+                                <div className="hc-shape hc-text">Headline</div>
+                            </div>
+                            <div className="hero-canvas-props">
+                                <div className="hc-prop" /><div className="hc-prop" /><div className="hc-prop short" />
+                            </div>
+                        </div>
+                    </div>
+                </motion.div>
             </section>
 
-            {/* ── Metrics (GSAP stagger) ── */}
-            <div className="lp-metrics-wrap gsap-reveal">
-                <div className="lp-metrics">
-                    {METRICS.map((m, i) => (
-                        <div key={i} className="lp-metric gsap-metric">
-                            <div className="lp-metric-value">{m.value}</div>
-                            <div className="lp-metric-label">{m.label}</div>
-                        </div>
-                    ))}
-                </div>
+            {/* ── Bento Grid ── */}
+            <BentoGrid />
+
+            {/* ── Smart Sizing ── */}
+            <div id="smart-sizing">
+                <SmartSizingShowcase />
             </div>
 
-            {/* ── 3D Grid Perspective + Features (GSAP stagger) ── */}
-            <section id="features" className="lp-features" style={{ position: 'relative' }}>
-                {/* 3D Perspective Grid Background */}
-                <div className="lp-cyber-grid" />
-
-                <div className="lp-features-header gsap-reveal">
-                    <div className="lp-section-label">Platform</div>
-                    <h2 className="lp-section-title">Everything you need.<br />Nothing you don't.</h2>
-                    <p className="lp-section-sub">A complete creative platform that replaces your entire tool stack.</p>
-                </div>
-                <div className="lp-features-grid">
-                    {FEATURES.map((f, i) => (
-                        <div key={i} className="lp-feature-card gsap-feature">
-                            {/* Cybernetic data stream layer */}
-                            <div className="lp-cyber-layer" />
-                            <div className="lp-feature-icon">{f.icon}</div>
-                            <div className="lp-feature-label">{f.label}</div>
-                            <h3 className="lp-feature-title">{f.title}</h3>
-                            <p className="lp-feature-desc">{f.desc}</p>
-                        </div>
-                    ))}
-                </div>
-            </section>
-
-            {/* ── How It Works ── */}
-            <HowItWorks addRef={addRef} />
-
             {/* ── Pricing ── */}
-            <LandingPricing addRef={addRef} />
+            <LandingPricing addRef={() => {}} />
 
-            {/* ── CTA (GSAP) ── */}
-            <section className="lp-cta gsap-cta">
+            {/* ── CTA ── */}
+            <motion.section
+                className="lp-cta"
+                initial={{ opacity: 0, y: 40 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.8 }}
+            >
                 <div className="lp-cta-glow" />
                 <h2 className="lp-cta-title">Ready to create?</h2>
                 <p className="lp-cta-sub">Start building production-ready creatives in minutes. No credit card required.</p>
-                <button className="lp-btn-primary lp-btn-lg" onClick={() => navigate('/login')}>
+                <motion.button className="lp-btn-primary lp-btn-lg" onClick={() => navigate('/login')} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.98 }}>
                     Get Started Free <Arrow />
-                </button>
-            </section>
+                </motion.button>
+            </motion.section>
 
             {/* ── Footer ── */}
             <footer className="lp-footer">
@@ -316,7 +214,6 @@ export function LandingPage() {
                             <h4>Product</h4>
                             <button onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}>Features</button>
                             <button onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}>Pricing</button>
-                            <button onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}>Workflow</button>
                         </div>
                         <div className="lp-footer-col">
                             <h4>Company</h4>
