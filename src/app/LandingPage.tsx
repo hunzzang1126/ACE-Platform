@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import Lenis from 'lenis';
 import { useAuthStore } from '@/stores/authStore';
 import { GlidLogo } from '@/components/brand/GlidLogo';
 import { HowItWorks } from './HowItWorks';
@@ -49,7 +50,7 @@ export function LandingPage() {
         if (isAuthenticated()) navigate('/dashboard', { replace: true });
     }, [isAuthenticated, navigate]);
 
-    // ★ Force scroll on landing page
+    // ★ Lenis smooth scroll + sync with GSAP ScrollTrigger
     useEffect(() => {
         const html = document.documentElement;
         const body = document.body;
@@ -57,7 +58,20 @@ export function LandingPage() {
         html.style.height = 'auto';
         body.style.overflow = 'auto';
         body.style.height = 'auto';
+
+        const lenis = new Lenis({
+            duration: 1.2,
+            easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+            smoothWheel: true,
+        });
+
+        // Sync Lenis → GSAP ScrollTrigger
+        lenis.on('scroll', ScrollTrigger.update);
+        gsap.ticker.add((time) => lenis.raf(time * 1000));
+        gsap.ticker.lagSmoothing(0);
+
         return () => {
+            lenis.destroy();
             html.style.overflow = '';
             html.style.height = '';
             body.style.overflow = '';
