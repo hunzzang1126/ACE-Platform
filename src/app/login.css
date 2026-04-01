@@ -1,0 +1,263 @@
+/* ─────────────────────────────────────────────────
+   login.css — Premium login page matching landing aesthetic
+   ───────────────────────────────────────────────── */
+
+.login-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #050510;
+    position: relative;
+    overflow: hidden;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ── Ambient glow blobs ── */
+.login-glow {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(140px);
+    pointer-events: none;
+    z-index: 1;
+}
+.login-glow--1 {
+    width: 500px; height: 500px;
+    background: rgba(99, 102, 241, 0.15);
+    top: -10%; left: -5%;
+    animation: loginGlow1 15s ease-in-out infinite alternate;
+}
+.login-glow--2 {
+    width: 400px; height: 400px;
+    background: rgba(0, 255, 214, 0.08);
+    bottom: -10%; right: -5%;
+    animation: loginGlow2 18s ease-in-out infinite alternate;
+}
+@keyframes loginGlow1 {
+    0% { transform: translate(0, 0) scale(1); }
+    100% { transform: translate(60px, 40px) scale(1.15); }
+}
+@keyframes loginGlow2 {
+    0% { transform: translate(0, 0) scale(1); }
+    100% { transform: translate(-50px, -30px) scale(1.2); }
+}
+
+/* ── Card ── */
+.login-card {
+    position: relative;
+    z-index: 2;
+    width: 100%;
+    max-width: 420px;
+    padding: 40px;
+    background: rgba(10, 14, 30, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 24px;
+    backdrop-filter: blur(40px);
+    animation: cardIn 0.8s ease-out;
+}
+@keyframes cardIn {
+    from { opacity: 0; transform: translateY(24px) scale(0.97); filter: blur(6px); }
+    to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0px); }
+}
+
+/* Animated gradient border */
+.login-card-border {
+    position: absolute;
+    inset: -1px;
+    border-radius: 25px;
+    z-index: -1;
+    background: conic-gradient(
+        from var(--login-angle, 0deg),
+        transparent 30%,
+        rgba(99, 102, 241, 0.2) 38%,
+        rgba(0, 255, 214, 0.15) 50%,
+        rgba(192, 132, 252, 0.2) 62%,
+        transparent 70%
+    );
+    animation: loginBorderSpin 8s linear infinite;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    -webkit-mask-composite: xor;
+    padding: 1px;
+}
+@property --login-angle {
+    syntax: '<angle>';
+    initial-value: 0deg;
+    inherits: false;
+}
+@keyframes loginBorderSpin {
+    to { --login-angle: 360deg; }
+}
+
+/* ── Logo area ── */
+.login-logo {
+    text-align: center;
+    margin-bottom: 32px;
+}
+.login-heading {
+    font-size: 24px;
+    font-weight: 700;
+    color: #fff;
+    margin: 16px 0 6px;
+}
+.login-sub {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.4);
+    margin: 0;
+}
+
+/* ── OAuth buttons ── */
+.login-oauth {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 24px;
+}
+.login-oauth-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.3s ease;
+    font-family: inherit;
+}
+.login-oauth-btn--google {
+    background: #fff;
+    color: #333;
+}
+.login-oauth-btn--google:hover { background: #f0f0f0; transform: translateY(-1px); }
+.login-oauth-btn--github {
+    background: rgba(255, 255, 255, 0.06);
+    color: #e2e8f0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.login-oauth-btn--github:hover {
+    background: rgba(255, 255, 255, 0.10);
+    border-color: rgba(255, 255, 255, 0.15);
+    transform: translateY(-1px);
+}
+
+/* ── Divider ── */
+.login-divider {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 24px;
+}
+.login-divider-line {
+    flex: 1;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.08);
+}
+.login-divider span {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.3);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* ── Form ── */
+.login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.login-input-wrap {
+    position: relative;
+    border-radius: 12px;
+    padding: 1px;
+    background: rgba(255, 255, 255, 0.08);
+    transition: all 0.3s ease;
+}
+.login-input-wrap.focused {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.3), rgba(0, 255, 214, 0.2));
+    box-shadow: 0 0 20px rgba(99, 102, 241, 0.1);
+}
+.login-input-wrap input {
+    width: 100%;
+    padding: 13px 16px;
+    border-radius: 11px;
+    background: rgba(10, 14, 30, 0.9);
+    border: none;
+    color: #f5f5f7;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    box-sizing: border-box;
+}
+.login-input-wrap input::placeholder {
+    color: rgba(255, 255, 255, 0.25);
+}
+
+/* ── Error ── */
+.login-error {
+    font-size: 13px;
+    color: #ff6b6b;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: rgba(255, 107, 107, 0.08);
+    border: 1px solid rgba(255, 107, 107, 0.15);
+}
+
+/* ── Submit ── */
+.login-submit {
+    padding: 13px 16px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #6366f1, #818cf8, #00ffd6);
+    background-size: 200% 200%;
+    animation: submitGradient 4s ease infinite;
+    color: #fff;
+    border: none;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-top: 4px;
+    font-family: inherit;
+}
+.login-submit:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(99, 102, 241, 0.25);
+}
+.login-submit:disabled {
+    opacity: 0.6;
+    cursor: wait;
+}
+@keyframes submitGradient {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+
+/* ── Toggle ── */
+.login-toggle {
+    text-align: center;
+    margin-top: 24px;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.4);
+}
+.login-toggle button {
+    background: none;
+    border: none;
+    color: #818cf8;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 0;
+    font-family: inherit;
+    transition: color 0.2s;
+}
+.login-toggle button:hover {
+    color: #00ffd6;
+}
+
+/* ── Responsive ── */
+@media (max-width: 480px) {
+    .login-card { margin: 16px; padding: 28px; }
+}
