@@ -498,3 +498,151 @@ describe('useTemplateStore — Locked State Stripping', () => {
         expect(variant.elements[0].locked).toBe(true);
     });
 });
+
+// ─────────────────────────────────────────────────
+// ★ REGRESSION: Template Save Data Integrity
+// Root cause: temp CS not in allCreativeSets meant
+// saveToStore silently dropped edits. These tests
+// ensure the override pipeline captures actual data.
+// ─────────────────────────────────────────────────
+describe('useTemplateStore — ★ REGRESSION: Template Save Data Integrity', () => {
+    beforeEach(() => {
+        useTemplateStore.setState({
+            templates: [...BUILT_IN_TEMPLATES],
+            templateOverrides: {},
+            editingTemplateId: null,
+            editingTempCsId: null,
+        });
+    });
+
+    it('★ REGRESSION: override captures font family changes (not default Inter)', () => {
+        const templateId = BUILT_IN_TEMPLATES[0].id;
+        const variant: BannerVariant = {
+            id: 'v-font',
+            preset: { id: 'p1', name: '1080x1080', width: 1080, height: 1080, category: 'social' },
+            elements: [
+                {
+                    id: 'hl', name: 'Headline', type: 'text',
+                    constraints: { horizontal: { anchor: 'left', offset: 80 }, vertical: { anchor: 'top', offset: 176 }, size: { widthMode: 'fixed', heightMode: 'fixed', width: 920, height: 273 }, rotation: 0 },
+                    opacity: 1, visible: true, locked: false, zIndex: 2,
+                    content: 'Design Is not Hard', fontSize: 130, fontWeight: 800, color: '#ffffff',
+                    fontFamily: 'Anton',
+                } as any,
+            ],
+            backgroundColor: '#0a0e1a',
+            overriddenElementIds: [],
+            syncLocked: false,
+        };
+
+        useTemplateStore.getState().overrideTemplate(templateId, variant);
+
+        const snapshot = useTemplateStore.getState().templateOverrides[templateId];
+        const parsed = JSON.parse(snapshot);
+        expect(parsed.elements[0].fontFamily).toBe('Anton');
+        expect(parsed.elements[0].fontSize).toBe(130);
+        expect(parsed.elements[0].content).toBe('Design Is not Hard');
+    });
+
+    it('★ REGRESSION: override captures position/size changes', () => {
+        const templateId = BUILT_IN_TEMPLATES[0].id;
+        const variant: BannerVariant = {
+            id: 'v-pos',
+            preset: { id: 'p1', name: '1080x1080', width: 1080, height: 1080, category: 'social' },
+            elements: [
+                {
+                    id: 'hl', name: 'Headline', type: 'text',
+                    constraints: {
+                        horizontal: { anchor: 'left', offset: 200 },
+                        vertical: { anchor: 'top', offset: 400 },
+                        size: { widthMode: 'fixed', heightMode: 'fixed', width: 600, height: 150 },
+                        rotation: 0,
+                    },
+                    opacity: 1, visible: true, locked: false, zIndex: 2,
+                    content: 'Moved Text', fontSize: 80, fontWeight: 700, color: '#fff',
+                } as any,
+            ],
+            backgroundColor: '#000',
+            overriddenElementIds: [],
+            syncLocked: false,
+        };
+
+        useTemplateStore.getState().overrideTemplate(templateId, variant);
+
+        const snapshot = useTemplateStore.getState().templateOverrides[templateId];
+        const parsed = JSON.parse(snapshot);
+        expect(parsed.elements[0].constraints.horizontal.offset).toBe(200);
+        expect(parsed.elements[0].constraints.vertical.offset).toBe(400);
+        expect(parsed.elements[0].constraints.size.width).toBe(600);
+        expect(parsed.elements[0].constraints.size.height).toBe(150);
+    });
+
+    it('★ REGRESSION: override reflects element deletion (fewer elements than original)', () => {
+        const templateId = BUILT_IN_TEMPLATES[0].id;
+        const originalParsed = JSON.parse(BUILT_IN_TEMPLATES[0].variantSnapshot);
+        const originalCount = originalParsed.elements.length;
+
+        // Simulate deleting one element: pass variant with fewer elements
+        const reducedVariant: BannerVariant = {
+            id: 'v-reduced',
+            preset: { id: 'p1', name: '1080x1080', width: 1080, height: 1080, category: 'social' },
+            elements: originalParsed.elements.slice(0, -1), // Remove last element
+            backgroundColor: originalParsed.backgroundColor,
+            overriddenElementIds: [],
+            syncLocked: false,
+        };
+
+        useTemplateStore.getState().overrideTemplate(templateId, reducedVariant);
+
+        const snapshot = useTemplateStore.getState().templateOverrides[templateId];
+        const parsed = JSON.parse(snapshot);
+        expect(parsed.elements.length).toBe(originalCount - 1);
+    });
+
+    it('★ REGRESSION: overrideTemplate snapshot matches the variant passed (not stale data)', () => {
+        const templateId = BUILT_IN_TEMPLATES[0].id;
+
+        // First override with data A
+        const variantA: BannerVariant = {
+            id: 'v-a', preset: { id: 'p1', name: '1080', width: 1080, height: 1080, category: 'social' },
+            elements: [{ id: 'a1', name: 'A', type: 'text', constraints: { horizontal: { anchor: 'left', offset: 10 }, vertical: { anchor: 'top', offset: 10 }, size: { widthMode: 'fixed', heightMode: 'fixed', width: 100, height: 50 }, rotation: 0 }, opacity: 1, visible: true, locked: false, zIndex: 1, content: 'First', fontSize: 20, fontWeight: 400, color: '#000' } as any],
+            backgroundColor: '#aaa', overriddenElementIds: [], syncLocked: false,
+        };
+        useTemplateStore.getState().overrideTemplate(templateId, variantA);
+        expect(JSON.parse(useTemplateStore.getState().templateOverrides[templateId]).elements[0].content).toBe('First');
+
+        // Second override with data B
+        const variantB: BannerVariant = {
+            id: 'v-b', preset: variantA.preset,
+            elements: [{ ...variantA.elements[0], id: 'b1', content: 'Second', fontFamily: 'Montserrat' } as any],
+            backgroundColor: '#bbb', overriddenElementIds: [], syncLocked: false,
+        };
+        useTemplateStore.getState().overrideTemplate(templateId, variantB);
+
+        const parsed = JSON.parse(useTemplateStore.getState().templateOverrides[templateId]);
+        expect(parsed.elements[0].content).toBe('Second');
+        expect(parsed.elements[0].fontFamily).toBe('Montserrat');
+        expect(parsed.backgroundColor).toBe('#bbb');
+    });
+
+    it('★ REGRESSION: template preview reads updated snapshot after override', () => {
+        const templateId = BUILT_IN_TEMPLATES[0].id;
+
+        const editedVariant: BannerVariant = {
+            id: 'v-preview', preset: { id: 'p1', name: '1080', width: 1080, height: 1080, category: 'social' },
+            elements: [{ id: 'p1', name: 'Preview', type: 'text', constraints: { horizontal: { anchor: 'center', offset: 0 }, vertical: { anchor: 'center', offset: 0 }, size: { widthMode: 'fixed', heightMode: 'fixed', width: 500, height: 100 }, rotation: 0 }, opacity: 1, visible: true, locked: false, zIndex: 1, content: 'EDITED CONTENT', fontSize: 64, fontWeight: 800, color: '#fff', fontFamily: 'Playfair Display' } as any],
+            backgroundColor: '#1a1a2e', overriddenElementIds: [], syncLocked: false,
+        };
+
+        useTemplateStore.getState().overrideTemplate(templateId, editedVariant);
+
+        // Simulate what TemplatePreview does: read template.variantSnapshot
+        const tmpl = useTemplateStore.getState().templates.find(t => t.id === templateId)!;
+        const previewData = JSON.parse(tmpl.variantSnapshot);
+
+        expect(previewData.elements[0].content).toBe('EDITED CONTENT');
+        expect(previewData.elements[0].fontFamily).toBe('Playfair Display');
+        expect(previewData.elements[0].fontSize).toBe(64);
+        expect(previewData.backgroundColor).toBe('#1a1a2e');
+    });
+});
+
