@@ -167,6 +167,7 @@ export function usePlanLimits() {
 
         // Convenience
         isStarter: plan === 'starter',
+        isCreator: plan === 'creator',
         isPro: plan === 'pro',
         isEnterprise: plan === 'enterprise',
         isAdmin: plan === 'admin',

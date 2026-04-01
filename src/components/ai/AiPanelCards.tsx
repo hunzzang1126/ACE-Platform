@@ -111,12 +111,12 @@ export function ImageGalleryCard({ images, onSelect }: { images: Array<{ id: str
 
 // ── Model Dropdown ───────────────────────────────
 
-const MODEL_OPTIONS: Array<{ role: AceModelRole; label: string; minPlan: 'starter' | 'pro' }> = [
-    { role: 'design', label: 'Claude Sonnet 4', minPlan: 'pro' },
+const MODEL_OPTIONS: Array<{ role: AceModelRole; label: string; minPlan: 'starter' | 'creator' | 'pro' }> = [
+    { role: 'design', label: 'Claude Sonnet 4', minPlan: 'creator' },
     { role: 'executor', label: 'Claude 3.5 Haiku (Fast)', minPlan: 'starter' },
 ];
 
-const PLAN_RANK: Record<string, number> = { starter: 0, pro: 1, enterprise: 2, admin: 3 };
+const PLAN_RANK: Record<string, number> = { starter: 0, creator: 1, pro: 2, enterprise: 3, admin: 4 };
 
 export function ModelDropdown({ selectedRole, onSelect }: { selectedRole: AceModelRole; onSelect: (role: AceModelRole) => void }) {
     const [userPlan, setUserPlan] = useState<string>('starter');

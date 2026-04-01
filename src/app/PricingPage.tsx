@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────
-// PricingPage — 3-tier plan selection
+// PricingPage — 4-tier plan selection
 // ─────────────────────────────────────────────────
 // Premium dark-mode pricing page with feature comparison.
 // Accessible from dashboard and landing page.
@@ -33,7 +33,7 @@ export default function PricingPage() {
             return;
         }
 
-        // ★ Pro upgrade — Stripe Checkout
+        // ★ Creator or Pro upgrade — Stripe Checkout
         if (!isStripeConfigured()) {
             console.error('[pricing] Stripe NOT configured. VITE_STRIPE_PUBLISHABLE_KEY:', import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
             alert('Payment system is being set up. Please try again shortly.');
@@ -133,8 +133,8 @@ export default function PricingPage() {
 
             {/* Plan Cards */}
             <div style={{
-                display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: 24, maxWidth: 1100, margin: '48px auto 0', padding: '0 20px',
+                display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
+                gap: 20, maxWidth: 1200, margin: '48px auto 0', padding: '0 20px',
             }}>
                 {PLANS.map(plan => {
                     const isCurrent = plan.tier === currentPlan;

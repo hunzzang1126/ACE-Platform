@@ -5,7 +5,7 @@
 // Used by usePlanLimits hook and enforcement logic.
 // ─────────────────────────────────────────────────
 
-export type PlanTier = 'starter' | 'pro' | 'enterprise' | 'admin';
+export type PlanTier = 'starter' | 'creator' | 'pro' | 'enterprise' | 'admin';
 
 export type ExportFormat = 'png' | 'jpg' | 'html5' | 'gif' | 'mp4' | 'js_bundle';
 
@@ -51,6 +51,16 @@ export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
         maxTeamMembers: 1,
         brandCloudEnabled: false,
     },
+    creator: {
+        maxCreativeSets: 10,
+        aiTokensPerMonth: 200, // 200 AI generations/month
+        allowedModels: ['anthropic/claude-3.5-haiku', 'anthropic/claude-sonnet-4'],
+        defaultModel: 'anthropic/claude-sonnet-4',
+        maxVariantsPerSet: 10,
+        allowedExports: ['png', 'jpg'],
+        maxTeamMembers: 1,
+        brandCloudEnabled: false,
+    },
     pro: {
         maxCreativeSets: -1,
         aiTokensPerMonth: 500, // 500 AI generations/month
@@ -58,7 +68,7 @@ export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
         defaultModel: 'anthropic/claude-sonnet-4',
         maxVariantsPerSet: -1,
         allowedExports: ['png', 'jpg', 'html5'],
-        maxTeamMembers: 1,
+        maxTeamMembers: 3,
         brandCloudEnabled: false,
     },
     enterprise: {
@@ -93,13 +103,21 @@ export const PLANS: PlanInfo[] = [
         limits: PLAN_LIMITS.starter,
     },
     {
+        tier: 'creator',
+        name: 'Creator',
+        tagline: 'For independent creators and freelancers',
+        priceMonthly: 15,
+        priceAnnual: 12, // ~20% discount
+        limits: PLAN_LIMITS.creator,
+        popular: true,
+    },
+    {
         tier: 'pro',
         name: 'Pro',
-        tagline: 'For professional creators and teams',
+        tagline: 'For professional teams and agencies',
         priceMonthly: 40,
         priceAnnual: 32, // ~20% discount
         limits: PLAN_LIMITS.pro,
-        popular: true,
     },
     {
         tier: 'enterprise',

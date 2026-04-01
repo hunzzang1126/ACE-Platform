@@ -10,6 +10,7 @@ import type { PlanTier } from '@/schema/planTypes';
 
 // Price ID mapping from environment
 const PRICE_IDS: Partial<Record<PlanTier, string>> = {
+    creator: import.meta.env.VITE_STRIPE_PRICE_CREATOR_MONTHLY as string,
     pro: import.meta.env.VITE_STRIPE_PRICE_PRO_MONTHLY as string,
     enterprise: import.meta.env.VITE_STRIPE_PRICE_ENTERPRISE_MONTHLY as string,
 };
