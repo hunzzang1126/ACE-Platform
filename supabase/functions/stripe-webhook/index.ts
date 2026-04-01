@@ -26,8 +26,15 @@ const supabase = createClient(
 
 // Map Stripe price IDs → plan tiers
 const PRICE_TO_PLAN: Record<string, string> = {
+    // Creator
+    [Deno.env.get('STRIPE_PRICE_CREATOR_MONTHLY') ?? '']: 'creator',
+    [Deno.env.get('STRIPE_PRICE_CREATOR_ANNUAL') ?? '']: 'creator',
+    // Pro
     [Deno.env.get('STRIPE_PRICE_PRO_MONTHLY') ?? '']: 'pro',
+    [Deno.env.get('STRIPE_PRICE_PRO_ANNUAL') ?? '']: 'pro',
+    // Enterprise
     [Deno.env.get('STRIPE_PRICE_ENTERPRISE_MONTHLY') ?? '']: 'enterprise',
+    [Deno.env.get('STRIPE_PRICE_ENTERPRISE_ANNUAL') ?? '']: 'enterprise',
 };
 
 serve(async (req) => {

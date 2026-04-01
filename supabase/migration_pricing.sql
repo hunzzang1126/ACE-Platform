@@ -9,7 +9,7 @@
 CREATE TABLE IF NOT EXISTS subscriptions (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    plan TEXT NOT NULL DEFAULT 'starter' CHECK (plan IN ('starter', 'pro', 'enterprise')),
+    plan TEXT NOT NULL DEFAULT 'starter' CHECK (plan IN ('starter', 'creator', 'pro', 'enterprise')),
     status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'canceled', 'past_due', 'trialing')),
     stripe_customer_id TEXT,
     stripe_subscription_id TEXT,
@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS organizations (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     name TEXT NOT NULL,
     owner_id UUID NOT NULL REFERENCES auth.users(id),
-    plan TEXT NOT NULL DEFAULT 'enterprise' CHECK (plan IN ('starter', 'pro', 'enterprise')),
+    plan TEXT NOT NULL DEFAULT 'enterprise' CHECK (plan IN ('starter', 'creator', 'pro', 'enterprise')),
     stripe_customer_id TEXT,
     brand_cloud JSONB DEFAULT '{}',
     max_seats INT DEFAULT 10,
