@@ -62,25 +62,40 @@ export function LandingPricing({ addRef }: { addRef: (el: HTMLDivElement | null)
                     onClick={() => navigate('/login')}
                     features={[
                         '3 Creative Sets',
-                        '10 AI Generations / month',
+                        '50 AI Generations / month',
                         'PNG Export',
                         'Community Support',
                     ]}
                 />
                 <PricingCard
-                    name="Pro"
-                    subtitle="For professional creators and teams"
-                    price="$40"
+                    name="Creator"
+                    subtitle="For independent creators and freelancers"
+                    price="$15"
                     priceSuffix="/month"
-                    cta="Start Free Trial"
+                    cta="Get Started"
                     onClick={() => navigate('/login')}
                     highlighted
                     badge="Most Popular"
                     features={[
+                        '10 Creative Sets',
+                        '200 AI Generations / month',
+                        'PNG, JPG Export (no watermark)',
+                        'Claude Sonnet AI model',
+                        'Email Support',
+                    ]}
+                />
+                <PricingCard
+                    name="Pro"
+                    subtitle="For professional teams and agencies"
+                    price="$50"
+                    priceSuffix="/month"
+                    cta="Start Free Trial"
+                    onClick={() => navigate('/login')}
+                    features={[
                         'Unlimited Creative Sets',
-                        '1,000 AI Generations / month',
+                        '500 AI Generations / month',
                         'PNG, JPG, HTML5 Export',
-                        'AI Vision QA',
+                        'Up to 3 team members',
                         'Priority Support',
                     ]}
                 />
