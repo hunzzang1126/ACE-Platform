@@ -1,18 +1,22 @@
 // ─────────────────────────────────────────────────
 // BentoGrid — Interactive feature grid for landing
 // ─────────────────────────────────────────────────
-// Frame.io-inspired bento layout with electric cyan
-// border glow on hover.
-// ─────────────────────────────────────────────────
 
 import { motion } from 'framer-motion';
+import { useLandingI18n } from './landingI18n';
+import type { TKey } from './landingI18n';
 
-const BENTO_ITEMS = [
+interface BentoItem {
+    span: 'wide' | 'normal';
+    labelKey: TKey;
+    titleKey: TKey;
+    descKey: TKey;
+    visual: React.ReactNode;
+}
+
+const BENTO_ITEMS: BentoItem[] = [
     {
-        span: 'wide',
-        label: 'Design Engine',
-        title: 'GPU-Accelerated Canvas',
-        desc: '60fps rendering engine for complex multi-layer compositions with real-time animations and effects.',
+        span: 'wide', labelKey: 'feat1Label', titleKey: 'feat1Title', descKey: 'feat1Desc',
         visual: (
             <svg width="100%" height="120" viewBox="0 0 400 120" fill="none">
                 <rect x="20" y="10" width="140" height="100" rx="8" fill="rgba(129,140,248,0.08)" stroke="rgba(129,140,248,0.2)" />
@@ -26,10 +30,7 @@ const BENTO_ITEMS = [
         ),
     },
     {
-        span: 'normal',
-        label: 'AI Agent',
-        title: 'Creative Co-Pilot',
-        desc: 'Generate layouts, swap colors, add elements through natural conversation.',
+        span: 'normal', labelKey: 'feat2Label', titleKey: 'feat2Title', descKey: 'feat2Desc',
         visual: (
             <svg width="100%" height="90" viewBox="0 0 200 90" fill="none">
                 <rect x="10" y="10" width="180" height="30" rx="6" fill="rgba(0,255,214,0.04)" stroke="rgba(0,255,214,0.1)" />
@@ -40,10 +41,7 @@ const BENTO_ITEMS = [
         ),
     },
     {
-        span: 'normal',
-        label: 'Animation',
-        title: 'Bring Creatives to Life',
-        desc: 'Timeline-based presets with custom easing. Export as video, GIF, or HTML5.',
+        span: 'normal', labelKey: 'feat3Label', titleKey: 'feat3Title', descKey: 'feat3Desc',
         visual: (
             <svg width="100%" height="90" viewBox="0 0 200 90" fill="none">
                 <rect x="10" y="50" width="180" height="4" rx="2" fill="rgba(255,255,255,0.06)" />
@@ -55,10 +53,7 @@ const BENTO_ITEMS = [
         ),
     },
     {
-        span: 'wide',
-        label: 'Export',
-        title: 'Production-Ready Output',
-        desc: 'PNG, JPG, HTML5, GIF, MP4, JS Bundle. Every format your campaign needs, in one click.',
+        span: 'wide', labelKey: 'feat4Label', titleKey: 'feat4Title', descKey: 'feat4Desc',
         visual: (
             <svg width="100%" height="100" viewBox="0 0 400 100" fill="none">
                 {[0, 1, 2, 3, 4].map(i => (
@@ -75,12 +70,13 @@ const BENTO_ITEMS = [
 ];
 
 export function BentoGrid() {
+    const { t } = useLandingI18n();
     return (
         <section id="features" className="bento-section">
             <div className="bento-header">
-                <span className="bento-label">Platform</span>
-                <h2 className="bento-title">Everything you need.<br />Nothing you don't.</h2>
-                <p className="bento-sub">A complete creative engine that replaces your entire tool stack.</p>
+                <span className="bento-label">{t('bentoLabel')}</span>
+                <h2 className="bento-title">{t('bentoTitle')}<br />{t('bentoTitle2')}</h2>
+                <p className="bento-sub">{t('bentoSub')}</p>
             </div>
             <div className="bento-grid">
                 {BENTO_ITEMS.map((item, i) => (
@@ -92,13 +88,12 @@ export function BentoGrid() {
                         viewport={{ once: true, amount: 0.2 }}
                         transition={{ delay: i * 0.1, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
                     >
-                        {/* Electric cyan glow border */}
                         <div className="bento-glow" />
                         <div className="bento-card-inner">
                             <div className="bento-visual">{item.visual}</div>
-                            <span className="bento-card-label">{item.label}</span>
-                            <h3 className="bento-card-title">{item.title}</h3>
-                            <p className="bento-card-desc">{item.desc}</p>
+                            <span className="bento-card-label">{t(item.labelKey)}</span>
+                            <h3 className="bento-card-title">{t(item.titleKey)}</h3>
+                            <p className="bento-card-desc">{t(item.descKey)}</p>
                         </div>
                     </motion.div>
                 ))}

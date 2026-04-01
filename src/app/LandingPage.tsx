@@ -16,6 +16,8 @@ import { BentoGrid } from '@/components/landing/BentoGrid';
 import { SmartSizingShowcase } from '@/components/landing/SmartSizingShowcase';
 import { LandingPricing } from './LandingPricing';
 import { setScrollVelocity } from '@/components/landing/SpiralVortex';
+import { LandingI18nProvider, useLandingI18n } from '@/components/landing/landingI18n';
+import { LangSelector } from '@/components/landing/LangSelector';
 import './landing.css';
 
 gsap.registerPlugin(ScrollTrigger);
@@ -31,10 +33,19 @@ const Arrow = () => (
 );
 
 export function LandingPage() {
+    return (
+        <LandingI18nProvider>
+            <LandingPageContent />
+        </LandingI18nProvider>
+    );
+}
+
+function LandingPageContent() {
     const navigate = useNavigate();
     const { isAuthenticated } = useAuthStore();
     const heroRef = useRef<HTMLDivElement>(null);
     const lpRef = useRef<HTMLDivElement>(null);
+    const { t } = useLandingI18n();
 
     useEffect(() => {
         if (isAuthenticated()) navigate('/dashboard', { replace: true });
@@ -98,13 +109,14 @@ export function LandingPage() {
                 <div className="lp-nav-inner">
                     <GlidLogo size={22} variant="white" className="lp-nav-logo" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} />
                     <div className="lp-nav-links">
-                        <button className="lp-nav-link" onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}>Features</button>
-                        <button className="lp-nav-link" onClick={() => document.getElementById('smart-sizing')?.scrollIntoView({ behavior: 'smooth' })}>Smart Sizing</button>
-                        <button className="lp-nav-link" onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}>Pricing</button>
+                        <button className="lp-nav-link" onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}>{t('navFeatures')}</button>
+                        <button className="lp-nav-link" onClick={() => document.getElementById('smart-sizing')?.scrollIntoView({ behavior: 'smooth' })}>{t('navSizing')}</button>
+                        <button className="lp-nav-link" onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}>{t('navPricing')}</button>
                     </div>
                     <div className="lp-nav-actions">
-                        <button className="lp-nav-link" onClick={() => navigate('/login')}>Sign In</button>
-                        <button className="lp-nav-cta" onClick={() => navigate('/login')}>Get Started Free</button>
+                        <LangSelector />
+                        <button className="lp-nav-link" onClick={() => navigate('/login')}>{t('navSignIn')}</button>
+                        <button className="lp-nav-cta" onClick={() => navigate('/login')}>{t('navCta')}</button>
                     </div>
                 </div>
             </motion.nav>
@@ -118,25 +130,24 @@ export function LandingPage() {
                 <motion.div className="lp-hero-content" style={{ y: heroY, opacity: heroOpacity }}>
                     <motion.div className="lp-hero-badge" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3, duration: 0.5 }}>
                         <span className="lp-hero-badge-dot" />
-                        AI-Native Creative Engine
+                        {t('heroBadge')}
                     </motion.div>
 
                     <motion.h1 className="lp-hero-title" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}>
-                        Create at the<br />
-                        <span className="lp-gradient-text">Speed of Thought</span>
+                        {t('heroTitle1')}<br />
+                        <span className="lp-gradient-text">{t('heroTitle2')}</span>
                     </motion.h1>
 
                     <motion.p className="lp-hero-sub" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7, duration: 0.7 }}>
-                        The creative engine for performance marketing teams.
-                        Design, animate, and deploy across every channel.
+                        {t('heroSub')}
                     </motion.p>
 
                     <motion.div className="lp-hero-actions" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.9, duration: 0.6 }}>
                         <button className="lp-btn-primary" onClick={() => navigate('/login')}>
-                            Get Started Free <Arrow />
+                            {t('heroBtn')} <Arrow />
                         </button>
                         <button className="lp-btn-ghost" onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}>
-                            Explore Features
+                            {t('heroBtn2')}
                         </button>
                     </motion.div>
                 </motion.div>
@@ -195,10 +206,10 @@ export function LandingPage() {
                 transition={{ duration: 0.8 }}
             >
                 <div className="lp-cta-glow" />
-                <h2 className="lp-cta-title">Ready to create?</h2>
-                <p className="lp-cta-sub">Start building production-ready creatives in minutes. No credit card required.</p>
+                <h2 className="lp-cta-title">{t('ctaTitle')}</h2>
+                <p className="lp-cta-sub">{t('ctaSub')}</p>
                 <motion.button className="lp-btn-primary lp-btn-lg" onClick={() => navigate('/login')} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.98 }}>
-                    Get Started Free <Arrow />
+                    {t('heroBtn')} <Arrow />
                 </motion.button>
             </motion.section>
 
@@ -211,14 +222,14 @@ export function LandingPage() {
                     </div>
                     <div className="lp-footer-cols">
                         <div className="lp-footer-col">
-                            <h4>Product</h4>
-                            <button onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}>Features</button>
-                            <button onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}>Pricing</button>
+                            <h4>{t('footerProduct')}</h4>
+                            <button onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}>{t('navFeatures')}</button>
+                            <button onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}>{t('navPricing')}</button>
                         </div>
                         <div className="lp-footer-col">
-                            <h4>Company</h4>
-                            <a href="mailto:hello@glid.ai">Contact</a>
-                            <a href="mailto:sales@glid.ai">Sales</a>
+                            <h4>{t('footerCompany')}</h4>
+                            <a href="mailto:hello@glid.ai">{t('footerContact')}</a>
+                            <a href="mailto:sales@glid.ai">{t('footerSales')}</a>
                         </div>
                     </div>
                 </div>

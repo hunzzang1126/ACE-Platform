@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────────
 
 import { useNavigate } from 'react-router-dom';
+import { useLandingI18n } from '@/components/landing/landingI18n';
 
 const CHECK = (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#818cf8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -46,12 +47,13 @@ function PricingCard({ name, subtitle, price, priceSuffix, features, cta, onClic
 
 export function LandingPricing({ addRef }: { addRef: (el: HTMLDivElement | null) => void }) {
     const navigate = useNavigate();
+    const { t } = useLandingI18n();
 
     return (
         <section id="pricing" className="lp-pricing fade-in-section" ref={addRef}>
-            <div className="lp-section-label">Pricing</div>
-            <h2 className="lp-section-title">Simple, Transparent Pricing</h2>
-            <p className="lp-section-sub">Start free. Scale when you are ready.</p>
+            <div className="lp-section-label">{t('navPricing')}</div>
+            <h2 className="lp-section-title">{t('pricingTitle')}</h2>
+            <p className="lp-section-sub">{t('pricingSub')}</p>
 
             <div className="lp-price-grid">
                 <PricingCard

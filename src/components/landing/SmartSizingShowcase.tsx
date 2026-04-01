@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useInView } from 'framer-motion';
+import { useLandingI18n } from './landingI18n';
 
 const AD_SIZES = [
     { w: 300, h: 250, label: '300x250' },
@@ -29,6 +30,7 @@ export function SmartSizingShowcase() {
     const ref = useRef<HTMLDivElement>(null);
     const isInView = useInView(ref, { once: true, amount: 0.4 });
     const [split, setSplit] = useState(false);
+    const { t } = useLandingI18n();
 
     useEffect(() => {
         if (isInView) {
@@ -40,9 +42,9 @@ export function SmartSizingShowcase() {
     return (
         <section className="sizing-section" ref={ref}>
             <div className="sizing-header">
-                <span className="bento-label">Smart Sizing</span>
-                <h2 className="bento-title">Design once.<br /><span style={{ color: '#00ffd6' }}>Deploy everywhere.</span></h2>
-                <p className="bento-sub">One master design auto-adapts to every ad format instantly.</p>
+                <span className="bento-label">{t('sizingLabel')}</span>
+                <h2 className="bento-title">{t('sizingTitle1')}<br /><span style={{ color: '#00ffd6' }}>{t('sizingTitle2')}</span></h2>
+                <p className="bento-sub">{t('sizingSub')}</p>
             </div>
 
             <div className="sizing-stage">
@@ -57,7 +59,7 @@ export function SmartSizingShowcase() {
                             transition={{ duration: 0.5 }}
                         >
                             <div className="sizing-master-inner">
-                                <div className="sizing-master-label">Master Design</div>
+                                <div className="sizing-master-label">{t('sizingMaster')}</div>
                                 <div className="sizing-master-visual">
                                     <div className="sizing-mock-headline" />
                                     <div className="sizing-mock-body" />
