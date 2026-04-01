@@ -214,6 +214,7 @@ export const useTemplateStore = create<TemplateState>()(
                         .sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0)),
                 };
                 const snapshot = JSON.stringify(cleanVariant);
+                console.log('[overrideTemplate] Saving override:', id, '| elements:', cleanVariant.elements.length, '| snapshot size:', snapshot.length);
                 // ★ Save locally first (immediate)
                 set(state => {
                     state.templateOverrides[id] = snapshot;
@@ -223,6 +224,9 @@ export const useTemplateStore = create<TemplateState>()(
                         if (width) tmpl.width = width;
                         if (height) tmpl.height = height;
                         tmpl.updatedAt = new Date().toISOString();
+                        console.log('[overrideTemplate] Updated template in store:', tmpl.name, '| new snapshot elements:', cleanVariant.elements.length);
+                    } else {
+                        console.warn('[overrideTemplate] Template NOT found in store:', id);
                     }
                     state.editingTemplateId = null;
                 });
@@ -233,7 +237,10 @@ export const useTemplateStore = create<TemplateState>()(
                         const userId = useAuthStore.getState().user?.id;
                         if (userId) {
                             const tmpl = get().templates.find(t => t.id === id);
-                            await upsertTemplateOverride(id, snapshot, userId, tmpl?.width, tmpl?.height);
+                            const result = await upsertTemplateOverride(id, snapshot, userId, tmpl?.width, tmpl?.height);
+                            if (result.error) {
+                                console.error('[overrideTemplate] Cloud save FAILED:', result.error);
+                            }
                         }
                     } catch (e) {
                         console.warn('[templateStore] Failed to push override to cloud:', e);
