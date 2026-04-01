@@ -179,6 +179,15 @@ function TemplatePreview({ template }: { template: DesignTemplate }) {
     let variant: BannerVariant | null = null;
     try {
         variant = JSON.parse(template.variantSnapshot);
+        // ★ DEBUG: log what data the preview is reading
+        if (template.id === 'builtin-bold-dark') {
+            console.log('[TemplatePreview] Rendering builtin-bold-dark | elements:', variant?.elements?.length, '| snapshot size:', template.variantSnapshot.length);
+            for (const el of variant?.elements ?? []) {
+                if (el.type === 'text') {
+                    console.log('[TemplatePreview] TEXT:', el.name, '| content:', (el as any).content?.substring(0, 30), '| fontFamily:', (el as any).fontFamily, '| fontSize:', (el as any).fontSize);
+                }
+            }
+        }
     } catch { /* noop */ }
 
     if (!variant) {

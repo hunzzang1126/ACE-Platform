@@ -215,6 +215,12 @@ export const useTemplateStore = create<TemplateState>()(
                 };
                 const snapshot = JSON.stringify(cleanVariant);
                 console.log('[overrideTemplate] Saving override:', id, '| elements:', cleanVariant.elements.length, '| snapshot size:', snapshot.length);
+                // ★ DEBUG: dump first text element to verify data
+                for (const el of cleanVariant.elements) {
+                    if (el.type === 'text') {
+                        console.log('[overrideTemplate] TEXT element:', el.name, '| content:', (el as any).content?.substring(0, 30), '| fontFamily:', (el as any).fontFamily, '| fontSize:', (el as any).fontSize, '| x:', el.constraints?.horizontal?.offset, '| y:', el.constraints?.vertical?.offset, '| w:', el.constraints?.size?.width, '| h:', el.constraints?.size?.height);
+                    }
+                }
                 // ★ Save locally first (immediate)
                 set(state => {
                     state.templateOverrides[id] = snapshot;
