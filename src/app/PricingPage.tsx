@@ -45,9 +45,9 @@ export default function PricingPage() {
             return;
         }
 
-        console.log('[pricing] Starting checkout for:', { tier, userId: user.id, email: user.email });
+        console.log('[pricing] Starting checkout for:', { tier, billing, userId: user.id, email: user.email });
         setLoading(true);
-        const { error } = await redirectToCheckout(tier, user.id, user.email ?? '');
+        const { error } = await redirectToCheckout(tier, user.id, user.email ?? '', billing);
         setLoading(false);
 
         if (error) {

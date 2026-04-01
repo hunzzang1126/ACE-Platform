@@ -8,12 +8,21 @@
 
 import type { PlanTier } from '@/schema/planTypes';
 
-// Price ID mapping from environment
-const PRICE_IDS: Partial<Record<PlanTier, string>> = {
+// Price ID mapping from environment — monthly
+const PRICE_IDS_MONTHLY: Partial<Record<PlanTier, string>> = {
     creator: import.meta.env.VITE_STRIPE_PRICE_CREATOR_MONTHLY as string,
     pro: import.meta.env.VITE_STRIPE_PRICE_PRO_MONTHLY as string,
     enterprise: import.meta.env.VITE_STRIPE_PRICE_ENTERPRISE_MONTHLY as string,
 };
+
+// Price ID mapping from environment — annual
+const PRICE_IDS_ANNUAL: Partial<Record<PlanTier, string>> = {
+    creator: import.meta.env.VITE_STRIPE_PRICE_CREATOR_ANNUAL as string,
+    pro: import.meta.env.VITE_STRIPE_PRICE_PRO_ANNUAL as string,
+    enterprise: import.meta.env.VITE_STRIPE_PRICE_ENTERPRISE_ANNUAL as string,
+};
+
+export type BillingInterval = 'monthly' | 'annual';
 
 const PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string;
 
@@ -46,8 +55,10 @@ export function isStripeConfigured(): boolean {
 /**
  * Get the Stripe Price ID for a given plan tier.
  */
-export function getPriceId(tier: PlanTier): string | undefined {
-    return PRICE_IDS[tier];
+export function getPriceId(tier: PlanTier, billing: BillingInterval = 'monthly'): string | undefined {
+    const map = billing === 'annual' ? PRICE_IDS_ANNUAL : PRICE_IDS_MONTHLY;
+    // Fallback to monthly if annual price not configured
+    return map[tier] || PRICE_IDS_MONTHLY[tier];
 }
 
 /**
@@ -59,11 +70,12 @@ export async function redirectToCheckout(
     tier: PlanTier,
     userId: string,
     email: string,
+    billing: BillingInterval = 'monthly',
     quantity = 1,
 ): Promise<{ error: string | null }> {
-    const priceId = PRICE_IDS[tier];
+    const priceId = getPriceId(tier, billing);
     if (!priceId) {
-        return { error: `No price configured for ${tier} plan` };
+        return { error: `No price configured for ${tier} ${billing} plan` };
     }
 
     if (!PUBLISHABLE_KEY) {
