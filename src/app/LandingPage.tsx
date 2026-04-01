@@ -16,6 +16,7 @@ import { BentoGrid } from '@/components/landing/BentoGrid';
 import { SmartSizingShowcase } from '@/components/landing/SmartSizingShowcase';
 import { LandingPricing } from './LandingPricing';
 import { setScrollVelocity } from '@/components/landing/SpiralVortex';
+import { OrbitalAccent } from '@/components/landing/SpiralVortex';
 import { LandingI18nProvider, useLandingI18n } from '@/components/landing/landingI18n';
 import { LangSelector } from '@/components/landing/LangSelector';
 import './landing.css';
@@ -196,6 +197,11 @@ function LandingPageContent() {
 
             {/* ── Pricing ── */}
             <LandingPricing addRef={() => {}} />
+
+            {/* ── Orbital Accent (mid-page visual continuity) ── */}
+            <Suspense fallback={null}>
+                <OrbitalAccent />
+            </Suspense>
 
             {/* ── CTA ── */}
             <motion.section

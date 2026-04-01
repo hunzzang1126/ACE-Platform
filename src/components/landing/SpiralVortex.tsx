@@ -1,8 +1,8 @@
 // ─────────────────────────────────────────────────
-// SpiralVortex — Interactive WebGL background
+// SpiralVortex — Orbital Arcs Background (WebGL)
 // ─────────────────────────────────────────────────
-// React Three Fiber + custom GLSL shader.
-// Dark-toned spiral vortex that responds to mouse + scroll velocity.
+// Large glowing orbital circles inspired by Frame.io / Apple style.
+// Slow, elegant mouse parallax. Responds to scroll velocity.
 // ─────────────────────────────────────────────────
 
 import { useRef, useMemo, useCallback, useEffect } from 'react';
@@ -30,90 +30,105 @@ const fragmentShader = /* glsl */ `
   uniform vec2 uMouse;
   uniform vec2 uResolution;
   uniform float uScrollVelocity;
+  uniform float uVariant; // 0.0 = hero, 1.0 = mid-page
 
   varying vec2 vUv;
 
-  // Simplex-ish noise
-  vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
-  vec2 mod289(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
-  vec3 permute(vec3 x) { return mod289(((x * 34.0) + 1.0) * x); }
-
-  float snoise(vec2 v) {
-    const vec4 C = vec4(0.211324865405187, 0.366025403784439,
-                       -0.577350269189626, 0.024390243902439);
-    vec2 i  = floor(v + dot(v, C.yy));
-    vec2 x0 = v - i + dot(i, C.xx);
-    vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
-    vec4 x12 = x0.xyxy + C.xxzz;
-    x12.xy -= i1;
-    i = mod289(i);
-    vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0))
-           + i.x + vec3(0.0, i1.x, 1.0));
-    vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy),
-                            dot(x12.zw,x12.zw)), 0.0);
-    m = m * m; m = m * m;
-    vec3 x = 2.0 * fract(p * C.www) - 1.0;
-    vec3 h = abs(x) - 0.5;
-    vec3 ox = floor(x + 0.5);
-    vec3 a0 = x - ox;
-    m *= 1.79284291400159 - 0.85373472095314 * (a0*a0 + h*h);
-    vec3 g;
-    g.x = a0.x * x0.x + h.x * x0.y;
-    g.yz = a0.yz * x12.xz + h.yz * x12.yw;
-    return 130.0 * dot(m, g);
+  // Draw a single glowing arc (partial circle)
+  float arc(vec2 p, vec2 center, float radius, float thickness, float glow) {
+    float d = abs(length(p - center) - radius);
+    float core = smoothstep(thickness, 0.0, d);
+    float halo = exp(-d * glow);
+    return core * 0.6 + halo * 0.4;
   }
 
   void main() {
     vec2 uv = vUv;
-    vec2 center = vec2(0.5) + uMouse * 0.05;
-    vec2 p = uv - center;
-
     float aspect = uResolution.x / uResolution.y;
+    vec2 p = uv - 0.5;
     p.x *= aspect;
 
-    float r = length(p);
-    float a = atan(p.y, p.x);
+    // Slow mouse influence
+    vec2 mouse = uMouse * 0.02;
+    float t = uTime * 0.15;
+    float scrollBoost = clamp(uScrollVelocity, 0.0, 2.0);
 
-    // Scroll velocity accelerates rotation (clamped 0..3)
-    float scrollBoost = clamp(uScrollVelocity, 0.0, 3.0);
-    float mouseInfluence = length(uMouse) * 0.3;
-    float baseSpeed = 0.4 + mouseInfluence * 0.15 + scrollBoost * 0.6;
-    float spiral = a + r * 6.0 - uTime * baseSpeed;
-    float twist = sin(spiral) * 0.5 + 0.5;
+    // Dark base
+    vec3 color = vec3(0.024, 0.031, 0.059);
 
-    // Layered noise — scroll velocity adds turbulence
-    float turbulence = 1.0 + scrollBoost * 0.3;
-    float n1 = snoise(vec2(spiral * 0.5, r * 3.0 - uTime * 0.1 * turbulence));
-    float n2 = snoise(vec2(a * 2.0 + uTime * 0.05, r * 5.0));
-    float n3 = snoise(vec2(p * 4.0 + uTime * 0.08 * turbulence));
+    // ── Define orbital arcs ──
+    // Each arc: center offset, radius, thickness, glow, color, rotation speed
 
-    float pattern = twist * 0.6 + n1 * 0.25 + n2 * 0.1 + n3 * 0.05;
+    // Variant shifts the composition
+    float vShift = uVariant * 0.3;
 
-    // Radial falloff
-    float falloff = smoothstep(0.9, 0.1, r);
-    pattern *= falloff;
+    // Arc 1 — Large outer arc (teal-blue)
+    {
+      float r = 0.65 + vShift * 0.1;
+      vec2 c = vec2(0.05 + mouse.x, -0.15 - vShift + mouse.y);
+      float angle = t * 0.3 + scrollBoost * 0.1;
+      c += vec2(cos(angle), sin(angle)) * 0.02;
+      float a = arc(p, c, r, 0.003, 6.0);
+      // Mask to show ~70% of the circle
+      float maskAngle = atan(p.y - c.y, p.x - c.x) + angle * 0.5;
+      a *= smoothstep(-0.3, 0.5, sin(maskAngle * 0.5 + 0.5));
+      color += vec3(0.08, 0.25, 0.45) * a * 1.2;
+    }
 
-    // Color palette — scroll adds slight brightness
-    float brightBoost = scrollBoost * 0.04;
-    vec3 col1 = vec3(0.08, 0.06, 0.18) + brightBoost;
-    vec3 col2 = vec3(0.15, 0.10, 0.30) + brightBoost;
-    vec3 col3 = vec3(0.30, 0.20, 0.50);
-    vec3 col4 = vec3(0.05, 0.04, 0.10);
+    // Arc 2 — Mid arc (indigo-purple)
+    {
+      float r = 0.48 + vShift * 0.08;
+      vec2 c = vec2(-0.02 + mouse.x * 0.8, -0.08 - vShift * 0.8 + mouse.y * 0.8);
+      float angle = t * 0.25 + 1.0;
+      c += vec2(cos(angle + 1.0), sin(angle + 1.0)) * 0.015;
+      float a = arc(p, c, r, 0.004, 8.0);
+      float maskAngle = atan(p.y - c.y, p.x - c.x) + angle * 0.4;
+      a *= smoothstep(-0.2, 0.6, sin(maskAngle * 0.5 + 1.2));
+      color += vec3(0.18, 0.12, 0.40) * a * 1.1;
+    }
 
-    vec3 color = mix(col4, col1, pattern);
-    color = mix(color, col2, smoothstep(0.3, 0.7, pattern));
-    color = mix(color, col3, smoothstep(0.65, 0.95, pattern) * 0.4);
+    // Arc 3 — Inner arc (cyan shimmer)
+    {
+      float r = 0.32 + vShift * 0.06;
+      vec2 c = vec2(0.08 + mouse.x * 0.6, -0.05 - vShift * 0.6 + mouse.y * 0.6);
+      float angle = t * 0.35 + 2.0 + scrollBoost * 0.15;
+      c += vec2(cos(angle + 2.5), sin(angle + 2.5)) * 0.01;
+      float a = arc(p, c, r, 0.003, 10.0);
+      float maskAngle = atan(p.y - c.y, p.x - c.x) + angle * 0.3;
+      a *= smoothstep(-0.4, 0.5, sin(maskAngle * 0.5 + 2.0));
+      color += vec3(0.10, 0.30, 0.42) * a * 0.9;
+    }
 
-    // Center glow
-    float glow = exp(-r * 3.0) * (0.15 + scrollBoost * 0.05);
-    color += vec3(0.25, 0.15, 0.45) * glow;
+    // Arc 4 — Subtle accent (pale violet)
+    {
+      float r = 0.55 + vShift * 0.12;
+      vec2 c = vec2(-0.1 + mouse.x * 0.5, 0.05 - vShift * 0.5 + mouse.y * 0.5);
+      float angle = t * 0.2 + 3.5;
+      c += vec2(cos(angle + 4.0), sin(angle + 4.0)) * 0.018;
+      float a = arc(p, c, r, 0.002, 5.0);
+      float maskAngle = atan(p.y - c.y, p.x - c.x) + angle * 0.6;
+      a *= smoothstep(-0.1, 0.7, sin(maskAngle * 0.5 + 3.0));
+      color += vec3(0.15, 0.10, 0.35) * a * 0.7;
+    }
 
-    // Mouse proximity highlight
-    vec2 mp = uv - (vec2(0.5) + uMouse * 0.5);
-    mp.x *= aspect;
-    float mouseDist = length(mp);
-    float mouseGlow = exp(-mouseDist * 4.0) * 0.06;
-    color += vec3(0.3, 0.2, 0.5) * mouseGlow;
+    // Arc 5 — Tiny inner glow ring
+    {
+      float r = 0.18 + vShift * 0.04;
+      vec2 c = vec2(0.03 + mouse.x * 0.4, 0.0 - vShift * 0.4 + mouse.y * 0.4);
+      float angle = t * 0.4 + 5.0;
+      c += vec2(cos(angle), sin(angle)) * 0.008;
+      float a = arc(p, c, r, 0.002, 12.0);
+      color += vec3(0.12, 0.22, 0.38) * a * 0.6;
+    }
+
+    // Center ambient glow
+    float centerDist = length(p - vec2(mouse.x * 0.1, -0.1 - vShift * 0.5 + mouse.y * 0.1));
+    float ambientGlow = exp(-centerDist * 2.5) * 0.12;
+    color += vec3(0.20, 0.12, 0.35) * ambientGlow;
+
+    // Subtle vignette
+    float vignette = 1.0 - smoothstep(0.4, 1.0, length(p) * 0.9);
+    color *= 0.6 + vignette * 0.4;
 
     gl_FragColor = vec4(color, 1.0);
   }
@@ -121,7 +136,11 @@ const fragmentShader = /* glsl */ `
 
 // ── Fullscreen Shader Mesh ──
 
-function VortexMesh() {
+interface VortexMeshProps {
+    variant?: number; // 0 = hero, 1 = mid-page
+}
+
+function VortexMesh({ variant = 0 }: VortexMeshProps) {
     const meshRef = useRef<THREE.Mesh>(null);
     const mouseRef = useRef({ x: 0, y: 0 });
     const scrollVelSmooth = useRef(0);
@@ -132,24 +151,27 @@ function VortexMesh() {
         uMouse: { value: new THREE.Vector2(0, 0) },
         uResolution: { value: new THREE.Vector2(size.width, size.height) },
         uScrollVelocity: { value: 0 },
+        uVariant: { value: variant },
     }), []);
 
     useFrame(({ clock }) => {
         const mat = meshRef.current?.material as THREE.ShaderMaterial | undefined;
-        if (!mat?.uniforms?.uTime || !mat.uniforms.uMouse || !mat.uniforms.uResolution) return;
+        if (!mat?.uniforms) return;
+        const u = mat.uniforms;
+        if (!u.uTime || !u.uResolution || !u.uScrollVelocity || !u.uMouse) return;
 
-        mat.uniforms.uTime.value = clock.getElapsedTime();
-        mat.uniforms.uResolution.value.set(size.width, size.height);
+        u.uTime.value = clock.getElapsedTime();
+        u.uResolution.value.set(size.width, size.height);
 
         // Smooth scroll velocity
-        scrollVelSmooth.current += (_scrollVelocity - scrollVelSmooth.current) * 0.08;
-        mat.uniforms.uScrollVelocity.value = scrollVelSmooth.current;
+        scrollVelSmooth.current += (_scrollVelocity - scrollVelSmooth.current) * 0.05;
+        u.uScrollVelocity.value = scrollVelSmooth.current;
 
-        // Lerp mouse
+        // Very slow mouse lerp — elegant, not jittery
         const target = mouseRef.current;
-        const current = mat.uniforms.uMouse.value;
-        current.x += (target.x - current.x) * 0.03;
-        current.y += (target.y - current.y) * 0.03;
+        const current = u.uMouse.value;
+        current.x += (target.x - current.x) * 0.015;
+        current.y += (target.y - current.y) * 0.015;
     });
 
     const handleMouseMove = useCallback((e: MouseEvent) => {
@@ -175,8 +197,9 @@ function VortexMesh() {
     );
 }
 
-// ── Exported Component ──
+// ── Exported Components ──
 
+/** Hero background — orbital arcs centered above hero text */
 export function SpiralVortex() {
     return (
         <div style={{
@@ -195,7 +218,35 @@ export function SpiralVortex() {
                 dpr={Math.min(window.devicePixelRatio, 1.5)}
                 camera={{ position: [0, 0, 1] }}
             >
-                <VortexMesh />
+                <VortexMesh variant={0} />
+            </Canvas>
+        </div>
+    );
+}
+
+/** Mid-page orbital accent — placed between sections for visual continuity */
+export function OrbitalAccent() {
+    return (
+        <div style={{
+            position: 'relative',
+            width: '100%',
+            height: '500px',
+            marginTop: '-100px',
+            marginBottom: '-100px',
+            zIndex: 0,
+            pointerEvents: 'none',
+        }}>
+            <Canvas
+                style={{ width: '100%', height: '100%' }}
+                gl={{
+                    antialias: false,
+                    alpha: true,
+                    powerPreference: 'high-performance',
+                }}
+                dpr={Math.min(window.devicePixelRatio, 1.5)}
+                camera={{ position: [0, 0, 1] }}
+            >
+                <VortexMesh variant={1} />
             </Canvas>
         </div>
     );
