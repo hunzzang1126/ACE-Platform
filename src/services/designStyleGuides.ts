@@ -150,6 +150,13 @@ RULES:
    - When the prompt has NO physical/visual subject → NO
    
    If YES, write a short Imagen prompt describing the ideal background.
+   CRITICAL FOR PEOPLE: If the user mentions PEOPLE or PROFESSIONS (doctor, dentist, nurse, model, athlete, chef, etc.),
+   the backgroundImagePrompt MUST include specific human descriptions:
+   GOOD: "professional female dentist smiling confidently, wearing white coat and gloves, modern dental office background"
+   GOOD: "athletic male basketball player mid-jump, dramatic arena lighting, crowd in background"
+   BAD: "dental clinic interior" (too vague — user asked for a person, not just a place)
+   BAD: "basketball court" (missing the person entirely)
+   Always describe the person's appearance, pose, clothing, and the environment.
 7. Return ONLY the JSON object, nothing else.`;
 
 interface AiColorResponse {

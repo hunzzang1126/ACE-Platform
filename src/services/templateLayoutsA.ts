@@ -39,11 +39,11 @@ export const centeredStack: DesignTemplate = {
         let y = startY;
         return [
             { type: 'rect', name: 'background', x: 0, y: 0, w: W, h: H, gradient_start_hex: g.colors.gradientStart, gradient_end_hex: g.colors.gradientEnd, gradient_angle: g.colors.gradientAngle },
-            { type: 'text', name: 'tag_text', x: pad, y, w: W - 2 * pad, h: tagFs + 4, content: c.tag.toUpperCase(), font_size: tagFs, font_weight: '600', color_hex: g.colors.accent, text_align: 'center', letter_spacing: 3 },
-            (y += tagFs + 10, { type: 'text', name: 'headline', x: pad, y, w: W - 2 * pad, h: headFs * 2.2, content: c.headline, font_size: headFs, font_weight: '800', color_hex: g.colors.foreground, text_align: 'center', letter_spacing: -0.5, line_height: 1.1 }),
-            (y += headFs * 2 + 8, { type: 'text', name: 'subheadline', x: pad, y, w: W - 2 * pad, h: subFs * 2.5, content: c.subheadline, font_size: subFs, font_weight: '400', color_hex: g.colors.secondary, text_align: 'center', line_height: 1.45 }),
+            { type: 'text', name: 'tag_text', x: pad, y, w: W - 2 * pad, h: tagFs + 4, content: c.tag.toUpperCase(), font_size: tagFs, font_family: g.typography.primaryFont, font_weight: '600', color_hex: g.colors.accent, text_align: 'center', letter_spacing: 3 },
+            (y += tagFs + 10, { type: 'text', name: 'headline', x: pad, y, w: W - 2 * pad, h: headFs * 2.2, content: c.headline, font_size: headFs, font_family: g.typography.primaryFont, font_weight: '800', color_hex: g.colors.foreground, text_align: 'center', letter_spacing: -0.5, line_height: 1.1 }),
+            (y += headFs * 2 + 8, { type: 'text', name: 'subheadline', x: pad, y, w: W - 2 * pad, h: subFs * 2.5, content: c.subheadline, font_size: subFs, font_family: g.typography.secondaryFont, font_weight: '400', color_hex: g.colors.secondary, text_align: 'center', line_height: 1.45 }),
             (y += subFs * 2 + 16, { type: 'rounded_rect', name: 'cta_button', x: Math.round((W - ctaW) / 2), y, w: ctaW, h: ctaH, r: ar, g: ag, b: ab, a: 1.0, radius: g.radius }),
-            { type: 'text', name: 'cta_label', x: Math.round((W - ctaW) / 2), y: y + Math.round((ctaH - ctaFs) / 2), w: ctaW, h: ctaFs + 4, content: c.cta.toUpperCase(), font_size: ctaFs, font_weight: '700', color_hex: g.colors.accentForeground, text_align: 'center', letter_spacing: 1.5 },
+            { type: 'text', name: 'cta_label', x: Math.round((W - ctaW) / 2), y: y + Math.round((ctaH - ctaFs) / 2), w: ctaW, h: ctaFs + 4, content: c.cta.toUpperCase(), font_size: ctaFs, font_family: g.typography.primaryFont, font_weight: '700', color_hex: g.colors.accentForeground, text_align: 'center', letter_spacing: 1.5 },
             { type: 'rect', name: 'bottom_accent', x: Math.round(W * 0.35), y: H - 3, w: Math.round(W * 0.3), h: 3, r: ar, g: ag, b: ab, a: 0.3 },
         ];
     },
@@ -69,11 +69,11 @@ export const leftAlignedCard: DesignTemplate = {
             { type: 'rect', name: 'background', x: 0, y: 0, w: W, h: H, gradient_start_hex: g.colors.gradientStart, gradient_end_hex: g.colors.gradientEnd, gradient_angle: g.colors.gradientAngle },
             { type: 'rect', name: 'accent_zone', x: 0, y: 0, w: W, h: azH, r: hex(g.colors.surface)[0], g: hex(g.colors.surface)[1], b: hex(g.colors.surface)[2], a: 0.4 },
             { type: 'rect', name: 'accent_line', x: pad, y: azH, w: Math.round(W * 0.13), h: 2, r: ar, g: ag, b: ab, a: 1.0 },
-            { type: 'text', name: 'tag_text', x: pad, y, w: W - 2 * pad, h: tagFs + 4, content: c.tag.toUpperCase(), font_size: tagFs, font_weight: '600', color_hex: g.colors.accent, text_align: 'left', letter_spacing: 3 },
-            (y = azH + 8, { type: 'text', name: 'headline', x: pad, y, w: W - 2 * pad, h: headFs * 2.2, content: c.headline, font_size: headFs, font_weight: '800', color_hex: g.colors.foreground, text_align: 'left', letter_spacing: -0.5, line_height: 1.1 }),
-            (y += headFs * 2 + 6, { type: 'text', name: 'subheadline', x: pad, y, w: Math.round(W * 0.82), h: subFs * 2.5, content: c.subheadline, font_size: subFs, font_weight: '400', color_hex: g.colors.secondary, text_align: 'left', line_height: 1.45 }),
+            { type: 'text', name: 'tag_text', x: pad, y, w: W - 2 * pad, h: tagFs + 4, content: c.tag.toUpperCase(), font_size: tagFs, font_family: g.typography.primaryFont, font_weight: '600', color_hex: g.colors.accent, text_align: 'left', letter_spacing: 3 },
+            (y = azH + 8, { type: 'text', name: 'headline', x: pad, y, w: W - 2 * pad, h: headFs * 2.2, content: c.headline, font_size: headFs, font_family: g.typography.primaryFont, font_weight: '800', color_hex: g.colors.foreground, text_align: 'left', letter_spacing: -0.5, line_height: 1.1 }),
+            (y += headFs * 2 + 6, { type: 'text', name: 'subheadline', x: pad, y, w: Math.round(W * 0.82), h: subFs * 2.5, content: c.subheadline, font_size: subFs, font_family: g.typography.secondaryFont, font_weight: '400', color_hex: g.colors.secondary, text_align: 'left', line_height: 1.45 }),
             { type: 'rounded_rect', name: 'cta_button', x: pad, y: H - pad - ctaH, w: ctaW, h: ctaH, r: ar, g: ag, b: ab, a: 1.0, radius: g.radius, shadow_offset_x: 2, shadow_offset_y: 4, shadow_blur: 10, shadow_opacity: 0.25 },
-            { type: 'text', name: 'cta_label', x: pad, y: H - pad - ctaH + Math.round((ctaH - ctaFs) / 2), w: ctaW, h: ctaFs + 4, content: c.cta.toUpperCase(), font_size: ctaFs, font_weight: '700', color_hex: g.colors.accentForeground, text_align: 'center', letter_spacing: 1.5 },
+            { type: 'text', name: 'cta_label', x: pad, y: H - pad - ctaH + Math.round((ctaH - ctaFs) / 2), w: ctaW, h: ctaFs + 4, content: c.cta.toUpperCase(), font_size: ctaFs, font_family: g.typography.primaryFont, font_weight: '700', color_hex: g.colors.accentForeground, text_align: 'center', letter_spacing: 1.5 },
             { type: 'rect', name: 'bottom_border', x: 0, y: H - 3, w: W, h: 3, r: ar, g: ag, b: ab, a: 0.25 },
         ];
     },
@@ -96,11 +96,11 @@ export const boldHeadline: DesignTemplate = {
         return [
             { type: 'rect', name: 'background', x: 0, y: 0, w: W, h: H, gradient_start_hex: g.colors.gradientStart, gradient_end_hex: g.colors.gradientEnd, gradient_angle: 180 },
             { type: 'rect', name: 'accent_block', x: 0, y: Math.round(H * 0.25), w: W, h: Math.round(H * 0.45), r: ar, g: ag, b: ab, a: 0.04 },
-            { type: 'text', name: 'tag_text', x: pad, y: pad, w: W - 2 * pad, h: tagFs + 4, content: c.tag.toUpperCase(), font_size: tagFs, font_weight: '600', color_hex: g.colors.accent, text_align: 'left', letter_spacing: 4 },
-            { type: 'text', name: 'headline', x: pad, y: Math.round(H * 0.25), w: W - 2 * pad, h: headFs * 2.5, content: c.headline, font_size: headFs, font_weight: '900', color_hex: g.colors.foreground, text_align: 'left', letter_spacing: -1.5, line_height: 0.95 },
-            { type: 'text', name: 'subheadline', x: pad, y: Math.round(H * 0.65), w: Math.round(W * 0.7), h: subFs * 2, content: c.subheadline, font_size: subFs, font_weight: '400', color_hex: g.colors.secondary, text_align: 'left', line_height: 1.4 },
+            { type: 'text', name: 'tag_text', x: pad, y: pad, w: W - 2 * pad, h: tagFs + 4, content: c.tag.toUpperCase(), font_size: tagFs, font_family: g.typography.primaryFont, font_weight: '600', color_hex: g.colors.accent, text_align: 'left', letter_spacing: 4 },
+            { type: 'text', name: 'headline', x: pad, y: Math.round(H * 0.25), w: W - 2 * pad, h: headFs * 2.5, content: c.headline, font_size: headFs, font_family: g.typography.primaryFont, font_weight: '900', color_hex: g.colors.foreground, text_align: 'left', letter_spacing: -1.5, line_height: 0.95 },
+            { type: 'text', name: 'subheadline', x: pad, y: Math.round(H * 0.65), w: Math.round(W * 0.7), h: subFs * 2, content: c.subheadline, font_size: subFs, font_family: g.typography.secondaryFont, font_weight: '400', color_hex: g.colors.secondary, text_align: 'left', line_height: 1.4 },
             { type: 'rounded_rect', name: 'cta_button', x: pad, y: Math.round(H * 0.82), w: ctaW, h: ctaH, r: ar, g: ag, b: ab, a: 1.0, radius: 0 },
-            { type: 'text', name: 'cta_label', x: pad, y: Math.round(H * 0.82) + Math.round((ctaH - ctaFs) / 2), w: ctaW, h: ctaFs + 4, content: c.cta.toUpperCase(), font_size: ctaFs, font_weight: '700', color_hex: g.colors.accentForeground, text_align: 'center', letter_spacing: 2 },
+            { type: 'text', name: 'cta_label', x: pad, y: Math.round(H * 0.82) + Math.round((ctaH - ctaFs) / 2), w: ctaW, h: ctaFs + 4, content: c.cta.toUpperCase(), font_size: ctaFs, font_family: g.typography.primaryFont, font_weight: '700', color_hex: g.colors.accentForeground, text_align: 'center', letter_spacing: 2 },
         ];
     },
 };
@@ -123,12 +123,12 @@ export const splitHorizontal: DesignTemplate = {
         return [
             { type: 'rect', name: 'background', x: 0, y: 0, w: W, h: H, gradient_start_hex: g.colors.gradientStart, gradient_end_hex: g.colors.gradientEnd, gradient_angle: 90 },
             { type: 'rect', name: 'image_zone', x: 0, y: 0, w: splitX, h: H, r: ar, g: ag, b: ab, a: 0.08 },
-            { type: 'text', name: 'zone_label', x: Math.round(splitX * 0.15), y: Math.round(H * 0.4), w: Math.round(splitX * 0.7), h: 20, content: 'PRODUCT IMAGE', font_size: Math.max(9, Math.round(splitX * 0.06)), font_weight: '500', color_hex: g.colors.muted, text_align: 'center', letter_spacing: 3 },
-            { type: 'text', name: 'tag_text', x: splitX + rp, y: Math.round(H * 0.12), w: W - splitX - 2 * rp, h: tagFs + 4, content: c.tag.toUpperCase(), font_size: tagFs, font_weight: '600', color_hex: g.colors.accent, text_align: 'left', letter_spacing: 3 },
-            { type: 'text', name: 'headline', x: splitX + rp, y: Math.round(H * 0.24), w: W - splitX - 2 * rp, h: headFs * 2.5, content: c.headline, font_size: headFs, font_weight: '800', color_hex: g.colors.foreground, text_align: 'left', letter_spacing: -0.5, line_height: 1.1 },
-            { type: 'text', name: 'subheadline', x: splitX + rp, y: Math.round(H * 0.52), w: W - splitX - 2 * rp, h: subFs * 3, content: c.subheadline, font_size: subFs, font_weight: '400', color_hex: g.colors.secondary, text_align: 'left', line_height: 1.4 },
+            { type: 'text', name: 'zone_label', x: Math.round(splitX * 0.15), y: Math.round(H * 0.4), w: Math.round(splitX * 0.7), h: 20, content: 'PRODUCT IMAGE', font_size: Math.max(9, Math.round(splitX * 0.06)), font_family: g.typography.secondaryFont, font_weight: '500', color_hex: g.colors.muted, text_align: 'center', letter_spacing: 3 },
+            { type: 'text', name: 'tag_text', x: splitX + rp, y: Math.round(H * 0.12), w: W - splitX - 2 * rp, h: tagFs + 4, content: c.tag.toUpperCase(), font_size: tagFs, font_family: g.typography.primaryFont, font_weight: '600', color_hex: g.colors.accent, text_align: 'left', letter_spacing: 3 },
+            { type: 'text', name: 'headline', x: splitX + rp, y: Math.round(H * 0.24), w: W - splitX - 2 * rp, h: headFs * 2.5, content: c.headline, font_size: headFs, font_family: g.typography.primaryFont, font_weight: '800', color_hex: g.colors.foreground, text_align: 'left', letter_spacing: -0.5, line_height: 1.1 },
+            { type: 'text', name: 'subheadline', x: splitX + rp, y: Math.round(H * 0.52), w: W - splitX - 2 * rp, h: subFs * 3, content: c.subheadline, font_size: subFs, font_family: g.typography.secondaryFont, font_weight: '400', color_hex: g.colors.secondary, text_align: 'left', line_height: 1.4 },
             { type: 'rounded_rect', name: 'cta_button', x: splitX + rp, y: Math.round(H * 0.78), w: ctaW, h: ctaH, r: ar, g: ag, b: ab, a: 1.0, radius: g.radius },
-            { type: 'text', name: 'cta_label', x: splitX + rp, y: Math.round(H * 0.78) + Math.round((ctaH - ctaFs) / 2), w: ctaW, h: ctaFs + 4, content: c.cta.toUpperCase(), font_size: ctaFs, font_weight: '700', color_hex: g.colors.accentForeground, text_align: 'center', letter_spacing: 1 },
+            { type: 'text', name: 'cta_label', x: splitX + rp, y: Math.round(H * 0.78) + Math.round((ctaH - ctaFs) / 2), w: ctaW, h: ctaFs + 4, content: c.cta.toUpperCase(), font_size: ctaFs, font_family: g.typography.primaryFont, font_weight: '700', color_hex: g.colors.accentForeground, text_align: 'center', letter_spacing: 1 },
             { type: 'rect', name: 'divider', x: splitX, y: Math.round(H * 0.1), w: 1, h: Math.round(H * 0.8), r: ar, g: ag, b: ab, a: 0.15 },
         ];
     },
@@ -152,11 +152,11 @@ export const diagonalSplit: DesignTemplate = {
             { type: 'rect', name: 'background', x: 0, y: 0, w: W, h: H, gradient_start_hex: g.colors.gradientStart, gradient_end_hex: g.colors.gradientEnd, gradient_angle: 135 },
             { type: 'rect', name: 'diagonal_accent', x: Math.round(W * 0.5), y: -Math.round(H * 0.2), w: Math.round(W * 0.7), h: Math.round(H * 1.4), r: ar, g: ag, b: ab, a: 0.04 },
             { type: 'rect', name: 'top_accent', x: 0, y: 0, w: Math.round(W * 0.25), h: 3, r: ar, g: ag, b: ab, a: 1.0 },
-            { type: 'text', name: 'tag_text', x: pad, y: Math.round(H * 0.1), w: W - 2 * pad, h: tagFs + 4, content: c.tag.toUpperCase(), font_size: tagFs, font_weight: '600', color_hex: g.colors.accent, text_align: 'left', letter_spacing: 4 },
-            { type: 'text', name: 'headline', x: pad, y: Math.round(H * 0.22), w: Math.round(W * 0.65), h: headFs * 2.5, content: c.headline, font_size: headFs, font_weight: '800', color_hex: g.colors.foreground, text_align: 'left', letter_spacing: -0.5, line_height: 1.05 },
-            { type: 'text', name: 'subheadline', x: pad, y: Math.round(H * 0.58), w: Math.round(W * 0.55), h: subFs * 2.5, content: c.subheadline, font_size: subFs, font_weight: '400', color_hex: g.colors.secondary, text_align: 'left', line_height: 1.4 },
+            { type: 'text', name: 'tag_text', x: pad, y: Math.round(H * 0.1), w: W - 2 * pad, h: tagFs + 4, content: c.tag.toUpperCase(), font_size: tagFs, font_family: g.typography.primaryFont, font_weight: '600', color_hex: g.colors.accent, text_align: 'left', letter_spacing: 4 },
+            { type: 'text', name: 'headline', x: pad, y: Math.round(H * 0.22), w: Math.round(W * 0.65), h: headFs * 2.5, content: c.headline, font_size: headFs, font_family: g.typography.primaryFont, font_weight: '800', color_hex: g.colors.foreground, text_align: 'left', letter_spacing: -0.5, line_height: 1.05 },
+            { type: 'text', name: 'subheadline', x: pad, y: Math.round(H * 0.58), w: Math.round(W * 0.55), h: subFs * 2.5, content: c.subheadline, font_size: subFs, font_family: g.typography.secondaryFont, font_weight: '400', color_hex: g.colors.secondary, text_align: 'left', line_height: 1.4 },
             { type: 'rounded_rect', name: 'cta_button', x: pad, y: Math.round(H * 0.8), w: ctaW, h: ctaH, r: ar, g: ag, b: ab, a: 1.0, radius: g.radius },
-            { type: 'text', name: 'cta_label', x: pad, y: Math.round(H * 0.8) + Math.round((ctaH - ctaFs) / 2), w: ctaW, h: ctaFs + 4, content: c.cta.toUpperCase(), font_size: ctaFs, font_weight: '700', color_hex: g.colors.accentForeground, text_align: 'center', letter_spacing: 1.5 },
+            { type: 'text', name: 'cta_label', x: pad, y: Math.round(H * 0.8) + Math.round((ctaH - ctaFs) / 2), w: ctaW, h: ctaFs + 4, content: c.cta.toUpperCase(), font_size: ctaFs, font_family: g.typography.primaryFont, font_weight: '700', color_hex: g.colors.accentForeground, text_align: 'center', letter_spacing: 1.5 },
         ];
     },
 };
@@ -178,12 +178,12 @@ export const topDownCascade: DesignTemplate = {
         return [
             { type: 'rect', name: 'background', x: 0, y: 0, w: W, h: H, gradient_start_hex: g.colors.gradientStart, gradient_end_hex: g.colors.gradientEnd, gradient_angle: 180 },
             { type: 'rect', name: 'accent_bar', x: 0, y: 0, w: W, h: Math.round(H * 0.04), r: ar, g: ag, b: ab, a: 1.0 },
-            { type: 'text', name: 'tag_text', x: pad, y: Math.round(H * 0.08), w: W - 2 * pad, h: tagFs + 4, content: c.tag.toUpperCase(), font_size: tagFs, font_weight: '600', color_hex: g.colors.accent, text_align: 'left', letter_spacing: 3 },
-            { type: 'text', name: 'headline', x: pad + Math.round(W * 0.04), y: Math.round(H * 0.18), w: W - 2 * pad - Math.round(W * 0.04), h: headFs * 2.8, content: c.headline, font_size: headFs, font_weight: '800', color_hex: g.colors.foreground, text_align: 'left', letter_spacing: -0.5, line_height: 1.05 },
+            { type: 'text', name: 'tag_text', x: pad, y: Math.round(H * 0.08), w: W - 2 * pad, h: tagFs + 4, content: c.tag.toUpperCase(), font_size: tagFs, font_family: g.typography.primaryFont, font_weight: '600', color_hex: g.colors.accent, text_align: 'left', letter_spacing: 3 },
+            { type: 'text', name: 'headline', x: pad + Math.round(W * 0.04), y: Math.round(H * 0.18), w: W - 2 * pad - Math.round(W * 0.04), h: headFs * 2.8, content: c.headline, font_size: headFs, font_family: g.typography.primaryFont, font_weight: '800', color_hex: g.colors.foreground, text_align: 'left', letter_spacing: -0.5, line_height: 1.05 },
             { type: 'rect', name: 'cascade_line', x: pad, y: Math.round(H * 0.45), w: Math.round(W * 0.2), h: 2, r: ar, g: ag, b: ab, a: 0.4 },
-            { type: 'text', name: 'subheadline', x: pad, y: Math.round(H * 0.5), w: Math.round(W * 0.8), h: subFs * 3, content: c.subheadline, font_size: subFs, font_weight: '400', color_hex: g.colors.secondary, text_align: 'left', line_height: 1.5 },
+            { type: 'text', name: 'subheadline', x: pad, y: Math.round(H * 0.5), w: Math.round(W * 0.8), h: subFs * 3, content: c.subheadline, font_size: subFs, font_family: g.typography.secondaryFont, font_weight: '400', color_hex: g.colors.secondary, text_align: 'left', line_height: 1.5 },
             { type: 'rounded_rect', name: 'cta_button', x: Math.round((W - ctaW) / 2), y: Math.round(H * 0.78), w: ctaW, h: ctaH, r: ar, g: ag, b: ab, a: 1.0, radius: Math.round(ctaH / 2) },
-            { type: 'text', name: 'cta_label', x: Math.round((W - ctaW) / 2), y: Math.round(H * 0.78) + Math.round((ctaH - ctaFs) / 2), w: ctaW, h: ctaFs + 4, content: c.cta.toUpperCase(), font_size: ctaFs, font_weight: '700', color_hex: g.colors.accentForeground, text_align: 'center', letter_spacing: 1.5 },
+            { type: 'text', name: 'cta_label', x: Math.round((W - ctaW) / 2), y: Math.round(H * 0.78) + Math.round((ctaH - ctaFs) / 2), w: ctaW, h: ctaFs + 4, content: c.cta.toUpperCase(), font_size: ctaFs, font_family: g.typography.primaryFont, font_weight: '700', color_hex: g.colors.accentForeground, text_align: 'center', letter_spacing: 1.5 },
         ];
     },
 };

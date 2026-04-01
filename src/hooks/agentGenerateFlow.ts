@@ -215,7 +215,7 @@ async function generateBgImage(
     try {
         const { generateBackgroundImage } = await resilientImport(() => import('@/services/imageGenClient'));
         const promptLow = (backgroundImagePrompt + ' ' + prompt).toLowerCase();
-        const needsRealism = /(?:person|people|woman|man|girl|boy|model|portrait|photo|face|human|여자|남자|사람|사진|모델|얼굴|product|bottle|package|food|drink|car|building|hotel|resort)/.test(promptLow);
+        const needsRealism = /(?:person|people|woman|man|girl|boy|model|portrait|photo|face|human|doctor|dentist|nurse|chef|athlete|worker|teacher|musician|artist|therapist|pharmacist|engineer|lawyer|pilot|soldier|barista|waiter|stylist|trainer|coach|의사|치과|간호사|요리사|선수|교사|운동|여자|남자|사람|사진|모델|얼굴|product|bottle|package|food|drink|car|building|hotel|resort)/.test(promptLow);
         const enhancedBgPrompt = needsRealism ? `${backgroundImagePrompt}. Hyper-realistic, professional photography, 8K resolution, cinematic lighting, shallow depth of field, shot on Sony A7R IV.` : backgroundImagePrompt;
 
         const bgResult = await generateBackgroundImage(enhancedBgPrompt, canvasW, canvasH, [guide.colors.accent, guide.colors.background, guide.colors.gradientEnd], abort.signal);
@@ -296,7 +296,7 @@ async function buildAndRender(
             cb.moveCursor(el.x ?? 0, el.y ?? 0, el.name);
             await pause(150);
             try {
-                const nodeId = renderElement(engine, el, canvasW, cacheGradientData);
+                const nodeId = renderElement(engine, el, canvasW, cacheGradientData, guide);
                 if (nodeId != null && el.shadow_blur && el.shadow_blur > 0) {
                     try { engine.set_shadow?.(nodeId, el.shadow_offset_x ?? 2, el.shadow_offset_y ?? 4, el.shadow_blur, 0, 0, 0, el.shadow_opacity ?? 0.25); } catch { /* ok */ }
                 }
@@ -325,7 +325,7 @@ async function buildAndRender(
     return rendered;
 }
 
-function renderElement(engine: FlowEngine, el: any, canvasW: number, cacheGradientData: (key: string, start: string, end: string, angle: number) => void): number | null {
+function renderElement(engine: FlowEngine, el: any, canvasW: number, cacheGradientData: (key: string, start: string, end: string, angle: number) => void, guide?: any): number | null {
     const hexToRgb = (hx: string): [number, number, number] => {
         const c = hx.replace('#', '');
         return [parseInt(c.slice(0, 2), 16) / 255, parseInt(c.slice(2, 4), 16) / 255, parseInt(c.slice(4, 6), 16) / 255];
@@ -333,7 +333,9 @@ function renderElement(engine: FlowEngine, el: any, canvasW: number, cacheGradie
 
     if (el.type === 'text') {
         const [tr, tg, tb] = el.color_hex ? hexToRgb(el.color_hex) : [1, 1, 1];
-        return engine.add_text(el.x ?? 0, el.y ?? 0, el.content || 'Text', el.font_size ?? 18, 'Inter, system-ui, sans-serif', el.font_weight ?? '700', tr, tg, tb, 1.0, (el.w && el.w > 0) ? el.w : canvasW * 0.85, el.text_align ?? 'center', el.name, el.line_height, el.letter_spacing);
+        const fontFamily = el.font_family || guide?.typography?.primaryFont || 'Inter';
+        const fullFont = `${fontFamily}, system-ui, sans-serif`;
+        return engine.add_text(el.x ?? 0, el.y ?? 0, el.content || 'Text', el.font_size ?? 18, fullFont, el.font_weight ?? '700', tr, tg, tb, 1.0, (el.w && el.w > 0) ? el.w : canvasW * 0.85, el.text_align ?? 'center', el.name, el.line_height, el.letter_spacing);
     } else if (el.gradient_start_hex && el.gradient_end_hex) {
         const nodeId = engine.add_gradient_rect(el.x ?? 0, el.y ?? 0, el.w ?? 100, el.h ?? 100, el.gradient_start_hex, el.gradient_end_hex, el.gradient_angle ?? 135, el.radius ?? 0, el.name);
         cacheGradientData(el.name ?? '', el.gradient_start_hex, el.gradient_end_hex, el.gradient_angle ?? 135);

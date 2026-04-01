@@ -9,6 +9,7 @@ export interface RenderElement {
     radius?: number;
     gradient_start_hex?: string; gradient_end_hex?: string; gradient_angle?: number;
     content?: string; font_size?: number; font_weight?: string;
+    font_family?: string;
     color_hex?: string; text_align?: string;
     letter_spacing?: number; line_height?: number;
     shadow_offset_x?: number; shadow_offset_y?: number;
