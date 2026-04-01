@@ -1,0 +1,212 @@
+/* ─────────────────────────────────────────────────
+   legal.css — Shared styles for About, Privacy, Terms pages
+   Premium dark theme matching landing page aesthetic
+   ───────────────────────────────────────────────── */
+
+.legal-page {
+    min-height: 100vh;
+    background: #06080f;
+    color: #c8d0de;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    line-height: 1.7;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ── Header ── */
+.legal-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    background: rgba(6, 8, 15, 0.85);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.legal-header-inner {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 16px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.legal-logo {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: opacity 0.2s;
+}
+.legal-logo:hover { opacity: 0.8; }
+
+.legal-nav {
+    display: flex;
+    gap: 24px;
+}
+.legal-nav a {
+    color: #94a3b8;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    transition: color 0.2s;
+}
+.legal-nav a:hover { color: #f1f5f9; }
+
+/* ── Content ── */
+.legal-content {
+    flex: 1;
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 64px 32px 80px;
+    width: 100%;
+}
+
+.legal-content h1 {
+    font-size: 40px;
+    font-weight: 700;
+    color: #f1f5f9;
+    margin: 0 0 12px;
+    letter-spacing: -0.03em;
+    line-height: 1.2;
+}
+
+.legal-effective {
+    font-size: 14px;
+    color: #64748b;
+    margin: 0 0 48px;
+}
+
+.legal-section {
+    margin-bottom: 48px;
+}
+
+.legal-section h2 {
+    font-size: 22px;
+    font-weight: 600;
+    color: #e2e8f0;
+    margin: 0 0 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.legal-section h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #cbd5e1;
+    margin: 20px 0 8px;
+}
+
+.legal-section p {
+    margin: 0 0 12px;
+    font-size: 15px;
+}
+
+.legal-section ul {
+    margin: 8px 0 16px 0;
+    padding-left: 24px;
+}
+
+.legal-section li {
+    margin-bottom: 8px;
+    font-size: 15px;
+}
+
+.legal-section li strong {
+    color: #e2e8f0;
+}
+
+.legal-section a {
+    color: #60a5fa;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+.legal-section a:hover {
+    color: #93c5fd;
+    text-decoration: underline;
+}
+
+.legal-section address {
+    font-style: normal;
+    line-height: 1.8;
+    color: #94a3b8;
+}
+
+/* ── Contact Grid (About page) ── */
+.legal-contact-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 24px;
+    margin-top: 16px;
+}
+
+.legal-contact-item {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    padding: 20px;
+    transition: border-color 0.2s;
+}
+.legal-contact-item:hover {
+    border-color: rgba(255, 255, 255, 0.12);
+}
+
+.legal-contact-item h3 {
+    font-size: 13px;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin: 0 0 8px;
+}
+
+.legal-contact-item a {
+    color: #60a5fa;
+    text-decoration: none;
+    font-size: 15px;
+}
+.legal-contact-item a:hover {
+    color: #93c5fd;
+}
+
+.legal-contact-item address {
+    font-style: normal;
+    color: #94a3b8;
+    font-size: 15px;
+    line-height: 1.6;
+}
+
+/* ── Footer ── */
+.legal-footer {
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 24px 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 860px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+.legal-footer span {
+    font-size: 13px;
+    color: #475569;
+}
+
+.legal-footer-address {
+    font-size: 12px !important;
+    color: #334155 !important;
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+    .legal-content { padding: 40px 20px 60px; }
+    .legal-content h1 { font-size: 28px; }
+    .legal-header-inner { padding: 12px 20px; }
+    .legal-nav { gap: 16px; }
+    .legal-nav a { font-size: 13px; }
+    .legal-footer { flex-direction: column; gap: 8px; text-align: center; }
+    .legal-contact-grid { grid-template-columns: 1fr; }
+}

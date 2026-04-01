@@ -26,6 +26,9 @@ import PricingPage from './PricingPage';
 import { TemplatesPage } from './TemplatesPage';
 import { ActivityPage } from './ActivityPage';
 import { OAuthCallbackPage } from './OAuthCallbackPage';
+import { AboutPage } from './AboutPage';
+import { PrivacyPage } from './PrivacyPage';
+import { TermsPage } from './TermsPage';
 
 // Components
 import { GlobalAiPanel } from '../components/ai/GlobalAiPanel';
@@ -53,6 +56,9 @@ export default function App() {
                     <Route path="/pricing" element={<PricingPage />} />
                     <Route path="/auth/callback/meta" element={<OAuthCallbackPage />} />
                     <Route path="/auth/callback/google-ads" element={<OAuthCallbackPage />} />
+                    <Route path="/about" element={<AboutPage />} />
+                    <Route path="/privacy" element={<PrivacyPage />} />
+                    <Route path="/terms" element={<TermsPage />} />
                     <Route path="/onboarding" element={
                         <ProtectedRoute>
                             <OnboardingPage />

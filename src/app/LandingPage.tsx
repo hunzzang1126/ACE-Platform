@@ -5,7 +5,7 @@
 // ─────────────────────────────────────────────────
 
 import { useEffect, useRef, lazy, Suspense } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
@@ -228,13 +228,20 @@ function LandingPageContent() {
                         </div>
                         <div className="lp-footer-col">
                             <h4>{t('footerCompany')}</h4>
+                            <Link to="/about">About Us</Link>
                             <a href="mailto:hello@glid.ai">{t('footerContact')}</a>
                             <a href="mailto:sales@glid.ai">{t('footerSales')}</a>
+                        </div>
+                        <div className="lp-footer-col">
+                            <h4>Legal</h4>
+                            <Link to="/privacy">Privacy Policy</Link>
+                            <Link to="/terms">Terms of Service</Link>
                         </div>
                     </div>
                 </div>
                 <div className="lp-footer-bottom">
-                    <span>&copy; {new Date().getFullYear()} Glid. All rights reserved.</span>
+                    <span>&copy; {new Date().getFullYear()} Glid Technologies Inc. All rights reserved.</span>
+                    <span className="lp-footer-address">50 Power St, Toronto, ON M5A 0V3, Canada</span>
                 </div>
             </footer>
         </div>

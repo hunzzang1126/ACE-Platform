@@ -751,10 +751,16 @@
 .lp-footer-bottom {
     border-top: 1px solid rgba(255,255,255,0.04);
     padding-top: 24px;
-    text-align: center;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 .lp-footer-bottom span {
     font-size: 12px; color: #475569;
+}
+.lp-footer-address {
+    font-size: 11px !important;
+    color: #334155 !important;
 }
 
 /* ════════════════════════════
