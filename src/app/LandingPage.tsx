@@ -4,7 +4,7 @@
 // Pricing → LandingPricing.tsx | Workflow → HowItWorks.tsx
 // ─────────────────────────────────────────────────
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { useAuthStore } from '@/stores/authStore';
@@ -12,6 +12,8 @@ import { GlidLogo } from '@/components/brand/GlidLogo';
 import { HowItWorks } from './HowItWorks';
 import { LandingPricing } from './LandingPricing';
 import './landing.css';
+
+const SpiralVortex = lazy(() => import('@/components/landing/SpiralVortex').then(m => ({ default: m.SpiralVortex })));
 
 const Arrow = () => (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>
@@ -101,7 +103,10 @@ export function LandingPage() {
             </motion.nav>
 
             {/* ── Hero ── */}
-            <section className="lp-hero" ref={heroRef}>
+            <section className="lp-hero" ref={heroRef} style={{ position: 'relative', overflow: 'hidden' }}>
+                <Suspense fallback={null}>
+                    <SpiralVortex />
+                </Suspense>
                 <div className="lp-hero-glow lp-hero-glow-1" />
                 <div className="lp-hero-glow lp-hero-glow-2" />
 
