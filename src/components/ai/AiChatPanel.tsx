@@ -217,7 +217,7 @@ export default function AiChatPanel({ aiService, engine, trackedNodes, onSendMes
                         value={input}
                         onChange={e => setInput(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder={!aiService.isConfigured() ? 'Set API key in Settings first' : `Ask anything... (${remainingTokens >= 1_000_000 ? `${(remainingTokens / 1_000_000).toFixed(1)}M` : `${Math.round(remainingTokens / 1000)}K`} tokens left)`}
+                        placeholder={!aiService.isConfigured() ? 'Set API key in Settings first' : `Ask anything... (${remainingTokens.toLocaleString()} generations left)`}
                         disabled={isProcessing}
                     />
                     <button
