@@ -159,15 +159,16 @@ const fragmentShader = /* glsl */ `
     float cDist = length(p - center);
     color += vec3(0.14, 0.08, 0.28) * exp(-cDist * 2.0) * 0.12;
 
-    // ── Variant dimming for mid-page accent ──
-    float variantDim = 1.0 - uVariant * 0.35;
-    color *= variantDim;
-
-    // ── Soft vignette ──
-    float vig = 1.0 - smoothstep(0.4, 1.2, length(p) * 0.85);
-    color *= 0.55 + vig * 0.45;
-
-    gl_FragColor = vec4(color, 1.0);
+    // ── Output ──
+    // For variant 0 (hero): fully opaque dark background
+    // For variant 1 (mid-page): transparent bg, only rings/particles visible
+    if (uVariant > 0.5) {
+      float alpha = (color.r + color.g + color.b) * 2.5;
+      alpha = clamp(alpha, 0.0, 1.0);
+      gl_FragColor = vec4(color, alpha);
+    } else {
+      gl_FragColor = vec4(color, 1.0);
+    }
   }
 `;
 
@@ -226,6 +227,7 @@ function VortexMesh({ variant = 0 }: VortexMeshProps) {
                 fragmentShader={fragmentShader}
                 uniforms={uniforms}
                 depthWrite={false}
+                transparent={variant > 0}
             />
         </mesh>
     );
