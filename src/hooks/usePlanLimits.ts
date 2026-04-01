@@ -120,35 +120,55 @@ export function usePlanLimits() {
             aiTokensUsed: prev.aiTokensUsed + tokenCount,
         }));
 
-        // Persist to Supabase via direct upsert (no RPC dependency)
+        // Persist to Supabase — explicit SELECT → INSERT or UPDATE
         const sb = getSupabase();
         if (sb && user?.id) {
             const month = getCurrentMonth();
             try {
-                // First try to read existing row
-                const { data: existing } = await sb
+                const { data: existing, error: readErr } = await sb
                     .from('usage_tracking')
-                    .select('ai_generations_used')
+                    .select('id, ai_generations_used')
                     .eq('user_id', user.id)
                     .eq('month', month)
                     .maybeSingle();
 
-                const currentUsed = existing?.ai_generations_used ?? 0;
-                const newUsed = currentUsed + tokenCount;
+                if (readErr) {
+                    console.error('[usePlanLimits] Read usage failed:', readErr.message);
+                    return true; // Still allow AI use, just tracking failed
+                }
 
-                const { error } = await sb
-                    .from('usage_tracking')
-                    .upsert({
-                        user_id: user.id,
-                        month,
-                        ai_generations_used: newUsed,
-                        updated_at: new Date().toISOString(),
-                    }, { onConflict: 'user_id,month' });
+                if (existing) {
+                    // Row exists → UPDATE
+                    const newUsed = (existing.ai_generations_used ?? 0) + tokenCount;
+                    const { error: updateErr } = await sb
+                        .from('usage_tracking')
+                        .update({
+                            ai_generations_used: newUsed,
+                            updated_at: new Date().toISOString(),
+                        })
+                        .eq('id', existing.id);
 
-                if (error) {
-                    console.error('[usePlanLimits] Failed to upsert AI usage:', error.message, error);
+                    if (updateErr) {
+                        console.error('[usePlanLimits] UPDATE usage failed:', updateErr.message);
+                    } else {
+                        console.log(`[usePlanLimits] AI usage updated: ${newUsed} (+${tokenCount})`);
+                    }
                 } else {
-                    console.log(`[usePlanLimits] AI usage recorded: ${newUsed} (was ${currentUsed}, +${tokenCount})`);
+                    // No row → INSERT
+                    const { error: insertErr } = await sb
+                        .from('usage_tracking')
+                        .insert({
+                            user_id: user.id,
+                            month,
+                            ai_generations_used: tokenCount,
+                            exports_used: 0,
+                        });
+
+                    if (insertErr) {
+                        console.error('[usePlanLimits] INSERT usage failed:', insertErr.message);
+                    } else {
+                        console.log(`[usePlanLimits] AI usage created: ${tokenCount} for ${month}`);
+                    }
                 }
             } catch (err) {
                 console.error('[usePlanLimits] AI usage tracking exception:', err);
