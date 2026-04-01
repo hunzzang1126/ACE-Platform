@@ -40,30 +40,26 @@ export function LoginPage() {
             await signUpWithEmail(email, password, name);
         }
         // Navigation handled by AuthCallback or syncSession
-        const { isAuthenticated, isApproved, user: authUser } = useAuthStore.getState();
+        const { isAuthenticated, user: authUser } = useAuthStore.getState();
         if (isAuthenticated()) {
-            if (!isApproved()) {
-                navigate('/pending', { replace: true });
-            } else {
-                // Check if user has completed onboarding (per-user)
-                const { loadUserPrefs } = await import('@/stores/userPrefs');
-                const prefs = loadUserPrefs(authUser?.id);
-                navigate(prefs.hasCompletedOnboarding ? '/dashboard' : '/onboarding', { replace: true });
-            }
+            // Check if user has completed onboarding (per-user)
+            const { loadUserPrefs } = await import('@/stores/userPrefs');
+            const prefs = loadUserPrefs(authUser?.id);
+            navigate(prefs.hasCompletedOnboarding ? '/dashboard' : '/onboarding', { replace: true });
         }
     };
 
     return (
-        <div className="landing-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+        <div className="lp" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
             {/* Background glow */}
-            <div style={{ position: 'absolute', width: 600, height: 600, borderRadius: '50%', background: 'var(--landing-gradient-1)', filter: 'blur(200px)', opacity: 0.08, top: '20%', left: '30%', pointerEvents: 'none' }} />
+            <div style={{ position: 'absolute', width: 600, height: 600, borderRadius: '50%', background: 'linear-gradient(135deg, #6c63ff, #a855f7)', filter: 'blur(200px)', opacity: 0.08, top: '20%', left: '30%', pointerEvents: 'none' }} />
 
             <div style={{
                 width: '100%',
                 maxWidth: 420,
                 padding: 40,
-                background: 'var(--landing-card)',
-                border: '1px solid var(--landing-card-border)',
+                background: 'rgba(255, 255, 255, 0.03)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
                 borderRadius: 20,
                 backdropFilter: 'blur(40px)',
                 position: 'relative',
@@ -71,7 +67,7 @@ export function LoginPage() {
                 {/* Logo */}
                 <div style={{ textAlign: 'center', marginBottom: 32 }}>
                     <GlidLogo size={32} onClick={() => navigate('/')} />
-                    <div style={{ fontSize: 15, color: 'var(--landing-text-muted)' }}>
+                    <div style={{ fontSize: 15, color: '#94a3b8', marginTop: 8 }}>
                         {mode === 'signin' ? 'Welcome back' : 'Create your account'}
                     </div>
                 </div>
@@ -111,9 +107,9 @@ export function LoginPage() {
 
                 {/* Divider */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-                    <div style={{ flex: 1, height: 1, background: 'var(--landing-card-border)' }} />
-                    <span style={{ fontSize: 12, color: 'var(--landing-text-muted)' }}>or</span>
-                    <div style={{ flex: 1, height: 1, background: 'var(--landing-card-border)' }} />
+                    <div style={{ flex: 1, height: 1, background: 'rgba(255, 255, 255, 0.08)' }} />
+                    <span style={{ fontSize: 12, color: '#94a3b8' }}>or</span>
+                    <div style={{ flex: 1, height: 1, background: 'rgba(255, 255, 255, 0.08)' }} />
                 </div>
 
                 {/* Email Form */}
@@ -157,7 +153,7 @@ export function LoginPage() {
                         disabled={isLoading}
                         style={{
                             padding: '12px 16px', borderRadius: 12,
-                            background: 'linear-gradient(135deg, var(--landing-gradient-1), var(--landing-accent-2))',
+                            background: 'linear-gradient(135deg, #6c63ff, #a855f7)',
                             color: '#fff', border: 'none', fontSize: 14, fontWeight: 600,
                             cursor: isLoading ? 'wait' : 'pointer',
                             opacity: isLoading ? 0.7 : 1,
@@ -169,12 +165,12 @@ export function LoginPage() {
                 </form>
 
                 {/* Toggle */}
-                <div style={{ textAlign: 'center', marginTop: 24, fontSize: 13, color: 'var(--landing-text-muted)' }}>
+                <div style={{ textAlign: 'center', marginTop: 24, fontSize: 13, color: '#94a3b8' }}>
                     {mode === 'signin' ? "Don't have an account? " : 'Already have an account? '}
                     <button
                         onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}
                         style={{
-                            background: 'none', border: 'none', color: 'var(--landing-accent-2)',
+                            background: 'none', border: 'none', color: '#a855f7',
                             cursor: 'pointer', fontSize: 13, fontWeight: 600, padding: 0,
                         }}
                     >
