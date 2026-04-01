@@ -423,11 +423,17 @@
     backdrop-filter: blur(14px) saturate(130%);
     -webkit-backdrop-filter: blur(14px) saturate(130%);
     transition: border-color 0.3s, background 0.3s, transform 0.3s;
+    position: relative;
+    overflow: hidden;
+    z-index: 1;
 }
 .lp-feature-card:hover {
-    border-color: rgba(129, 140, 248, 0.2);
+    border-color: rgba(129, 140, 248, 0.25);
     background: rgba(255, 255, 255, 0.05);
     transform: translateY(-4px);
+}
+.lp-feature-card:hover .lp-cyber-layer {
+    opacity: 0.12;
 }
 .lp-feature-icon {
     width: 48px;
@@ -678,25 +684,132 @@
 }
 
 /* ══════════════════════════════════
+   CYBERNETIC GRID + DATA STREAMS
+   ══════════════════════════════════ */
+
+/* 3D Perspective Grid Background */
+.lp-cyber-grid {
+    position: absolute;
+    inset: -100px -200px;
+    z-index: 0;
+    opacity: 0.06;
+    background-image:
+        linear-gradient(rgba(129, 140, 248, 0.3) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(129, 140, 248, 0.3) 1px, transparent 1px);
+    background-size: 60px 60px;
+    transform: perspective(600px) rotateX(15deg);
+    transform-origin: center top;
+    pointer-events: none;
+    mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, black 30%, transparent 80%);
+    -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, black 30%, transparent 80%);
+}
+
+/* Cybernetic data stream inside feature cards */
+.lp-cyber-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    opacity: 0.05;
+    background:
+        repeating-linear-gradient(
+            90deg,
+            transparent,
+            transparent 29px,
+            rgba(129, 140, 248, 0.15) 29px,
+            rgba(129, 140, 248, 0.15) 30px
+        ),
+        repeating-linear-gradient(
+            0deg,
+            transparent,
+            transparent 29px,
+            rgba(129, 140, 248, 0.1) 29px,
+            rgba(129, 140, 248, 0.1) 30px
+        );
+    border-radius: inherit;
+    pointer-events: none;
+    transition: opacity 0.4s;
+}
+.lp-cyber-layer::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 60%;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(129, 140, 248, 0.06),
+        rgba(192, 132, 252, 0.04),
+        transparent
+    );
+    animation: cyberSweep 4s ease-in-out infinite;
+}
+@keyframes cyberSweep {
+    0%   { left: -60%; }
+    100% { left: 120%; }
+}
+
+/* Feature card content above cyber layer */
+.lp-feature-icon,
+.lp-feature-label,
+.lp-feature-title,
+.lp-feature-desc {
+    position: relative;
+    z-index: 1;
+}
+
+/* ══════════════════════════════════
    RESPONSIVE
    ══════════════════════════════════ */
 @media (max-width: 900px) {
     .lp-features-grid { grid-template-columns: 1fr; }
-    .lp-price-grid { grid-template-columns: repeat(2, 1fr); max-width: 600px; margin-left: auto; margin-right: auto; }
+    .lp-price-grid {
+        grid-template-columns: repeat(2, 1fr);
+        max-width: 600px;
+        margin-left: auto;
+        margin-right: auto;
+        gap: 16px;
+    }
     .lp-metrics { flex-direction: column; gap: 20px; padding: 24px; }
     .lp-metric-divider { width: 40px; height: 1px; }
     .lp-footer-inner { flex-direction: column; gap: 32px; }
     .lp-nav-links { display: none; }
+    .lp-cyber-grid { display: none; }
 }
 
 @media (max-width: 600px) {
     .lp-hero { padding: 120px 20px 40px; }
-    .lp-hero-title { font-size: 40px; }
+    .lp-hero-title { font-size: 36px; }
     .lp-hero-sub { font-size: 15px; }
     .lp-hero-actions { flex-direction: column; align-items: center; }
-    .lp-features, .lp-pricing { padding: 60px 20px; }
-    .lp-feature-card { padding: 28px; }
+    .lp-features, .lp-pricing { padding: 60px 16px; }
+    .lp-feature-card { padding: 24px; }
     .lp-cta { padding: 80px 20px; }
+    .lp-price-grid {
+        grid-template-columns: 1fr;
+        max-width: 400px;
+        gap: 14px;
+    }
+    .lp-price-card {
+        padding: 24px;
+    }
+    .lp-price-value {
+        font-size: 28px;
+    }
+    .lp-section-title {
+        font-size: 28px;
+    }
+    .lp-section-sub {
+        font-size: 14px;
+    }
+    .lp-metrics {
+        margin: 40px auto;
+        padding: 20px 16px;
+    }
+    .lp-metric-value {
+        font-size: 24px;
+    }
 }
 
 /* ─────────────────────────────────

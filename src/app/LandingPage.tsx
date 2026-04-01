@@ -125,6 +125,23 @@ export function LandingPage() {
                 });
             });
 
+            // ── 3D Grid perspective warp on scroll ──
+            const grid = document.querySelector('.lp-cyber-grid');
+            if (grid) {
+                gsap.to(grid, {
+                    rotateX: -25,
+                    scale: 1.15,
+                    opacity: 0.12,
+                    ease: 'none',
+                    scrollTrigger: {
+                        trigger: '#features',
+                        start: 'top bottom',
+                        end: 'bottom top',
+                        scrub: 1.5,
+                    },
+                });
+            }
+
             // ── Section headers ──
             gsap.utils.toArray<HTMLElement>('.gsap-reveal').forEach((el) => {
                 gsap.from(el, {
@@ -247,8 +264,11 @@ export function LandingPage() {
                 </div>
             </div>
 
-            {/* ── Features (GSAP stagger) ── */}
-            <section id="features" className="lp-features">
+            {/* ── 3D Grid Perspective + Features (GSAP stagger) ── */}
+            <section id="features" className="lp-features" style={{ position: 'relative' }}>
+                {/* 3D Perspective Grid Background */}
+                <div className="lp-cyber-grid" />
+
                 <div className="lp-features-header gsap-reveal">
                     <div className="lp-section-label">Platform</div>
                     <h2 className="lp-section-title">Everything you need.<br />Nothing you don't.</h2>
@@ -257,6 +277,8 @@ export function LandingPage() {
                 <div className="lp-features-grid">
                     {FEATURES.map((f, i) => (
                         <div key={i} className="lp-feature-card gsap-feature">
+                            {/* Cybernetic data stream layer */}
+                            <div className="lp-cyber-layer" />
                             <div className="lp-feature-icon">{f.icon}</div>
                             <div className="lp-feature-label">{f.label}</div>
                             <h3 className="lp-feature-title">{f.title}</h3>
