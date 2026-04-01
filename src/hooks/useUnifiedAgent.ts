@@ -12,6 +12,7 @@ import { DASHBOARD_TOOL_NAMES } from '@/ai/dashboardTools';
 import { executeDashboardTool } from '@/ai/dashboardExecutor';
 import { useDesignStore } from '@/stores/designStore';
 import { getModelForRole, type AceModelRole } from '@/services/modelRouter';
+import { usePlanLimits } from '@/hooks/usePlanLimits';
 import type { AgentMessage } from '@/ai/agentContext';
 import type { NavigateFunction } from 'react-router-dom';
 import { useLocation } from 'react-router-dom';
@@ -66,6 +67,7 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
     const engineRef = useRef<any>(null);
     const serviceRef = useRef<AiService | null>(null);
     const location = useLocation();
+    const { recordAIUsage, canUseAI } = usePlanLimits();
 
     // ── Narration & Card callbacks ──
     const narrate = useCallback((text: string) => {
@@ -244,6 +246,12 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
             if (intent === 'scan' && imageData) {
                 reply = await runScanFlow(imageData);
             } else {
+                // ★ Check AI quota before proceeding
+                if (!canUseAI()) {
+                    setMessages(prev => [...prev, { role: 'assistant', content: 'You have reached your monthly AI generation limit. Please upgrade your plan for more AI generations.', timestamp: Date.now() }]);
+                    setState(prev => ({ ...prev, phase: 'done' }));
+                    return;
+                }
                 const config = getConfig();
                 const ctx = buildContext(location.pathname);
                 const enrichedMsg = enrichMessageWithContext(msg, ctx);
@@ -256,12 +264,20 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
             }
             setMessages(prev => [...prev, { role: 'assistant', content: reply, timestamp: Date.now() }]);
             setState(prev => ({ ...prev, phase: 'done' }));
+
+            // ★ Record AI usage after successful completion
+            console.log('[useUnifiedAgent] AI request completed — recording usage');
+            recordAIUsage(1);
         } catch (err) {
             const errMsg = err instanceof Error ? err.message : String(err);
             setMessages(prev => [...prev, { role: 'assistant', content: `[Error] ${errMsg}`, timestamp: Date.now() }]);
             setState(prev => ({ ...prev, phase: 'error', error: errMsg }));
+
+            // ★ Record even failed attempts (they still cost tokens)
+            console.log('[useUnifiedAgent] AI request errored — still recording usage');
+            recordAIUsage(1);
         }
-    }, [input, location.pathname, getConfig, runGenerateFlow, runScanFlow, runChatFlow]);
+    }, [input, location.pathname, getConfig, runGenerateFlow, runScanFlow, runChatFlow, canUseAI, recordAIUsage]);
 
     const clearChat = useCallback(() => { setMessages([]); setState(INITIAL_STATE); }, []);
 
