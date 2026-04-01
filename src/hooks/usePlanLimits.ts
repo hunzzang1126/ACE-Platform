@@ -134,45 +134,55 @@ export function usePlanLimits() {
 
                 if (readErr) {
                     console.error('[usePlanLimits] Read usage failed:', readErr.message);
-                    return true; // Still allow AI use, just tracking failed
+                    return true;
                 }
 
                 if (existing) {
-                    // Row exists → UPDATE
+                    // Row exists → UPDATE (with .select() to detect RLS blocks)
                     const newUsed = (existing.ai_generations_used ?? 0) + tokenCount;
-                    const { error: updateErr } = await sb
+                    const { data: updated, error: updateErr } = await sb
                         .from('usage_tracking')
                         .update({
                             ai_generations_used: newUsed,
                             updated_at: new Date().toISOString(),
                         })
-                        .eq('id', existing.id);
+                        .eq('id', existing.id)
+                        .select()
+                        .single();
 
                     if (updateErr) {
-                        console.error('[usePlanLimits] UPDATE usage failed:', updateErr.message);
+                        console.error('[usePlanLimits] UPDATE failed:', updateErr.message, updateErr);
+                    } else if (!updated) {
+                        console.error('[usePlanLimits] UPDATE returned no data — RLS likely blocked the write');
                     } else {
-                        console.log(`[usePlanLimits] AI usage updated: ${newUsed} (+${tokenCount})`);
+                        console.log('[usePlanLimits] AI usage UPDATED:', updated);
                     }
                 } else {
-                    // No row → INSERT
-                    const { error: insertErr } = await sb
+                    // No row → INSERT (with .select() to detect RLS blocks)
+                    const { data: inserted, error: insertErr } = await sb
                         .from('usage_tracking')
                         .insert({
                             user_id: user.id,
                             month,
                             ai_generations_used: tokenCount,
                             exports_used: 0,
-                        });
+                        })
+                        .select()
+                        .single();
 
                     if (insertErr) {
-                        console.error('[usePlanLimits] INSERT usage failed:', insertErr.message);
+                        console.error('[usePlanLimits] INSERT failed:', insertErr.message, insertErr);
+                    } else if (!inserted) {
+                        console.error('[usePlanLimits] INSERT returned no data — RLS likely blocked the write');
                     } else {
-                        console.log(`[usePlanLimits] AI usage created: ${tokenCount} for ${month}`);
+                        console.log('[usePlanLimits] AI usage INSERTED:', inserted);
                     }
                 }
             } catch (err) {
                 console.error('[usePlanLimits] AI usage tracking exception:', err);
             }
+        } else {
+            console.warn('[usePlanLimits] No Supabase client or user.id — cannot track usage');
         }
 
         return true;
