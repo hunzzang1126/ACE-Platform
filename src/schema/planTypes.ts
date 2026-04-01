@@ -115,8 +115,8 @@ export const PLANS: PlanInfo[] = [
         tier: 'pro',
         name: 'Pro',
         tagline: 'For professional teams and agencies',
-        priceMonthly: 40,
-        priceAnnual: 32, // ~20% discount
+        priceMonthly: 50,
+        priceAnnual: 40, // ~20% discount
         limits: PLAN_LIMITS.pro,
     },
     {
