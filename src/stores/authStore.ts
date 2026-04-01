@@ -122,8 +122,17 @@ export const useAuthStore = create<AuthState>()(
             },
 
             signOut: async () => {
+                const userId = get().user?.id;
                 await sbSignOut();
                 set({ user: null, session: null, role: null, error: null });
+                // ★ Clear persisted session from IndexedDB
+                try {
+                    await idbStorage.removeItem('glid-auth');
+                } catch { /* best-effort */ }
+                // ★ Clear login timestamp
+                if (userId) {
+                    localStorage.removeItem(`ace_login_ts_${userId}`);
+                }
             },
 
             syncSessionFromSupabase: async () => {
