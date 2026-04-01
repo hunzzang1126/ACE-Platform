@@ -8,6 +8,7 @@ import { useDesignStore } from '@/stores/designStore';
 import { useTemplateStore } from '@/stores/templateStore';
 import type { OverlayElement } from '@/hooks/useOverlayElements';
 import type { EngineNode } from '@/hooks/canvasTypes';
+import { readNodesFromEngine, addOverlaysAndSort } from '@/hooks/canvasSyncSave';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Engine = any;
@@ -50,7 +51,6 @@ export function useEditorPageSave(
                 // and construct the variant ourselves, bypassing the broken store path.
                 const engine = engineRef.current;
                 if (engine) {
-                    const { readNodesFromEngine, addOverlaysAndSort } = require('@/hooks/canvasSyncSave');
                     const elements = readNodesFromEngine(engine, width, height);
                     addOverlaysAndSort(elements, overlayElements, width, height);
 
