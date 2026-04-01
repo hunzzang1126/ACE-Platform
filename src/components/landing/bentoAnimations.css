@@ -5,6 +5,7 @@
 /* ── Section Layout ── */
 .features-section {
   padding: 0 0 80px;
+  perspective: 1200px;
 }
 .features-header {
   text-align: center;
@@ -18,10 +19,33 @@
   max-width: 1200px;
   margin: 0 auto;
   padding: 80px 40px;
-  min-height: 70vh;
+  min-height: 80vh;
+  position: relative;
+  overflow: visible;
 }
 .feat-row--right {
   flex-direction: row-reverse;
+}
+
+/* ── Section background glow ── */
+.feat-bg-glow {
+  position: absolute;
+  width: 500px; height: 500px;
+  border-radius: 50%;
+  filter: blur(120px);
+  opacity: 0.08;
+  pointer-events: none;
+  z-index: -1;
+  animation: glowDrift 12s ease-in-out infinite;
+}
+.feat-bg-glow--gpu-canvas { background: #6366f1; top: 10%; right: -5%; }
+.feat-bg-glow--ai-copilot { background: #00ffd6; top: 20%; left: -5%; }
+.feat-bg-glow--animation { background: #c084fc; top: 5%; right: 10%; }
+.feat-bg-glow--smart-resize { background: #00ffd6; top: 15%; left: 5%; }
+.feat-bg-glow--export { background: #818cf8; top: 10%; right: 0%; }
+@keyframes glowDrift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(30px, -20px) scale(1.1); }
 }
 
 .feat-text {
@@ -62,10 +86,39 @@
 }
 .feat-visual {
   flex: 1.2;
-  min-height: 360px;
+  min-height: 380px;
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
+  transform-style: preserve-3d;
+}
+
+/* ── Animated gradient border (rotating conic) ── */
+.feat-visual-border {
+  position: absolute;
+  inset: -1px;
+  border-radius: 17px;
+  background: conic-gradient(
+    from var(--border-angle, 0deg),
+    transparent 40%,
+    rgba(0,255,214,0.15) 50%,
+    transparent 60%
+  );
+  z-index: -1;
+  animation: borderSpin 6s linear infinite;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  -webkit-mask-composite: xor;
+  padding: 1px;
+}
+@property --border-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+@keyframes borderSpin {
+  to { --border-angle: 360deg; }
 }
 
 /* ── Shared visual container ── */
@@ -76,7 +129,12 @@
   background: rgba(255,255,255,0.02);
   border: 1px solid rgba(255,255,255,0.06);
   overflow: hidden;
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(12px);
+  transition: transform 0.4s ease, box-shadow 0.4s ease;
+}
+.fv:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3), 0 0 40px rgba(99,102,241,0.05);
 }
 
 /* ════════════════════════════════════════════════

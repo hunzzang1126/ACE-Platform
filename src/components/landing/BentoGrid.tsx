@@ -64,10 +64,10 @@ export function BentoGrid() {
             {/* Header */}
             <motion.div
                 className="features-header"
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0, y: 50, filter: 'blur(8px)' }}
+                whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.8 }}
+                transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
             >
                 <span className="bento-label">{t('bentoLabel')}</span>
                 <h2 className="bento-title">{t('bentoTitle')}<br />{t('bentoTitle2')}</h2>
@@ -76,14 +76,17 @@ export function BentoGrid() {
 
             {/* Feature Sections */}
             {FEATURES.map((feat, i) => (
-                <div key={feat.id} className={`feat-row feat-row--${feat.align}`}>
+                <div key={feat.id} className={`feat-row feat-row--${feat.align} feat-row--${feat.id}`}>
+                    {/* Section background glow */}
+                    <div className={`feat-bg-glow feat-bg-glow--${feat.id}`} />
+
                     {/* Text */}
                     <motion.div
                         className="feat-text"
-                        initial={{ opacity: 0, x: feat.align === 'left' ? -40 : 40 }}
-                        whileInView={{ opacity: 1, x: 0 }}
+                        initial={{ opacity: 0, x: feat.align === 'left' ? -60 : 60, filter: 'blur(6px)' }}
+                        whileInView={{ opacity: 1, x: 0, filter: 'blur(0px)' }}
                         viewport={{ once: true, amount: 0.3 }}
-                        transition={{ duration: 0.7, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+                        transition={{ duration: 0.9, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
                     >
                         <span className="feat-label">{t(feat.labelKey)}</span>
                         <h3 className="feat-title">{t(feat.titleKey)}</h3>
@@ -94,11 +97,28 @@ export function BentoGrid() {
                     {/* Visual */}
                     <motion.div
                         className="feat-visual"
-                        initial={{ opacity: 0, x: feat.align === 'left' ? 40 : -40, scale: 0.95 }}
-                        whileInView={{ opacity: 1, x: 0, scale: 1 }}
+                        initial={{
+                            opacity: 0,
+                            x: feat.align === 'left' ? 80 : -80,
+                            scale: 0.85,
+                            rotateY: feat.align === 'left' ? 8 : -8,
+                            filter: 'blur(10px)',
+                        }}
+                        whileInView={{
+                            opacity: 1,
+                            x: 0,
+                            scale: 1,
+                            rotateY: 0,
+                            filter: 'blur(0px)',
+                        }}
                         viewport={{ once: true, amount: 0.2 }}
-                        transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                        transition={{
+                            duration: 1.1,
+                            delay: 0.25,
+                            ease: [0.16, 1, 0.3, 1],
+                        }}
                     >
+                        <div className="feat-visual-border" />
                         {feat.visual}
                     </motion.div>
                 </div>
