@@ -27,23 +27,8 @@ interface Props {
     onClose: () => void;
 }
 
-// Country code → flag emoji
-const FLAG_MAP: Record<string, string> = {
-    'English': 'GB', 'Korean': 'KR', 'Japanese': 'JP',
-    'Chinese (Simplified)': 'CN', 'Chinese (Traditional)': 'TW',
-    'French': 'FR', 'Spanish': 'ES', 'German': 'DE',
-    'Portuguese': 'PT', 'Italian': 'IT', 'Dutch': 'NL',
-    'Russian': 'RU', 'Arabic': 'SA', 'Hindi': 'IN', 'Thai': 'TH',
-    'Vietnamese': 'VN', 'Indonesian': 'ID', 'Turkish': 'TR',
-    'Polish': 'PL', 'Swedish': 'SE',
-};
 
-function flagEmoji(lang: string): string {
-    const code = FLAG_MAP[lang] ?? 'GB';
-    return code.toUpperCase().split('').map(c =>
-        String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65)
-    ).join('');
-}
+
 
 export function SettingsPanel({ isOpen, onClose }: Props) {
     const user = useAuthStore(s => s.user);
@@ -132,7 +117,7 @@ export function SettingsPanel({ isOpen, onClose }: Props) {
                         >
                             {SUPPORTED_LANGUAGES.map(lang => (
                                 <option key={lang} value={lang}>
-                                    {flagEmoji(lang)}  {lang}
+                                    {lang}
                                 </option>
                             ))}
                         </select>
