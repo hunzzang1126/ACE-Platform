@@ -37,9 +37,9 @@ const fragmentShader = /* glsl */ `
   // Draw a single glowing arc (partial circle)
   float arc(vec2 p, vec2 center, float radius, float thickness, float glow) {
     float d = abs(length(p - center) - radius);
-    float core = smoothstep(thickness, 0.0, d);
+    float core = smoothstep(thickness * 2.0, 0.0, d);
     float halo = exp(-d * glow);
-    return core * 0.6 + halo * 0.4;
+    return core * 0.5 + halo * 0.5;
   }
 
   void main() {
@@ -69,9 +69,9 @@ const fragmentShader = /* glsl */ `
       float angle = t * 0.3 + scrollBoost * 0.1;
       c += vec2(cos(angle), sin(angle)) * 0.02;
       float a = arc(p, c, r, 0.003, 6.0);
-      // Mask to show ~70% of the circle
+      // Smooth mask to show ~70% of the circle — wide fade to avoid pixelation
       float maskAngle = atan(p.y - c.y, p.x - c.x) + angle * 0.5;
-      a *= smoothstep(-0.3, 0.5, sin(maskAngle * 0.5 + 0.5));
+      a *= smoothstep(-0.8, 0.8, sin(maskAngle * 0.5 + 0.5));
       color += vec3(0.08, 0.25, 0.45) * a * 1.2;
     }
 
@@ -83,7 +83,7 @@ const fragmentShader = /* glsl */ `
       c += vec2(cos(angle + 1.0), sin(angle + 1.0)) * 0.015;
       float a = arc(p, c, r, 0.004, 8.0);
       float maskAngle = atan(p.y - c.y, p.x - c.x) + angle * 0.4;
-      a *= smoothstep(-0.2, 0.6, sin(maskAngle * 0.5 + 1.2));
+      a *= smoothstep(-0.7, 0.9, sin(maskAngle * 0.5 + 1.2));
       color += vec3(0.18, 0.12, 0.40) * a * 1.1;
     }
 
@@ -95,7 +95,7 @@ const fragmentShader = /* glsl */ `
       c += vec2(cos(angle + 2.5), sin(angle + 2.5)) * 0.01;
       float a = arc(p, c, r, 0.003, 10.0);
       float maskAngle = atan(p.y - c.y, p.x - c.x) + angle * 0.3;
-      a *= smoothstep(-0.4, 0.5, sin(maskAngle * 0.5 + 2.0));
+      a *= smoothstep(-0.6, 0.8, sin(maskAngle * 0.5 + 2.0));
       color += vec3(0.10, 0.30, 0.42) * a * 0.9;
     }
 
@@ -107,7 +107,7 @@ const fragmentShader = /* glsl */ `
       c += vec2(cos(angle + 4.0), sin(angle + 4.0)) * 0.018;
       float a = arc(p, c, r, 0.002, 5.0);
       float maskAngle = atan(p.y - c.y, p.x - c.x) + angle * 0.6;
-      a *= smoothstep(-0.1, 0.7, sin(maskAngle * 0.5 + 3.0));
+      a *= smoothstep(-0.5, 0.9, sin(maskAngle * 0.5 + 3.0));
       color += vec3(0.15, 0.10, 0.35) * a * 0.7;
     }
 
@@ -211,11 +211,11 @@ export function SpiralVortex() {
             <Canvas
                 style={{ width: '100%', height: '100%' }}
                 gl={{
-                    antialias: false,
+                    antialias: true,
                     alpha: false,
                     powerPreference: 'high-performance',
                 }}
-                dpr={Math.min(window.devicePixelRatio, 1.5)}
+                dpr={Math.min(window.devicePixelRatio, 2)}
                 camera={{ position: [0, 0, 1] }}
             >
                 <VortexMesh variant={0} />
@@ -243,7 +243,7 @@ export function OrbitalAccent() {
                     alpha: true,
                     powerPreference: 'high-performance',
                 }}
-                dpr={Math.min(window.devicePixelRatio, 1.5)}
+                dpr={Math.min(window.devicePixelRatio, 2)}
                 camera={{ position: [0, 0, 1] }}
             >
                 <VortexMesh variant={1} />
