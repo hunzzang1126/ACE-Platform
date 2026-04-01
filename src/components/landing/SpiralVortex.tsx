@@ -59,10 +59,9 @@ const fragmentShader = /* glsl */ `
     float vs = uVariant * 0.35;
 
     // Deep dark base
-    vec3 color = vec3(0.02, 0.025, 0.055);
+    vec3 color = vec3(0.018, 0.022, 0.048);
 
     // ── Single center that auto-orbits slowly ──
-    // Always moving, mouse just shifts it a little extra
     float orbitSpeed = 0.08 + sv * 0.03;
     vec2 center = vec2(
       0.0 + sin(t * orbitSpeed) * 0.06 + mouse.x,
@@ -73,44 +72,48 @@ const fragmentShader = /* glsl */ `
     float baseRadius = 0.16;
     float spacing = 0.135;
 
-    // Color palette — inner to outer: cyan → teal → indigo → violet → deep blue
+    // Muted deep palette — barely lifted from background
     vec3 colors[5];
-    colors[0] = vec3(0.15, 0.42, 0.58);  // bright cyan
-    colors[1] = vec3(0.12, 0.36, 0.52);  // teal
-    colors[2] = vec3(0.18, 0.20, 0.50);  // indigo
-    colors[3] = vec3(0.20, 0.14, 0.45);  // violet
-    colors[4] = vec3(0.10, 0.30, 0.52);  // teal-blue
+    colors[0] = vec3(0.08, 0.22, 0.35);  // deep cyan
+    colors[1] = vec3(0.07, 0.20, 0.32);  // dark teal
+    colors[2] = vec3(0.12, 0.10, 0.30);  // deep indigo
+    colors[3] = vec3(0.12, 0.08, 0.28);  // deep violet
+    colors[4] = vec3(0.06, 0.18, 0.30);  // muted blue
 
     for (int i = 0; i < 5; i++) {
       float fi = float(i);
       float r = baseRadius + spacing * fi;
 
-      // Each ring has a very subtle individual wobble
+      // Subtle individual wobble
       vec2 c = center + vec2(
         sin(t * 0.1 + fi * 1.3) * 0.008,
         cos(t * 0.12 + fi * 1.7) * 0.006
       );
 
-      float crisp = ring(p, c, r, 0.0022);
-      float glow  = ringGlow(p, c, r, 45.0);
-      float glow2 = ringGlow(p, c, r, 8.0);
+      float crisp = ring(p, c, r, 0.0018);
+      float glow  = ringGlow(p, c, r, 60.0);
+      float glow2 = ringGlow(p, c, r, 12.0);
 
-      // Outer rings slightly dimmer
-      float brightness = 1.0 - fi * 0.08;
+      // Outer rings dimmer
+      float brightness = 0.6 - fi * 0.06;
 
       vec3 col = colors[i];
-      color += col * crisp * 0.85 * brightness;
-      color += col * glow * 0.35 * brightness;
-      color += col * glow2 * 0.12 * brightness;
+      color += col * crisp * 0.5 * brightness;
+      color += col * glow * 0.2 * brightness;
+      color += col * glow2 * 0.06 * brightness;
     }
 
-    // ── Center ambient glow ──
-    float cDist = length(p - vec2(mouse.x * 0.1, -0.1 - vs * 0.5 + mouse.y * 0.1));
-    color += vec3(0.18, 0.10, 0.32) * exp(-cDist * 2.0) * 0.15;
+    // ── Very subtle center ambient glow ──
+    float cDist = length(p - vec2(mouse.x * 0.08, -0.1 - vs * 0.5 + mouse.y * 0.08));
+    color += vec3(0.10, 0.06, 0.18) * exp(-cDist * 2.5) * 0.08;
+
+    // ── Center text readability zone — dim rings near center ──
+    float textZone = smoothstep(0.15, 0.45, length(p - vec2(0.0, 0.0)));
+    color *= 0.4 + textZone * 0.6;
 
     // ── Soft vignette ──
     float vig = 1.0 - smoothstep(0.35, 1.1, length(p) * 0.85);
-    color *= 0.55 + vig * 0.45;
+    color *= 0.5 + vig * 0.5;
 
     gl_FragColor = vec4(color, 1.0);
   }
