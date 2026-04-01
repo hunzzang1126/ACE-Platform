@@ -13,6 +13,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@gsap/react": "^2.1.2",
     "@imgly/background-removal": "^1.7.0",
     "@react-three/fiber": "^9.5.0",
     "@stripe/stripe-js": "^8.10.0",
@@ -22,6 +23,7 @@
     "dexie": "^4.3.0",
     "fabric": "^6.9.1",
     "framer-motion": "^12.38.0",
+    "gsap": "^3.14.2",
     "immer": "^10.1.1",
     "mp4-muxer": "^5.2.2",
     "pixi.js": "^8.6.6",

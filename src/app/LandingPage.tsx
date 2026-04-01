@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────
-// LandingPage — Framer Motion-powered cinematic landing
+// LandingPage — GSAP ScrollTrigger + R3F Vortex
 // ─────────────────────────────────────────────────
 // Pricing → LandingPricing.tsx | Workflow → HowItWorks.tsx
 // ─────────────────────────────────────────────────
@@ -7,29 +7,21 @@
 import { useEffect, useRef, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, useScroll, useTransform } from 'framer-motion';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useAuthStore } from '@/stores/authStore';
 import { GlidLogo } from '@/components/brand/GlidLogo';
 import { HowItWorks } from './HowItWorks';
 import { LandingPricing } from './LandingPricing';
+import { setScrollVelocity } from '@/components/landing/SpiralVortex';
 import './landing.css';
+
+gsap.registerPlugin(ScrollTrigger);
 
 const SpiralVortex = lazy(() => import('@/components/landing/SpiralVortex').then(m => ({ default: m.SpiralVortex })));
 
 const Arrow = () => (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>
-);
-
-// Scroll-reveal wrapper
-const Reveal = ({ children, delay = 0, className = '' }: { children: React.ReactNode; delay?: number; className?: string }) => (
-    <motion.div
-        initial={{ opacity: 0, y: 40 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, amount: 0.15 }}
-        transition={{ duration: 0.7, delay, ease: [0.16, 1, 0.3, 1] }}
-        className={className}
-    >
-        {children}
-    </motion.div>
 );
 
 const FEATURES = [
@@ -39,17 +31,25 @@ const FEATURES = [
     { label: 'Animation', title: 'Bring Creatives to Life', desc: 'Timeline-based animation presets with custom easing, stagger, and sequencing. Preview in real-time and export as video, GIF, or HTML5.', icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#818cf8" strokeWidth="1.5"><polygon points="5 3 19 12 5 21 5 3" /></svg> },
 ];
 
+const METRICS = [
+    { value: '60fps', label: 'GPU-Accelerated Rendering' },
+    { value: '15+', label: 'Ad Sizes, One Click' },
+    { value: 'AI', label: 'Built-in Creative Agent' },
+    { value: '<1s', label: 'Export Latency' },
+];
+
 export function LandingPage() {
     const navigate = useNavigate();
     const { isAuthenticated } = useAuthStore();
     const heroRef = useRef<HTMLDivElement>(null);
     const sectionsRef = useRef<HTMLDivElement[]>([]);
+    const lpRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         if (isAuthenticated()) navigate('/dashboard', { replace: true });
     }, [isAuthenticated, navigate]);
 
-    // ★ Force scroll on landing page — override global overflow:hidden
+    // ★ Force scroll on landing page
     useEffect(() => {
         const html = document.documentElement;
         const body = document.body;
@@ -65,7 +65,92 @@ export function LandingPage() {
         };
     }, []);
 
-    // Intersection observer for legacy HowItWorks sections
+    // ★ GSAP ScrollTrigger — stagger reveals + scroll velocity → vortex
+    useEffect(() => {
+        const ctx = gsap.context(() => {
+            // ── Scroll velocity tracker → feeds SpiralVortex ──
+            let lastScroll = window.scrollY;
+            let velocity = 0;
+            const velocityTicker = () => {
+                const cur = window.scrollY;
+                velocity = Math.abs(cur - lastScroll) / 16; // px per frame → normalized
+                lastScroll = cur;
+                setScrollVelocity(velocity);
+            };
+            gsap.ticker.add(velocityTicker);
+
+            // ── Stagger reveal: Metrics ──
+            gsap.utils.toArray<HTMLElement>('.gsap-metric').forEach((el, i) => {
+                gsap.from(el, {
+                    y: 60,
+                    opacity: 0,
+                    duration: 0.8,
+                    delay: i * 0.12,
+                    ease: 'power3.out',
+                    scrollTrigger: {
+                        trigger: el,
+                        start: 'top 88%',
+                        once: true,
+                    },
+                });
+            });
+
+            // ── Stagger reveal: Feature cards ──
+            gsap.utils.toArray<HTMLElement>('.gsap-feature').forEach((el, i) => {
+                gsap.from(el, {
+                    y: 80,
+                    opacity: 0,
+                    duration: 0.9,
+                    delay: i * 0.15,
+                    ease: 'power3.out',
+                    scrollTrigger: {
+                        trigger: el,
+                        start: 'top 88%',
+                        once: true,
+                    },
+                });
+            });
+
+            // ── Section headers ──
+            gsap.utils.toArray<HTMLElement>('.gsap-reveal').forEach((el) => {
+                gsap.from(el, {
+                    y: 50,
+                    opacity: 0,
+                    duration: 0.8,
+                    ease: 'power3.out',
+                    scrollTrigger: {
+                        trigger: el,
+                        start: 'top 85%',
+                        once: true,
+                    },
+                });
+            });
+
+            // ── CTA section ──
+            const ctaEl = document.querySelector('.gsap-cta');
+            if (ctaEl) {
+                gsap.from(ctaEl, {
+                    y: 60,
+                    opacity: 0,
+                    duration: 1,
+                    ease: 'power3.out',
+                    scrollTrigger: {
+                        trigger: ctaEl,
+                        start: 'top 85%',
+                        once: true,
+                    },
+                });
+            }
+
+            return () => {
+                gsap.ticker.remove(velocityTicker);
+            };
+        }, lpRef);
+
+        return () => ctx.revert();
+    }, []);
+
+    // Intersection observer for HowItWorks
     useEffect(() => {
         const observer = new IntersectionObserver(
             (entries) => { entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); }); },
@@ -78,14 +163,13 @@ export function LandingPage() {
         if (el && !sectionsRef.current.includes(el)) sectionsRef.current.push(el);
     };
 
-    // ── Parallax scroll values ──
+    // ── Parallax (hero only — Framer Motion) ──
     const { scrollYProgress } = useScroll({ target: heroRef, offset: ['start start', 'end start'] });
     const heroY = useTransform(scrollYProgress, [0, 1], [0, 200]);
     const heroOpacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
 
-
     return (
-        <div className="lp">
+        <div className="lp" ref={lpRef}>
             {/* ── Nav ── */}
             <motion.nav className="lp-nav" initial={{ y: -80 }} animate={{ y: 0 }} transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}>
                 <div className="lp-nav-inner">
@@ -137,38 +221,33 @@ export function LandingPage() {
                 </motion.div>
             </section>
 
-            {/* ── Metrics ── */}
-            <Reveal className="lp-metrics-wrap">
+            {/* ── Metrics (GSAP stagger) ── */}
+            <div className="lp-metrics-wrap gsap-reveal">
                 <div className="lp-metrics">
-                    {[
-                        { value: '60fps', label: 'GPU-Accelerated Rendering' },
-                        { value: '15+', label: 'Ad Sizes, One Click' },
-                        { value: 'AI', label: 'Built-in Creative Agent' },
-                        { value: '<1s', label: 'Export Latency' },
-                    ].map((m, i) => (
-                        <motion.div key={i} className="lp-metric" initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.1, duration: 0.5 }}>
+                    {METRICS.map((m, i) => (
+                        <div key={i} className="lp-metric gsap-metric">
                             <div className="lp-metric-value">{m.value}</div>
                             <div className="lp-metric-label">{m.label}</div>
-                        </motion.div>
+                        </div>
                     ))}
                 </div>
-            </Reveal>
+            </div>
 
-            {/* ── Features ── */}
+            {/* ── Features (GSAP stagger) ── */}
             <section id="features" className="lp-features">
-                <Reveal className="lp-features-header">
+                <div className="lp-features-header gsap-reveal">
                     <div className="lp-section-label">Platform</div>
                     <h2 className="lp-section-title">Everything you need.<br />Nothing you don't.</h2>
                     <p className="lp-section-sub">A complete creative platform that replaces your entire tool stack.</p>
-                </Reveal>
+                </div>
                 <div className="lp-features-grid">
                     {FEATURES.map((f, i) => (
-                        <motion.div key={i} className="lp-feature-card" initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.2 }} transition={{ delay: i * 0.12, duration: 0.6, ease: [0.16, 1, 0.3, 1] }} whileHover={{ y: -4, transition: { duration: 0.25 } }}>
+                        <div key={i} className="lp-feature-card gsap-feature">
                             <div className="lp-feature-icon">{f.icon}</div>
                             <div className="lp-feature-label">{f.label}</div>
                             <h3 className="lp-feature-title">{f.title}</h3>
                             <p className="lp-feature-desc">{f.desc}</p>
-                        </motion.div>
+                        </div>
                     ))}
                 </div>
             </section>
@@ -179,17 +258,15 @@ export function LandingPage() {
             {/* ── Pricing ── */}
             <LandingPricing addRef={addRef} />
 
-            {/* ── CTA ── */}
-            <Reveal>
-                <section className="lp-cta">
-                    <div className="lp-cta-glow" />
-                    <h2 className="lp-cta-title">Ready to create?</h2>
-                    <p className="lp-cta-sub">Start building production-ready creatives in minutes. No credit card required.</p>
-                    <motion.button className="lp-btn-primary lp-btn-lg" onClick={() => navigate('/login')} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.98 }}>
-                        Get Started Free <Arrow />
-                    </motion.button>
-                </section>
-            </Reveal>
+            {/* ── CTA (GSAP) ── */}
+            <section className="lp-cta gsap-cta">
+                <div className="lp-cta-glow" />
+                <h2 className="lp-cta-title">Ready to create?</h2>
+                <p className="lp-cta-sub">Start building production-ready creatives in minutes. No credit card required.</p>
+                <button className="lp-btn-primary lp-btn-lg" onClick={() => navigate('/login')}>
+                    Get Started Free <Arrow />
+                </button>
+            </section>
 
             {/* ── Footer ── */}
             <footer className="lp-footer">

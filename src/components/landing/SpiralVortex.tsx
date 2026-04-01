@@ -2,12 +2,16 @@
 // SpiralVortex — Interactive WebGL background
 // ─────────────────────────────────────────────────
 // React Three Fiber + custom GLSL shader.
-// Dark-toned spiral vortex that responds to mouse.
+// Dark-toned spiral vortex that responds to mouse + scroll velocity.
 // ─────────────────────────────────────────────────
 
-import { useRef, useMemo, useCallback } from 'react';
+import { useRef, useMemo, useCallback, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
+
+// ── Global scroll velocity (written by LandingPage, read by shader) ──
+let _scrollVelocity = 0;
+export function setScrollVelocity(v: number) { _scrollVelocity = v; }
 
 // ── GLSL Shaders ──
 
@@ -25,6 +29,7 @@ const fragmentShader = /* glsl */ `
   uniform float uTime;
   uniform vec2 uMouse;
   uniform vec2 uResolution;
+  uniform float uScrollVelocity;
 
   varying vec2 vUv;
 
@@ -63,45 +68,47 @@ const fragmentShader = /* glsl */ `
     vec2 center = vec2(0.5) + uMouse * 0.05;
     vec2 p = uv - center;
 
-    // Aspect correction
     float aspect = uResolution.x / uResolution.y;
     p.x *= aspect;
 
-    // Polar coordinates
     float r = length(p);
     float a = atan(p.y, p.x);
 
-    // Spiral distortion — mouse influences rotation speed
+    // Scroll velocity accelerates rotation (clamped 0..3)
+    float scrollBoost = clamp(uScrollVelocity, 0.0, 3.0);
     float mouseInfluence = length(uMouse) * 0.3;
-    float spiral = a + r * 6.0 - uTime * (0.4 + mouseInfluence * 0.15);
+    float baseSpeed = 0.4 + mouseInfluence * 0.15 + scrollBoost * 0.6;
+    float spiral = a + r * 6.0 - uTime * baseSpeed;
     float twist = sin(spiral) * 0.5 + 0.5;
 
-    // Layered noise for organic feel
-    float n1 = snoise(vec2(spiral * 0.5, r * 3.0 - uTime * 0.1));
+    // Layered noise — scroll velocity adds turbulence
+    float turbulence = 1.0 + scrollBoost * 0.3;
+    float n1 = snoise(vec2(spiral * 0.5, r * 3.0 - uTime * 0.1 * turbulence));
     float n2 = snoise(vec2(a * 2.0 + uTime * 0.05, r * 5.0));
-    float n3 = snoise(vec2(p * 4.0 + uTime * 0.08));
+    float n3 = snoise(vec2(p * 4.0 + uTime * 0.08 * turbulence));
 
     float pattern = twist * 0.6 + n1 * 0.25 + n2 * 0.1 + n3 * 0.05;
 
-    // Radial falloff — vortex fades at edges
+    // Radial falloff
     float falloff = smoothstep(0.9, 0.1, r);
     pattern *= falloff;
 
-    // Color palette — deep indigo / violet / slate
-    vec3 col1 = vec3(0.08, 0.06, 0.18);  // deep navy
-    vec3 col2 = vec3(0.15, 0.10, 0.30);  // indigo
-    vec3 col3 = vec3(0.30, 0.20, 0.50);  // violet highlight
-    vec3 col4 = vec3(0.05, 0.04, 0.10);  // near-black
+    // Color palette — scroll adds slight brightness
+    float brightBoost = scrollBoost * 0.04;
+    vec3 col1 = vec3(0.08, 0.06, 0.18) + brightBoost;
+    vec3 col2 = vec3(0.15, 0.10, 0.30) + brightBoost;
+    vec3 col3 = vec3(0.30, 0.20, 0.50);
+    vec3 col4 = vec3(0.05, 0.04, 0.10);
 
     vec3 color = mix(col4, col1, pattern);
     color = mix(color, col2, smoothstep(0.3, 0.7, pattern));
     color = mix(color, col3, smoothstep(0.65, 0.95, pattern) * 0.4);
 
-    // Subtle glow at center
-    float glow = exp(-r * 3.0) * 0.15;
+    // Center glow
+    float glow = exp(-r * 3.0) * (0.15 + scrollBoost * 0.05);
     color += vec3(0.25, 0.15, 0.45) * glow;
 
-    // Very subtle mouse proximity highlight
+    // Mouse proximity highlight
     vec2 mp = uv - (vec2(0.5) + uMouse * 0.5);
     mp.x *= aspect;
     float mouseDist = length(mp);
@@ -117,15 +124,16 @@ const fragmentShader = /* glsl */ `
 function VortexMesh() {
     const meshRef = useRef<THREE.Mesh>(null);
     const mouseRef = useRef({ x: 0, y: 0 });
+    const scrollVelSmooth = useRef(0);
     const { size } = useThree();
 
     const uniforms = useMemo(() => ({
         uTime: { value: 0 },
         uMouse: { value: new THREE.Vector2(0, 0) },
         uResolution: { value: new THREE.Vector2(size.width, size.height) },
+        uScrollVelocity: { value: 0 },
     }), []);
 
-    // Smooth mouse tracking
     useFrame(({ clock }) => {
         const mat = meshRef.current?.material as THREE.ShaderMaterial | undefined;
         if (!mat?.uniforms?.uTime || !mat.uniforms.uMouse || !mat.uniforms.uResolution) return;
@@ -133,24 +141,24 @@ function VortexMesh() {
         mat.uniforms.uTime.value = clock.getElapsedTime();
         mat.uniforms.uResolution.value.set(size.width, size.height);
 
-        // Lerp mouse for smooth movement
+        // Smooth scroll velocity
+        scrollVelSmooth.current += (_scrollVelocity - scrollVelSmooth.current) * 0.08;
+        mat.uniforms.uScrollVelocity.value = scrollVelSmooth.current;
+
+        // Lerp mouse
         const target = mouseRef.current;
         const current = mat.uniforms.uMouse.value;
         current.x += (target.x - current.x) * 0.03;
         current.y += (target.y - current.y) * 0.03;
     });
 
-    // Track mouse globally (not just over canvas)
     const handleMouseMove = useCallback((e: MouseEvent) => {
         mouseRef.current.x = (e.clientX / window.innerWidth) * 2 - 1;
         mouseRef.current.y = -(e.clientY / window.innerHeight) * 2 + 1;
     }, []);
 
-    // Attach global listener
-    useMemo(() => {
-        if (typeof window !== 'undefined') {
-            window.addEventListener('mousemove', handleMouseMove);
-        }
+    useEffect(() => {
+        window.addEventListener('mousemove', handleMouseMove);
         return () => window.removeEventListener('mousemove', handleMouseMove);
     }, [handleMouseMove]);
 
