@@ -52,6 +52,9 @@ export async function signInWithOAuth(provider: Provider): Promise<{ error: stri
         provider,
         options: {
             redirectTo: `${window.location.origin}/auth/callback`,
+            queryParams: {
+                prompt: 'select_account', // ★ Always show account picker
+            },
         },
     });
 
