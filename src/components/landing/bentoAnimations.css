@@ -1,0 +1,296 @@
+/* ─────────────────────────────────────────────────
+   bentoAnimations.css — Unique animations per feature card
+   ───────────────────────────────────────────────── */
+
+/* ── Shared visual container ── */
+.bento-vis {
+  position: relative;
+  width: 100%;
+  height: 120px;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+/* ════════════════════════════════════════════════
+   1. GPU-Accelerated Canvas — floating layers
+   ════════════════════════════════════════════════ */
+.bento-vis--gpu {
+  background: linear-gradient(135deg, rgba(99,102,241,0.04), rgba(0,255,214,0.03));
+}
+
+.gpu-layer {
+  position: absolute;
+  border-radius: 8px;
+  border: 1px solid rgba(129,140,248,0.15);
+  background: rgba(129,140,248,0.04);
+}
+
+.gpu-layer--1 {
+  width: 120px; height: 80px;
+  left: 10%; top: 15%;
+  animation: gpuFloat1 6s ease-in-out infinite;
+}
+.gpu-layer--2 {
+  width: 100px; height: 60px;
+  left: 40%; top: 25%;
+  border-color: rgba(0,255,214,0.12);
+  background: rgba(0,255,214,0.03);
+  animation: gpuFloat2 7s ease-in-out infinite;
+}
+.gpu-layer--3 {
+  width: 80px; height: 50px;
+  right: 10%; top: 20%;
+  border-color: rgba(192,132,252,0.12);
+  background: rgba(192,132,252,0.03);
+  animation: gpuFloat3 8s ease-in-out infinite;
+}
+
+.gpu-shape--rect {
+  position: absolute;
+  width: 30px; height: 30px;
+  left: 25%; top: 35%;
+  border-radius: 6px;
+  background: rgba(0,255,214,0.08);
+  border: 1px solid rgba(0,255,214,0.15);
+  animation: gpuPulse 4s ease-in-out infinite;
+}
+.gpu-shape--circle {
+  position: absolute;
+  width: 24px; height: 24px;
+  left: 55%; top: 30%;
+  border-radius: 50%;
+  background: rgba(129,140,248,0.08);
+  border: 1px solid rgba(129,140,248,0.15);
+  animation: gpuPulse 5s ease-in-out infinite 1s;
+}
+
+.gpu-cursor {
+  position: absolute;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.5);
+  box-shadow: 0 0 12px rgba(0,255,214,0.4);
+  animation: gpuCursor 10s ease-in-out infinite;
+}
+
+@keyframes gpuFloat1 {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  50% { transform: translate(8px, -6px) rotate(1deg); }
+}
+@keyframes gpuFloat2 {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  50% { transform: translate(-6px, 8px) rotate(-1deg); }
+}
+@keyframes gpuFloat3 {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(5px, -10px); }
+}
+@keyframes gpuPulse {
+  0%, 100% { transform: scale(1); opacity: 0.6; }
+  50% { transform: scale(1.1); opacity: 1; }
+}
+@keyframes gpuCursor {
+  0% { left: 15%; top: 25%; }
+  25% { left: 55%; top: 45%; }
+  50% { left: 70%; top: 20%; }
+  75% { left: 35%; top: 60%; }
+  100% { left: 15%; top: 25%; }
+}
+
+/* ════════════════════════════════════════════════
+   2. AI Co-Pilot — chat bubbles with typing
+   ════════════════════════════════════════════════ */
+.bento-vis--ai {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 16px;
+  justify-content: center;
+}
+
+.ai-bubble {
+  border-radius: 12px;
+  padding: 8px 14px;
+  font-size: 12px;
+  max-width: 85%;
+  animation: aiBubbleIn 0.6s ease both;
+}
+.ai-bubble--user {
+  background: rgba(99,102,241,0.12);
+  border: 1px solid rgba(99,102,241,0.2);
+  color: rgba(255,255,255,0.7);
+  align-self: flex-end;
+  animation-delay: 0.3s;
+}
+.ai-bubble--bot {
+  background: rgba(0,255,214,0.06);
+  border: 1px solid rgba(0,255,214,0.12);
+  color: rgba(255,255,255,0.65);
+  align-self: flex-start;
+  animation-delay: 0.8s;
+  position: relative;
+}
+
+.ai-typing {
+  display: flex;
+  gap: 3px;
+  margin-top: 6px;
+}
+.ai-typing i {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: rgba(0,255,214,0.4);
+  animation: aiDot 1.4s ease-in-out infinite;
+}
+.ai-typing i:nth-child(2) { animation-delay: 0.2s; }
+.ai-typing i:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes aiBubbleIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes aiDot {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
+/* ════════════════════════════════════════════════
+   3. Animation — orbiting dots + timeline
+   ════════════════════════════════════════════════ */
+.bento-vis--anim {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.anim-object {
+  position: relative;
+  width: 60px; height: 60px;
+}
+.anim-orbit {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(192,132,252,0.15);
+}
+.anim-orbit--1 {
+  animation: animOrbit 6s linear infinite;
+}
+.anim-orbit--2 {
+  inset: -8px;
+  border-color: rgba(0,255,214,0.1);
+  animation: animOrbit 9s linear infinite reverse;
+}
+.anim-dot {
+  position: absolute;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: rgba(192,132,252,0.7);
+  box-shadow: 0 0 10px rgba(192,132,252,0.5);
+  top: -4px; left: 50%;
+  transform-origin: 50% calc(50% + 30px);
+  animation: animDotOrbit 6s linear infinite;
+}
+
+.anim-timeline {
+  width: 80%;
+  height: 4px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 2px;
+  position: relative;
+  overflow: hidden;
+}
+.anim-track {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(192,132,252,0.3), rgba(0,255,214,0.2));
+  border-radius: 2px;
+  transform-origin: left;
+  animation: animTrack 4s ease-in-out infinite;
+}
+.anim-playhead {
+  position: absolute;
+  width: 8px; height: 12px;
+  top: -4px;
+  background: rgba(255,255,255,0.6);
+  border-radius: 2px;
+  animation: animPlayhead 4s ease-in-out infinite;
+}
+
+@keyframes animOrbit {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes animDotOrbit {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes animTrack {
+  0% { transform: scaleX(0); }
+  50% { transform: scaleX(1); }
+  100% { transform: scaleX(0); }
+}
+@keyframes animPlayhead {
+  0% { left: 0%; }
+  50% { left: calc(100% - 8px); }
+  100% { left: 0%; }
+}
+
+/* ════════════════════════════════════════════════
+   4. Export — format badges
+   ════════════════════════════════════════════════ */
+.bento-vis--export {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px;
+  flex-wrap: wrap;
+}
+
+.export-badge {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.5px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.03);
+  color: rgba(255,255,255,0.5);
+  transition: all 0.3s ease;
+}
+.export-badge:hover {
+  border-color: rgba(0,255,214,0.2);
+  color: rgba(0,255,214,0.7);
+  background: rgba(0,255,214,0.05);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(0,255,214,0.1);
+}
+
+.export-badge--0 { animation: exportFloat 5s ease-in-out infinite; }
+.export-badge--1 { animation: exportFloat 6s ease-in-out infinite 0.5s; }
+.export-badge--2 { animation: exportFloat 5.5s ease-in-out infinite 1s; }
+.export-badge--3 { animation: exportFloat 7s ease-in-out infinite 1.5s; }
+.export-badge--4 { animation: exportFloat 6.5s ease-in-out infinite 2s; }
+
+@keyframes exportFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+/* ── Card hover glow per type ── */
+.bento-card--gpu:hover .bento-glow {
+  background: radial-gradient(circle at 30% 30%, rgba(99,102,241,0.08), transparent 60%);
+}
+.bento-card--ai:hover .bento-glow {
+  background: radial-gradient(circle at 50% 30%, rgba(0,255,214,0.06), transparent 60%);
+}
+.bento-card--anim:hover .bento-glow {
+  background: radial-gradient(circle at 50% 50%, rgba(192,132,252,0.06), transparent 60%);
+}
+.bento-card--export:hover .bento-glow {
+  background: radial-gradient(circle at 60% 40%, rgba(0,255,214,0.06), transparent 60%);
+}

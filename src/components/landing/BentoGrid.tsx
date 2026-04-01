@@ -1,71 +1,107 @@
 // ─────────────────────────────────────────────────
-// BentoGrid — Interactive feature grid for landing
+// BentoGrid — Dynamic feature grid for landing page
 // ─────────────────────────────────────────────────
+// Each card has a unique animated visual matching its feature.
 
 import { motion } from 'framer-motion';
 import { useLandingI18n } from './landingI18n';
 import type { TKey } from './landingI18n';
+import './bentoAnimations.css';
 
 interface BentoItem {
     span: 'wide' | 'normal';
     labelKey: TKey;
     titleKey: TKey;
     descKey: TKey;
+    visualClass: string;
     visual: React.ReactNode;
+}
+
+// ── GPU Canvas Visual: animated layers with floating shapes ──
+function GPUCanvasVisual() {
+    return (
+        <div className="bento-vis bento-vis--gpu">
+            <div className="gpu-layer gpu-layer--1" />
+            <div className="gpu-layer gpu-layer--2" />
+            <div className="gpu-layer gpu-layer--3" />
+            <div className="gpu-shape gpu-shape--rect" />
+            <div className="gpu-shape gpu-shape--circle" />
+            <div className="gpu-cursor" />
+        </div>
+    );
+}
+
+// ── AI Co-Pilot Visual: typing chat bubbles ──
+function AICoPilotVisual() {
+    return (
+        <div className="bento-vis bento-vis--ai">
+            <div className="ai-bubble ai-bubble--user">
+                <span>Make the headline bolder</span>
+            </div>
+            <div className="ai-bubble ai-bubble--bot">
+                <span>Done. Updated font weight to 800</span>
+                <div className="ai-typing">
+                    <i /><i /><i />
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ── Animation Visual: orbiting keyframes ──
+function AnimationVisual() {
+    return (
+        <div className="bento-vis bento-vis--anim">
+            <div className="anim-timeline">
+                <div className="anim-track" />
+                <div className="anim-playhead" />
+            </div>
+            <div className="anim-object">
+                <div className="anim-orbit anim-orbit--1" />
+                <div className="anim-orbit anim-orbit--2" />
+                <div className="anim-dot" />
+            </div>
+        </div>
+    );
+}
+
+// ── Export Visual: file format badges flying in ──
+function ExportVisual() {
+    const formats = ['PNG', 'JPG', 'HTML5', 'GIF', 'MP4'];
+    return (
+        <div className="bento-vis bento-vis--export">
+            {formats.map((fmt, i) => (
+                <motion.div
+                    key={fmt}
+                    className={`export-badge export-badge--${i}`}
+                    initial={{ opacity: 0, scale: 0.5, y: 20 }}
+                    whileInView={{ opacity: 1, scale: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.3 + i * 0.1, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                >
+                    {fmt}
+                </motion.div>
+            ))}
+        </div>
+    );
 }
 
 const BENTO_ITEMS: BentoItem[] = [
     {
         span: 'wide', labelKey: 'feat1Label', titleKey: 'feat1Title', descKey: 'feat1Desc',
-        visual: (
-            <svg width="100%" height="120" viewBox="0 0 400 120" fill="none">
-                <rect x="20" y="10" width="140" height="100" rx="8" fill="rgba(129,140,248,0.08)" stroke="rgba(129,140,248,0.2)" />
-                <rect x="30" y="20" width="60" height="20" rx="4" fill="rgba(129,140,248,0.15)" />
-                <rect x="30" y="50" width="120" height="8" rx="2" fill="rgba(255,255,255,0.06)" />
-                <rect x="30" y="65" width="80" height="8" rx="2" fill="rgba(255,255,255,0.04)" />
-                <rect x="180" y="20" width="200" height="80" rx="8" fill="rgba(0,255,214,0.04)" stroke="rgba(0,255,214,0.1)" />
-                <circle cx="280" cy="60" r="20" fill="rgba(129,140,248,0.1)" stroke="rgba(129,140,248,0.2)" />
-                <rect x="210" y="40" width="40" height="40" rx="6" fill="rgba(0,255,214,0.06)" stroke="rgba(0,255,214,0.12)" />
-            </svg>
-        ),
+        visualClass: 'gpu', visual: <GPUCanvasVisual />,
     },
     {
         span: 'normal', labelKey: 'feat2Label', titleKey: 'feat2Title', descKey: 'feat2Desc',
-        visual: (
-            <svg width="100%" height="90" viewBox="0 0 200 90" fill="none">
-                <rect x="10" y="10" width="180" height="30" rx="6" fill="rgba(0,255,214,0.04)" stroke="rgba(0,255,214,0.1)" />
-                <rect x="20" y="20" width="80" height="10" rx="3" fill="rgba(255,255,255,0.06)" />
-                <rect x="10" y="50" width="120" height="30" rx="6" fill="rgba(129,140,248,0.06)" stroke="rgba(129,140,248,0.12)" />
-                <rect x="20" y="60" width="60" height="10" rx="3" fill="rgba(129,140,248,0.15)" />
-            </svg>
-        ),
+        visualClass: 'ai', visual: <AICoPilotVisual />,
     },
     {
         span: 'normal', labelKey: 'feat3Label', titleKey: 'feat3Title', descKey: 'feat3Desc',
-        visual: (
-            <svg width="100%" height="90" viewBox="0 0 200 90" fill="none">
-                <rect x="10" y="50" width="180" height="4" rx="2" fill="rgba(255,255,255,0.06)" />
-                <circle cx="30" cy="52" r="6" fill="rgba(0,255,214,0.2)" />
-                <circle cx="80" cy="52" r="6" fill="rgba(129,140,248,0.2)" />
-                <circle cx="140" cy="52" r="6" fill="rgba(192,132,252,0.2)" />
-                <polyline points="30,30 60,15 90,25 120,10 150,20 180,5" stroke="rgba(0,255,214,0.3)" strokeWidth="1.5" fill="none" />
-            </svg>
-        ),
+        visualClass: 'anim', visual: <AnimationVisual />,
     },
     {
         span: 'wide', labelKey: 'feat4Label', titleKey: 'feat4Title', descKey: 'feat4Desc',
-        visual: (
-            <svg width="100%" height="100" viewBox="0 0 400 100" fill="none">
-                {[0, 1, 2, 3, 4].map(i => (
-                    <g key={i} transform={`translate(${20 + i * 76}, 15)`}>
-                        <rect width="64" height="70" rx="8" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.06)" />
-                        <text x="32" y="45" textAnchor="middle" fill="rgba(255,255,255,0.25)" fontSize="9" fontFamily="monospace">
-                            {['PNG', 'JPG', 'HTML5', 'GIF', 'MP4'][i]}
-                        </text>
-                    </g>
-                ))}
-            </svg>
-        ),
+        visualClass: 'export', visual: <ExportVisual />,
     },
 ];
 
@@ -82,11 +118,12 @@ export function BentoGrid() {
                 {BENTO_ITEMS.map((item, i) => (
                     <motion.div
                         key={i}
-                        className={`bento-card ${item.span === 'wide' ? 'bento-card--wide' : ''}`}
+                        className={`bento-card bento-card--${item.visualClass} ${item.span === 'wide' ? 'bento-card--wide' : ''}`}
                         initial={{ opacity: 0, y: 40 }}
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true, amount: 0.2 }}
                         transition={{ delay: i * 0.1, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+                        whileHover={{ y: -4, transition: { duration: 0.3 } }}
                     >
                         <div className="bento-glow" />
                         <div className="bento-card-inner">

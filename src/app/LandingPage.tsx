@@ -16,7 +16,6 @@ import { BentoGrid } from '@/components/landing/BentoGrid';
 import { SmartSizingShowcase } from '@/components/landing/SmartSizingShowcase';
 import { LandingPricing } from './LandingPricing';
 import { setScrollVelocity } from '@/components/landing/SpiralVortex';
-import { OrbitalAccent } from '@/components/landing/SpiralVortex';
 import { LandingI18nProvider, useLandingI18n } from '@/components/landing/landingI18n';
 import { LangSelector } from '@/components/landing/LangSelector';
 import './landing.css';
@@ -187,13 +186,8 @@ function LandingPageContent() {
                 </motion.div>
             </section>
 
-            {/* ── Bento Grid with Orbital Accent behind ── */}
-            <div style={{ position: 'relative' }}>
-                <Suspense fallback={null}>
-                    <OrbitalAccent />
-                </Suspense>
-                <BentoGrid />
-            </div>
+            {/* ── Bento Grid ── */}
+            <BentoGrid />
 
             {/* ── Smart Sizing ── */}
             <div id="smart-sizing">
