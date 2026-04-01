@@ -44,11 +44,30 @@ export function useEditorPageSave(
         try {
             const tmplId = useTemplateStore.getState().editingTemplateId;
             if (tmplId) {
-                saveToStore(engineRef, overlayElements);
-                const cs = useDesignStore.getState().creativeSet;
-                const v = cs?.variants.find(vi => vi.id === variantId);
-                if (v) {
-                    overrideTemplate(tmplId, v, width, height);
+                // ★ ROOT CAUSE FIX: Template editing uses a temp CS that is NOT in allCreativeSets.
+                // saveToStore → replaceVariantElements → getActiveCS() returns undefined, so
+                // the store never gets updated. We MUST read elements directly from the engine
+                // and construct the variant ourselves, bypassing the broken store path.
+                const engine = engineRef.current;
+                if (engine) {
+                    const { readNodesFromEngine, addOverlaysAndSort } = require('@/hooks/canvasSyncSave');
+                    const elements = readNodesFromEngine(engine, width, height);
+                    addOverlaysAndSort(elements, overlayElements, width, height);
+
+                    // Construct variant directly from live canvas data
+                    const cs = useDesignStore.getState().creativeSet;
+                    const existingVariant = cs?.variants.find(vi => vi.id === variantId);
+                    const directVariant = {
+                        id: variantId ?? 'tmpl-direct',
+                        preset: existingVariant?.preset ?? { id: 'tmpl', name: `${width}x${height}`, width, height, category: 'display' as const },
+                        elements,
+                        backgroundColor: existingVariant?.backgroundColor ?? '#ffffff',
+                        overriddenElementIds: [],
+                        syncLocked: false,
+                    };
+
+                    console.log('[handleSave] Template direct save: elements:', elements.length, 'from engine (bypassing broken store path)');
+                    overrideTemplate(tmplId, directVariant, width, height);
                     setEditingTemplateId(null);
                     useTemplateStore.getState().setEditingTempCsId(null);
                     isDirtyRef.current = false;
@@ -61,7 +80,7 @@ export function useEditorPageSave(
             isDirtyRef.current = false;
             lastManualSaveRef.current = Date.now();
             if (result.success) setSaveStatus('saved'); else setSaveStatus('idle');
-        } catch { setSaveStatus('idle'); }
+        } catch (e) { console.error('[handleSave] Error:', e); setSaveStatus('idle'); }
         setTimeout(() => { isSavingRef.current = false; }, 200);
         setTimeout(() => setSaveStatus('idle'), 2000);
     }, [saveToStore, engineRef, overlayElements, overrideTemplate, variantId, width, height]);
