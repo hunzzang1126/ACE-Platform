@@ -231,7 +231,7 @@ export default function PricingPage() {
                                     label="AI Token Budget"
                                     value={plan.limits.aiTokensPerMonth >= Number.MAX_SAFE_INTEGER
                                         ? 'Unlimited'
-                                        : `${(plan.limits.aiTokensPerMonth / 1_000_000).toFixed(1)}M/mo`}
+                                        : `${plan.limits.aiTokensPerMonth.toLocaleString()}/mo`}
                                 />
                                 <Feature
                                     label="AI Model"
