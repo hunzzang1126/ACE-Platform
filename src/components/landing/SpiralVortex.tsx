@@ -53,95 +53,55 @@ const fragmentShader = /* glsl */ `
     vec2 p = uv - 0.5;
     p.x *= aspect;
 
-    vec2 mouse = uMouse * 0.025;
-    float t = uTime * 0.12;
+    vec2 mouse = uMouse * 0.02;
+    float t = uTime;
     float sv = clamp(uScrollVelocity, 0.0, 2.0);
     float vs = uVariant * 0.35;
 
     // Deep dark base
     vec3 color = vec3(0.02, 0.025, 0.055);
 
-    // ── Ring 1 — Large outer (teal-cyan) ──
-    {
-      float r = 0.72 + vs * 0.08;
-      vec2 c = vec2(0.04 + mouse.x, -0.18 - vs + mouse.y);
-      float angle = t * 0.25 + sv * 0.08;
-      c += vec2(cos(angle), sin(angle)) * 0.015;
+    // ── Single center that auto-orbits slowly ──
+    // Always moving, mouse just shifts it a little extra
+    float orbitSpeed = 0.08 + sv * 0.03;
+    vec2 center = vec2(
+      0.0 + sin(t * orbitSpeed) * 0.06 + mouse.x,
+      -0.12 - vs + cos(t * orbitSpeed * 0.7) * 0.04 + mouse.y
+    );
 
-      float crisp = ring(p, c, r, 0.0025);
-      float glow  = ringGlow(p, c, r, 40.0);
+    // ── 5 concentric rings with even spacing ──
+    float baseRadius = 0.16;
+    float spacing = 0.135;
+
+    // Color palette — inner to outer: cyan → teal → indigo → violet → deep blue
+    vec3 colors[5];
+    colors[0] = vec3(0.15, 0.42, 0.58);  // bright cyan
+    colors[1] = vec3(0.12, 0.36, 0.52);  // teal
+    colors[2] = vec3(0.18, 0.20, 0.50);  // indigo
+    colors[3] = vec3(0.20, 0.14, 0.45);  // violet
+    colors[4] = vec3(0.10, 0.30, 0.52);  // teal-blue
+
+    for (int i = 0; i < 5; i++) {
+      float fi = float(i);
+      float r = baseRadius + spacing * fi;
+
+      // Each ring has a very subtle individual wobble
+      vec2 c = center + vec2(
+        sin(t * 0.1 + fi * 1.3) * 0.008,
+        cos(t * 0.12 + fi * 1.7) * 0.006
+      );
+
+      float crisp = ring(p, c, r, 0.0022);
+      float glow  = ringGlow(p, c, r, 45.0);
       float glow2 = ringGlow(p, c, r, 8.0);
 
-      vec3 teal = vec3(0.10, 0.35, 0.55);
-      color += teal * crisp * 0.9;
-      color += teal * glow * 0.4;
-      color += teal * glow2 * 0.15;
-    }
+      // Outer rings slightly dimmer
+      float brightness = 1.0 - fi * 0.08;
 
-    // ── Ring 2 — Mid (indigo-purple) ──
-    {
-      float r = 0.52 + vs * 0.06;
-      vec2 c = vec2(-0.03 + mouse.x * 0.8, -0.12 - vs * 0.8 + mouse.y * 0.8);
-      float angle = t * 0.2 + 1.2;
-      c += vec2(cos(angle + 1.0), sin(angle + 1.0)) * 0.012;
-
-      float crisp = ring(p, c, r, 0.003);
-      float glow  = ringGlow(p, c, r, 35.0);
-      float glow2 = ringGlow(p, c, r, 7.0);
-
-      vec3 indigo = vec3(0.22, 0.14, 0.50);
-      color += indigo * crisp * 0.85;
-      color += indigo * glow * 0.35;
-      color += indigo * glow2 * 0.12;
-    }
-
-    // ── Ring 3 — Inner (cyan) ──
-    {
-      float r = 0.36 + vs * 0.05;
-      vec2 c = vec2(0.06 + mouse.x * 0.6, -0.06 - vs * 0.6 + mouse.y * 0.6);
-      float angle = t * 0.3 + 2.5 + sv * 0.1;
-      c += vec2(cos(angle + 2.5), sin(angle + 2.5)) * 0.01;
-
-      float crisp = ring(p, c, r, 0.002);
-      float glow  = ringGlow(p, c, r, 50.0);
-      float glow2 = ringGlow(p, c, r, 10.0);
-
-      vec3 cyan = vec3(0.12, 0.35, 0.48);
-      color += cyan * crisp * 0.8;
-      color += cyan * glow * 0.3;
-      color += cyan * glow2 * 0.1;
-    }
-
-    // ── Ring 4 — Accent (pale violet, larger) ──
-    {
-      float r = 0.60 + vs * 0.1;
-      vec2 c = vec2(-0.08 + mouse.x * 0.5, 0.04 - vs * 0.5 + mouse.y * 0.5);
-      float angle = t * 0.18 + 3.8;
-      c += vec2(cos(angle + 4.0), sin(angle + 4.0)) * 0.014;
-
-      float crisp = ring(p, c, r, 0.002);
-      float glow  = ringGlow(p, c, r, 30.0);
-      float glow2 = ringGlow(p, c, r, 6.0);
-
-      vec3 violet = vec3(0.18, 0.12, 0.40);
-      color += violet * crisp * 0.7;
-      color += violet * glow * 0.25;
-      color += violet * glow2 * 0.10;
-    }
-
-    // ── Ring 5 — Small inner bright ring ──
-    {
-      float r = 0.20 + vs * 0.03;
-      vec2 c = vec2(0.02 + mouse.x * 0.4, 0.02 - vs * 0.4 + mouse.y * 0.4);
-      float angle = t * 0.35 + 5.5;
-      c += vec2(cos(angle), sin(angle)) * 0.008;
-
-      float crisp = ring(p, c, r, 0.0018);
-      float glow  = ringGlow(p, c, r, 60.0);
-
-      vec3 brightCyan = vec3(0.15, 0.40, 0.55);
-      color += brightCyan * crisp * 0.75;
-      color += brightCyan * glow * 0.25;
+      vec3 col = colors[i];
+      color += col * crisp * 0.85 * brightness;
+      color += col * glow * 0.35 * brightness;
+      color += col * glow2 * 0.12 * brightness;
     }
 
     // ── Center ambient glow ──
