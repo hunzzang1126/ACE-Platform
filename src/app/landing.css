@@ -13,6 +13,38 @@
     -moz-osx-font-smoothing: grayscale;
     position: relative;
 }
+
+/* ── Ambient glow background ── */
+.lp::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(ellipse 600px 600px at 20% 30%, rgba(99,102,241,0.06), transparent 70%),
+        radial-gradient(ellipse 500px 500px at 80% 60%, rgba(0,255,214,0.04), transparent 70%),
+        radial-gradient(ellipse 700px 700px at 50% 80%, rgba(192,132,252,0.05), transparent 70%),
+        radial-gradient(ellipse 400px 400px at 70% 20%, rgba(99,102,241,0.03), transparent 70%);
+    animation: ambientDrift 20s ease-in-out infinite alternate;
+}
+@keyframes ambientDrift {
+    0% {
+        background-position: 0% 0%, 100% 50%, 50% 100%, 70% 0%;
+    }
+    50% {
+        background-position: 10% 20%, 80% 40%, 40% 90%, 60% 15%;
+    }
+    100% {
+        background-position: 20% 10%, 90% 70%, 60% 80%, 80% 10%;
+    }
+}
+
+/* Ensure page content sits above the glow */
+.lp > * {
+    position: relative;
+    z-index: 1;
+}
 /* Film grain overlay */
 .lp::after {
     content: '';
