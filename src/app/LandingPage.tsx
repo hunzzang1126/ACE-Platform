@@ -80,7 +80,7 @@ export function LandingPage() {
     const { scrollYProgress } = useScroll({ target: heroRef, offset: ['start start', 'end start'] });
     const heroY = useTransform(scrollYProgress, [0, 1], [0, 200]);
     const heroOpacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
-    const imgScale = useTransform(scrollYProgress, [0, 1], [1, 0.92]);
+
 
     return (
         <div className="lp">
@@ -130,26 +130,7 @@ export function LandingPage() {
                         </button>
                     </motion.div>
                 </motion.div>
-
-                <motion.div className="lp-hero-visual" style={{ scale: imgScale }} initial={{ opacity: 0, y: 60 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.1, duration: 1, ease: [0.16, 1, 0.3, 1] }}>
-                    <img src="/hero-mockup.png" alt="Glid Creative Platform" className="lp-hero-img" />
-                    <div className="lp-hero-img-glow" />
-                </motion.div>
             </section>
-
-            {/* ── Video Showcase ── */}
-            <Reveal className="lp-video-section">
-                <div className="lp-video-wrapper">
-                    <video className="lp-video" autoPlay muted loop playsInline poster="/hero-mockup.png">
-                        <source src="https://cdn.coverr.co/videos/coverr-a-man-working-on-a-laptop-5494/1080p.mp4" type="video/mp4" />
-                    </video>
-                    <div className="lp-video-overlay" />
-                    <div className="lp-video-text">
-                        <div className="lp-section-label">See It In Action</div>
-                        <h2 className="lp-section-title">From concept to campaign<br /><span className="lp-gradient-text">in minutes, not days.</span></h2>
-                    </div>
-                </div>
-            </Reveal>
 
             {/* ── Metrics ── */}
             <Reveal className="lp-metrics-wrap">
