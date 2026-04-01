@@ -281,7 +281,7 @@ export async function upsertTemplateOverride(
     if (!sb) return { error: 'Supabase not configured' };
 
     try {
-        const { error } = await sb
+        const { data, error } = await sb
             .from('template_overrides')
             .upsert({
                 template_id: templateId,
@@ -290,13 +290,15 @@ export async function upsertTemplateOverride(
                 height: height ?? null,
                 updated_by: userId,
                 updated_at: new Date().toISOString(),
-            }, { onConflict: 'template_id' });
+            }, { onConflict: 'template_id' })
+            .select('template_id')
+            .single();
 
         if (error) {
-            console.warn('[upsertTemplateOverride] Error:', error.message);
+            console.error('[upsertTemplateOverride] RLS or DB error:', error.message, error.details);
             return { error: error.message };
         }
-        console.log('[upsertTemplateOverride] Saved override for', templateId);
+        console.log('[upsertTemplateOverride] Saved override for', data?.template_id ?? templateId);
         return { error: null };
     } catch (e: any) {
         console.warn('[upsertTemplateOverride] Failed:', e);
