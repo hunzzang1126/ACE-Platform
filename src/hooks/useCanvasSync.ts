@@ -17,18 +17,12 @@ import {
     restoreIdbRefs, preserveCustomStyles, convertNodesToElements,
     readNodesFromEngine, addOverlaysAndSort, asyncExtractAssets,
 } from './canvasSyncSave';
+// ★ Extracted for testability — pure functions that previously caused recurring bugs
+import { parseShadowColor } from './canvasSyncHelpers';
+export { parseShadowColor } from './canvasSyncHelpers';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Engine = any;
-
-/** Parse CSS shadow color string → [r, g, b, a] floats (0-1) */
-function parseShadowColor(color: string): [number, number, number, number] {
-    const m = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
-    if (m) return [parseInt(m[1]!) / 255, parseInt(m[2]!) / 255, parseInt(m[3]!) / 255, m[4] !== undefined ? parseFloat(m[4]!) : 1.0];
-    const hex = color.replace('#', '');
-    if (hex.length >= 6) return [parseInt(hex.slice(0, 2), 16) / 255, parseInt(hex.slice(2, 4), 16) / 255, parseInt(hex.slice(4, 6), 16) / 255, 1.0];
-    return [0, 0, 0, 0.5];
-}
 
 export function useCanvasSync(variantId: string | undefined, canvasW: number, canvasH: number) {
     const replaceVariantElements = useDesignStore((s) => s.replaceVariantElements);

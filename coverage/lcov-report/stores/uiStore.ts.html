@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">40% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>12/30</span>
+                <span class='fraction'>30/30</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">14.28% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>1/7</span>
+                <span class='fraction'>7/7</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">37.93% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>11/29</span>
+                <span class='fraction'>29/29</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">43.75% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>7/16</span>
+                <span class='fraction'>16/16</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -207,18 +207,18 @@
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -289,18 +289,18 @@ export const useUIStore = create&lt;UIState&gt;()((set) =&gt; ({
     toggleAIChat: () =&gt; set((s) =&gt; ({ aiChatOpen: !s.aiChatOpen })),
     togglePropertyPanel: () =&gt; set((s) =&gt; ({ propertyPanelOpen: !s.propertyPanelOpen })),
     toggleLayerPanel: () =&gt; set((s) =&gt; ({ layerPanelOpen: !s.layerPanelOpen })),
-    toggleExportPanel: <span class="fstat-no" title="function not covered" >() =&gt; <span class="cstat-no" title="statement not covered" >s</span>et(<span class="fstat-no" title="function not covered" >(s</span>) =&gt; (<span class="cstat-no" title="statement not covered" >{ exportPanelOpen: !s.exportPanelOpen }))</span>,</span>
-    toggleTemplateGallery: <span class="fstat-no" title="function not covered" >() =&gt; <span class="cstat-no" title="statement not covered" >s</span>et(<span class="fstat-no" title="function not covered" >(s</span>) =&gt; (<span class="cstat-no" title="statement not covered" >{ templateGalleryOpen: !s.templateGalleryOpen }))</span>,</span>
-    toggleBrandCompliance: <span class="fstat-no" title="function not covered" >() =&gt; <span class="cstat-no" title="statement not covered" >s</span>et(<span class="fstat-no" title="function not covered" >(s</span>) =&gt; (<span class="cstat-no" title="statement not covered" >{ brandComplianceOpen: !s.brandComplianceOpen }))</span>,</span>
-    toggleCanvasRuler: <span class="fstat-no" title="function not covered" >() =&gt; <span class="cstat-no" title="statement not covered" >s</span>et(<span class="fstat-no" title="function not covered" >(s</span>) =&gt; (<span class="cstat-no" title="statement not covered" >{ canvasRulerVisible: !s.canvasRulerVisible }))</span>,</span>
-    toggleAuthModal: <span class="fstat-no" title="function not covered" >() =&gt; <span class="cstat-no" title="statement not covered" >s</span>et(<span class="fstat-no" title="function not covered" >(s</span>) =&gt; (<span class="cstat-no" title="statement not covered" >{ authModalOpen: !s.authModalOpen }))</span>,</span>
-    toggleKeyframeInspector: <span class="fstat-no" title="function not covered" >() =&gt; <span class="cstat-no" title="statement not covered" >s</span>et(<span class="fstat-no" title="function not covered" >(s</span>) =&gt; (<span class="cstat-no" title="statement not covered" >{ keyframeInspectorOpen: !s.keyframeInspectorOpen }))</span>,</span>
-    toggleDesignScore: <span class="fstat-no" title="function not covered" >() =&gt; <span class="cstat-no" title="statement not covered" >s</span>et(<span class="fstat-no" title="function not covered" >(s</span>) =&gt; (<span class="cstat-no" title="statement not covered" >{ designScoreOpen: !s.designScoreOpen }))</span>,</span>
-    toggleSidebarTab: <span class="fstat-no" title="function not covered" >(t</span>ab: string) =&gt; <span class="cstat-no" title="statement not covered" >set(<span class="fstat-no" title="function not covered" >(s</span>) =&gt; (<span class="cstat-no" title="statement not covered" >{</span></span>
+    toggleExportPanel: () =&gt; set((s) =&gt; ({ exportPanelOpen: !s.exportPanelOpen })),
+    toggleTemplateGallery: () =&gt; set((s) =&gt; ({ templateGalleryOpen: !s.templateGalleryOpen })),
+    toggleBrandCompliance: () =&gt; set((s) =&gt; ({ brandComplianceOpen: !s.brandComplianceOpen })),
+    toggleCanvasRuler: () =&gt; set((s) =&gt; ({ canvasRulerVisible: !s.canvasRulerVisible })),
+    toggleAuthModal: () =&gt; set((s) =&gt; ({ authModalOpen: !s.authModalOpen })),
+    toggleKeyframeInspector: () =&gt; set((s) =&gt; ({ keyframeInspectorOpen: !s.keyframeInspectorOpen })),
+    toggleDesignScore: () =&gt; set((s) =&gt; ({ designScoreOpen: !s.designScoreOpen })),
+    toggleSidebarTab: (tab: string) =&gt; set((s) =&gt; ({
         activeSidebarTab: s.activeSidebarTab === tab ? null : tab,
         activeInlinePanel: null, // close inline panel when switching tabs
     })),
-    setInlinePanel: <span class="fstat-no" title="function not covered" >(p</span>anel) =&gt; <span class="cstat-no" title="statement not covered" >set(<span class="fstat-no" title="function not covered" >(s</span>) =&gt; (<span class="cstat-no" title="statement not covered" >{</span></span>
+    setInlinePanel: (panel) =&gt; set((s) =&gt; ({
         activeInlinePanel: s.activeInlinePanel === panel ? null : panel,
         activeSidebarTab: panel ? null : s.activeSidebarTab, // close sidebar tab when opening inline
     })),
@@ -316,7 +316,7 @@ export const useUIStore = create&lt;UIState&gt;()((set) =&gt; ({
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-04-02T16:06:41.481Z
+                at 2026-04-02T16:10:15.922Z
             </div>
         <script src="../prettify.js"></script>
         <script>
