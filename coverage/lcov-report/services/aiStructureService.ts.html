@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">62.38% </span>
+                <span class="strong">63.06% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>68/109</span>
+                <span class='fraction'>70/111</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">45.33% </span>
+                <span class="strong">44.44% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>34/75</span>
+                <span class='fraction'>36/81</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">61% </span>
+                <span class="strong">61.76% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>61/100</span>
+                <span class='fraction'>63/102</span>
             </div>
         
             
@@ -432,7 +432,17 @@
 <a name='L367'></a><a href='#L367'>367</a>
 <a name='L368'></a><a href='#L368'>368</a>
 <a name='L369'></a><a href='#L369'>369</a>
-<a name='L370'></a><a href='#L370'>370</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L370'></a><a href='#L370'>370</a>
+<a name='L371'></a><a href='#L371'>371</a>
+<a name='L372'></a><a href='#L372'>372</a>
+<a name='L373'></a><a href='#L373'>373</a>
+<a name='L374'></a><a href='#L374'>374</a>
+<a name='L375'></a><a href='#L375'>375</a>
+<a name='L376'></a><a href='#L376'>376</a>
+<a name='L377'></a><a href='#L377'>377</a>
+<a name='L378'></a><a href='#L378'>378</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -623,7 +633,12 @@
 <span class="cline-any cline-yes">22x</span>
 <span class="cline-any cline-yes">22x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">22x</span>
+<span class="cline-any cline-yes">22x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">22x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -782,6 +797,7 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -851,6 +867,8 @@ export interface LayoutSpec {
     headlineZone: { xPct: number; yPct: number; wPct: number; hPct: number };
     /** CTA zone (% of canvas) */
     ctaZone: { xPct: number; yPct: number; wPct: number; hPct: number };
+    /** Whether to include a CTA button. Only for commercial/ad designs. */
+    hasCTA: boolean;
     /** Recommended headline font size (px) — calculated from content length */
     headlineFontSize: number;
     /** Recommended subheadline font size (px) */
@@ -992,17 +1010,22 @@ export function generateLayoutSpecSync(
     const headlineZone = getHeadlineZone(layoutType, ratio);
     const ctaZone = getCtaZone(layoutType, ratio);
 &nbsp;
+    // ★ CTA is only for commercial/advertising moods
+    const commercialMoods = new Set(['promotional', 'energetic']);
+    const hasCTA = commercialMoods.has(mood);
+&nbsp;
     return {
         layoutType,
         alignment,
         headlineZone,
         ctaZone,
+        hasCTA,
         headlineFontSize: headlineFs,
         subheadlineFontSize: subheadlineFs,
         accentStrategy,
         spacing,
         mood,
-        reasoning: `${layoutType} layout (${ratio} canvas, ${headlineLen}-char headline, ${mood} mood)`,
+        reasoning: `${layoutType} layout (${ratio} canvas, ${headlineLen}-char headline, ${mood} mood${hasCTA ? '' : ', no CTA'})`,
     };
 }
 &nbsp;
@@ -1155,6 +1178,7 @@ Return JSON:
             alignment: parsed.alignment || 'center',
             headlineZone: getHeadlineZone(parsed.layoutType || 'centered-stack', ratio),
             ctaZone: getCtaZone(parsed.layoutType || 'centered-stack', ratio),
+            hasCTA: (parsed as any).hasCTA ?? new Set(['promotional', 'energetic']).has(parsed.mood || ''),
             headlineFontSize: headlineFs,
             subheadlineFontSize: subheadlineFs,
             accentStrategy: sanitizedAccent as AccentStrategy,
@@ -1177,7 +1201,7 @@ Return JSON:
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-03-18T16:07:41.605Z
+                at 2026-04-02T14:56:12.142Z
             </div>
         <script src="../prettify.js"></script>
         <script>

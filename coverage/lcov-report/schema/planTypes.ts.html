@@ -243,7 +243,32 @@
 <a name='L178'></a><a href='#L178'>178</a>
 <a name='L179'></a><a href='#L179'>179</a>
 <a name='L180'></a><a href='#L180'>180</a>
-<a name='L181'></a><a href='#L181'>181</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L181'></a><a href='#L181'>181</a>
+<a name='L182'></a><a href='#L182'>182</a>
+<a name='L183'></a><a href='#L183'>183</a>
+<a name='L184'></a><a href='#L184'>184</a>
+<a name='L185'></a><a href='#L185'>185</a>
+<a name='L186'></a><a href='#L186'>186</a>
+<a name='L187'></a><a href='#L187'>187</a>
+<a name='L188'></a><a href='#L188'>188</a>
+<a name='L189'></a><a href='#L189'>189</a>
+<a name='L190'></a><a href='#L190'>190</a>
+<a name='L191'></a><a href='#L191'>191</a>
+<a name='L192'></a><a href='#L192'>192</a>
+<a name='L193'></a><a href='#L193'>193</a>
+<a name='L194'></a><a href='#L194'>194</a>
+<a name='L195'></a><a href='#L195'>195</a>
+<a name='L196'></a><a href='#L196'>196</a>
+<a name='L197'></a><a href='#L197'>197</a>
+<a name='L198'></a><a href='#L198'>198</a>
+<a name='L199'></a><a href='#L199'>199</a>
+<a name='L200'></a><a href='#L200'>200</a>
+<a name='L201'></a><a href='#L201'>201</a>
+<a name='L202'></a><a href='#L202'>202</a>
+<a name='L203'></a><a href='#L203'>203</a>
+<a name='L204'></a><a href='#L204'>204</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -323,7 +348,28 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -430,15 +476,19 @@
 // Used by usePlanLimits hook and enforcement logic.
 // ─────────────────────────────────────────────────
 &nbsp;
-export type PlanTier = 'starter' | 'pro' | 'enterprise' | 'admin';
+export type PlanTier = 'starter' | 'creator' | 'pro' | 'enterprise' | 'admin';
 &nbsp;
 export type ExportFormat = 'png' | 'jpg' | 'html5' | 'gif' | 'mp4' | 'js_bundle';
 &nbsp;
 export interface PlanLimits {
     /** Max creative sets allowed (-1 = unlimited) */
     maxCreativeSets: number;
-    /** Max AI generations per month */
-    aiGenerationsPerMonth: number;
+    /** Max AI tokens per month (input + output combined) */
+    aiTokensPerMonth: number;
+    /** OpenRouter model IDs allowed for this plan */
+    allowedModels: string[];
+    /** Default model for new users on this plan */
+    defaultModel: string;
     /** Max size variants per creative set (-1 = unlimited) */
     maxVariantsPerSet: number;
     /** Allowed export formats */
@@ -447,8 +497,6 @@ export interface PlanLimits {
     maxTeamMembers: number;
     /** Brand Cloud access */
     brandCloudEnabled: boolean;
-    /** AI Vision QA access */
-    aiVisionQAEnabled: boolean;
 }
 &nbsp;
 export interface PlanInfo {
@@ -466,40 +514,53 @@ export interface PlanInfo {
 export const PLAN_LIMITS: Record&lt;PlanTier, PlanLimits&gt; = <span class="cstat-no" title="statement not covered" >{</span>
     starter: {
         maxCreativeSets: 3,
-        aiGenerationsPerMonth: 10,
+        aiTokensPerMonth: 50, // 50 AI generations/month
+        allowedModels: ['anthropic/claude-3.5-haiku'],
+        defaultModel: 'anthropic/claude-3.5-haiku',
         maxVariantsPerSet: 3,
         allowedExports: ['png'],
         maxTeamMembers: 1,
         brandCloudEnabled: false,
-        aiVisionQAEnabled: false,
+    },
+    creator: {
+        maxCreativeSets: 10,
+        aiTokensPerMonth: 200, // 200 AI generations/month
+        allowedModels: ['anthropic/claude-3.5-haiku', 'anthropic/claude-sonnet-4'],
+        defaultModel: 'anthropic/claude-sonnet-4',
+        maxVariantsPerSet: 10,
+        allowedExports: ['png', 'jpg'],
+        maxTeamMembers: 1,
+        brandCloudEnabled: false,
     },
     pro: {
         maxCreativeSets: -1,
-        aiGenerationsPerMonth: 1_000,
+        aiTokensPerMonth: 500, // 500 AI generations/month
+        allowedModels: ['anthropic/claude-3.5-haiku', 'anthropic/claude-sonnet-4'],
+        defaultModel: 'anthropic/claude-sonnet-4',
         maxVariantsPerSet: -1,
         allowedExports: ['png', 'jpg', 'html5'],
-        maxTeamMembers: 1,
+        maxTeamMembers: 3,
         brandCloudEnabled: false,
-        aiVisionQAEnabled: true,
     },
     enterprise: {
         maxCreativeSets: -1,
-        aiGenerationsPerMonth: 5_000,
+        aiTokensPerMonth: 5_000, // 5000 AI generations/month
+        allowedModels: ['anthropic/claude-3.5-haiku', 'anthropic/claude-sonnet-4'],
+        defaultModel: 'anthropic/claude-sonnet-4',
         maxVariantsPerSet: -1,
         allowedExports: ['png', 'jpg', 'html5', 'gif', 'mp4', 'js_bundle'],
         maxTeamMembers: -1,
         brandCloudEnabled: true,
-        aiVisionQAEnabled: true,
     },
-    // ★ Admin — truly unlimited, no restrictions whatsoever
     admin: {
         maxCreativeSets: -1,
-        aiGenerationsPerMonth: Number.MAX_SAFE_INTEGER,
+        aiTokensPerMonth: Number.MAX_SAFE_INTEGER,
+        allowedModels: ['anthropic/claude-3.5-haiku', 'anthropic/claude-sonnet-4'],
+        defaultModel: 'anthropic/claude-sonnet-4',
         maxVariantsPerSet: -1,
         allowedExports: ['png', 'jpg', 'html5', 'gif', 'mp4', 'js_bundle'],
         maxTeamMembers: -1,
         brandCloudEnabled: true,
-        aiVisionQAEnabled: true,
     },
 };
 &nbsp;
@@ -513,13 +574,21 @@ export const PLANS: PlanInfo[] = <span class="cstat-no" title="statement not cov
         limits: PLAN_LIMITS.starter,
     },
     {
+        tier: 'creator',
+        name: 'Creator',
+        tagline: 'For independent creators and freelancers',
+        priceMonthly: 15,
+        priceAnnual: 12, // ~20% discount
+        limits: PLAN_LIMITS.creator,
+        popular: true,
+    },
+    {
         tier: 'pro',
         name: 'Pro',
-        tagline: 'For professional creators and teams',
-        priceMonthly: 49,
-        priceAnnual: 39, // ~20% discount
+        tagline: 'For professional teams and agencies',
+        priceMonthly: 50,
+        priceAnnual: 40, // ~20% discount
         limits: PLAN_LIMITS.pro,
-        popular: true,
     },
     {
         tier: 'enterprise',
@@ -556,8 +625,8 @@ export function <span class="fstat-no" title="function not covered" >hasFeature(
 export interface UsageData {
     /** Current billing month (YYYY-MM) */
     month: string;
-    /** AI generations used this month */
-    aiGenerationsUsed: number;
+    /** AI tokens used this month (input + output combined) */
+    aiTokensUsed: number;
     /** Creative sets currently owned */
     creativeSetsCount: number;
 }
@@ -610,7 +679,7 @@ export interface OrgMember {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-03-18T16:07:41.605Z
+                at 2026-04-02T14:56:12.142Z
             </div>
         <script src="../prettify.js"></script>
         <script>
