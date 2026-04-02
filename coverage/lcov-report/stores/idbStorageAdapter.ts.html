@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">58.82% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>10/17</span>
+                <span class='fraction'>17/17</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/2</span>
+                <span class='fraction'>2/2</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">66.66% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>2/3</span>
+                <span class='fraction'>3/3</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">58.82% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>10/17</span>
+                <span class='fraction'>17/17</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line medium'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -146,44 +146,44 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">13x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">14x</span>
-<span class="cline-any cline-yes">14x</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">17x</span>
+<span class="cline-any cline-yes">17x</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">14x</span>
-<span class="cline-any cline-yes">14x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">734x</span>
-<span class="cline-any cline-yes">734x</span>
+<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-yes">15x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">734x</span>
-<span class="cline-any cline-yes">734x</span>
-<span class="cline-any cline-yes">734x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">738x</span>
+<span class="cline-any cline-yes">738x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">736x</span>
+<span class="cline-any cline-yes">736x</span>
+<span class="cline-any cline-yes">736x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -213,7 +213,7 @@ export const idbStorage: StateStorage = {
     getItem: async (name: string): Promise&lt;string | null&gt; =&gt; {
         try {
             const entry = await aceDB.kvStore.get(name);
-<span class="cstat-no" title="statement not covered" >            return entry?.value ?? null;</span>
+            return entry?.value ?? null;
         } catch (err) {
             console.warn('[idbStorage] getItem failed, falling back to localStorage:', err);
             return localStorage.getItem(name);
@@ -233,20 +233,20 @@ export const idbStorage: StateStorage = {
                 localStorage.setItem(name, value);
             } catch {
                 // Both failed — data won't persist this cycle
-<span class="cstat-no" title="statement not covered" >                console.error('[idbStorage] Both IndexedDB and localStorage failed for:', name);</span>
+                console.error('[idbStorage] Both IndexedDB and localStorage failed for:', name);
             }
         }
     },
 &nbsp;
-    removeItem: <span class="fstat-no" title="function not covered" >async (n</span>ame: string): Promise&lt;void&gt; =&gt; {
-<span class="cstat-no" title="statement not covered" >        try {</span>
-<span class="cstat-no" title="statement not covered" >            await aceDB.kvStore.delete(name);</span>
+    removeItem: async (name: string): Promise&lt;void&gt; =&gt; {
+        try {
+            await aceDB.kvStore.delete(name);
         } catch (err) {
-<span class="cstat-no" title="statement not covered" >            console.warn('[idbStorage] removeItem failed:', err);</span>
+            console.warn('[idbStorage] removeItem failed:', err);
         }
         // Also clean localStorage (migration cleanup)
-<span class="cstat-no" title="statement not covered" >        try {</span>
-<span class="cstat-no" title="statement not covered" >            localStorage.removeItem(name);</span>
+        try {
+            localStorage.removeItem(name);
         } catch {
             // ok
         }
@@ -259,7 +259,7 @@ export const idbStorage: StateStorage = {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-04-02T16:10:15.922Z
+                at 2026-04-02T18:06:10.771Z
             </div>
         <script src="../prettify.js"></script>
         <script>
