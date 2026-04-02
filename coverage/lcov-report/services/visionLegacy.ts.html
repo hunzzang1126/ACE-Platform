@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/12</span>
+                <span class='fraction'>12/12</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">70% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/10</span>
+                <span class='fraction'>7/10</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/3</span>
+                <span class='fraction'>3/3</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/9</span>
+                <span class='fraction'>9/9</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -174,12 +174,10 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -194,7 +192,9 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -203,11 +203,11 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">// ─────────────────────────────────────────────────
 // visionLegacy — Legacy callVisionCheck() compat
@@ -240,17 +240,17 @@ export interface VisionResult {
 /**
  * @deprecated Use analyzeDesign() for new code.
  */
-export async function <span class="fstat-no" title="function not covered" >callVisionCheck(</span>
+export async function callVisionCheck(
     base64Png: string,
     canvasW: number,
     canvasH: number,
     category: string,
     elements: Array&lt;{ name: string; role?: string; type: string }&gt;,
 ): Promise&lt;VisionResult&gt; {
-    const pureBase64 = <span class="cstat-no" title="statement not covered" >base64Png.startsWith('data:') ? base64Png.split(',')[1] ?? base64Png : base64Png;</span>
-    const elementList = <span class="cstat-no" title="statement not covered" >elements.map(<span class="fstat-no" title="function not covered" >(e</span>) =&gt; <span class="cstat-no" title="statement not covered" >`  - "${e.name}" (type: ${e.type}, role: ${e.role ?? 'unknown'})`)</span>.join('\n');</span>
+    const pureBase64 = base64Png.startsWith('data:') ? base64Png.split(',')[1] ?? <span class="branch-1 cbranch-no" title="branch not covered" >base64Png : b</span>ase64Png;
+    const elementList = elements.map((e) =&gt; `  - "${e.name}" (type: ${e.type}, role: ${e.role ?? <span class="branch-1 cbranch-no" title="branch not covered" >'unknown'}</span>)`).join('\n');
 &nbsp;
-    const prompt = <span class="cstat-no" title="statement not covered" >`You are a professional banner ad designer reviewing a resized layout.</span>
+    const prompt = `You are a professional banner ad designer reviewing a resized layout.
 &nbsp;
 Canvas: ${canvasW}x${canvasH}px (category: ${category})
 Elements present:
@@ -267,7 +267,7 @@ Analyze this banner image for visual quality. Return ONLY valid JSON:
 Check: readability, hierarchy, CTA prominence, whitespace, clipping.
 Return ONLY JSON.`;
 &nbsp;
-    const body = <span class="cstat-no" title="statement not covered" >{</span>
+    const body = {
         model: DEFAULT_CLAUDE_MODEL,
         max_tokens: 1024,
         messages: [{ role: 'user', content: [
@@ -276,11 +276,11 @@ Return ONLY JSON.`;
         ] }],
     };
 &nbsp;
-    const data = <span class="cstat-no" title="statement not covered" >await callAnthropicApi(body) as { content: Array&lt;{ type: string; text?: string }&gt; };</span>
-    const rawText = <span class="cstat-no" title="statement not covered" >data.content.find(<span class="fstat-no" title="function not covered" >c =&gt; <span class="cstat-no" title="statement not covered" >c</span>.type === 'text')</span>?.text ?? '';</span>
-    const jsonMatch = <span class="cstat-no" title="statement not covered" >rawText.match(/\{[\s\S]*\}/);</span>
-<span class="cstat-no" title="statement not covered" >    if (!jsonMatch) <span class="cstat-no" title="statement not covered" >throw new Error(`Vision API returned non-JSON: ${rawText.slice(0, 200)}`);</span></span>
-<span class="cstat-no" title="statement not covered" >    return JSON.parse(jsonMatch[0]) as VisionResult;</span>
+    const data = await callAnthropicApi(body) as { content: Array&lt;{ type: string; text?: string }&gt; };
+    const rawText = data.content.find(c =&gt; c.type === 'text')?.text ?? <span class="branch-1 cbranch-no" title="branch not covered" >'';</span>
+    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error(`Vision API returned non-JSON: ${rawText.slice(0, 200)}`);
+    return JSON.parse(jsonMatch[0]) as VisionResult;
 }
 &nbsp;</pre></td></tr></table></pre>
 
@@ -289,7 +289,7 @@ Return ONLY JSON.`;
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-04-02T20:13:52.085Z
+                at 2026-04-02T20:31:23.211Z
             </div>
         <script src="../prettify.js"></script>
         <script>
