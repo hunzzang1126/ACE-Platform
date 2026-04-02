@@ -10,6 +10,15 @@ beforeEach(() => {
         aiChatOpen: false,
         propertyPanelOpen: true,
         layerPanelOpen: true,
+        exportPanelOpen: false,
+        templateGalleryOpen: false,
+        brandComplianceOpen: false,
+        canvasRulerVisible: false,
+        authModalOpen: false,
+        keyframeInspectorOpen: false,
+        designScoreOpen: false,
+        activeSidebarTab: null,
+        activeInlinePanel: null,
         notification: null,
     });
 });
@@ -43,6 +52,94 @@ describe('uiStore — Panel Toggles', () => {
         expect(useUIStore.getState().layerPanelOpen).toBe(true);
         useUIStore.getState().toggleLayerPanel();
         expect(useUIStore.getState().layerPanelOpen).toBe(false);
+    });
+});
+
+describe('uiStore — Extra Panel Toggles', () => {
+    it('toggleExportPanel flips value', () => {
+        expect(useUIStore.getState().exportPanelOpen).toBe(false);
+        useUIStore.getState().toggleExportPanel();
+        expect(useUIStore.getState().exportPanelOpen).toBe(true);
+    });
+
+    it('toggleTemplateGallery flips value', () => {
+        expect(useUIStore.getState().templateGalleryOpen).toBe(false);
+        useUIStore.getState().toggleTemplateGallery();
+        expect(useUIStore.getState().templateGalleryOpen).toBe(true);
+    });
+
+    it('toggleBrandCompliance flips value', () => {
+        expect(useUIStore.getState().brandComplianceOpen).toBe(false);
+        useUIStore.getState().toggleBrandCompliance();
+        expect(useUIStore.getState().brandComplianceOpen).toBe(true);
+    });
+
+    it('toggleCanvasRuler flips value', () => {
+        expect(useUIStore.getState().canvasRulerVisible).toBe(false);
+        useUIStore.getState().toggleCanvasRuler();
+        expect(useUIStore.getState().canvasRulerVisible).toBe(true);
+    });
+
+    it('toggleAuthModal flips value', () => {
+        expect(useUIStore.getState().authModalOpen).toBe(false);
+        useUIStore.getState().toggleAuthModal();
+        expect(useUIStore.getState().authModalOpen).toBe(true);
+    });
+
+    it('toggleKeyframeInspector flips value', () => {
+        expect(useUIStore.getState().keyframeInspectorOpen).toBe(false);
+        useUIStore.getState().toggleKeyframeInspector();
+        expect(useUIStore.getState().keyframeInspectorOpen).toBe(true);
+    });
+
+    it('toggleDesignScore flips value', () => {
+        expect(useUIStore.getState().designScoreOpen).toBe(false);
+        useUIStore.getState().toggleDesignScore();
+        expect(useUIStore.getState().designScoreOpen).toBe(true);
+    });
+});
+
+describe('uiStore — Sidebar Tab', () => {
+    it('toggleSidebarTab sets active tab', () => {
+        useUIStore.getState().toggleSidebarTab('elements');
+        expect(useUIStore.getState().activeSidebarTab).toBe('elements');
+    });
+
+    it('toggleSidebarTab same tab collapses to null', () => {
+        useUIStore.setState({ activeSidebarTab: 'elements' });
+        useUIStore.getState().toggleSidebarTab('elements');
+        expect(useUIStore.getState().activeSidebarTab).toBeNull();
+    });
+
+    it('toggleSidebarTab closes inline panel', () => {
+        useUIStore.setState({ activeInlinePanel: 'effects' });
+        useUIStore.getState().toggleSidebarTab('elements');
+        expect(useUIStore.getState().activeInlinePanel).toBeNull();
+    });
+});
+
+describe('uiStore — Inline Panel', () => {
+    it('setInlinePanel opens panel', () => {
+        useUIStore.getState().setInlinePanel('animate');
+        expect(useUIStore.getState().activeInlinePanel).toBe('animate');
+    });
+
+    it('setInlinePanel same panel toggles to null', () => {
+        useUIStore.setState({ activeInlinePanel: 'animate' });
+        useUIStore.getState().setInlinePanel('animate');
+        expect(useUIStore.getState().activeInlinePanel).toBeNull();
+    });
+
+    it('setInlinePanel closes sidebar tab', () => {
+        useUIStore.setState({ activeSidebarTab: 'elements' });
+        useUIStore.getState().setInlinePanel('effects');
+        expect(useUIStore.getState().activeSidebarTab).toBeNull();
+    });
+
+    it('setInlinePanel null restores sidebar tab', () => {
+        useUIStore.setState({ activeSidebarTab: 'elements' });
+        useUIStore.getState().setInlinePanel(null);
+        expect(useUIStore.getState().activeSidebarTab).toBe('elements');
     });
 });
 
