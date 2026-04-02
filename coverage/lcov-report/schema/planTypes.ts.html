@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">92.3% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/13</span>
+                <span class='fraction'>12/13</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">83.33% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/6</span>
+                <span class='fraction'>5/6</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/3</span>
+                <span class='fraction'>3/3</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">90% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/10</span>
+                <span class='fraction'>9/10</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -308,7 +308,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -361,7 +361,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -400,20 +400,20 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -511,7 +511,7 @@ export interface PlanInfo {
 &nbsp;
 // ── Plan Definitions ────────────────────────────
 &nbsp;
-export const PLAN_LIMITS: Record&lt;PlanTier, PlanLimits&gt; = <span class="cstat-no" title="statement not covered" >{</span>
+export const PLAN_LIMITS: Record&lt;PlanTier, PlanLimits&gt; = {
     starter: {
         maxCreativeSets: 3,
         aiTokensPerMonth: 50, // 50 AI generations/month
@@ -564,7 +564,7 @@ export const PLAN_LIMITS: Record&lt;PlanTier, PlanLimits&gt; = <span class="csta
     },
 };
 &nbsp;
-export const PLANS: PlanInfo[] = <span class="cstat-no" title="statement not covered" >[</span>
+export const PLANS: PlanInfo[] = [
     {
         tier: 'starter',
         name: 'Starter',
@@ -602,21 +602,21 @@ export const PLANS: PlanInfo[] = <span class="cstat-no" title="statement not cov
 &nbsp;
 // ── Helpers ──────────────────────────────────────
 &nbsp;
-export function <span class="fstat-no" title="function not covered" >getPlanLimits(t</span>ier: PlanTier): PlanLimits {
-<span class="cstat-no" title="statement not covered" >    return PLAN_LIMITS[tier];</span>
+export function getPlanLimits(tier: PlanTier): PlanLimits {
+    return PLAN_LIMITS[tier];
 }
 &nbsp;
-export function <span class="fstat-no" title="function not covered" >isUnlimited(v</span>alue: number): boolean {
-<span class="cstat-no" title="statement not covered" >    return value === -1;</span>
+export function isUnlimited(value: number): boolean {
+    return value === -1;
 }
 &nbsp;
 /** Check if a specific feature is available on a given plan */
-export function <span class="fstat-no" title="function not covered" >hasFeature(t</span>ier: PlanTier, feature: keyof PlanLimits): boolean {
-    const limits = <span class="cstat-no" title="statement not covered" >PLAN_LIMITS[tier];</span>
-    const val = <span class="cstat-no" title="statement not covered" >limits[feature];</span>
-<span class="cstat-no" title="statement not covered" >    if (typeof val === 'boolean') <span class="cstat-no" title="statement not covered" >return val;</span></span>
-<span class="cstat-no" title="statement not covered" >    if (typeof val === 'number') <span class="cstat-no" title="statement not covered" >return val !== 0;</span></span>
-<span class="cstat-no" title="statement not covered" >    if (Array.isArray(val)) <span class="cstat-no" title="statement not covered" >return val.length &gt; 0;</span></span>
+export function hasFeature(tier: PlanTier, feature: keyof PlanLimits): boolean {
+    const limits = PLAN_LIMITS[tier];
+    const val = limits[feature];
+    if (typeof val === 'boolean') return val;
+    if (typeof val === 'number') return val !== 0;
+    <span class="missing-if-branch" title="else path not taken" >E</span>if (Array.isArray(val)) return val.length &gt; 0;
 <span class="cstat-no" title="statement not covered" >    return false;</span>
 }
 &nbsp;
@@ -679,7 +679,7 @@ export interface OrgMember {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-04-02T14:56:12.142Z
+                at 2026-04-02T15:58:56.063Z
             </div>
         <script src="../prettify.js"></script>
         <script>
