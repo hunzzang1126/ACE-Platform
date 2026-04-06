@@ -1,54 +1,115 @@
 // ─────────────────────────────────────────────────
-// ResizeHandles — Canva/Polotno-style round handles for overlay elements
+// ResizeHandles — Figma-style selection handles
+// ─────────────────────────────────────────────────
+// Corner: 8×8 square, white fill + #0D99FF border
+// Side: invisible hit area, edge hover shows resize cursor
+// Rotation: corner outside hover zone → cursor changes
 // ─────────────────────────────────────────────────
 
 import type { OverlayElement } from '@/hooks/useOverlayElements';
 
-const HANDLE_SIZE = 10;
-const HALF = HANDLE_SIZE / 2;
+const CORNER_SIZE = 8;
+const CORNER_HALF = CORNER_SIZE / 2;
+const EDGE_HIT = 6; // invisible edge hit area width
 
 export type HandleDir = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
 
-const HANDLE_POSITIONS: { dir: HandleDir; cursor: string; style: React.CSSProperties }[] = [
-    { dir: 'nw', cursor: 'nw-resize', style: { top: -HALF, left: -HALF } },
-    { dir: 'n', cursor: 'n-resize', style: { top: -HALF, left: `calc(50% - ${HALF}px)` } },
-    { dir: 'ne', cursor: 'ne-resize', style: { top: -HALF, right: -HALF } },
-    { dir: 'w', cursor: 'w-resize', style: { top: `calc(50% - ${HALF}px)`, left: -HALF } },
-    { dir: 'e', cursor: 'e-resize', style: { top: `calc(50% - ${HALF}px)`, right: -HALF } },
-    { dir: 'sw', cursor: 'sw-resize', style: { bottom: -HALF, left: -HALF } },
-    { dir: 's', cursor: 's-resize', style: { bottom: -HALF, left: `calc(50% - ${HALF}px)` } },
-    { dir: 'se', cursor: 'se-resize', style: { bottom: -HALF, right: -HALF } },
+// ── Corner handles (visible squares) ──
+const CORNER_HANDLES: { dir: HandleDir; cursor: string; style: React.CSSProperties }[] = [
+    { dir: 'nw', cursor: 'nwse-resize', style: { top: -CORNER_HALF, left: -CORNER_HALF } },
+    { dir: 'ne', cursor: 'nesw-resize', style: { top: -CORNER_HALF, right: -CORNER_HALF } },
+    { dir: 'sw', cursor: 'nesw-resize', style: { bottom: -CORNER_HALF, left: -CORNER_HALF } },
+    { dir: 'se', cursor: 'nwse-resize', style: { bottom: -CORNER_HALF, right: -CORNER_HALF } },
 ];
 
-export function ResizeHandles({ el, onResizeStart }: {
+// ── Edge handles (invisible hit zones) ──
+const EDGE_HANDLES: { dir: HandleDir; cursor: string; style: React.CSSProperties }[] = [
+    { dir: 'n', cursor: 'ns-resize', style: { top: -EDGE_HIT / 2, left: CORNER_SIZE, right: CORNER_SIZE, height: EDGE_HIT } },
+    { dir: 's', cursor: 'ns-resize', style: { bottom: -EDGE_HIT / 2, left: CORNER_SIZE, right: CORNER_SIZE, height: EDGE_HIT } },
+    { dir: 'w', cursor: 'ew-resize', style: { left: -EDGE_HIT / 2, top: CORNER_SIZE, bottom: CORNER_SIZE, width: EDGE_HIT } },
+    { dir: 'e', cursor: 'ew-resize', style: { right: -EDGE_HIT / 2, top: CORNER_SIZE, bottom: CORNER_SIZE, width: EDGE_HIT } },
+];
+
+// ── Rotation zones (invisible, outside corners) ──
+const ROTATION_SIZE = 14;
+const ROTATION_ZONES: { style: React.CSSProperties; cursor: string }[] = [
+    { style: { top: -ROTATION_SIZE, left: -ROTATION_SIZE, width: ROTATION_SIZE, height: ROTATION_SIZE }, cursor: 'url("data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'20\' height=\'20\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%230D99FF\' stroke-width=\'2\'><path d=\'M21 12a9 9 0 11-6.22-8.56\'/><path d=\'M21 3v9h-9\'/></svg>") 10 10, pointer' },
+    { style: { top: -ROTATION_SIZE, right: -ROTATION_SIZE, width: ROTATION_SIZE, height: ROTATION_SIZE }, cursor: 'url("data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'20\' height=\'20\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%230D99FF\' stroke-width=\'2\'><path d=\'M21 12a9 9 0 11-6.22-8.56\'/><path d=\'M21 3v9h-9\'/></svg>") 10 10, pointer' },
+    { style: { bottom: -ROTATION_SIZE, left: -ROTATION_SIZE, width: ROTATION_SIZE, height: ROTATION_SIZE }, cursor: 'url("data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'20\' height=\'20\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%230D99FF\' stroke-width=\'2\'><path d=\'M21 12a9 9 0 11-6.22-8.56\'/><path d=\'M21 3v9h-9\'/></svg>") 10 10, pointer' },
+    { style: { bottom: -ROTATION_SIZE, right: -ROTATION_SIZE, width: ROTATION_SIZE, height: ROTATION_SIZE }, cursor: 'url("data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'20\' height=\'20\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%230D99FF\' stroke-width=\'2\'><path d=\'M21 12a9 9 0 11-6.22-8.56\'/><path d=\'M21 3v9h-9\'/></svg>") 10 10, pointer' },
+];
+
+export function ResizeHandles({ el, onResizeStart, onRotateStart }: {
     el: OverlayElement;
-    onResizeStart: (e: React.MouseEvent, el: OverlayElement, dir: string) => void;
+    onResizeStart: (e: React.MouseEvent, el: OverlayElement, dir: HandleDir) => void;
+    onRotateStart?: (e: React.MouseEvent, el: OverlayElement) => void;
 }) {
     return (
         <>
-            {HANDLE_POSITIONS.map(({ dir, cursor, style }) => (
+            {/* Edge hit zones (invisible, cursor-only) */}
+            {EDGE_HANDLES.map(({ dir, cursor, style }) => (
                 <div
-                    key={dir}
+                    key={`edge-${dir}`}
+                    onMouseDown={(e) => onResizeStart(e, el, dir)}
+                    style={{ position: 'absolute', background: 'transparent', cursor, zIndex: 9998, ...style }}
+                />
+            ))}
+            {/* Corner handles (visible Figma squares) */}
+            {CORNER_HANDLES.map(({ dir, cursor, style }) => (
+                <div
+                    key={`corner-${dir}`}
                     onMouseDown={(e) => onResizeStart(e, el, dir)}
                     style={{
-                        position: 'absolute',
-                        width: HANDLE_SIZE,
-                        height: HANDLE_SIZE,
-                        background: '#FFFFFF',
-                        border: '1px solid #0D99FF',
-                        borderRadius: '50%',
-                        boxShadow: '0 0 3px rgba(0,0,0,0.2)',
-                        cursor,
-                        zIndex: 9999,
-                        ...style,
+                        position: 'absolute', width: CORNER_SIZE, height: CORNER_SIZE,
+                        background: '#FFFFFF', border: '1.5px solid #0D99FF',
+                        borderRadius: 1, boxShadow: '0 0 0 0.5px rgba(0,0,0,0.1)',
+                        cursor, zIndex: 9999, ...style,
                     }}
+                />
+            ))}
+            {/* Rotation zones (invisible, outside corners) */}
+            {onRotateStart && ROTATION_ZONES.map((zone, i) => (
+                <div
+                    key={`rot-${i}`}
+                    onMouseDown={(e) => onRotateStart(e, el)}
+                    style={{ position: 'absolute', background: 'transparent', cursor: zone.cursor, zIndex: 9997, ...zone.style }}
                 />
             ))}
         </>
     );
 }
 
-// ── EditorCanvas styles ──
+// ── Dimension tooltip (shown during resize) ──
+export function DimensionTooltip({ w, h, x, y }: { w: number; h: number; x: number; y: number }) {
+    return (
+        <div style={{
+            position: 'absolute', left: x + w / 2, top: y + h + 8,
+            background: '#0D99FF', color: '#fff', fontSize: 11, fontWeight: 500,
+            padding: '2px 6px', borderRadius: 3, whiteSpace: 'nowrap',
+            pointerEvents: 'none', zIndex: 10000, fontFamily: 'Inter, system-ui, sans-serif',
+            transform: 'translateX(-50%)',
+        }}>
+            {Math.round(w)} x {Math.round(h)}
+        </div>
+    );
+}
+
+// ── Rotation tooltip ──
+export function RotationTooltip({ angle, x, y }: { angle: number; x: number; y: number }) {
+    return (
+        <div style={{
+            position: 'absolute', left: x, top: y - 28,
+            background: '#0D99FF', color: '#fff', fontSize: 11, fontWeight: 500,
+            padding: '2px 6px', borderRadius: 3, whiteSpace: 'nowrap',
+            pointerEvents: 'none', zIndex: 10000, fontFamily: 'Inter, system-ui, sans-serif',
+            transform: 'translateX(-50%)',
+        }}>
+            {Math.round(angle)}°
+        </div>
+    );
+}
+
+// ── EditorCanvas styles (kept from original) ──
 
 export const overlayMessage: React.CSSProperties = {
     position: 'absolute', inset: 0,

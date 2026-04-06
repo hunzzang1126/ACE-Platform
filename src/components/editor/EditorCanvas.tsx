@@ -11,7 +11,7 @@ import { useAnimPresetStore } from '@/hooks/useAnimationPresets';
 import { useEditorStore } from '@/stores/editorStore';
 import { useUIStore } from '@/stores/uiStore';
 import { useAiMcpBridge } from '@/hooks/useAiMcpBridge';
-import { ResizeHandles, type HandleDir, overlayMessage, spinnerStyle, statusBarStyle, zoomBtnStyle } from './ResizeHandles';
+import { ResizeHandles, type HandleDir, DimensionTooltip, RotationTooltip, overlayMessage, spinnerStyle, statusBarStyle, zoomBtnStyle } from './ResizeHandles';
 import { CanvasRuler } from './CanvasRuler';
 import { CanvasContextMenu } from './CanvasContextMenu';
 import type { SceneNodeInfo } from '@/ai/agentContext';
@@ -89,17 +89,17 @@ export function EditorCanvas({ variant, canvasRef, overlayRef, engineRef, state,
             <div className="ed-overlay-layer" style={{ position: 'absolute', top: 0, left: 0, width, height, pointerEvents: 'none', overflow: 'visible', transformOrigin: '0 0', transform: overlayTransform }}>
                 {overlayElements.filter(el => el.type === 'image' && (el.visible ?? true)).map(el => {
                     const isSel = el.id === selectedOverlayId;
-                    const isDrag = oi.isDraggingOverlay.current && oi.dragOverlayId.current === el.id;
-                    const isResize = oi.isResizingOverlay.current && oi.resizeOverlayId.current === el.id;
+                    const isDrag = oi.isDragging.current && oi.dragId.current === el.id;
+                    const isResize = oi.isResizing.current && oi.resizeId.current === el.id;
                     const anim = (animIsPlaying && !isDrag && !isResize) ? getAnimStyle(el.id) : {};
-                    return (<div key={el.id} onMouseDown={e => oi.handleOverlayMouseDown(e, el)} style={{ ...overlayStyle(el, isSel), ...anim }}><img src={el.src} alt={el.name} draggable={false} style={{ width: '100%', height: '100%', objectFit: el.objectFit || 'cover', pointerEvents: 'none', display: 'block' }} />{isSel && !el.locked && <ResizeHandles el={el} onResizeStart={oi.handleResizeMouseDown} />}</div>);
+                    return (<div key={el.id} onMouseDown={e => oi.handleOverlayMouseDown(e, el)} style={{ ...overlayStyle(el, isSel), ...anim }}><img src={el.src} alt={el.name} draggable={false} style={{ width: '100%', height: '100%', objectFit: el.objectFit || 'cover', pointerEvents: 'none', display: 'block' }} />{isSel && !el.locked && <ResizeHandles el={el} onResizeStart={oi.handleResizeMouseDown} onRotateStart={oi.handleRotateMouseDown} />}</div>);
                 })}
                 {overlayElements.filter(el => el.type === 'video' && (el.visible ?? true)).map(el => {
                     const isSel = el.id === selectedOverlayId;
-                    const isDrag = oi.isDraggingOverlay.current && oi.dragOverlayId.current === el.id;
-                    const isResize = oi.isResizingOverlay.current && oi.resizeOverlayId.current === el.id;
+                    const isDrag = oi.isDragging.current && oi.dragId.current === el.id;
+                    const isResize = oi.isResizing.current && oi.resizeId.current === el.id;
                     const anim = (animIsPlaying && !isDrag && !isResize) ? getAnimStyle(el.id) : {};
-                    return (<div key={el.id} onMouseDown={e => oi.handleOverlayMouseDown(e, el)} style={{ ...overlayStyle(el, isSel), background: '#000', ...anim }}><video ref={videoEl => { if (videoEl) { videoRefsMap.current.set(el.id, videoEl); if (!animIsPlaying) { videoEl.pause(); videoEl.currentTime = 0; } } else { videoRefsMap.current.delete(el.id); } }} src={el.videoSrc} poster={el.posterSrc} muted={el.muted ?? true} playsInline preload="metadata" onLoadedData={e => { if (!useAnimPresetStore.getState().isPlaying) { e.currentTarget.pause(); e.currentTarget.currentTime = 0; } }} style={{ width: '100%', height: '100%', objectFit: el.objectFit || 'cover', pointerEvents: 'none', display: 'block' }} />{isSel && !el.locked && <ResizeHandles el={el} onResizeStart={oi.handleResizeMouseDown} />}</div>);
+                    return (<div key={el.id} onMouseDown={e => oi.handleOverlayMouseDown(e, el)} style={{ ...overlayStyle(el, isSel), background: '#000', ...anim }}><video ref={videoEl => { if (videoEl) { videoRefsMap.current.set(el.id, videoEl); if (!animIsPlaying) { videoEl.pause(); videoEl.currentTime = 0; } } else { videoRefsMap.current.delete(el.id); } }} src={el.videoSrc} poster={el.posterSrc} muted={el.muted ?? true} playsInline preload="metadata" onLoadedData={e => { if (!useAnimPresetStore.getState().isPlaying) { e.currentTarget.pause(); e.currentTarget.currentTime = 0; } }} style={{ width: '100%', height: '100%', objectFit: el.objectFit || 'cover', pointerEvents: 'none', display: 'block' }} />{isSel && !el.locked && <ResizeHandles el={el} onResizeStart={oi.handleResizeMouseDown} onRotateStart={oi.handleRotateMouseDown} />}</div>);
                 })}
             </div>
 

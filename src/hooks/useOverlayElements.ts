@@ -41,6 +41,7 @@ export interface OverlayElement {
     editing?: boolean;   // true when text is being inline-edited
     locked?: boolean;    // can't select/move
     visible?: boolean;   // hide layer
+    rotation?: number;   // degrees (0-360), Figma-style rotation
 }
 
 let _overlayIdCounter = 0;
