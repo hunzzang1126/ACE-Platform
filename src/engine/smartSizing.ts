@@ -2,10 +2,12 @@
 // Smart Sizing Engine — Template-Proven Adaptive Layout
 // ─────────────────────────────────────────────────
 // Types, zones, role detection → smartSizingTypes.ts
+// Modes: 'uniform' (center-aligned) | 'edge-pin' (left-gap fixed)
 // ─────────────────────────────────────────────────
 
 import type { DesignElement } from '@/schema/elements.types';
 import type { ElementConstraints } from '@/schema/constraints.types';
+import type { SizingMode } from '@/schema/design.types';
 import { constraintsToAbsolute } from './elementConverters';
 import type { LayoutRole } from '@/schema/layoutRoles';
 import { computeSmartConstraints, getSmartFontSize } from './smartLayout';
@@ -37,8 +39,10 @@ const MIN_CTA_HEIGHT = 44;
 export function smartSizeElements(
     originElements: DesignElement[], originW: number, originH: number,
     targetW: number, targetH: number,
+    mode: SizingMode = 'uniform',
 ): DesignElement[] {
     if (originW === targetW && originH === targetH) return JSON.parse(JSON.stringify(originElements));
+    if (mode === 'edge-pin') return edgePinSizeElements(originElements, originW, originH, targetW, targetH);
 
     const scaleX = targetW / originW;
     const scaleY = targetH / originH;
@@ -125,6 +129,84 @@ function postStretchTextFit(elements: DesignElement[], targetW: number, targetH:
         if (y < 0) c.vertical = { anchor: 'top' as const, offset: MARGIN };
     }
     return elements;
+}
+
+// ── Edge Pin sizing — left gap fixed, inter-element distance preserved ──
+
+function edgePinSizeElements(
+    originElements: DesignElement[], originW: number, originH: number,
+    targetW: number, targetH: number,
+): DesignElement[] {
+    const uniformScale = Math.min(targetW / originW, targetH / originH);
+    const result: DesignElement[] = [];
+    const contentItems: Array<{ el: DesignElement; x: number; y: number; w: number; h: number }> = [];
+
+    // Collect original left gap from non-background elements
+    const nonBgElements = originElements.filter(el => detectElementRole(el, originW, originH) !== 'background');
+    const originalLeftGap = nonBgElements.length > 0
+        ? Math.min(...nonBgElements.map(el => constraintsToAbsolute(el.constraints, originW, originH).x))
+        : 0;
+
+    for (const el of originElements) {
+        const abs = constraintsToAbsolute(el.constraints, originW, originH);
+        const role = detectElementRole(el, originW, originH);
+
+        // Background: cover fill (same as uniform mode)
+        if (role === 'background') {
+            let bgW = targetW, bgH = targetH, bgX = 0, bgY = 0;
+            if (el.type === 'image' && abs.w > 0 && abs.h > 0) {
+                const imgAspect = abs.w / abs.h;
+                const canvasAspect = targetW / targetH;
+                if (imgAspect > canvasAspect) { bgH = targetH; bgW = Math.round(targetH * imgAspect); bgX = -Math.round((bgW - targetW) / 2); }
+                else { bgW = targetW; bgH = Math.round(targetW / imgAspect); bgY = -Math.round((bgH - targetH) / 2); }
+            }
+            result.push({
+                ...JSON.parse(JSON.stringify(el)),
+                constraints: { horizontal: { anchor: 'left' as const, offset: bgX }, vertical: { anchor: 'top' as const, offset: bgY }, size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width: bgW, height: bgH }, rotation: el.constraints.rotation },
+            } as DesignElement);
+            continue;
+        }
+
+        // Content: uniformScale for position + size (preserves inter-element distances)
+        const newX = Math.round(abs.x * uniformScale);
+        const newY = Math.round(abs.y * uniformScale);
+        const newW = Math.max(4, Math.round(abs.w * uniformScale));
+        const newH = Math.max(4, Math.round(abs.h * uniformScale));
+
+        const fontPatch: Record<string, unknown> = {};
+        if ((el.type === 'text' || el.type === 'button') && (el as any).fontSize) {
+            fontPatch.fontSize = Math.max(MIN_FONT, Math.round((el as any).fontSize * uniformScale));
+        }
+        if ((el as any).borderRadius) fontPatch.borderRadius = Math.round((el as any).borderRadius * uniformScale);
+
+        const scaled = {
+            ...JSON.parse(JSON.stringify(el)),
+            constraints: { horizontal: { anchor: 'left' as const, offset: newX }, vertical: { anchor: 'top' as const, offset: newY }, size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width: newW, height: newH }, rotation: el.constraints.rotation },
+            ...fontPatch,
+        } as DesignElement;
+
+        contentItems.push({ el: scaled, x: newX, y: newY, w: newW, h: newH });
+    }
+
+    // Pin content group to original left gap
+    if (contentItems.length > 0) {
+        const scaledLeftEdge = Math.min(...contentItems.map(c => c.x));
+        const shiftX = originalLeftGap - scaledLeftEdge;
+
+        // Vertical: center the content group in target canvas
+        const minY = Math.min(...contentItems.map(c => c.y));
+        const maxY = Math.max(...contentItems.map(c => c.y + c.h));
+        const groupH = maxY - minY;
+        const shiftY = Math.round((targetH - groupH) / 2) - minY;
+
+        for (const { el } of contentItems) {
+            el.constraints.horizontal = { anchor: 'left' as const, offset: el.constraints.horizontal.offset + shiftX };
+            el.constraints.vertical = { anchor: 'top' as const, offset: el.constraints.vertical.offset + shiftY };
+            result.push(el);
+        }
+    }
+
+    return postStretchTextFit(result, targetW, targetH);
 }
 
 // ── Cross-category layout (kept for future use) ──

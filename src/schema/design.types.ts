@@ -55,6 +55,9 @@ export interface LocaleData {
     originalLocale: string;
 }
 
+/** Smart sizing mode: how elements are repositioned across variants */
+export type SizingMode = 'uniform' | 'edge-pin';
+
 /** 크리에이티브 셋 (오리진 + 플러그 연결된 변형들) */
 export interface CreativeSet {
     id: string;
@@ -86,6 +89,8 @@ export interface CreativeSet {
     cardPositions?: Record<string, { x: number; y: number }>;
     /** ★ Locale Layer — multi-language content switching (optional, backward-compat) */
     localeData?: LocaleData;
+    /** ★ Smart sizing mode: 'uniform' (center-aligned) or 'edge-pin' (left-gap fixed) */
+    sizingMode?: SizingMode;
 }
 
 

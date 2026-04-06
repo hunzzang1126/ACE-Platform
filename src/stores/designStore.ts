@@ -72,7 +72,7 @@ export const useDesignStore = create<DesignState>()(
                         master.elements.push(element);
                         for (const variant of cs.variants) {
                             if (variant.id === cs.masterVariantId) continue;
-                            const adapted = smartSizeElements([element], master.preset.width, master.preset.height, variant.preset.width, variant.preset.height);
+                            const adapted = smartSizeElements([element], master.preset.width, master.preset.height, variant.preset.width, variant.preset.height, cs.sizingMode ?? 'uniform');
                             variant.elements.push(...adapted);
                         }
                         cs.updatedAt = new Date().toISOString(); state.creativeSet = cs;
@@ -176,7 +176,7 @@ export const useDesignStore = create<DesignState>()(
                         if (pluggedTargetIds.length > 0) {
                             for (const target of cs.variants) {
                                 if (target.id === variantId || target.syncLocked || !pluggedTargetIds.includes(target.id)) continue;
-                                const adapted = smartSizeElements(elements, variant.preset.width, variant.preset.height, target.preset.width, target.preset.height);
+                                const adapted = smartSizeElements(elements, variant.preset.width, variant.preset.height, target.preset.width, target.preset.height, cs.sizingMode ?? 'uniform');
                                 target.elements = target.elements.length > 0 ? mergePropertyChanges(adapted, elements, variant.preset.width, variant.preset.height, target.preset.width, target.preset.height) : adapted;
                             }
                         }
@@ -201,7 +201,7 @@ export const useDesignStore = create<DesignState>()(
                         if (!cs.plugConnections) cs.plugConnections = {};
                         cs.plugConnections[targetId] = originId;
                         if (origin.elements.length > 0) {
-                            target.elements = smartSizeElements(origin.elements, origin.preset.width, origin.preset.height, target.preset.width, target.preset.height);
+                            target.elements = smartSizeElements(origin.elements, origin.preset.width, origin.preset.height, target.preset.width, target.preset.height, cs.sizingMode ?? 'uniform');
                         }
                         cs.updatedAt = new Date().toISOString(); state.creativeSet = cs;
                     });
@@ -223,7 +223,7 @@ export const useDesignStore = create<DesignState>()(
                             const origin = cs.variants.find(v => v.id === originId);
                             const target = cs.variants.find(v => v.id === targetId);
                             if (!origin || !target || origin.elements.length === 0) continue;
-                            target.elements = smartSizeElements(origin.elements, origin.preset.width, origin.preset.height, target.preset.width, target.preset.height);
+                            target.elements = smartSizeElements(origin.elements, origin.preset.width, origin.preset.height, target.preset.width, target.preset.height, cs.sizingMode ?? 'uniform');
                             synced++;
                         }
                         if (synced > 0) { cs.updatedAt = new Date().toISOString(); state.creativeSet = cs; }
