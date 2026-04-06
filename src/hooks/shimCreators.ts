@@ -113,6 +113,7 @@ export function createCreatorMethods(ctx: ShimContext) {
             (tb as any).__glidName = name || `Text #${id}`;
             (tb as any).__glidZIndex = userObjects().length;
             patchAceProps(tb);
+            tb.padding = 4; // ★ Consistent handle spacing around text
             fc.add(tb);
             tb.setCoords();
             fc.renderAll(); syncState();
