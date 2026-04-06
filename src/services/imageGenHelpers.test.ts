@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────
 
 import { describe, it, expect } from 'vitest';
-import { snapToFluxResolution, extractImageUrl, buildEnhancedPrompt } from './imageGenHelpers';
+import { snapToFluxResolution, extractImageUrl, buildEnhancedPrompt, generateFallbackImage } from './imageGenHelpers';
 
 describe('imageGenHelpers', () => {
     describe('snapToFluxResolution', () => {
@@ -33,6 +33,17 @@ describe('imageGenHelpers', () => {
 
         it('should return valid positive dimensions', () => {
             const result = snapToFluxResolution(1, 1);
+            expect(result.width).toBeGreaterThan(0);
+            expect(result.height).toBeGreaterThan(0);
+        });
+
+        it('should handle extreme wide ratio (970x250)', () => {
+            const result = snapToFluxResolution(970, 250);
+            expect(result.width).toBeGreaterThan(result.height);
+        });
+
+        it('should handle mobile sizes (320x50)', () => {
+            const result = snapToFluxResolution(320, 50);
             expect(result.width).toBeGreaterThan(0);
             expect(result.height).toBeGreaterThan(0);
         });
@@ -101,6 +112,16 @@ describe('imageGenHelpers', () => {
             };
             expect(extractImageUrl(resp)).toBe('data:image/webp;base64,base64data');
         });
+
+        it('should handle jpg URL', () => {
+            const resp = { choices: [{ message: { content: 'https://cdn.example.com/photo.jpg' } }] };
+            expect(extractImageUrl(resp)).toBe('https://cdn.example.com/photo.jpg');
+        });
+
+        it('should handle webp URL', () => {
+            const resp = { choices: [{ message: { content: 'https://cdn.example.com/img.webp' } }] };
+            expect(extractImageUrl(resp)).toBe('https://cdn.example.com/img.webp');
+        });
     });
 
     describe('buildEnhancedPrompt', () => {
@@ -126,5 +147,51 @@ describe('imageGenHelpers', () => {
             const result = buildEnhancedPrompt({ prompt: 'test', width: 100, height: 100 });
             expect(result).toContain('masterpiece');
         });
+
+        it('should handle minimal style', () => {
+            const result = buildEnhancedPrompt({ prompt: 'logo', width: 300, height: 250, style: 'minimal' });
+            expect(result.length).toBeGreaterThan(0);
+        });
+
+        it('should handle abstract style', () => {
+            const result = buildEnhancedPrompt({ prompt: 'pattern', width: 300, height: 250, style: 'abstract' });
+            expect(result.length).toBeGreaterThan(0);
+        });
+
+        it('should handle no style', () => {
+            const result = buildEnhancedPrompt({ prompt: 'flower', width: 300, height: 250 });
+            expect(result).toContain('flower');
+        });
+    });
+
+    describe('generateFallbackImage', () => {
+        it('returns success with gradient data URL', () => {
+            const result = generateFallbackImage({ prompt: 'bg', width: 300, height: 250 });
+            expect(result.success).toBe(true);
+            expect(result.isFallback).toBe(true);
+            expect(result.model).toBe('fallback');
+            expect(result.imageUrl).toContain('data:image');
+        });
+
+        it('uses color constraints when provided', () => {
+            const result = generateFallbackImage({
+                prompt: 'bg', width: 300, height: 250,
+                colorConstraint: ['#ff0000', '#00ff00'],
+            });
+            expect(result.success).toBe(true);
+        });
+
+        it('handles small canvas sizes', () => {
+            const result = generateFallbackImage({ prompt: 'tiny', width: 10, height: 10 });
+            expect(result.success).toBe(true);
+        });
+
+        it('handles various styles', () => {
+            for (const style of ['minimal', 'realistic', 'abstract'] as const) {
+                const result = generateFallbackImage({ prompt: 'test', width: 100, height: 100, style });
+                expect(result.success).toBe(true);
+            }
+        });
     });
 });
+
