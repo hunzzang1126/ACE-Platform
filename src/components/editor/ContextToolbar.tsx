@@ -4,7 +4,7 @@
 // Constants → contextToolbarConstants.ts
 // ─────────────────────────────────────────────────
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { IcAlignLeft, IcAlignCenterH, IcAlignRight } from '@/components/ui/Icons';
 import { ColorPicker } from '@/components/ui/ColorPicker';
 import { useUIStore } from '@/stores/uiStore';
@@ -12,6 +12,69 @@ import type { EngineNode, CanvasEngineActions } from '@/hooks/canvasTypes';
 import type { OverlayElement } from '@/hooks/useOverlayElements';
 import { removeBackgroundFromUrl, blobToDataUrl } from '@/services/backgroundRemovalService';
 import { FONT_FAMILIES } from './contextToolbarConstants';
+
+// ── ScrubInput: icon + number input with drag-to-scrub ──
+function ScrubInput({ icon, value, min, max, step = 1, title, onChange }: {
+    icon: React.ReactNode; value: number; min: number; max: number;
+    step?: number; title?: string; onChange: (v: number) => void;
+}) {
+    const isDecimal = step < 1;
+    const fmt = (v: number) => isDecimal ? v.toFixed(1) : String(Math.round(v));
+    const [localVal, setLocalVal] = useState(fmt(value));
+    const [isFocused, setIsFocused] = useState(false);
+    const scrubbing = useRef(false);
+    const scrubStartX = useRef(0);
+    const scrubStartVal = useRef(0);
+
+    useEffect(() => { if (!isFocused && !scrubbing.current) setLocalVal(fmt(value)); }, [value, isFocused]);
+
+    const commit = useCallback(() => {
+        setIsFocused(false);
+        const p = parseFloat(localVal);
+        if (!isNaN(p) && p >= min && p <= max) onChange(p);
+        else setLocalVal(fmt(value));
+    }, [localVal, onChange, value, min, max]);
+
+    const handleScrub = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        scrubbing.current = true;
+        scrubStartX.current = e.clientX;
+        scrubStartVal.current = value;
+        const move = (ev: MouseEvent) => {
+            if (!scrubbing.current) return;
+            const dx = ev.clientX - scrubStartX.current;
+            const raw = scrubStartVal.current + dx * step;
+            const snapped = Math.round(raw / step) * step;
+            const nv = Math.min(max, Math.max(min, snapped));
+            setLocalVal(fmt(nv));
+            onChange(nv);
+        };
+        const up = () => {
+            scrubbing.current = false;
+            document.removeEventListener('mousemove', move);
+            document.removeEventListener('mouseup', up);
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        };
+        document.body.style.cursor = 'ew-resize';
+        document.body.style.userSelect = 'none';
+        document.addEventListener('mousemove', move);
+        document.addEventListener('mouseup', up);
+    }, [value, min, max, step, onChange]);
+
+    return (
+        <div className="ctx-font-size" title={title}>
+            <span onMouseDown={handleScrub} style={{ cursor: 'ew-resize', display: 'flex', alignItems: 'center' }}>{icon}</span>
+            <input className="ctx-size-input" type="number" min={min} max={max} step={step}
+                value={localVal} style={{ width: 36 }}
+                onFocus={() => setIsFocused(true)}
+                onChange={(e) => { setLocalVal(e.target.value); const p = parseFloat(e.target.value); if (!isNaN(p) && p >= min && p <= max) onChange(p); }}
+                onBlur={commit}
+                onKeyDown={(e) => { if (e.key === 'Enter') commit(); e.stopPropagation(); }}
+            />
+        </div>
+    );
+}
 
 interface Props {
     nodes?: EngineNode[];
@@ -53,14 +116,8 @@ function TextControls({ fontFamily, fontSize, color, fontWeight, textAlign, line
                 </button>
             ))}
             <div className="ctx-divider" />
-            <div className="ctx-font-size" title="Line Height">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ opacity: 0.5, flexShrink: 0 }}><path d="M21 10H3M21 14H3M12 3v18M8 7l4-4 4 4M8 17l4 4 4-4" /></svg>
-                <input className="ctx-size-input" type="number" value={Number(lineHeight.toFixed(1))} onChange={e => onUpdate({ lineHeight: Number(e.target.value) })} min={0.5} max={4} step={0.1} style={{ width: 36 }} />
-            </div>
-            <div className="ctx-font-size" title="Letter Spacing">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ opacity: 0.5, flexShrink: 0 }}><path d="M7 8h10M5 12H1M23 12h-4M7 16h10M11 4l-4 16M17 4l-4 16" /></svg>
-                <input className="ctx-size-input" type="number" value={Number(letterSpacing.toFixed(1))} onChange={e => onUpdate({ letterSpacing: Number(e.target.value) })} min={-10} max={40} step={0.5} style={{ width: 36 }} />
-            </div>
+            <ScrubInput icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ opacity: 0.5, flexShrink: 0 }}><path d="M21 10H3M21 14H3M12 3v18M8 7l4-4 4 4M8 17l4 4 4-4" /></svg>} value={lineHeight} min={0.5} max={4} step={0.1} title="Line Height — drag icon to adjust" onChange={v => onUpdate({ lineHeight: v })} />
+            <ScrubInput icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ opacity: 0.5, flexShrink: 0 }}><path d="M7 8h10M5 12H1M23 12h-4M7 16h10M11 4l-4 16M17 4l-4 16" /></svg>} value={letterSpacing} min={-10} max={40} step={0.5} title="Letter Spacing — drag icon to adjust" onChange={v => onUpdate({ letterSpacing: v })} />
         </>
     );
 }
