@@ -19,12 +19,20 @@ import {
 } from '@/services/supabaseClient';
 import type { PlanTier } from '@/schema/planTypes';
 
+export interface SubscriptionInfo {
+    plan: PlanTier;
+    status: 'active' | 'canceled' | 'past_due' | 'trialing';
+    currentPeriodEnd: string | null;
+    stripeSubscriptionId: string | null;
+}
+
 export interface User {
     id: string;
     email: string;
     displayName: string;
     avatarUrl?: string;
     plan: PlanTier;
+    subscription?: SubscriptionInfo;
     createdAt: string;
 }
 
@@ -185,15 +193,23 @@ export const useAuthStore = create<AuthState>()(
                     createdAt: supaUser.created_at,
                 };
 
-                // ★ Load plan from subscriptions table
+                // ★ Load plan + subscription details from subscriptions table
                 let userPlan: PlanTier = 'starter';
+                let subscriptionInfo: SubscriptionInfo | undefined;
                 try {
                     const { data: sub } = await sb.from('subscriptions')
-                        .select('plan')
+                        .select('plan, status, current_period_end, stripe_subscription_id')
                         .eq('user_id', supaUser.id)
-                        .eq('status', 'active')
                         .maybeSingle();
-                    if (sub?.plan) userPlan = sub.plan as PlanTier;
+                    if (sub?.plan) {
+                        userPlan = sub.plan as PlanTier;
+                        subscriptionInfo = {
+                            plan: sub.plan as PlanTier,
+                            status: sub.status ?? 'active',
+                            currentPeriodEnd: sub.current_period_end ?? null,
+                            stripeSubscriptionId: sub.stripe_subscription_id ?? null,
+                        };
+                    }
                 } catch { /* no subscription = starter */ }
 
                 console.log('[syncSession] Fetching role for:', supaUser.id);
@@ -208,6 +224,7 @@ export const useAuthStore = create<AuthState>()(
                     console.log('[syncSession] Admin role detected — overriding plan to admin');
                 }
                 user.plan = userPlan;
+                user.subscription = subscriptionInfo;
 
                 // ★ Sync onboarding status from Supabase → localStorage
                 // This ensures cache-clear doesn't re-trigger onboarding

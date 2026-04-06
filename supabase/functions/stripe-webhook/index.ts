@@ -37,6 +37,22 @@ const PRICE_TO_PLAN: Record<string, string> = {
     [Deno.env.get('STRIPE_PRICE_ENTERPRISE_ANNUAL') ?? '']: 'enterprise',
 };
 
+// Helper: resolve userId from subscription metadata OR DB lookup
+async function resolveUserId(subscription: any): Promise<string | null> {
+    const fromMeta = subscription.metadata?.supabase_user_id;
+    if (fromMeta) return fromMeta;
+    // Fallback: look up by stripe_subscription_id in our DB
+    const subId = subscription.id;
+    if (!subId) return null;
+    try {
+        const { data } = await supabase.from('subscriptions')
+            .select('user_id')
+            .eq('stripe_subscription_id', subId)
+            .maybeSingle();
+        return data?.user_id ?? null;
+    } catch { return null; }
+}
+
 serve(async (req) => {
     const signature = req.headers.get('stripe-signature');
     if (!signature) {
@@ -85,8 +101,8 @@ serve(async (req) => {
 
         case 'customer.subscription.updated': {
             const subscription = event.data.object as Stripe.Subscription;
-            const userId = subscription.metadata?.supabase_user_id;
-            if (!userId) break;
+            const userId = await resolveUserId(subscription);
+            if (!userId) { console.warn('[webhook] No userId for subscription.updated'); break; }
 
             const priceId = subscription.items.data[0]?.price.id ?? '';
             const plan = PRICE_TO_PLAN[priceId] ?? 'pro';
@@ -109,8 +125,8 @@ serve(async (req) => {
 
         case 'customer.subscription.deleted': {
             const subscription = event.data.object as Stripe.Subscription;
-            const userId = subscription.metadata?.supabase_user_id;
-            if (!userId) break;
+            const userId = await resolveUserId(subscription);
+            if (!userId) { console.warn('[webhook] No userId for subscription.deleted'); break; }
 
             // Downgrade to starter (free)
             await supabase.from('subscriptions').update({

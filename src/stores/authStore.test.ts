@@ -133,7 +133,7 @@ describe('authStore', () => {
     describe('signInWithEmail', () => {
         it('should set loading=true and clear error before calling API', async () => {
             mockGetSession.mockResolvedValue({ data: { session: mockSupabaseSession() } });
-            mockFrom.mockReturnValue({ select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: null }) }) }) }) });
+            mockFrom.mockReturnValue({ select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: null }) }) }) });
 
             const promise = useAuthStore.getState().signInWithEmail('test@ace.design', 'password');
             // isLoading is set synchronously before the awaited call
@@ -152,7 +152,7 @@ describe('authStore', () => {
         it('should sync session from Supabase on success', async () => {
             vi.mocked(sbSignInWithEmail).mockResolvedValueOnce({ error: null });
             mockGetSession.mockResolvedValue({ data: { session: mockSupabaseSession() } });
-            mockFrom.mockReturnValue({ select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: null }) }) }) }) });
+            mockFrom.mockReturnValue({ select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: null }) }) }) });
 
             await useAuthStore.getState().signInWithEmail('test@ace.design', 'password');
             const state = useAuthStore.getState();
@@ -250,7 +250,7 @@ describe('authStore', () => {
 
         it('should populate user from Supabase session', async () => {
             mockGetSession.mockResolvedValue({ data: { session: mockSupabaseSession() } });
-            mockFrom.mockReturnValue({ select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: null }) }) }) }) });
+            mockFrom.mockReturnValue({ select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: null }) }) }) });
 
             await useAuthStore.getState().syncSessionFromSupabase();
 
@@ -264,16 +264,17 @@ describe('authStore', () => {
         it('should set plan from active subscription', async () => {
             mockGetSession.mockResolvedValue({ data: { session: mockSupabaseSession() } });
             mockFrom.mockReturnValue({
-                select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: { plan: 'pro' } }) }) }) }),
+                select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: { plan: 'pro', status: 'active', current_period_end: '2026-05-01T00:00:00Z', stripe_subscription_id: 'sub_123' } }) }) }),
             });
 
             await useAuthStore.getState().syncSessionFromSupabase();
             expect(useAuthStore.getState().user?.plan).toBe('pro');
+            expect(useAuthStore.getState().user?.subscription?.status).toBe('active');
         });
 
         it('should override plan to admin when role is admin', async () => {
             mockGetSession.mockResolvedValue({ data: { session: mockSupabaseSession() } });
-            mockFrom.mockReturnValue({ select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: null }) }) }) }) });
+            mockFrom.mockReturnValue({ select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: null }) }) }) });
             vi.mocked(fetchUserRole).mockResolvedValueOnce('admin');
 
             await useAuthStore.getState().syncSessionFromSupabase();
@@ -297,7 +298,7 @@ describe('authStore', () => {
         it('should use email prefix as displayName when full_name is missing', async () => {
             const session = mockSupabaseSession({ user_metadata: {} });
             mockGetSession.mockResolvedValue({ data: { session } });
-            mockFrom.mockReturnValue({ select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: null }) }) }) }) });
+            mockFrom.mockReturnValue({ select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: null }) }) }) });
 
             await useAuthStore.getState().syncSessionFromSupabase();
             expect(useAuthStore.getState().user?.displayName).toBe('test');
