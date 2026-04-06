@@ -9,8 +9,9 @@ import { Canvas, Textbox, FabricObject, Line, Shadow } from 'fabric';
 import { nextId, isArtboard, patchAceProps } from './fabricHelpers';
 import { snapToGuides, type GuideLine } from './useFabricGuides';
 
-// ★ Auto-shrink: Tighten Textbox bounding box to actual rendered text width.
-// Prevents right-side gap and premature word wrapping on handle resize.
+// ★ Auto-shrink: Tighten Textbox bounding box to actual rendered text width + height.
+// Width: shrinks to longest rendered line (prevents right-side gap).
+// Height: trims trailing lineHeight space from last line (equal top/bottom gap).
 function autoShrinkTextbox(tb: Textbox): void {
     if ((tb as any).__autoShrinking) return; // guard: prevent infinite loop
     (tb as any).__autoShrinking = true;
@@ -24,7 +25,13 @@ function autoShrinkTextbox(tb: Textbox): void {
             tb.set({ width: minWidth });
             tb.initDimensions(); // re-layout after width change
         }
-        tb.set({ height: tb.calcTextHeight() });
+        // ★ Trim trailing lineHeight gap: last line should not add extra lineHeight space below
+        const rawHeight = tb.calcTextHeight();
+        const fontSize = tb.fontSize ?? 16;
+        const lh = tb.lineHeight ?? 1.15;
+        const trailingGap = fontSize * (lh - 1); // extra space after last line
+        const trimmedHeight = Math.max(fontSize, rawHeight - trailingGap);
+        tb.set({ height: trimmedHeight });
         tb.setCoords();
     } finally {
         (tb as any).__autoShrinking = false;
@@ -104,7 +111,15 @@ export function setupCanvasEvents({
             if ((obj.scaleX ?? 1) !== 1 || (obj.scaleY ?? 1) !== 1) {
                 obj.set({ width: Math.max(20, (obj.width ?? 200) * (obj.scaleX ?? 1)), scaleX: 1, scaleY: 1 });
             }
-            autoShrinkTextbox(obj);
+            // ★ On add: only trim trailing height gap. Do NOT shrink width here —
+            // templates/restore set width intentionally and shrinking it corrupts sub-head positions.
+            obj.initDimensions();
+            const rawH = obj.calcTextHeight();
+            const fs = obj.fontSize ?? 16;
+            const lhVal = obj.lineHeight ?? 1.15;
+            const gap = fs * (lhVal - 1);
+            obj.set({ height: Math.max(fs, rawH - gap) });
+            obj.setCoords();
         }
         if (!(obj as any)?.__aceGuide) pushUndo('Add element');
         syncState();
