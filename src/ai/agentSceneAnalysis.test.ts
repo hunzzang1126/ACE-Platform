@@ -79,10 +79,53 @@ describe('resolveMention', () => {
 });
 
 describe('inferDesignIntent', () => {
-    it('returns a non-empty string', () => {
+    it('returns empty canvas message', () => {
+        expect(inferDesignIntent([])).toContain('Empty canvas');
+    });
+
+    it('returns single element message', () => {
         const nodes = [makeNode(1, 'Logo', 'rect', 0, 0, 50, 50)];
-        const intent = inferDesignIntent(nodes);
-        expect(typeof intent).toBe('string');
-        expect(intent.length).toBeGreaterThan(0);
+        expect(inferDesignIntent(nodes)).toContain('Single element');
+    });
+
+    it('detects horizontal row', () => {
+        const nodes = [
+            makeNode(1, 'A', 'rect', 0, 50, 80, 40),
+            makeNode(2, 'B', 'rect', 100, 50, 80, 40),
+            makeNode(3, 'C', 'rect', 200, 50, 80, 40),
+        ];
+        expect(inferDesignIntent(nodes)).toContain('Horizontal row');
+    });
+
+    it('detects vertical column', () => {
+        const nodes = [
+            makeNode(1, 'A', 'rect', 50, 0, 80, 40),
+            makeNode(2, 'B', 'rect', 50, 60, 80, 40),
+            makeNode(3, 'C', 'rect', 50, 120, 80, 40),
+        ];
+        expect(inferDesignIntent(nodes)).toContain('Vertical column');
+    });
+
+    it('detects grid layout', () => {
+        const nodes = [
+            makeNode(1, 'A', 'rect', 0, 0, 50, 50),
+            makeNode(2, 'B', 'rect', 100, 0, 50, 50),
+            makeNode(3, 'C', 'rect', 200, 0, 50, 50),
+            makeNode(4, 'D', 'rect', 0, 100, 50, 50),
+            makeNode(5, 'E', 'rect', 100, 100, 50, 50),
+            makeNode(6, 'F', 'rect', 200, 100, 50, 50),
+            makeNode(7, 'G', 'rect', 0, 200, 50, 50),
+            makeNode(8, 'H', 'rect', 100, 200, 50, 50),
+            makeNode(9, 'I', 'rect', 200, 200, 50, 50),
+        ];
+        expect(inferDesignIntent(nodes)).toContain('Grid');
+    });
+
+    it('detects freeform layout', () => {
+        const nodes = [
+            makeNode(1, 'A', 'rect', 10, 20, 50, 50),
+            makeNode(2, 'B', 'rect', 150, 80, 50, 50),
+        ];
+        expect(inferDesignIntent(nodes)).toContain('Freeform');
     });
 });
