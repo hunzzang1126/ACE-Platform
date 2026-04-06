@@ -105,7 +105,7 @@ export function createCreatorMethods(ctx: ShimContext) {
                 fontStyle: (fontStyle === 'italic' ? 'italic' : 'normal') as any,
                 fill: rgbToHex(r, g, b),
                 textAlign: (textAlign as any) || 'left',
-                lineHeight: lineHeight ?? 1.4,
+                lineHeight: lineHeight ?? 1.15,
                 charSpacing: (letterSpacing ?? 0) * 10,
                 editable: true,
             });
@@ -113,7 +113,6 @@ export function createCreatorMethods(ctx: ShimContext) {
             (tb as any).__glidName = name || `Text #${id}`;
             (tb as any).__glidZIndex = userObjects().length;
             patchAceProps(tb);
-            tb.padding = 4; // ★ Consistent handle spacing around text
             fc.add(tb);
             tb.setCoords();
             fc.renderAll(); syncState();
