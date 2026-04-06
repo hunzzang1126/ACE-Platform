@@ -109,6 +109,16 @@ export function useFabricCanvas(width: number, height: number, _addDemoShapes = 
             (fc as any).selectionBorderColor = '#0D99FF';
             (fc as any).selectionLineWidth = 1;
 
+            // ★ Figma-style handle defaults for all objects
+            FabricObject.ownDefaults.cornerStyle = 'rect';
+            FabricObject.ownDefaults.cornerSize = 8;
+            FabricObject.ownDefaults.cornerColor = '#FFFFFF';
+            FabricObject.ownDefaults.cornerStrokeColor = '#0D99FF';
+            FabricObject.ownDefaults.transparentCorners = false;
+            FabricObject.ownDefaults.borderColor = '#0D99FF';
+            FabricObject.ownDefaults.borderScaleFactor = 1;
+            FabricObject.ownDefaults.padding = 0;
+
             // ★ Artboard
             skipHistory.current = true;
             const artboard = new Rect({
