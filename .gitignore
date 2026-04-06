@@ -38,3 +38,4 @@ chroma_data/
 DEV REPORT/
 supabase/.temp/
 .vercel
+coverage/

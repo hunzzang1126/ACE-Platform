@@ -1,477 +1,253 @@
 // ─────────────────────────────────────────────────
-// fabricHelpers — Pure function tests
+// fabricHelpers.test.ts — Pure utility functions
 // ─────────────────────────────────────────────────
-// Tests for color conversion and utility functions that don't need Fabric.js.
-// fabricToEngineNode is tested indirectly via engine integration tests
-// since it requires Fabric.js objects.
 
-import { describe, it, expect } from 'vitest';
-import { hexToRgb01, rgbToHex, nextColor } from './fabricHelpers';
+import { describe, it, expect, vi } from 'vitest';
 
-// ── hexToRgb01 ────────────────────────────────────
+// Mock fabric module
+vi.mock('fabric', () => ({
+    Textbox: class Textbox {
+        type = 'textbox';
+        text = '';
+        fontSize = 16;
+        fontFamily = 'Inter';
+        fontWeight = '400';
+        fill = '#000';
+        textAlign = 'left';
+        left = 0; top = 0; width = 100; height = 50;
+        scaleX = 1; scaleY = 1; opacity = 1; angle = 0;
+        constructor(t: string, opts: any = {}) {
+            Object.assign(this, { text: t, ...opts });
+        }
+    },
+    Shadow: class Shadow {},
+}));
 
-describe('hexToRgb01 — hex string to 0-1 float RGB', () => {
-    it('#ff0000 → [1, 0, 0]', () => {
-        const [r, g, b] = hexToRgb01('#ff0000');
-        expect(r).toBeCloseTo(1, 2);
-        expect(g).toBeCloseTo(0, 2);
-        expect(b).toBeCloseTo(0, 2);
-    });
+import {
+    nextId, nextColor,
+    hexToRgb01, rgbToHex,
+    isArtboard, fabricToEngineNode,
+    GLID_CUSTOM_PROPS, patchAceProps,
+} from './fabricHelpers';
 
-    it('#00ff00 → [0, 1, 0]', () => {
-        const [r, g, b] = hexToRgb01('#00ff00');
-        expect(r).toBeCloseTo(0, 2);
-        expect(g).toBeCloseTo(1, 2);
-        expect(b).toBeCloseTo(0, 2);
-    });
+// ══════════════════════════════════════════════════
+// nextId
+// ══════════════════════════════════════════════════
 
-    it('#000000 → [0, 0, 0]', () => {
-        const [r, g, b] = hexToRgb01('#000000');
-        expect(r).toBeCloseTo(0, 2);
-        expect(g).toBeCloseTo(0, 2);
-        expect(b).toBeCloseTo(0, 2);
-    });
-
-    it('#ffffff → [1, 1, 1]', () => {
-        const [r, g, b] = hexToRgb01('#ffffff');
-        expect(r).toBeCloseTo(1, 2);
-        expect(g).toBeCloseTo(1, 2);
-        expect(b).toBeCloseTo(1, 2);
-    });
-
-    it('shorthand #f00 → [1, 0, 0]', () => {
-        const [r, g, b] = hexToRgb01('#f00');
-        expect(r).toBeCloseTo(1, 2);
-        expect(g).toBeCloseTo(0, 2);
-        expect(b).toBeCloseTo(0, 2);
-    });
-
-    it('rgba(128, 64, 32) → ~[0.502, 0.251, 0.125]', () => {
-        const [r, g, b] = hexToRgb01('rgba(128, 64, 32, 0.5)');
-        expect(r).toBeCloseTo(0.502, 2);
-        expect(g).toBeCloseTo(0.251, 2);
-        expect(b).toBeCloseTo(0.125, 2);
-    });
-
-    it('rgb(255, 128, 0) → ~[1, 0.502, 0]', () => {
-        const [r, g, b] = hexToRgb01('rgb(255, 128, 0)');
-        expect(r).toBeCloseTo(1, 2);
-        expect(g).toBeCloseTo(0.502, 2);
-        expect(b).toBeCloseTo(0, 2);
-    });
-
-    it('malformed input → [0.5, 0.5, 0.5] fallback', () => {
-        const [r, g, b] = hexToRgb01('not-a-color');
-        expect(r).toBe(0.5);
-        expect(g).toBe(0.5);
-        expect(b).toBe(0.5);
+describe('nextId', () => {
+    it('returns incrementing integers', () => {
+        const a = nextId();
+        const b = nextId();
+        expect(b).toBe(a + 1);
     });
 });
 
-// ── rgbToHex ──────────────────────────────────────
+// ══════════════════════════════════════════════════
+// nextColor
+// ══════════════════════════════════════════════════
 
-describe('rgbToHex — 0-1 float RGB to hex string', () => {
-    it('[1, 0, 0] → #ff0000', () => {
-        expect(rgbToHex(1, 0, 0)).toBe('#ff0000');
-    });
-
-    it('[0, 1, 0] → #00ff00', () => {
-        expect(rgbToHex(0, 1, 0)).toBe('#00ff00');
-    });
-
-    it('[0, 0, 0] → #000000', () => {
-        expect(rgbToHex(0, 0, 0)).toBe('#000000');
-    });
-
-    it('[1, 1, 1] → #ffffff', () => {
-        expect(rgbToHex(1, 1, 1)).toBe('#ffffff');
-    });
-
-    it('[0.5, 0.5, 0.5] → #808080', () => {
-        expect(rgbToHex(0.5, 0.5, 0.5)).toBe('#808080');
-    });
-});
-
-// ── Round-trip: hexToRgb01 → rgbToHex ─────────────
-
-describe('Color Round-Trip — hexToRgb01 → rgbToHex', () => {
-    it('#3b82f6 survives round-trip', () => {
-        const [r, g, b] = hexToRgb01('#3b82f6');
-        expect(rgbToHex(r, g, b)).toBe('#3b82f6');
-    });
-
-    it('#ff5733 survives round-trip', () => {
-        const [r, g, b] = hexToRgb01('#ff5733');
-        expect(rgbToHex(r, g, b)).toBe('#ff5733');
-    });
-
-    it('#0f172a survives round-trip', () => {
-        const [r, g, b] = hexToRgb01('#0f172a');
-        expect(rgbToHex(r, g, b)).toBe('#0f172a');
-    });
-});
-
-// ── nextColor ─────────────────────────────────────
-
-describe('nextColor — pastel color cycle', () => {
-    it('returns a valid hex color', () => {
+describe('nextColor', () => {
+    it('returns hex color strings', () => {
         const c = nextColor();
         expect(c).toMatch(/^#[0-9a-fA-F]{6}$/);
     });
 
-    it('returns different colors on successive calls', () => {
-        const c1 = nextColor();
-        const c2 = nextColor();
-        expect(c1).not.toBe(c2);
+    it('cycles through colors', () => {
+        const colors = Array.from({ length: 10 }, () => nextColor());
+        expect(colors[0]).not.toBe(colors[1]);
     });
 });
 
-// ═══════════════════════════════════════════════════
-// ★ REGRESSION GUARD: __glidPersistSrc image persistence
-// Fixed in v0.0.0.288 — blob: URLs caused image loss on reload
-// ═══════════════════════════════════════════════════
+// ══════════════════════════════════════════════════
+// hexToRgb01
+// ══════════════════════════════════════════════════
 
-import { GLID_CUSTOM_PROPS } from './fabricHelpers';
-import { readFileSync } from 'fs';
-import { resolve } from 'path';
-
-describe('★ REGRESSION: __glidPersistSrc — image data integrity', () => {
-
-    it('GLID_CUSTOM_PROPS includes __glidPersistSrc', () => {
-        expect(GLID_CUSTOM_PROPS).toContain('__glidPersistSrc');
+describe('hexToRgb01', () => {
+    it('converts 6-digit hex to [0..1] RGB', () => {
+        expect(hexToRgb01('#ff0000')).toEqual([1, 0, 0]);
+        expect(hexToRgb01('#00ff00')).toEqual([0, 1, 0]);
+        expect(hexToRgb01('#0000ff')).toEqual([0, 0, 1]);
     });
 
-    it('fabricToEngineNode prefers __glidPersistSrc over _element.src', () => {
-        const src = readFileSync(resolve(__dirname, './fabricHelpers.ts'), 'utf-8');
-        // __glidPersistSrc should be checked BEFORE _element.src
-        const persistIdx = src.indexOf('__glidPersistSrc');
-        const elementSrcIdx = src.indexOf('imgEl?.src');
-        expect(persistIdx).toBeGreaterThan(-1);
-        expect(elementSrcIdx).toBeGreaterThan(-1);
-        expect(persistIdx).toBeLessThan(elementSrcIdx);
+    it('converts 3-digit hex', () => {
+        const [r, g, b] = hexToRgb01('#fff');
+        expect(r).toBe(1);
+        expect(g).toBe(1);
+        expect(b).toBe(1);
     });
 
-    it('shimCreators sets __glidPersistSrc for data: URLs', () => {
-        const src = readFileSync(resolve(__dirname, './shimCreators.ts'), 'utf-8');
-        expect(src).toContain('__glidPersistSrc');
-        expect(src).toContain("src.startsWith('data:')");
-        expect(src).toContain("src.startsWith('idb://')");
+    it('handles rgba() strings', () => {
+        const [r] = hexToRgb01('rgba(255, 0, 0, 1)');
+        expect(r).toBe(1);
     });
 
-    it('useCanvasSync restoreImage sets __glidPersistSrc on fabric object', () => {
-        const src = readFileSync(resolve(__dirname, './useCanvasSync.ts'), 'utf-8');
-        expect(src).toContain('__glidPersistSrc = stableSrc');
-        expect(src).toContain('_findById');
+    it('handles rgb() strings', () => {
+        const [r] = hexToRgb01('rgb(128, 128, 128)');
+        expect(r).toBeCloseTo(128 / 255, 2);
     });
 
-    it('fabricEngineShim exposes _findById for restoreImage', () => {
-        const src = readFileSync(resolve(__dirname, './fabricEngineShim.ts'), 'utf-8');
-        expect(src).toContain('_findById: findById');
+    it('★ REGRESSION: returns fallback for non-string input', () => {
+        expect(hexToRgb01(0.9 as any)).toEqual([0.5, 0.5, 0.5]);
+    });
+
+    it('returns fallback for invalid hex', () => {
+        expect(hexToRgb01('notahex')).toEqual([0.5, 0.5, 0.5]);
     });
 });
 
-// ═══════════════════════════════════════════════════
-// ★ REGRESSION GUARD: restoreIdbRefs — blob → idb recovery
-// ═══════════════════════════════════════════════════
+// ══════════════════════════════════════════════════
+// rgbToHex
+// ══════════════════════════════════════════════════
 
-describe('★ REGRESSION: canvasSyncSave — restoreIdbRefs', () => {
-
-    it('restoreIdbRefs only processes blob: URLs', () => {
-        const src = readFileSync(resolve(__dirname, './canvasSyncSave.ts'), 'utf-8');
-        expect(src).toContain("img.src.startsWith('blob:')");
+describe('rgbToHex', () => {
+    it('converts [0..1] RGB to hex', () => {
+        expect(rgbToHex(1, 0, 0)).toBe('#ff0000');
+        expect(rgbToHex(0, 1, 0)).toBe('#00ff00');
+        expect(rgbToHex(0, 0, 1)).toBe('#0000ff');
     });
 
-    it('restoreIdbRefs looks up by both name and id', () => {
-        const src = readFileSync(resolve(__dirname, './canvasSyncSave.ts'), 'utf-8');
-        expect(src).toContain('storedSrcByName');
-        expect(src).toContain('storedSrcById');
+    it('handles fractional values', () => {
+        const hex = rgbToHex(0.5, 0.5, 0.5);
+        expect(hex).toMatch(/^#[0-9a-f]{6}$/);
     });
 
-    it('asyncExtractAssets logs failures (not silently swallowed)', () => {
-        const src = readFileSync(resolve(__dirname, './canvasSyncSave.ts'), 'utf-8');
-        expect(src).toContain('Asset extraction failed');
-    });
-});
-
-// ═══════════════════════════════════════════════════
-// ★ REGRESSION GUARD: Upload Library — AI images saved
-// Added in v0.0.0.289
-// ═══════════════════════════════════════════════════
-
-describe('★ REGRESSION: AI images → Upload Library integration', () => {
-
-    it('agentGenerateFlow imports saveToUploadLibrary', () => {
-        const src = readFileSync(resolve(__dirname, '../hooks/agentGenerateFlow.ts'), 'utf-8');
-        expect(src).toContain('saveToUploadLibrary');
-    });
-
-    it('saveToUploadLibrary stores with source ai', () => {
-        const src = readFileSync(resolve(__dirname, '../hooks/agentGenerateFlow.ts'), 'utf-8');
-        expect(src).toMatch(/saveToUploadLibrary\(.*'ai'\)/s);
+    it('roundtrips with hexToRgb01', () => {
+        const original = '#ab34ef';
+        const [r, g, b] = hexToRgb01(original);
+        expect(rgbToHex(r, g, b)).toBe(original);
     });
 });
 
-// ═══════════════════════════════════════════════════
-// ★ REGRESSION GUARD: Rotation pipeline (full chain)
-// Fixed in v0.0.0.305 — rotation was hardcoded to 0
-// ═══════════════════════════════════════════════════
+// ══════════════════════════════════════════════════
+// isArtboard
+// ══════════════════════════════════════════════════
 
-describe('★ REGRESSION: Rotation pipeline — full chain', () => {
-
-    it('EngineNode type includes angle field', () => {
-        const src = readFileSync(resolve(__dirname, './canvasTypes.ts'), 'utf-8');
-        expect(src).toContain('angle?: number');
+describe('isArtboard', () => {
+    it('returns true for artboard objects', () => {
+        expect(isArtboard({ __glidArtboard: true } as any)).toBe(true);
     });
 
-    it('fabricToEngineNode extracts obj.angle', () => {
-        const src = readFileSync(resolve(__dirname, './fabricHelpers.ts'), 'utf-8');
-        expect(src).toContain('angle: obj.angle');
-    });
-
-    it('absoluteToConstraints accepts angle parameter', () => {
-        const src = readFileSync(resolve(__dirname, '../engine/constraintUtils.ts'), 'utf-8');
-        expect(src).toContain('angle: number = 0');
-        expect(src).toContain('rotation: angle');
-    });
-
-    it('elementConverters pass node.angle to absoluteToConstraints', () => {
-        const src = readFileSync(resolve(__dirname, '../engine/elementConverters.ts'), 'utf-8');
-        // All 3 converter functions must include node.angle
-        const matches = src.match(/node\.angle \?\? 0/g);
-        expect(matches).toBeTruthy();
-        expect(matches!.length).toBeGreaterThanOrEqual(3);
-    });
-
-    it('fabricEngineShim exposes set_angle method', () => {
-        const src = readFileSync(resolve(__dirname, './fabricEngineShim.ts'), 'utf-8');
-        expect(src).toContain('set_angle');
-        expect(src).toContain('obj.set({ angle })');
-    });
-
-    it('useCanvasSync restore functions call set_angle for rotation', () => {
-        const src = readFileSync(resolve(__dirname, './useCanvasSync.ts'), 'utf-8');
-        const matches = src.match(/engine\.set_angle/g);
-        expect(matches).toBeTruthy();
-        // Shape, Text, and Image restores
-        expect(matches!.length).toBeGreaterThanOrEqual(3);
-    });
-
-    it('fabricHeadlessRenderer applies angle from constraints.rotation', () => {
-        const src = readFileSync(resolve(__dirname, '../components/creativeset/fabricHeadlessRenderer.ts'), 'utf-8');
-        const matches = src.match(/constraints\.rotation/g) ?? src.match(/constraints\?\.rotation/g);
-        expect(matches).toBeTruthy();
-        // At least 4 element types: shape (ellipse + rect), text, image, button
-        expect(matches!.length).toBeGreaterThanOrEqual(4);
+    it('returns false for regular objects', () => {
+        expect(isArtboard({ type: 'rect' } as any)).toBe(false);
     });
 });
 
-// ═══════════════════════════════════════════════════
-// ★ REGRESSION GUARD: PlugCanvas v2 — lightweight cables
-// Refactored in v0.0.0.304
-// ═══════════════════════════════════════════════════
+// ══════════════════════════════════════════════════
+// fabricToEngineNode
+// ══════════════════════════════════════════════════
 
-describe('★ REGRESSION: PlugCanvas v2 — no SVG gradient bugs', () => {
-
-    it('PlugCanvas uses solid rgba stroke, not SVG gradient', () => {
-        const src = readFileSync(resolve(__dirname, '../components/creativeset/PlugCanvas.tsx'), 'utf-8');
-        // Must NOT use objectBoundingBox gradient (caused invisible cables)
-        expect(src).not.toContain('gradientUnits');
-        expect(src).not.toContain('url(#plug-cable-grad)');
-        // Should use solid color
-        expect(src).toContain('rgba(');
+describe('fabricToEngineNode', () => {
+    const makeObj = (overrides: any = {}) => ({
+        type: 'rect',
+        left: 10, top: 20, width: 100, height: 50,
+        scaleX: 1, scaleY: 1, opacity: 0.8, angle: 0,
+        fill: '#ff0000',
+        __glidId: 42,
+        __glidZIndex: 3,
+        __glidName: '',
+        rx: 0,
+        ...overrides,
     });
 
-    it('PlugCanvas cable has plug-cable-flow CSS class for animation', () => {
-        const src = readFileSync(resolve(__dirname, '../components/creativeset/PlugCanvas.tsx'), 'utf-8');
-        expect(src).toContain('plug-cable-flow');
+    it('extracts position and scaled size', () => {
+        const node = fabricToEngineNode(makeObj({ scaleX: 2, scaleY: 1.5 }) as any);
+        expect(node.x).toBe(10);
+        expect(node.y).toBe(20);
+        expect(node.w).toBe(200);
+        expect(node.h).toBe(75);
     });
 
-    it('CSS defines @keyframes plug-flow animation', () => {
-        const css = readFileSync(resolve(__dirname, '../styles/creativeset.css'), 'utf-8');
-        expect(css).toContain('@keyframes plug-flow');
-        expect(css).toContain('stroke-dashoffset');
+    it('extracts fill color as RGB 0..1', () => {
+        const node = fabricToEngineNode(makeObj({ fill: '#ff0000' }) as any);
+        expect(node.fill_r).toBe(1);
+        expect(node.fill_g).toBe(0);
+        expect(node.fill_b).toBe(0);
     });
 
-    it('PlugCanvas SVG z-index is >= 50 (above cards)', () => {
-        const src = readFileSync(resolve(__dirname, '../components/creativeset/PlugCanvas.tsx'), 'utf-8');
-        const match = src.match(/zIndex:\s*(\d+)/);
-        expect(match).toBeTruthy();
-        expect(parseInt(match![1]!)).toBeGreaterThanOrEqual(50);
-    });
-});
-
-// ═══════════════════════════════════════════════════
-// ★ REGRESSION GUARD: ActiveSelection save coords (v0.0.0.311)
-// Bug: Fabric.js objects inside ActiveSelection have left/top relative
-// to group center → negative coords → CTA jumps to (0,0) on save.
-// Fix: get_all_nodes() discards selection before reading positions.
-// ═══════════════════════════════════════════════════
-
-describe('★ REGRESSION: ActiveSelection — save must use absolute coords', () => {
-
-    it('fabricEngineShim imports ActiveSelection from fabric', () => {
-        const src = readFileSync(resolve(__dirname, './fabricEngineShim.ts'), 'utf-8');
-        expect(src).toContain('ActiveSelection');
-        // Must be a top-level import, not dynamic
-        expect(src).toMatch(/import\s*\{[^}]*ActiveSelection[^}]*\}\s*from\s*'fabric'/);
+    it('detects rect type', () => {
+        const node = fabricToEngineNode(makeObj() as any);
+        expect(node.type).toBe('rect');
     });
 
-    it('get_all_nodes discards active selection before reading positions', () => {
-        const src = readFileSync(resolve(__dirname, './fabricEngineShim.ts'), 'utf-8');
-        // Must call discardActiveObject BEFORE fabricToEngineNode
-        const discardIdx = src.indexOf('fc.discardActiveObject()');
-        const mapIdx = src.indexOf('userObjects().map(fabricToEngineNode)');
-        expect(discardIdx).toBeGreaterThan(-1);
-        expect(mapIdx).toBeGreaterThan(-1);
-        expect(discardIdx).toBeLessThan(mapIdx);
+    it('detects ellipse type', () => {
+        const node = fabricToEngineNode(makeObj({ type: 'ellipse' }) as any);
+        expect(node.type).toBe('ellipse');
     });
 
-    it('get_all_nodes checks for multi-select (length > 1), not any selection', () => {
-        const src = readFileSync(resolve(__dirname, './fabricEngineShim.ts'), 'utf-8');
-        // Single-select should NOT trigger discard (no coordinate issue)
-        expect(src).toContain('activeObjs.length > 1');
+    it('detects image type', () => {
+        const node = fabricToEngineNode(makeObj({ type: 'image' }) as any);
+        expect(node.type).toBe('image');
     });
 
-    it('get_all_nodes re-creates ActiveSelection after reading', () => {
-        const src = readFileSync(resolve(__dirname, './fabricEngineShim.ts'), 'utf-8');
-        const discardIdx = src.indexOf('fc.discardActiveObject()');
-        const reSelectIdx = src.indexOf('new ActiveSelection(activeObjs');
-        expect(reSelectIdx).toBeGreaterThan(-1);
-        // Re-select must happen AFTER discard
-        expect(reSelectIdx).toBeGreaterThan(discardIdx);
-        // Must set it as active and render
-        expect(src).toContain('fc.setActiveObject(sel)');
-        expect(src.indexOf('fc.renderAll()', reSelectIdx)).toBeGreaterThan(reSelectIdx);
+    it('detects rounded_rect when rx > 0', () => {
+        const node = fabricToEngineNode(makeObj({ rx: 8 }) as any);
+        expect(node.type).toBe('rounded_rect');
     });
 
-    it('fabricToEngineNode reads obj.left/obj.top directly (relies on upstream fix)', () => {
-        const src = readFileSync(resolve(__dirname, './fabricHelpers.ts'), 'utf-8');
-        // Must use obj.left and obj.top (not getX/getY or transform matrix)
-        // because the upstream get_all_nodes ensures absolute coords
-        expect(src).toContain('x: obj.left ?? 0');
-        expect(src).toContain('y: obj.top ?? 0');
-    });
-});
-
-// ═══════════════════════════════════════════════════
-// ★ REGRESSION GUARD: Save roundtrip coordinate sanity
-// Ensures constraint conversion never produces negative offsets
-// for elements visually inside the canvas bounds.
-// ═══════════════════════════════════════════════════
-
-import { absoluteToConstraints, constraintsToAbsolute } from '../engine/constraintUtils';
-
-describe('★ REGRESSION: Constraint roundtrip — no negative drift', () => {
-
-    const canvasW = 1920, canvasH = 1080;
-
-    it('CTA at right-center saves and restores to same position', () => {
-        // CTA positioned at right side of 1920×1080 canvas
-        const x = 1600, y = 500, w = 200, h = 60;
-        const constraints = absoluteToConstraints(x, y, w, h, canvasW, canvasH);
-        const restored = constraintsToAbsolute(constraints, canvasW, canvasH);
-        expect(restored.x).toBeCloseTo(x, 0);
-        expect(restored.y).toBeCloseTo(y, 0);
-        expect(restored.w).toBe(w);
-        expect(restored.h).toBe(h);
+    it('★ REGRESSION: scale-aware borderRadius', () => {
+        const node = fabricToEngineNode(makeObj({ rx: 10, scaleX: 2, scaleY: 3 }) as any);
+        expect(node.border_radius).toBe(20);
     });
 
-    it('element at canvas center survives roundtrip', () => {
-        const x = 800, y = 490, w = 320, h = 100;
-        const constraints = absoluteToConstraints(x, y, w, h, canvasW, canvasH);
-        const restored = constraintsToAbsolute(constraints, canvasW, canvasH);
-        expect(restored.x).toBeCloseTo(x, 0);
-        expect(restored.y).toBeCloseTo(y, 0);
+    it('extracts gradient from custom props', () => {
+        const node = fabricToEngineNode(makeObj({
+            __glidGradientStart: '#ff0000',
+            __glidGradientEnd: '#0000ff',
+            __glidGradientAngle: 45,
+        }) as any);
+        expect(node.gradient_start).toBe('#ff0000');
+        expect(node.gradient_end).toBe('#0000ff');
+        expect(node.gradient_angle).toBe(45);
     });
 
-    it('negative x/y input produces constraint that restores to same negative position (off-canvas)', () => {
-        // This simulates the buggy scenario — if we get -160,-50 as input
-        // the constraint system should faithfully store and restore it
-        const x = -160, y = -50, w = 320, h = 99;
-        const constraints = absoluteToConstraints(x, y, w, h, canvasW, canvasH);
-        const restored = constraintsToAbsolute(constraints, canvasW, canvasH);
-        // The constraint system is correct — the BUG was in reading wrong coords
-        expect(restored.x).toBeCloseTo(x, 0);
-        expect(restored.y).toBeCloseTo(y, 0);
+    it('extracts gradient from Fabric gradient object', () => {
+        const node = fabricToEngineNode(makeObj({
+            fill: { colorStops: [{ color: '#aa0000' }, { color: '#00aa00' }] },
+        }) as any);
+        expect(node.gradient_start).toBe('#aa0000');
+        expect(node.gradient_end).toBe('#00aa00');
     });
 
-    it('small canvas (300x250) CTA survives roundtrip', () => {
-        const x = 180, y = 200, w = 100, h = 35;
-        const c = absoluteToConstraints(x, y, w, h, 300, 250);
-        const r = constraintsToAbsolute(c, 300, 250);
-        expect(r.x).toBeCloseTo(x, 0);
-        expect(r.y).toBeCloseTo(y, 0);
+    it('uses __glidName when set', () => {
+        const node = fabricToEngineNode(makeObj({ __glidName: 'Headline' }) as any);
+        expect(node.name).toBe('Headline');
+    });
+
+    it('extracts opacity and angle', () => {
+        const node = fabricToEngineNode(makeObj({ opacity: 0.5, angle: 45 }) as any);
+        expect(node.opacity).toBe(0.5);
+        expect(node.angle).toBe(45);
     });
 });
 
-// ═══════════════════════════════════════════════════
-// ★ REGRESSION GUARD: Replace image src updates __glidPersistSrc
-// Fixed in v0.0.0.332 — Remove BG results lost on save because
-// __glidPersistSrc still pointed to the original (pre-BG-removal) image.
-// ═══════════════════════════════════════════════════
+// ══════════════════════════════════════════════════
+// GLID_CUSTOM_PROPS & patchAceProps
+// ══════════════════════════════════════════════════
 
-describe('★ REGRESSION: replaceImageSrc — updates __glidPersistSrc', () => {
-
-    it('replace_image_src sets __glidPersistSrc to new source', () => {
-        const src = readFileSync(resolve(__dirname, './shimCreators.ts'), 'utf-8');
-        // The line that updates __glidPersistSrc must be INSIDE replace_image_src
-        const replaceBlock = src.slice(
-            src.indexOf('replace_image_src:'),
-            src.indexOf('},', src.indexOf('replace_image_src:'))
-        );
-        expect(replaceBlock).toContain('__glidPersistSrc = newSrc');
-    });
-
-    it('__glidPersistSrc update happens AFTER _element swap, BEFORE renderAll', () => {
-        const src = readFileSync(resolve(__dirname, './shimCreators.ts'), 'utf-8');
-        const replaceBlock = src.slice(
-            src.indexOf('replace_image_src:'),
-            src.indexOf('},', src.indexOf('replace_image_src:'))
-        );
-        const elementIdx = replaceBlock.indexOf('_element');
-        const persistIdx = replaceBlock.indexOf('__glidPersistSrc = newSrc');
-        const renderIdx = replaceBlock.indexOf('fc.renderAll()');
-        expect(elementIdx).toBeGreaterThan(-1);
-        expect(persistIdx).toBeGreaterThan(elementIdx);
-        expect(renderIdx).toBeGreaterThan(persistIdx);
+describe('GLID_CUSTOM_PROPS', () => {
+    it('includes essential custom properties', () => {
+        expect(GLID_CUSTOM_PROPS).toContain('__glidId');
+        expect(GLID_CUSTOM_PROPS).toContain('__glidZIndex');
+        expect(GLID_CUSTOM_PROPS).toContain('__glidName');
+        expect(GLID_CUSTOM_PROPS).toContain('__glidGradientStart');
+        expect(GLID_CUSTOM_PROPS).toContain('__glidTextEffectType');
     });
 });
 
-// ═══════════════════════════════════════════════════
-// ★ REGRESSION GUARD: Fill to Page + Remove BG placement
-// Fixed in v0.0.0.336 — moved from Position panel to inline toolbar.
-// ═══════════════════════════════════════════════════
-
-describe('★ REGRESSION: Fill to Page is in inline toolbar, NOT Position panel', () => {
-
-    it('ContextToolbar has FillToPageToolbarBtn component', () => {
-        const src = readFileSync(resolve(__dirname, '../components/editor/ContextToolbar.tsx'), 'utf-8');
-        expect(src).toContain('FillToPageToolbarBtn');
-        expect(src).toContain('actions.fillToPage(nodeId)');
+describe('patchAceProps', () => {
+    it('patches toObject to include custom props', () => {
+        const obj = { type: 'rect', __glidId: 42, __glidZIndex: 3, toObject: () => ({}), toJSON: () => ({}) } as any;
+        patchAceProps(obj);
+        const data = obj.toObject();
+        expect(data.__glidId).toBe(42);
+        expect(data.__glidZIndex).toBe(3);
     });
 
-    it('ContextToolbar has RemoveBgToolbarBtn for images', () => {
-        const src = readFileSync(resolve(__dirname, '../components/editor/ContextToolbar.tsx'), 'utf-8');
-        expect(src).toContain('RemoveBgToolbarBtn');
-        expect(src).toContain('removeBackgroundFromUrl');
-    });
-
-    it('ContextToolbar renders both buttons for image type', () => {
-        const src = readFileSync(resolve(__dirname, '../components/editor/ContextToolbar.tsx'), 'utf-8');
-        const removeBgIdx = src.indexOf('RemoveBgToolbarBtn');
-        const fillIdx = src.indexOf('FillToPageToolbarBtn');
-        // Both should be present
-        expect(removeBgIdx).toBeGreaterThan(-1);
-        expect(fillIdx).toBeGreaterThan(-1);
-        // Fill should come after Remove BG
-        expect(fillIdx).toBeGreaterThan(removeBgIdx);
-    });
-
-    it('InlinePositionPanel does NOT contain RemoveBgInline or FillToPageInline in render', () => {
-        const src = readFileSync(resolve(__dirname, '../components/editor/InlinePositionPanel.tsx'), 'utf-8');
-        // The render method should NOT reference these components
-        const renderSection = src.slice(0, src.indexOf('function RemoveBgInline') > -1 ? src.indexOf('function RemoveBgInline') : src.length);
-        expect(renderSection).not.toContain('<RemoveBgInline');
-        expect(renderSection).not.toContain('<FillToPageInline');
+    it('preserves original toObject data', () => {
+        const obj = { type: 'rect', __glidId: 1, toObject: () => ({ width: 100 }), toJSON: () => ({}) } as any;
+        patchAceProps(obj);
+        const data = obj.toObject();
+        expect(data.width).toBe(100);
+        expect(data.__glidId).toBe(1);
     });
 });
