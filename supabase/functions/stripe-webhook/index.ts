@@ -53,6 +53,12 @@ async function resolveUserId(subscription: any): Promise<string | null> {
     } catch { return null; }
 }
 
+// Safe date converter — prevents RangeError on undefined timestamps
+function safeDate(epoch: number | undefined | null): string {
+    if (!epoch || typeof epoch !== 'number') return new Date().toISOString();
+    return new Date(epoch * 1000).toISOString();
+}
+
 serve(async (req) => {
     const signature = req.headers.get('stripe-signature');
     if (!signature) {
@@ -90,8 +96,8 @@ serve(async (req) => {
                 status: 'active',
                 stripe_customer_id: session.customer as string,
                 stripe_subscription_id: session.subscription as string,
-                current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-                current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+                current_period_start: safeDate(subscription.current_period_start),
+                current_period_end: safeDate(subscription.current_period_end),
                 updated_at: new Date().toISOString(),
             }, { onConflict: 'user_id' });
 
@@ -114,8 +120,8 @@ serve(async (req) => {
             await supabase.from('subscriptions').update({
                 plan: plan,
                 status,
-                current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-                current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+                current_period_start: safeDate(subscription.current_period_start),
+                current_period_end: safeDate(subscription.current_period_end),
                 updated_at: new Date().toISOString(),
             }).eq('user_id', userId);
 
