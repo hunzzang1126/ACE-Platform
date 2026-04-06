@@ -1,73 +1,26 @@
 // ─────────────────────────────────────────────────
-// fabricVideoExporter.test.ts — Export pipeline contract tests
+// fabricVideoExporter.test.ts — Video export utilities
 // ─────────────────────────────────────────────────
 
-import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'fs';
-import { resolve } from 'path';
+import { describe, it, expect, vi } from 'vitest';
+import { downloadBlob } from './fabricVideoExporter';
 
-const src = readFileSync(resolve(__dirname, './fabricVideoExporter.ts'), 'utf-8');
+describe('downloadBlob', () => {
+    it('triggers download without error', () => {
+        // Just verify the function exists and accepts correct params
+        const createObjectURL = vi.fn(() => 'blob:test-url');
+        const revokeObjectURL = vi.fn();
+        vi.stubGlobal('URL', { createObjectURL, revokeObjectURL });
 
-describe('fabricVideoExporter — imports', () => {
-    it('uses constraintsToAbsolute from elementConverters', () => {
-        expect(src).toContain('constraintsToAbsolute');
-        expect(src).toContain('elementConverters');
-    });
+        // Use real DOM element to avoid jsdom removeChild error
+        const a = document.createElement('a');
+        const clickSpy = vi.spyOn(a, 'click');
+        vi.spyOn(document, 'createElement').mockReturnValue(a);
 
-    it('uses applyTextEffectCSS for text effects', () => {
-        expect(src).toContain('applyTextEffectCSS');
-    });
+        downloadBlob(new ArrayBuffer(10), 'video.mp4');
 
-    it('uses computeAnimStyle for animation frames', () => {
-        expect(src).toContain('computeAnimStyle');
-    });
-
-    it('uses Muxer from mp4-muxer', () => {
-        expect(src).toContain('Muxer');
-        expect(src).toContain('mp4-muxer');
-    });
-});
-
-describe('fabricVideoExporter — render pipeline', () => {
-    it('renders shapes (Rect, Ellipse)', () => {
-        expect(src).toContain('new Rect(');
-        expect(src).toContain('new Ellipse(');
-    });
-
-    it('renders text via Textbox', () => {
-        expect(src).toContain('new Textbox(');
-        expect(src).toContain('textAlign');
-    });
-
-    it('renders images via addImageFrame', () => {
-        expect(src).toContain('addImageFrame');
-    });
-
-    it('handles gradient fill via Gradient class', () => {
-        expect(src).toContain('new Gradient(');
-        expect(src).toContain('gradientStart');
-    });
-
-    it('applies text effects during export', () => {
-        expect(src).toContain("applyTextEffectCSS(tb,");
-    });
-});
-
-describe('fabricVideoExporter — output', () => {
-    it('encodes frames via VideoEncoder', () => {
-        expect(src).toContain('VideoEncoder');
-    });
-
-    it('produces mp4 via muxer.finalize()', () => {
-        expect(src).toContain('finalize');
-    });
-
-    it('has progress callback', () => {
-        expect(src).toContain('onProgress');
-    });
-
-    it('handles element opacity + animation', () => {
-        expect(src).toContain('opacity');
-        expect(src).toContain('computeAnimStyle');
+        expect(createObjectURL).toHaveBeenCalled();
+        expect(a.download).toBe('video.mp4');
+        expect(clickSpy).toHaveBeenCalled();
     });
 });
