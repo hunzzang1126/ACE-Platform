@@ -58,7 +58,12 @@ export function setupCanvasEvents({
 
     // Reset original font size ref after scaling ends
     fc.on('object:modified', (opt) => {
-        if (opt.target instanceof Textbox) delete (opt.target as any).__glidOrigFontSize;
+        if (opt.target instanceof Textbox) {
+            delete (opt.target as any).__glidOrigFontSize;
+            // ★ Auto-shrink height after scaling/editing
+            opt.target.set({ height: opt.target.calcTextHeight() });
+            opt.target.setCoords();
+        }
     });
 
     // ── Object lifecycle ──
@@ -74,6 +79,9 @@ export function setupCanvasEvents({
             if ((obj.scaleX ?? 1) !== 1 || (obj.scaleY ?? 1) !== 1) {
                 obj.set({ width: Math.max(20, (obj.width ?? 200) * (obj.scaleX ?? 1)), scaleX: 1, scaleY: 1 });
             }
+            // ★ Auto-shrink height to fit actual text content
+            obj.set({ height: obj.calcTextHeight() });
+            obj.setCoords();
         }
         if (!(obj as any)?.__aceGuide) pushUndo('Add element');
         syncState();

@@ -288,6 +288,9 @@ export function useFabricCanvas(width: number, height: number, _addDemoShapes = 
             if (obj instanceof Textbox) {
                 obj.setControlsVisibility({ tl: true, tr: true, bl: true, br: true, mt: false, mb: false, ml: true, mr: true, mtr: false });
                 if ((obj.scaleX ?? 1) !== 1 || (obj.scaleY ?? 1) !== 1) obj.set({ width: Math.max(20, (obj.width ?? 200) * (obj.scaleX ?? 1)), scaleX: 1, scaleY: 1 });
+                // ★ Auto-shrink height to fit actual text (prevents empty space below)
+                obj.set({ height: obj.calcTextHeight() });
+                obj.setCoords();
             }
             patchAceProps(obj);
         });
