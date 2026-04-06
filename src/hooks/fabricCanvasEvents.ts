@@ -9,6 +9,28 @@ import { Canvas, Textbox, FabricObject, Line, Shadow } from 'fabric';
 import { nextId, isArtboard, patchAceProps } from './fabricHelpers';
 import { snapToGuides, type GuideLine } from './useFabricGuides';
 
+// ★ Auto-shrink: Tighten Textbox bounding box to actual rendered text width.
+// Prevents right-side gap and premature word wrapping on handle resize.
+function autoShrinkTextbox(tb: Textbox): void {
+    if ((tb as any).__autoShrinking) return; // guard: prevent infinite loop
+    (tb as any).__autoShrinking = true;
+    try {
+        tb.initDimensions();
+        const lineWidths: number[] = (tb as any).__lineWidths || [];
+        if (lineWidths.length === 0) return;
+        const longestLine = Math.max(...lineWidths);
+        const minWidth = Math.max(20, longestLine + 2); // 2px breathing room
+        if (tb.width > minWidth) {
+            tb.set({ width: minWidth });
+            tb.initDimensions(); // re-layout after width change
+        }
+        tb.set({ height: tb.calcTextHeight() });
+        tb.setCoords();
+    } finally {
+        (tb as any).__autoShrinking = false;
+    }
+}
+
 interface EventSetupParams {
     fc: Canvas;
     width: number;
@@ -56,14 +78,17 @@ export function setupCanvasEvents({
         }
     });
 
-    // Reset original font size ref after scaling ends
+    // Reset original font size ref after scaling ends + auto-shrink
     fc.on('object:modified', (opt) => {
         if (opt.target instanceof Textbox) {
             delete (opt.target as any).__glidOrigFontSize;
-            // ★ Auto-shrink height after scaling/editing
-            opt.target.set({ height: opt.target.calcTextHeight() });
-            opt.target.setCoords();
+            autoShrinkTextbox(opt.target);
         }
+    });
+
+    // ★ Auto-shrink during text editing (typing)
+    fc.on('text:changed', (opt) => {
+        if (opt.target instanceof Textbox) autoShrinkTextbox(opt.target);
     });
 
     // ── Object lifecycle ──
@@ -79,9 +104,7 @@ export function setupCanvasEvents({
             if ((obj.scaleX ?? 1) !== 1 || (obj.scaleY ?? 1) !== 1) {
                 obj.set({ width: Math.max(20, (obj.width ?? 200) * (obj.scaleX ?? 1)), scaleX: 1, scaleY: 1 });
             }
-            // ★ Auto-shrink height to fit actual text content
-            obj.set({ height: obj.calcTextHeight() });
-            obj.setCoords();
+            autoShrinkTextbox(obj);
         }
         if (!(obj as any)?.__aceGuide) pushUndo('Add element');
         syncState();
