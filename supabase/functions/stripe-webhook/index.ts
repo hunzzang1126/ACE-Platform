@@ -120,6 +120,8 @@ serve(async (req) => {
             await supabase.from('subscriptions').update({
                 plan: plan,
                 status,
+                cancel_at_period_end: subscription.cancel_at_period_end ?? false,
+                cancel_at: subscription.cancel_at ? safeDate(subscription.cancel_at) : null,
                 current_period_start: safeDate(subscription.current_period_start),
                 current_period_end: safeDate(subscription.current_period_end),
                 updated_at: new Date().toISOString(),

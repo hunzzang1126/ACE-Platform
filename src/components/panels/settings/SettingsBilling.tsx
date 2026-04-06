@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────
 
 import { useState } from 'react';
-import type { User, SubscriptionInfo } from '@/stores/authStore';
+import type { User } from '@/stores/authStore';
 import { redirectToPortal } from '@/services/stripeService';
 import { Section } from './settingsShared';
 
@@ -15,8 +15,12 @@ export function SettingsBilling({ user }: Props) {
     const [portalLoading, setPortalLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const sub = user?.subscription;
-    const isPaid = sub && sub.plan !== 'starter' && sub.status === 'active';
+
+    // State derivation
+    const isPaid = sub && sub.plan !== 'starter' && sub.status === 'active' && !sub.cancelAtPeriodEnd;
+    const isCanceling = sub && sub.status === 'active' && sub.cancelAtPeriodEnd;
     const isCanceled = sub?.status === 'canceled';
+    const isFree = !sub || sub.plan === 'starter';
 
     const handleManageSubscription = async () => {
         if (!user?.id) return;
@@ -27,7 +31,6 @@ export function SettingsBilling({ user }: Props) {
             setError(result.error);
             setPortalLoading(false);
         }
-        // If no error, page redirects to Stripe Portal
     };
 
     const formatDate = (dateStr: string | null) => {
@@ -39,13 +42,19 @@ export function SettingsBilling({ user }: Props) {
         } catch { return '-'; }
     };
 
+    // Determine display state
+    const statusLabel = isCanceling ? 'Canceling' : isPaid ? 'Active' : isCanceled ? 'Canceled' : 'Free';
+    const statusColor = isCanceling ? '#ff9f0a' : isPaid ? '#34c759' : isCanceled ? '#ff6b6b' : '#86868b';
+    const statusBg = isCanceling ? 'rgba(255,159,10,0.12)' : isPaid ? 'rgba(52,199,89,0.12)' : isCanceled ? 'rgba(255,59,48,0.1)' : 'rgba(255,255,255,0.06)';
+    const cardBg = (isPaid || isCanceling) ? 'linear-gradient(135deg, rgba(13,153,255,0.08), rgba(99,102,241,0.08))' : 'rgba(255,255,255,0.03)';
+    const cardBorder = (isPaid || isCanceling) ? 'rgba(13,153,255,0.15)' : 'rgba(255,255,255,0.06)';
+
     return (
         <>
             <Section title="Current Plan">
                 <div style={{
                     padding: '16px 20px', borderRadius: 12,
-                    background: isPaid ? 'linear-gradient(135deg, rgba(13,153,255,0.08), rgba(99,102,241,0.08))' : 'rgba(255,255,255,0.03)',
-                    border: `1px solid ${isPaid ? 'rgba(13,153,255,0.15)' : 'rgba(255,255,255,0.06)'}`,
+                    background: cardBg, border: `1px solid ${cardBorder}`,
                     marginBottom: 16,
                 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -54,22 +63,26 @@ export function SettingsBilling({ user }: Props) {
                                 {sub?.plan ?? 'Starter'}
                             </div>
                             <div style={{ fontSize: 12, color: '#86868b', marginTop: 2 }}>
-                                {isPaid ? 'Active subscription' : isCanceled ? 'Canceled' : 'Free plan'}
+                                {isCanceling ? 'Scheduled to cancel'
+                                    : isPaid ? 'Active subscription'
+                                    : isCanceled ? 'Subscription ended'
+                                    : 'Free plan'}
                             </div>
                         </div>
                         <div style={{
                             padding: '4px 12px', borderRadius: 20, fontSize: 11, fontWeight: 600,
-                            background: isPaid ? 'rgba(52,199,89,0.12)' : isCanceled ? 'rgba(255,59,48,0.1)' : 'rgba(255,255,255,0.06)',
-                            color: isPaid ? '#34c759' : isCanceled ? '#ff6b6b' : '#86868b',
+                            background: statusBg, color: statusColor,
                         }}>
-                            {isPaid ? 'Active' : isCanceled ? 'Canceled' : 'Free'}
+                            {statusLabel}
                         </div>
                     </div>
 
                     {sub?.currentPeriodEnd && (
-                        <div style={{ fontSize: 12, color: '#86868b' }}>
-                            {isCanceled
-                                ? `Access until ${formatDate(sub.currentPeriodEnd)}`
+                        <div style={{ fontSize: 12, color: isCanceling ? '#ff9f0a' : '#86868b' }}>
+                            {isCanceling
+                                ? `Access until ${formatDate(sub.currentPeriodEnd)}. After this date your plan will be downgraded to Starter.`
+                                : isCanceled
+                                ? `Your paid access ended on ${formatDate(sub.currentPeriodEnd)}.`
                                 : `Next billing date: ${formatDate(sub.currentPeriodEnd)}`
                             }
                         </div>
@@ -78,7 +91,19 @@ export function SettingsBilling({ user }: Props) {
             </Section>
 
             <Section title="Manage">
-                {isPaid ? (
+                {isCanceling ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <p style={{ fontSize: 13, color: '#86868b', margin: 0, lineHeight: 1.5 }}>
+                            Your subscription will be canceled at the end of the current billing period. You can reactivate it before then.
+                        </p>
+                        <button onClick={handleManageSubscription} disabled={portalLoading} style={primaryBtnStyle}>
+                            {portalLoading ? 'Opening...' : 'Reactivate Subscription'}
+                        </button>
+                        <p style={{ fontSize: 11, color: '#555', margin: 0, lineHeight: 1.4 }}>
+                            Opens Stripe's secure portal to manage your subscription.
+                        </p>
+                    </div>
+                ) : isPaid ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                         <button onClick={handleManageSubscription} disabled={portalLoading} style={primaryBtnStyle}>
                             {portalLoading ? 'Opening...' : 'Manage Subscription'}
@@ -90,7 +115,7 @@ export function SettingsBilling({ user }: Props) {
                 ) : isCanceled ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                         <p style={{ fontSize: 13, color: '#86868b', margin: 0, lineHeight: 1.5 }}>
-                            Your subscription has been canceled. You can still access paid features until the end of your billing period.
+                            Your subscription has ended and your plan has been downgraded to Starter.
                         </p>
                         <button
                             onClick={() => window.location.href = '/pricing'}

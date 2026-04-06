@@ -22,6 +22,7 @@ import type { PlanTier } from '@/schema/planTypes';
 export interface SubscriptionInfo {
     plan: PlanTier;
     status: 'active' | 'canceled' | 'past_due' | 'trialing';
+    cancelAtPeriodEnd: boolean;
     currentPeriodEnd: string | null;
     stripeSubscriptionId: string | null;
 }
@@ -198,7 +199,7 @@ export const useAuthStore = create<AuthState>()(
                 let subscriptionInfo: SubscriptionInfo | undefined;
                 try {
                     const { data: sub } = await sb.from('subscriptions')
-                        .select('plan, status, current_period_end, stripe_subscription_id')
+                        .select('plan, status, cancel_at_period_end, current_period_end, stripe_subscription_id')
                         .eq('user_id', supaUser.id)
                         .maybeSingle();
                     if (sub?.plan) {
@@ -206,6 +207,7 @@ export const useAuthStore = create<AuthState>()(
                         subscriptionInfo = {
                             plan: sub.plan as PlanTier,
                             status: sub.status ?? 'active',
+                            cancelAtPeriodEnd: sub.cancel_at_period_end ?? false,
                             currentPeriodEnd: sub.current_period_end ?? null,
                             stripeSubscriptionId: sub.stripe_subscription_id ?? null,
                         };

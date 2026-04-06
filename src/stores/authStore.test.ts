@@ -264,12 +264,13 @@ describe('authStore', () => {
         it('should set plan from active subscription', async () => {
             mockGetSession.mockResolvedValue({ data: { session: mockSupabaseSession() } });
             mockFrom.mockReturnValue({
-                select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: { plan: 'pro', status: 'active', current_period_end: '2026-05-01T00:00:00Z', stripe_subscription_id: 'sub_123' } }) }) }),
+                select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: { plan: 'pro', status: 'active', cancel_at_period_end: false, current_period_end: '2026-05-01T00:00:00Z', stripe_subscription_id: 'sub_123' } }) }) }),
             });
 
             await useAuthStore.getState().syncSessionFromSupabase();
             expect(useAuthStore.getState().user?.plan).toBe('pro');
             expect(useAuthStore.getState().user?.subscription?.status).toBe('active');
+            expect(useAuthStore.getState().user?.subscription?.cancelAtPeriodEnd).toBe(false);
         });
 
         it('should override plan to admin when role is admin', async () => {
