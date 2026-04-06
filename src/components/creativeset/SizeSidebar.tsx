@@ -2,13 +2,15 @@
 // SizeSidebar – Left panel with size list + toggles
 // ─────────────────────────────────────────────────
 import { useState } from 'react';
-import type { BannerVariant } from '@/schema/design.types';
+import type { BannerVariant, SizingMode } from '@/schema/design.types';
 
 interface Props {
     variants: BannerVariant[];
     visibleIds: Set<string>;
     onToggleVisibility: (id: string) => void;
     onAddSizeClick: () => void;
+    sizingMode?: SizingMode;
+    onSizingModeChange?: (mode: SizingMode) => void;
     isPlaying?: boolean;
     onTogglePlay?: () => void;
 }
@@ -21,7 +23,7 @@ interface StatusCounts {
     approved: number;
 }
 
-export function SizeSidebar({ variants, visibleIds, onToggleVisibility, onAddSizeClick, isPlaying = false, onTogglePlay }: Props) {
+export function SizeSidebar({ variants, visibleIds, onToggleVisibility, onAddSizeClick, sizingMode = 'uniform', onSizingModeChange, isPlaying = false, onTogglePlay }: Props) {
     const [sizesExpanded, setSizesExpanded] = useState(true);
     const [statusExpanded, setStatusExpanded] = useState(true);
 
@@ -40,6 +42,32 @@ export function SizeSidebar({ variants, visibleIds, onToggleVisibility, onAddSiz
                 <button className="cs-sidebar-add-btn" onClick={onAddSizeClick}>
                     + ADD SIZE
                 </button>
+            </div>
+
+            {/* Sizing Mode Toggle */}
+            <div className="cs-sidebar-section">
+                <div className="cs-sidebar-section-header" style={{ cursor: 'default', fontSize: 11, color: '#8b949e', padding: '6px 12px' }}>
+                    Sizing Mode
+                </div>
+                <div style={{ display: 'flex', gap: 4, padding: '0 12px 8px' }}>
+                    {(['uniform', 'edge-pin'] as const).map((mode) => (
+                        <button
+                            key={mode}
+                            onClick={() => onSizingModeChange?.(mode)}
+                            style={{
+                                flex: 1, padding: '5px 8px', fontSize: 10, fontWeight: 600,
+                                borderRadius: 4, border: '1px solid',
+                                borderColor: sizingMode === mode ? '#0D99FF' : 'rgba(255,255,255,0.08)',
+                                background: sizingMode === mode ? 'rgba(13,153,255,0.15)' : 'rgba(255,255,255,0.03)',
+                                color: sizingMode === mode ? '#0D99FF' : '#8b949e',
+                                cursor: 'pointer', transition: 'all 0.15s',
+                                letterSpacing: '0.03em',
+                            }}
+                        >
+                            {mode === 'uniform' ? 'Uniform' : 'Edge Pin'}
+                        </button>
+                    ))}
+                </div>
             </div>
 
             {/* Playback Controls */}

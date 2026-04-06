@@ -215,6 +215,14 @@ export const useDesignStore = create<DesignState>()(
                     });
                 },
 
+                setSizingMode: (mode: import('@/schema/design.types').SizingMode) => {
+                    set((state) => {
+                        const cs = getActiveCS(state); if (!cs) return;
+                        cs.sizingMode = mode;
+                        cs.updatedAt = new Date().toISOString(); state.creativeSet = cs;
+                    });
+                },
+
                 resyncAllPluggedVariants: () => {
                     set((state) => {
                         const cs = getActiveCS(state); if (!cs?.plugConnections) return;

@@ -130,6 +130,8 @@ export function GeneralEditorPage() {
                     visibleIds={visibleIds}
                     onToggleVisibility={toggleVisibility}
                     onAddSizeClick={() => setShowAddSizeModal(true)}
+                    sizingMode={creativeSet.sizingMode ?? 'uniform'}
+                    onSizingModeChange={(mode) => useDesignStore.getState().setSizingMode(mode)}
                     isPlaying={previewPlaying}
                     onTogglePlay={togglePreviewPlay}
                 />

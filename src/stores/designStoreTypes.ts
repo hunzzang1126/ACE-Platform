@@ -33,6 +33,7 @@ export interface DesignState {
     // ── Plug Connection Actions ──
     connectPlug: (originId: string, targetId: string) => void;
     disconnectPlug: (targetId: string) => void;
+    setSizingMode: (mode: import('@/schema/design.types').SizingMode) => void;
     resyncAllPluggedVariants: () => void;
     getOriginForVariant: (variantId: string) => string | undefined;
     getPluggedTargets: (originId: string) => string[];
