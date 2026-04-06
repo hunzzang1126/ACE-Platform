@@ -131,28 +131,20 @@ function postStretchTextFit(elements: DesignElement[], targetW: number, targetH:
     return elements;
 }
 
-// ── Edge Pin sizing — left gap fixed, inter-element distance preserved ──
+// ── Edge Pin sizing v2 — adaptive scale with padding ratio preservation ──
 
 function edgePinSizeElements(
     originElements: DesignElement[], originW: number, originH: number,
     targetW: number, targetH: number,
 ): DesignElement[] {
-    const uniformScale = Math.min(targetW / originW, targetH / originH);
     const result: DesignElement[] = [];
-    const contentItems: Array<{ el: DesignElement; x: number; y: number; w: number; h: number }> = [];
+    const nonBgElements: DesignElement[] = [];
 
-    // Collect original left gap from non-background elements
-    const nonBgElements = originElements.filter(el => detectElementRole(el, originW, originH) !== 'background');
-    const originalLeftGap = nonBgElements.length > 0
-        ? Math.min(...nonBgElements.map(el => constraintsToAbsolute(el.constraints, originW, originH).x))
-        : 0;
-
+    // ── 0. Process backgrounds first (cover fill) ──
     for (const el of originElements) {
-        const abs = constraintsToAbsolute(el.constraints, originW, originH);
         const role = detectElementRole(el, originW, originH);
-
-        // Background: cover fill (same as uniform mode)
         if (role === 'background') {
+            const abs = constraintsToAbsolute(el.constraints, originW, originH);
             let bgW = targetW, bgH = targetH, bgX = 0, bgY = 0;
             if (el.type === 'image' && abs.w > 0 && abs.h > 0) {
                 const imgAspect = abs.w / abs.h;
@@ -164,20 +156,63 @@ function edgePinSizeElements(
                 ...JSON.parse(JSON.stringify(el)),
                 constraints: { horizontal: { anchor: 'left' as const, offset: bgX }, vertical: { anchor: 'top' as const, offset: bgY }, size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width: bgW, height: bgH }, rotation: el.constraints.rotation },
             } as DesignElement);
-            continue;
+        } else {
+            nonBgElements.push(el);
         }
+    }
+    if (nonBgElements.length === 0) return result;
 
-        // Content: uniformScale for position + size (preserves inter-element distances)
-        const newX = Math.round(abs.x * uniformScale);
-        const newY = Math.round(abs.y * uniformScale);
-        const newW = Math.max(4, Math.round(abs.w * uniformScale));
-        const newH = Math.max(4, Math.round(abs.h * uniformScale));
+    // ── 1. Compute original content group bounding box ──
+    const absList = nonBgElements.map(el => ({
+        el, abs: constraintsToAbsolute(el.constraints, originW, originH),
+    }));
+    const groupLeft = Math.min(...absList.map(a => a.abs.x));
+    const groupTop = Math.min(...absList.map(a => a.abs.y));
+    const groupRight = Math.max(...absList.map(a => a.abs.x + a.abs.w));
+    const groupBottom = Math.max(...absList.map(a => a.abs.y + a.abs.h));
+    const groupW = groupRight - groupLeft;
+    const groupH = groupBottom - groupTop;
+
+    // ── 2. Compute padding RATIOS from original canvas ──
+    const leftRatio = groupLeft / originW;     // e.g. 20/300 = 6.7%
+    const topRatio = groupTop / originH;       // e.g. 30/250 = 12%
+
+    // ── 3. Compute adaptive scale ──
+    // baseScale: guaranteed no-overflow scale
+    const baseScale = Math.min(targetW / originW, targetH / originH);
+
+    // Available space in target after applying padding ratios
+    const availableW = targetW * (1 - leftRatio * 2); // symmetric padding approximation
+    const availableH = targetH * (1 - topRatio * 2);
+
+    // How much can we boost beyond baseScale while staying within available space?
+    const boostW = groupW > 0 ? availableW / (groupW * baseScale) : 1;
+    const boostH = groupH > 0 ? availableH / (groupH * baseScale) : 1;
+    const boost = Math.min(boostW, boostH, 2.0); // cap at 2x to prevent absurd scaling
+
+    const finalScale = baseScale * Math.max(1, boost); // never scale DOWN below baseScale
+
+    // ── 4. Apply target padding from ratios ──
+    const targetLeftGap = Math.round(targetW * leftRatio);
+    const targetTopGap = Math.round(targetH * topRatio);
+
+    // ── 5. Scale and position each element ──
+    const contentItems: Array<{ el: DesignElement; x: number; y: number; w: number; h: number }> = [];
+
+    for (const { el, abs } of absList) {
+        // Scale relative to group origin (preserves inter-element distances)
+        const relX = abs.x - groupLeft;
+        const relY = abs.y - groupTop;
+        const newX = Math.round(targetLeftGap + relX * finalScale);
+        const newY = Math.round(targetTopGap + relY * finalScale);
+        const newW = Math.max(4, Math.round(abs.w * finalScale));
+        const newH = Math.max(4, Math.round(abs.h * finalScale));
 
         const fontPatch: Record<string, unknown> = {};
         if ((el.type === 'text' || el.type === 'button') && (el as any).fontSize) {
-            fontPatch.fontSize = Math.max(MIN_FONT, Math.round((el as any).fontSize * uniformScale));
+            fontPatch.fontSize = Math.max(MIN_FONT, Math.round((el as any).fontSize * finalScale));
         }
-        if ((el as any).borderRadius) fontPatch.borderRadius = Math.round((el as any).borderRadius * uniformScale);
+        if ((el as any).borderRadius) fontPatch.borderRadius = Math.round((el as any).borderRadius * finalScale);
 
         const scaled = {
             ...JSON.parse(JSON.stringify(el)),
@@ -188,24 +223,26 @@ function edgePinSizeElements(
         contentItems.push({ el: scaled, x: newX, y: newY, w: newW, h: newH });
     }
 
-    // Pin content group to original left gap
+    // ── 6. Vertical centering if content doesn't fill height well ──
     if (contentItems.length > 0) {
-        const scaledLeftEdge = Math.min(...contentItems.map(c => c.x));
-        const shiftX = originalLeftGap - scaledLeftEdge;
-
-        // Vertical: center the content group in target canvas
         const minY = Math.min(...contentItems.map(c => c.y));
         const maxY = Math.max(...contentItems.map(c => c.y + c.h));
-        const groupH = maxY - minY;
-        const shiftY = Math.round((targetH - groupH) / 2) - minY;
+        const scaledGroupH = maxY - minY;
+        const idealTopGap = targetTopGap;
+        const idealBottomGap = targetH - idealTopGap - scaledGroupH;
 
-        for (const { el } of contentItems) {
-            el.constraints.horizontal = { anchor: 'left' as const, offset: el.constraints.horizontal.offset + shiftX };
-            el.constraints.vertical = { anchor: 'top' as const, offset: el.constraints.vertical.offset + shiftY };
-            result.push(el);
+        // If bottom gap is negative (overflow), shift up; otherwise center vertically
+        if (idealBottomGap < 0) {
+            // Overflow: center the group
+            const shiftY = Math.round((targetH - scaledGroupH) / 2) - minY;
+            for (const { el } of contentItems) {
+                el.constraints.vertical = { anchor: 'top' as const, offset: el.constraints.vertical.offset + shiftY };
+            }
         }
+        // else: padding ratio already applied, no shift needed
     }
 
+    for (const { el } of contentItems) result.push(el);
     return postStretchTextFit(result, targetW, targetH);
 }
 
