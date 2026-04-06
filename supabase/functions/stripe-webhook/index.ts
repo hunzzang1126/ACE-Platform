@@ -53,9 +53,9 @@ async function resolveUserId(subscription: any): Promise<string | null> {
     } catch { return null; }
 }
 
-// Safe date converter — prevents RangeError on undefined timestamps
-function safeDate(epoch: number | undefined | null): string {
-    if (!epoch || typeof epoch !== 'number') return new Date().toISOString();
+// Safe date converter — returns null for missing timestamps to avoid corrupting DB
+function safeDate(epoch: number | undefined | null): string | null {
+    if (!epoch || typeof epoch !== 'number') return null;
     return new Date(epoch * 1000).toISOString();
 }
 
