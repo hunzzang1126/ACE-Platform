@@ -182,7 +182,7 @@ export function createEngineShim(
             const objects = ids.map(findById).filter(Boolean) as FabricObject[];
             if (objects.length < 2) return -1;
             const gid = nextId();
-            const group = new Group(objects, { subTargetCheck: true, interactive: true });
+            const group = new Group(objects);
             objects.forEach(o => fc.remove(o));
             (group as any).__glidId = gid;
             (group as any).__glidName = name || `Group #${gid}`;
