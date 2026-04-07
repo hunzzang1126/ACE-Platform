@@ -25,7 +25,11 @@ vi.mock('fabric', () => {
         color = 'rgba(0,0,0,0.5)'; blur = 0; offsetX = 0; offsetY = 0;
         constructor(opts: any = {}) { Object.assign(this, opts); }
     }
-    return { Textbox: MockTextbox, Shadow: MockShadow, FabricObject: class {} };
+    return { Textbox: MockTextbox, Shadow: MockShadow, FabricObject: class {}, Group: class MockGroup {
+        type = 'group'; left = 0; top = 0; width = 0; height = 0; scaleX = 1; scaleY = 1; opacity = 1; angle = 0; visible = true; rx = 0; _objects: any[] = [];
+        constructor(objs: any[] = []) { this._objects = objs; }
+        getObjects() { return this._objects; }
+    } };
 });
 
 import { fabricToEngineNode, patchAceProps, isArtboard } from './fabricHelpers';

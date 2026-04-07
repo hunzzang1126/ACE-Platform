@@ -11,7 +11,7 @@ export interface SelectionBounds { x: number; y: number; w: number; h: number }
 /** Node info returned by engine.get_all_nodes() */
 export interface EngineNode {
     id: number;
-    type: 'rect' | 'rounded_rect' | 'ellipse' | 'text' | 'image' | 'path';
+    type: 'rect' | 'rounded_rect' | 'ellipse' | 'text' | 'image' | 'path' | 'group';
     x: number;
     y: number;
     w: number;
@@ -59,6 +59,8 @@ export interface EngineNode {
     name?: string;
     // Rotation angle (degrees, from Fabric.js)
     angle?: number;
+    // Group children (when type === 'group')
+    children?: EngineNode[];
 }
 
 export interface CanvasEngineState {

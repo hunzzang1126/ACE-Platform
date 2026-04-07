@@ -21,6 +21,12 @@ vi.mock('fabric', () => ({
         }
     },
     Shadow: class Shadow {},
+    Group: class Group {
+        type = 'group';
+        _objects: any[] = [];
+        constructor(objs: any[] = []) { this._objects = objs; }
+        getObjects() { return this._objects; }
+    },
 }));
 
 import {

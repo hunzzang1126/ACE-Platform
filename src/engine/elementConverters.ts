@@ -4,7 +4,7 @@
 // Constraint utils, color, fonts → constraintUtils.ts
 // ─────────────────────────────────────────────────
 
-import type { DesignElement, ShapeElement, TextElement, ImageElement, VideoElement } from '@/schema/elements.types';
+import type { DesignElement, ShapeElement, TextElement, ImageElement, VideoElement, GroupElement } from '@/schema/elements.types';
 import type { EngineNode } from '@/hooks/useCanvasEngine';
 import type { OverlayElement } from '@/hooks/useOverlayElements';
 
@@ -54,6 +54,18 @@ export function engineNodeToImageElement(node: EngineNode, canvasW: number, canv
     const animation = getAnimationForElement(`engine-${node.id}`);
     const shadow = node.shadow_color ? { offsetX: node.shadow_offsetX ?? 0, offsetY: node.shadow_offsetY ?? 0, blur: node.shadow_blur ?? 0, color: node.shadow_color } : undefined;
     return { id: `engine-${node.id}`, name: node.name || `Image ${node.id}`, type: 'image', constraints, src: node.src ?? '', fit: node.objectFit ?? 'cover', naturalWidth: node.naturalWidth, naturalHeight: node.naturalHeight, opacity: node.opacity ?? 1, visible: node.visible !== false, locked: node.locked ?? false, zIndex: node.z_index ?? 1, shadow, animation } as ImageElement;
+}
+// ── Engine Node → Group Element ──
+
+export function engineNodeToGroupElement(node: EngineNode, canvasW: number, canvasH: number): GroupElement {
+    const constraints = absoluteToConstraints(node.x, node.y, node.w, node.h, canvasW, canvasH, node.angle ?? 0);
+    const children: DesignElement[] = (node.children ?? []).map(child => {
+        if (child.type === 'text') return engineNodeToTextElement(child, canvasW, canvasH);
+        if (child.type === 'image') return engineNodeToImageElement(child, canvasW, canvasH);
+        if (child.type === 'group') return engineNodeToGroupElement(child, canvasW, canvasH);
+        return engineNodeToShapeElement(child, canvasW, canvasH);
+    });
+    return { id: `engine-${node.id}`, name: node.name || `Group ${node.id}`, type: 'group', constraints, children, opacity: node.opacity ?? 1, visible: node.visible !== false, locked: node.locked ?? false, zIndex: node.z_index ?? 1 } as GroupElement;
 }
 
 // ── Overlay → Design Element ──

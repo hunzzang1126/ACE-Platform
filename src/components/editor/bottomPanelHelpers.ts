@@ -31,6 +31,7 @@ export function nodeLabel(node: EngineNode): string {
         text: 'Text',
         image: 'Image',
         path: 'Path',
+        group: 'Group',
     };
     return `${types[node.type] || node.type} #${node.id}`;
 }
@@ -43,6 +44,7 @@ export function nodeIcon(type: string): string {
         case 'text': return 'T';
         case 'image': return '▣';
         case 'path': return '∕';
+        case 'group': return '▧';
         default: return '□';
     }
 }
