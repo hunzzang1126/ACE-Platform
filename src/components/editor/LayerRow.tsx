@@ -177,20 +177,21 @@ export function EngineLayerRow({
                 </div>
             </div>
             {/* ★ Group children — render indented when expanded */}
+            {/* Clicking a child selects the parent group (children are not standalone canvas objects) */}
             {isGroup && expanded && node.children!.map((child, ci) => (
                 <EngineLayerRow
                     key={`eng-${child.id}`}
                     node={child}
-                    isSelected={selectionIds.includes(child.id)}
+                    isSelected={isSelected}
                     isRenaming={false}
                     renameValue=""
                     draggedClass=""
                     dropTargetClass=""
-                    onStartDrag={onStartDrag}
+                    onStartDrag={() => {}}
                     idx={idx + ci + 1}
                     justDragged={justDragged}
-                    onSelect={onSelect}
-                    onDelete={onDelete}
+                    onSelect={() => onSelect(node.id)}
+                    onDelete={() => onDelete(node.id)}
                     onRenameStart={onRenameStart}
                     onRenameChange={onRenameChange}
                     onRenameCommit={onRenameCommit}

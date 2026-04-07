@@ -175,17 +175,14 @@ export function createEngineShim(
             if (obj) { (obj as any).__glidName = name; syncState(); }
         },
 
-        // ── Grouping (Figma-style: non-destructive, interactive) ──
+        // ── Grouping (Figma-style) ──
+        // Single click → select group as a unit (move/resize all children)
+        // Cmd+Shift+G → ungroup to edit children individually
         group_elements: (ids: number[], name?: string): number => {
             const objects = ids.map(findById).filter(Boolean) as FabricObject[];
             if (objects.length < 2) return -1;
             const gid = nextId();
-            // ★ Figma-style: subTargetCheck lets clicks pass through to children,
-            // interactive lets children be independently editable within the group.
-            const group = new Group(objects, {
-                subTargetCheck: true,
-                interactive: true,
-            });
+            const group = new Group(objects);
             objects.forEach(o => fc.remove(o));
             (group as any).__glidId = gid;
             (group as any).__glidName = name || `Group #${gid}`;

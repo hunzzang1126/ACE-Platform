@@ -234,15 +234,32 @@ function applyVariantToCanvas(variant: BannerVariant, actions: CanvasEngineActio
             ? constraintsToAbsolute(el.constraints, tW, tH)
             : { x: 0, y: 0, w: 100, h: 100 };
 
-        // ★ Detect full-canvas elements (backgrounds): if element covers ≥98% of template,
-        // force it to fill the entire canvas regardless of uniform scale.
-        const coversTemplate = abs.w >= tW * 0.98 && abs.h >= tH * 0.98;
+        // ★ Structural element detection — 4 categories:
+        // 1. Full background (covers both axes) → fill entire canvas
+        // 2. Full-height element (accent bars, dividers) → stretch height, scale x proportionally
+        // 3. Full-width element (top bars) → stretch width, scale y proportionally
+        // 4. Content element → uniform scale + center offset
+        const coversW = abs.w >= tW * 0.98;
+        const coversH = abs.h >= tH * 0.98;
 
-        // Scale from template space → canvas space (uniform), with background override
-        const x = coversTemplate ? 0 : Math.round(abs.x * uniformScale) + offsetX;
-        const y = coversTemplate ? 0 : Math.round(abs.y * uniformScale) + offsetY;
-        const w = coversTemplate ? cW : Math.round(abs.w * uniformScale);
-        const h = coversTemplate ? cH : Math.round(abs.h * uniformScale);
+        let x: number, y: number, w: number, h: number;
+        if (coversW && coversH) {
+            x = 0; y = 0; w = cW; h = cH;
+        } else if (coversH) {
+            // Full-height element (e.g., accent bar at x=0) — pin to edge, stretch height
+            x = Math.round(abs.x * (cW / tW)); y = 0;
+            w = Math.max(1, Math.round(abs.w * (cW / tW))); h = cH;
+        } else if (coversW) {
+            // Full-width element (e.g., top bar at y=0) — pin to edge, stretch width
+            x = 0; y = Math.round(abs.y * (cH / tH));
+            w = cW; h = Math.max(1, Math.round(abs.h * (cH / tH)));
+        } else {
+            // Content element — uniform scale + center
+            x = Math.round(abs.x * uniformScale) + offsetX;
+            y = Math.round(abs.y * uniformScale) + offsetY;
+            w = Math.round(abs.w * uniformScale);
+            h = Math.round(abs.h * uniformScale);
+        }
         const scaledRadius = Math.round(((el as any).borderRadius ?? 0) * uniformScale);
         let nodeId: number | null = null;
 
