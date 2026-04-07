@@ -5,7 +5,7 @@
 // No React dependencies.
 // ─────────────────────────────────────────────────
 
-import { Textbox, Shadow, Group, type FabricObject } from 'fabric';
+import { Textbox, Shadow, type FabricObject } from 'fabric';
 import type { EngineNode } from './canvasTypes';
 
 // ── Unique ID generator ──
@@ -112,9 +112,6 @@ export function fabricToEngineNode(obj: FabricObject): EngineNode {
     } else if (objType === 'path') {
         aceType = 'path';
         name = `Path #${id}`;
-    } else if (obj instanceof Group) {
-        aceType = 'group';
-        name = (obj as any).__glidName || `Group #${id}`;
     } else if (br > 0) {
         aceType = 'rounded_rect';
         name = `Rounded Rect #${id}`;
@@ -232,18 +229,7 @@ export function fabricToEngineNode(obj: FabricObject): EngineNode {
     node.visible = obj.visible !== false;
     node.locked = !!(obj as any).lockMovementX;
 
-    // ★ Group children: recursively convert, adjust positions to absolute coords
-    if (aceType === 'group' && obj instanceof Group) {
-        const groupX = obj.left ?? 0;
-        const groupY = obj.top ?? 0;
-        node.children = (obj as Group).getObjects().map(child => {
-            const childNode = fabricToEngineNode(child);
-            // Children are relative to group center; convert to absolute
-            childNode.x += groupX;
-            childNode.y += groupY;
-            return childNode;
-        });
-    }
+
 
     return node;
 }

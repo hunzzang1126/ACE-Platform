@@ -342,8 +342,6 @@ export function useFabricCanvas(width: number, height: number, _addDemoShapes = 
         addText, updateText, getTextContent, addImage, deleteSelected, clearAll, selectNode, deselectAll,
         setNodePosition, setNodeSize, setNodeOpacity, setFillColor, bringToFront, sendToBack, bringForward, sendBackward,
         setShadow, removeShadow, setTextEffect, removeTextEffect, setBlendMode, setBrightness, setContrast, setSaturation, setHueRotate, addKeyframe, duplicateSelected,
-        groupSelected: (name?: string) => { const fc = fabricRef.current; if (!fc) return null; const ids = fc.getActiveObjects().map(o => (o as any).__glidId as number).filter(id => id > 0); if (ids.length < 2) return null; return engineRef.current?.group_elements(ids, name) ?? null; },
-        ungroupSelected: () => { const fc = fabricRef.current; if (!fc) return; const active = fc.getActiveObject(); if (!active) return; const id = (active as any).__glidId; if (id) engineRef.current?.ungroup(id); },
         undo, redo, alignToCanvas,
         replaceImageSrc: async (id: number, newSrc: string) => { await engineRef.current?.replace_image_src(id, newSrc); },
         fillToPage: (id: number) => {

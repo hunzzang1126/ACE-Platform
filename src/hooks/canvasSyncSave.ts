@@ -9,7 +9,7 @@ import type { EngineNode } from './useCanvasEngine';
 import type { OverlayElement } from './useOverlayElements';
 import {
     engineNodeToShapeElement, engineNodeToTextElement,
-    engineNodeToImageElement, engineNodeToGroupElement, overlayToDesignElement,
+    engineNodeToImageElement, overlayToDesignElement,
 } from '@/engine/elementConverters';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -79,8 +79,7 @@ export function convertNodesToElements(nodes: EngineNode[], canvasW: number, can
             elements.push(engineNodeToTextElement(node, canvasW, canvasH));
         } else if (node.type === 'image') {
             elements.push(engineNodeToImageElement(node, canvasW, canvasH));
-        } else if (node.type === 'group') {
-            elements.push(engineNodeToGroupElement(node, canvasW, canvasH));
+
         } else {
             elements.push(engineNodeToShapeElement(node, canvasW, canvasH));
         }

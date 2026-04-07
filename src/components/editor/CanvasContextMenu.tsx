@@ -120,14 +120,6 @@ export function CanvasContextMenu({ x, y, actions, hasSelection, selectionCount,
             }
         }
 
-        if (selectionCount > 1) {
-            items.push(
-                { label: 'Group', shortcut: 'Cmd+G', action: () => { actions.groupSelected?.(); onClose(); } },
-            );
-        }
-        items.push(
-            { label: 'Ungroup', shortcut: 'Cmd+Shift+G', action: () => { actions.ungroupSelected?.(); onClose(); } },
-        );
     } else {
         items.push(
             { label: 'Deselect All', shortcut: 'Esc', action: () => { actions.deselectAll(); onClose(); } },

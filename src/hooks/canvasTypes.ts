@@ -126,9 +126,6 @@ export interface CanvasEngineActions {
     addKeyframe: (nodeId: number, property: string, time: number, value: number, easing: string) => void;
     // Duplicate
     duplicateSelected: () => number | null;
-    // Grouping
-    groupSelected: (name?: string) => number | null;
-    ungroupSelected: () => void;
     // Undo / Redo
     undo: () => void;
     redo: () => void;

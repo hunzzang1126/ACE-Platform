@@ -14,13 +14,10 @@ interface KeyboardActions {
     addRect: (x?: number, y?: number) => number | null;
     addEllipse: (x?: number, y?: number) => number | null;
     duplicateSelected: () => number | null;
-    groupSelected?: () => number | null;
-    ungroupSelected?: () => void;
 }
 
 export function useCanvasKeyboard({
     engineRef, syncState, setTool, addRect, addEllipse, duplicateSelected,
-    groupSelected, ungroupSelected,
 }: KeyboardActions) {
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
@@ -46,14 +43,6 @@ export function useCanvasKeyboard({
                 e.preventDefault();
                 engine.delete_selected();
                 syncState();
-            } else if ((e.metaKey || e.ctrlKey) && e.key === 'g' && !e.shiftKey) {
-                // Cmd+G → Group selected
-                e.preventDefault();
-                groupSelected?.();
-            } else if ((e.metaKey || e.ctrlKey) && e.key === 'g' && e.shiftKey) {
-                // Cmd+Shift+G → Ungroup selected
-                e.preventDefault();
-                ungroupSelected?.();
             }
             // Tool shortcuts (only without modifiers)
             else if (!e.metaKey && !e.ctrlKey && !e.altKey) {
@@ -71,5 +60,5 @@ export function useCanvasKeyboard({
         };
         window.addEventListener('keydown', handler);
         return () => window.removeEventListener('keydown', handler);
-    }, [engineRef, syncState, setTool, addRect, addEllipse, duplicateSelected, groupSelected, ungroupSelected]);
+    }, [engineRef, syncState, setTool, addRect, addEllipse, duplicateSelected]);
 }

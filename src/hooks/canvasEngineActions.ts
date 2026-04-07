@@ -80,9 +80,7 @@ export function useCanvasEngineActions(
         syncState(); return newId;
     }, [selection, nodes, syncState]);
 
-    // Group
-    const groupSelected = useCallback((): number | null => { const e = engineRef.current; if (!e || selection.length < 2) return null; try { const gid = e.group_elements(selection); syncState(); return gid; } catch { return null; } }, [selection, syncState]);
-    const ungroupSelected = useCallback((): void => { const e = engineRef.current; if (!e || selection.length === 0) return; try { e.ungroup(selection[0]); syncState(); } catch { /* */ } }, [selection, syncState]);
+
 
     // Alignment
     const alignToCanvas = useCallback((id: number, alignment: 'left' | 'center-h' | 'right' | 'top' | 'center-v' | 'bottom') => {
@@ -102,6 +100,6 @@ export function useCanvasEngineActions(
         setShadow, removeShadow, setBlendMode,
         setBrightness, setContrast, setSaturation, setHueRotate,
         addKeyframe, duplicateSelected, alignToCanvas,
-        groupSelected, ungroupSelected,
+
     };
 }

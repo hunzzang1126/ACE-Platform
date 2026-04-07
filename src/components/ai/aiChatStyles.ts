@@ -33,7 +33,7 @@ export const TOOL_LABELS: Record<string, string> = {
     add_text: 'Adding text element',
     add_line: 'Drawing a line',
     add_path: 'Drawing a path',
-    add_group: 'Creating a group',
+
     set_fill: 'Setting fill color',
     set_stroke: 'Setting stroke / border',
     set_opacity: 'Adjusting opacity',
@@ -53,8 +53,7 @@ export const TOOL_LABELS: Record<string, string> = {
     select_node: 'Selecting element',
     select_all: 'Selecting all elements',
     deselect_all: 'Clearing selection',
-    group_selection: 'Grouping selected elements',
-    ungroup_selection: 'Ungrouping elements',
+
     bring_to_front: 'Moving to front',
     send_to_back: 'Moving to back',
     undo: 'Undoing last action',

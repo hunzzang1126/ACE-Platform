@@ -297,15 +297,6 @@ export function useAutoDesign(options: AutoDesignOptions) {
                     if (renderElement(engine, el, canvasW, canvasH)) createdCount++;
                 }
 
-                // Auto-group CTA: cta_button + cta_label → 'CTA' group
-                try {
-                    const btnId = engine.find_by_name?.('cta_button');
-                    const lblId = engine.find_by_name?.('cta_label');
-                    if (btnId && lblId && btnId > 0 && lblId > 0) {
-                        engine.group_elements([btnId, lblId], 'CTA');
-                        console.log('[useAutoDesign] CTA auto-grouped');
-                    }
-                } catch { /* group is optional */ }
 
                 console.log(`[useAutoDesign] From-scratch: rendered=${createdCount}`);
             }

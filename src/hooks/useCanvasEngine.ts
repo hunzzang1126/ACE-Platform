@@ -158,7 +158,7 @@ export function useCanvasEngine(width: number, height: number, addDemoShapes = f
     const onMouseUp = useCallback(() => { if (!isDragging.current) return; isDragging.current = false; const engine = engineRef.current; if (!engine) return; engine.end_drag(); syncState(); }, [syncState]);
 
     // ── Keyboard ──
-    useCanvasKeyboard({ engineRef, syncState, setTool, addRect: actions.addRect, addEllipse: actions.addEllipse, duplicateSelected: actions.duplicateSelected, groupSelected: actions.groupSelected, ungroupSelected: actions.ungroupSelected });
+    useCanvasKeyboard({ engineRef, syncState, setTool, addRect: actions.addRect, addEllipse: actions.addEllipse, duplicateSelected: actions.duplicateSelected });
 
     const retryInit = useCallback(() => { if (engineRef.current) { try { engineRef.current.free(); } catch { /* */ } engineRef.current = null; } setStatus('loading'); setErrorMsg(''); setInitAttempt(n => n + 1); }, []);
 

@@ -11,7 +11,7 @@ import type {
     ShapeElement,
     ButtonElement,
     VideoElement,
-    GroupElement,
+
     DesignElement,
     DesignElementType,
     TextEffectType,
@@ -134,15 +134,7 @@ describe('Element type structure', () => {
         expect(v.loop).toBe(true);
     });
 
-    it('GroupElement has children array', () => {
-        const g: GroupElement = {
-            id: 'g1', name: 'Group', type: 'group',
-            constraints: createDefaultConstraints(),
-            opacity: 1, visible: true, locked: false, zIndex: 5,
-            children: [],
-        };
-        expect(g.children).toEqual([]);
-    });
+
 });
 
 // ── TextEffect types ──

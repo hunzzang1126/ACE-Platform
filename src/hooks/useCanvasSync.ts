@@ -8,7 +8,7 @@ import { useCallback } from 'react';
 import { isAssetRef, resolveAsset } from '@/services/assetService';
 import { useDesignStore } from '@/stores/designStore';
 import { loadVideoBlob } from '@/stores/videoStorage';
-import type { DesignElement, ShapeElement, TextElement, ImageElement, VideoElement, GroupElement, ElementAnimation } from '@/schema/elements.types';
+import type { DesignElement, ShapeElement, TextElement, ImageElement, VideoElement, ElementAnimation } from '@/schema/elements.types';
 import type { EngineNode } from './useCanvasEngine';
 import type { OverlayElement } from './useOverlayElements';
 import { useAnimPresetStore } from './useAnimationPresets';
@@ -117,9 +117,7 @@ export function useCanvasSync(variantId: string | undefined, canvasW: number, ca
             } else if (el.type === 'image') {
                 newNodeId = restoreImage(engine, el as ImageElement, canvasW, canvasH, parseShadowColor, pendingImageLoads, el.animation);
                 restoredShapes++;
-            } else if (el.type === 'group') {
-                newNodeId = restoreGroup(engine, el as GroupElement, canvasW, canvasH, parseShadowColor, pendingImageLoads);
-                restoredShapes++;
+
             } else if (el.type === 'video') {
                 restoreVideo(el as VideoElement, canvasW, canvasH, overlayElements, pendingVideoLoads);
             }
@@ -255,23 +253,4 @@ function restoreVideo(vid: VideoElement, canvasW: number, canvasH: number, overl
     }
 }
 
-function restoreGroup(engine: Engine, group: GroupElement, canvasW: number, canvasH: number, parseShadow: typeof parseShadowColor, pendingImageLoads: (() => Promise<void>)[]): number {
-    const childIds: number[] = [];
-    for (const child of group.children) {
-        let childId: number | null = null;
-        if (child.type === 'shape') {
-            childId = restoreShape(engine, child as ShapeElement, canvasW, canvasH, parseShadow);
-        } else if (child.type === 'text') {
-            childId = restoreText(engine, child as TextElement, canvasW, canvasH, parseShadow);
-        } else if (child.type === 'image') {
-            childId = restoreImage(engine, child as ImageElement, canvasW, canvasH, parseShadow, pendingImageLoads);
-        } else if (child.type === 'group') {
-            childId = restoreGroup(engine, child as GroupElement, canvasW, canvasH, parseShadow, pendingImageLoads);
-        }
-        if (childId != null && childId > 0) childIds.push(childId);
-    }
-    if (childIds.length >= 2) {
-        return engine.group_elements(childIds, group.name);
-    }
-    return childIds[0] ?? -1;
-}
+

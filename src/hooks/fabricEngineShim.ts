@@ -6,7 +6,7 @@
 // ─────────────────────────────────────────────────
 
 import {
-    Canvas, Shadow, Group, ActiveSelection, type FabricObject,
+    Canvas, Shadow, ActiveSelection, type FabricObject,
 } from 'fabric';
 import {
     nextId, rgbToHex, isArtboard, fabricToEngineNode, GLID_CUSTOM_PROPS,
@@ -173,41 +173,6 @@ export function createEngineShim(
         set_name: (id: number, name: string) => {
             const obj = findById(id);
             if (obj) { (obj as any).__glidName = name; syncState(); }
-        },
-
-        // ── Grouping (Figma-style) ──
-        // Single click → select group as a unit (move/resize all children)
-        // Cmd+Shift+G → ungroup to edit children individually
-        group_elements: (ids: number[], name?: string): number => {
-            const objects = ids.map(findById).filter(Boolean) as FabricObject[];
-            if (objects.length < 2) return -1;
-            const gid = nextId();
-            const group = new Group(objects);
-            objects.forEach(o => fc.remove(o));
-            (group as any).__glidId = gid;
-            (group as any).__glidName = name || `Group #${gid}`;
-            (group as any).__glidZIndex = userObjects().length;
-            patchAceProps(group);
-            fc.add(group); fc.setActiveObject(group); fc.renderAll(); syncState();
-            return gid;
-        },
-        ungroup: (id: number) => {
-            const obj = findById(id);
-            if (!obj || !(obj instanceof Group)) return;
-            const items = (obj as Group).getObjects().slice();
-            // ★ Remove children from group, then re-add to canvas with absolute coords
-            // Fabric.js interactive groups: children know their transform within the group.
-            // We use removeAll() to detach children, which resets their transform to absolute.
-            (obj as Group).removeAll();
-            fc.remove(obj);
-            items.forEach((item, i) => {
-                item.setCoords();
-                (item as any).__glidId = (item as any).__glidId || nextId();
-                (item as any).__glidZIndex = userObjects().length + i;
-                patchAceProps(item);
-                fc.add(item);
-            });
-            fc.renderAll(); syncState();
         },
 
         // ── Selection ────────────────────────────────────
