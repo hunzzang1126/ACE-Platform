@@ -9,27 +9,10 @@ import { Canvas, Textbox, FabricObject, Line, Shadow } from 'fabric';
 import { nextId, isArtboard, patchAceProps } from './fabricHelpers';
 import { snapToGuides, type GuideLine } from './useFabricGuides';
 
-// ★ Auto-shrink: Tighten Textbox bounding box height to actual rendered text.
-// Width is NOT shrunk — user/template-defined width must be preserved.
-// Shrinking width caused premature word-wrap because Fabric.js _measuringContext
-// has sub-pixel differences from actual rendering (known Fabric.js issue).
-function autoShrinkTextbox(tb: Textbox): void {
-    if ((tb as any).__autoShrinking) return;
-    (tb as any).__autoShrinking = true;
-    try {
-        tb.initDimensions();
-        // ★ Only trim trailing lineHeight gap: last line should not add extra space below
-        const rawHeight = tb.calcTextHeight();
-        const fontSize = tb.fontSize ?? 16;
-        const lh = tb.lineHeight ?? 1.15;
-        const trailingGap = fontSize * (lh - 1);
-        const trimmedHeight = Math.max(fontSize, rawHeight - trailingGap);
-        tb.set({ height: trimmedHeight });
-        tb.setCoords();
-    } finally {
-        (tb as any).__autoShrinking = false;
-    }
-}
+// ★ autoShrinkTextbox REMOVED (v407-v408).
+// Fabric.js Textbox computes height internally from content+width.
+// Manual height/width override caused premature word-wrap and layout conflicts.
+// See: text_wrapping_postmortem.md for full analysis.
 
 interface EventSetupParams {
     fc: Canvas;
@@ -78,17 +61,11 @@ export function setupCanvasEvents({
         }
     });
 
-    // Reset original font size ref after scaling ends + auto-shrink
+    // Reset original font size ref after scaling ends
     fc.on('object:modified', (opt) => {
         if (opt.target instanceof Textbox) {
             delete (opt.target as any).__glidOrigFontSize;
-            autoShrinkTextbox(opt.target);
         }
-    });
-
-    // ★ Auto-shrink during text editing (typing)
-    fc.on('text:changed', (opt) => {
-        if (opt.target instanceof Textbox) autoShrinkTextbox(opt.target);
     });
 
     // ── Object lifecycle ──
