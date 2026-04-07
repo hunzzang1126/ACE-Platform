@@ -221,49 +221,49 @@ function applyVariantToCanvas(variant: BannerVariant, actions: CanvasEngineActio
     const cW = actions.canvasWidth || 300;
     const cH = actions.canvasHeight || 250;
 
-    // ★ Independent X/Y scaling — template FILLS entire canvas (like painting a wall)
-    const scaleX = cW / tW;
-    const scaleY = cH / tH;
-    // Font/radius: geometric mean keeps text visually balanced across both axes
-    const scaleFontRadius = Math.sqrt(scaleX * scaleY);
+    // ★ FIX: Uniform scale preserves ALL proportions (gaps, font ratios, aspect ratios).
+    // Non-uniform scale was causing spacing collapse when template aspect ≠ canvas aspect.
+    const uniformScale = Math.min(cW / tW, cH / tH);
+    // Center the scaled template within the canvas
+    const offsetX = Math.round((cW - tW * uniformScale) / 2);
+    const offsetY = Math.round((cH - tH * uniformScale) / 2);
 
     for (const el of elements) {
-        // ★ Use constraintsToAbsolute() to resolve positions against the TEMPLATE's native size,
-        // then scale to the target canvas. This handles center/right/bottom anchors correctly.
+        // Resolve positions against the TEMPLATE's native size
         const abs = el.constraints
             ? constraintsToAbsolute(el.constraints, tW, tH)
             : { x: 0, y: 0, w: 100, h: 100 };
 
-        // Scale from template space → canvas space
-        const x = Math.round(abs.x * scaleX);
-        const y = Math.round(abs.y * scaleY);
-        const w = Math.round(abs.w * scaleX);
-        const h = Math.round(abs.h * scaleY);
+        // Scale from template space → canvas space (uniform)
+        const x = Math.round(abs.x * uniformScale) + offsetX;
+        const y = Math.round(abs.y * uniformScale) + offsetY;
+        const w = Math.round(abs.w * uniformScale);
+        const h = Math.round(abs.h * uniformScale);
+        const scaledRadius = Math.round(((el as any).borderRadius ?? 0) * uniformScale);
+        let nodeId: number | null = null;
 
         if (el.type === 'shape') {
             if (el.gradientStart && el.gradientEnd) {
-                actions.addGradientRect(
+                nodeId = actions.addGradientRect(
                     x, y, w, h,
-                    el.gradientStart,
-                    el.gradientEnd,
+                    el.gradientStart, el.gradientEnd,
                     el.gradientAngle ?? 0,
-                    Math.round((el.borderRadius ?? 0) * scaleFontRadius),
-                    el.name,
+                    scaledRadius, el.name,
                 );
             } else {
-                const nodeId = actions.addRect(x, y);
+                nodeId = actions.addRect(x, y);
                 if (nodeId != null) {
                     actions.setNodeSize(nodeId, w, h);
                     const fillHex = el.fill || '#808080';
                     const parsed = parseColor(fillHex);
                     if (parsed) {
-                        actions.setFillColor(nodeId, parsed.r, parsed.g, parsed.b, el.opacity ?? 1);
+                        actions.setFillColor(nodeId, parsed.r, parsed.g, parsed.b, 1);
                     }
                 }
             }
         } else if (el.type === 'text') {
-            const scaledFontSize = Math.max(Math.round(el.fontSize * scaleFontRadius), 6);
-            actions.addText(x, y, el.content ?? 'Text', {
+            const scaledFontSize = Math.max(Math.round(el.fontSize * uniformScale), 6);
+            nodeId = actions.addText(x, y, el.content ?? 'Text', {
                 fontSize: scaledFontSize,
                 fontFamily: el.fontFamily ?? 'Inter, sans-serif',
                 fontWeight: String(el.fontWeight),
@@ -274,14 +274,13 @@ function applyVariantToCanvas(variant: BannerVariant, actions: CanvasEngineActio
             });
         } else if (el.type === 'button') {
             const bgHex = el.backgroundColor || '#7c3aed';
-            const nodeId = actions.addGradientRect(
+            nodeId = actions.addGradientRect(
                 x, y, w, h,
-                bgHex, bgHex,
-                0,
-                Math.round((el.borderRadius ?? 8) * scaleFontRadius),
+                bgHex, bgHex, 0,
+                Math.round((el.borderRadius ?? 8) * uniformScale),
                 el.name,
             );
-            const scaledFontSize = Math.max(Math.round(el.fontSize * scaleFontRadius), 6);
+            const scaledFontSize = Math.max(Math.round(el.fontSize * uniformScale), 6);
             actions.addText(x, y, el.label, {
                 fontSize: scaledFontSize,
                 fontFamily: 'Inter, sans-serif',
@@ -290,9 +289,13 @@ function applyVariantToCanvas(variant: BannerVariant, actions: CanvasEngineActio
                 textAlign: 'center',
                 width: w,
             });
-            void nodeId;
         } else if (el.type === 'image' && el.src) {
             actions.addImage(x, y, el.src, w, h);
+        }
+
+        // ★ FIX: Apply opacity AFTER creation — previously lost for ALL element types
+        if (nodeId != null && el.opacity !== undefined && el.opacity !== 1) {
+            actions.setNodeOpacity(nodeId, el.opacity);
         }
     }
 }
