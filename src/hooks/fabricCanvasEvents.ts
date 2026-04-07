@@ -5,7 +5,7 @@
 // object lifecycle, zoom/pan, smart guides.
 // ─────────────────────────────────────────────────
 
-import { Canvas, Textbox, FabricObject, Line, Shadow } from 'fabric';
+import { Canvas, Textbox, Group, FabricObject, Line, Shadow } from 'fabric';
 import { nextId, isArtboard, patchAceProps } from './fabricHelpers';
 import { snapToGuides, type GuideLine } from './useFabricGuides';
 
@@ -65,6 +65,19 @@ export function setupCanvasEvents({
     fc.on('object:modified', (opt) => {
         if (opt.target instanceof Textbox) {
             delete (opt.target as any).__glidOrigFontSize;
+        }
+    });
+
+    // ── Deep selection: double-click to enter group ──
+    // Fabric.js v6: subTargetCheck + interactive flags on Group enable this.
+    // subTargets array contains the clicked child object.
+    fc.on('mouse:dblclick', (opt) => {
+        const target = opt.target;
+        if (target instanceof Group && (opt as any).subTargets?.length) {
+            const child = (opt as any).subTargets[0] as FabricObject;
+            fc.setActiveObject(child);
+            fc.renderAll();
+            syncState();
         }
     });
 
