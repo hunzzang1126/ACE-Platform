@@ -10,7 +10,7 @@ import { useCloudSync } from '@/hooks/useCloudSync';
 import { LandingPage } from './LandingPage';
 import { LoginPage } from './LoginPage';
 import { AuthCallback } from './AuthCallback';
-import { PendingPage } from './PendingPage';
+
 import { OnboardingPage } from './OnboardingPage';
 import { AdminPage } from './AdminPage';
 import { DashboardPage } from './DashboardPage';
@@ -52,7 +52,7 @@ export default function App() {
                     <Route path="/" element={<LandingPage />} />
                     <Route path="/login" element={<LoginPage />} />
                     <Route path="/auth/callback" element={<AuthCallback />} />
-                    <Route path="/pending" element={<PendingPage />} />
+
                     <Route path="/pricing" element={<PricingPage />} />
                     <Route path="/auth/callback/meta" element={<OAuthCallbackPage />} />
                     <Route path="/auth/callback/google-ads" element={<OAuthCallbackPage />} />
