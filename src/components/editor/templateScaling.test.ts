@@ -169,19 +169,19 @@ describe('scaleFontSize', () => {
 // ═══════════════════════════════════════════════════
 
 describe('textWidthBuffer', () => {
-    it('returns ~0.5em buffer', () => {
-        expect(textWidthBuffer(20)).toBe(10); // 20 * 0.5
-        expect(textWidthBuffer(25)).toBe(13); // round(25 * 0.5) = 13
+    it('returns ~1em buffer', () => {
+        expect(textWidthBuffer(20)).toBe(20); // 20 * 1.0
+        expect(textWidthBuffer(25)).toBe(25); // 25 * 1.0
     });
 
     it('returns small buffer for small fonts', () => {
-        expect(textWidthBuffer(6)).toBe(3);
+        expect(textWidthBuffer(6)).toBe(6);
     });
 
     it('scales linearly with font size', () => {
         const buf10 = textWidthBuffer(10);
         const buf20 = textWidthBuffer(20);
-        expect(buf20).toBe(buf10 * 2);
+        expect(buf20).toBe(buf10 * 2); // linear: 10 * 2 = 20
     });
 });
 
