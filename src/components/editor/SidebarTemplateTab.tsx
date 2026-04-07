@@ -5,7 +5,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useTemplateStore, type TemplateCategory, type DesignTemplate } from '@/stores/templateStore';
 import { constraintsToAbsolute } from '@/engine/elementConverters';
-import { computeUniformScale, scaleElementRect, scaleFontSize, measureTextWidth } from './templateScaling';
+import { computeUniformScale, scaleElementRect, scaleFontSize } from './templateScaling';
 import type { CanvasEngineActions } from '@/hooks/canvasTypes';
 import type { BannerVariant } from '@/schema/design.types';
 
@@ -255,13 +255,6 @@ function applyVariantToCanvas(variant: BannerVariant, actions: CanvasEngineActio
             }
         } else if (el.type === 'text') {
             const scaledFontSize = scaleFontSize(el.fontSize, uniformScale);
-            // ★ FIX: Measure actual text width with Canvas2D — no arbitrary buffer.
-            // This ensures the textbox width exactly matches the text content,
-            // so the handle edge = text edge (line breaks when handle touches text).
-            const finalWidth = measureTextWidth(
-                el.content ?? 'Text', scaledFontSize,
-                el.fontFamily ?? 'Inter, sans-serif', String(el.fontWeight ?? 400), w,
-            );
             nodeId = actions.addText(x, y, el.content ?? 'Text', {
                 fontSize: scaledFontSize,
                 fontFamily: el.fontFamily ?? 'Inter, sans-serif',
@@ -269,7 +262,7 @@ function applyVariantToCanvas(variant: BannerVariant, actions: CanvasEngineActio
                 color: el.color,
                 textAlign: el.textAlign,
                 lineHeight: el.lineHeight,
-                width: finalWidth,
+                width: w,
             });
         } else if (el.type === 'button') {
             const bgHex = el.backgroundColor || '#7c3aed';
