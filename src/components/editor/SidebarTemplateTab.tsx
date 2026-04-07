@@ -234,11 +234,15 @@ function applyVariantToCanvas(variant: BannerVariant, actions: CanvasEngineActio
             ? constraintsToAbsolute(el.constraints, tW, tH)
             : { x: 0, y: 0, w: 100, h: 100 };
 
-        // Scale from template space → canvas space (uniform)
-        const x = Math.round(abs.x * uniformScale) + offsetX;
-        const y = Math.round(abs.y * uniformScale) + offsetY;
-        const w = Math.round(abs.w * uniformScale);
-        const h = Math.round(abs.h * uniformScale);
+        // ★ Detect full-canvas elements (backgrounds): if element covers ≥98% of template,
+        // force it to fill the entire canvas regardless of uniform scale.
+        const coversTemplate = abs.w >= tW * 0.98 && abs.h >= tH * 0.98;
+
+        // Scale from template space → canvas space (uniform), with background override
+        const x = coversTemplate ? 0 : Math.round(abs.x * uniformScale) + offsetX;
+        const y = coversTemplate ? 0 : Math.round(abs.y * uniformScale) + offsetY;
+        const w = coversTemplate ? cW : Math.round(abs.w * uniformScale);
+        const h = coversTemplate ? cH : Math.round(abs.h * uniformScale);
         const scaledRadius = Math.round(((el as any).borderRadius ?? 0) * uniformScale);
         let nodeId: number | null = null;
 
