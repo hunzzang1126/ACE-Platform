@@ -34,7 +34,9 @@ export function executeAddText(
     const fontFamily = (params.font_family as string) ?? 'Inter, system-ui, sans-serif';
     const fontWeight = (params.font_weight as string) ?? '400';
     const colorHex = (params.color_hex as string) ?? '#000000';
-    const width = (params.width as number) ?? 200;
+    // ★ FIX: Default width from content length, not hardcoded 200px
+    const defaultWidth = Math.max(60, Math.min(Math.ceil(content.length * fontSize * 0.6) + fontSize, 600));
+    const width = (params.width as number) ?? defaultWidth;
     const textAlign = (params.text_align as string) ?? 'left';
 
     if (!content.trim()) {

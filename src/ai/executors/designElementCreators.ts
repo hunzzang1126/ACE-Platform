@@ -55,11 +55,14 @@ export function handleAddText(params: Record<string, unknown>): DashboardExecRes
     }
 
     const canvasW = firstVariant?.preset?.width || 300;
-    const width = Number(params.width) || Math.round(canvasW * 0.95);
-    const avgCharWidth = fontSize * 0.55;
+    // ★ FIX: Size text box to fit content, not 95% of canvas.
+    // Estimate text width from content + font metrics. Clamp to canvas bounds.
+    const avgCharWidth = fontSize * 0.6;
+    const contentWidth = Math.ceil(content.length * avgCharWidth);
+    const width = Number(params.width) || Math.min(Math.max(contentWidth + fontSize, 60), Math.round(canvasW * 0.95));
     const charsPerLine = Math.max(1, Math.floor(width / avgCharWidth));
     const lineCount = Math.ceil(content.length / charsPerLine);
-    const estimatedH = Math.round(fontSize * 1.8) * lineCount;
+    const estimatedH = Math.round(fontSize * 1.4) * lineCount;
     const height = Math.max(Number(params.height) || 0, estimatedH);
     let y = Number(params.y) || 0;
     if (firstVariant) y = autoCollision(firstVariant, y, height);
