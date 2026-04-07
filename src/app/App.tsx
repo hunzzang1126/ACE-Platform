@@ -17,11 +17,7 @@ import { DashboardPage } from './DashboardPage';
 import { TrashPage } from './TrashPage';
 import { GeneralEditorPage } from './GeneralEditorPage';
 import { DetailEditorPage } from './DetailEditorPage';
-import EngineTestPage from './EngineTestPage';
-import AnimationTestPage from './AnimationTestPage';
-import EffectsTestPage from './EffectsTestPage';
-import ExportTestPage from './ExportTestPage';
-import AiTestPage from './AiTestPage';
+
 import PricingPage from './PricingPage';
 import { TemplatesPage } from './TemplatesPage';
 import { ActivityPage } from './ActivityPage';
@@ -119,12 +115,7 @@ export default function App() {
                         </ProtectedRoute>
                     } />
 
-                    {/* ── Dev/Test Routes (protected) ── */}
-                    <Route path="/engine-test" element={<ProtectedRoute><EngineTestPage /></ProtectedRoute>} />
-                    <Route path="/animation-test" element={<ProtectedRoute><AnimationTestPage /></ProtectedRoute>} />
-                    <Route path="/effects-test" element={<ProtectedRoute><EffectsTestPage /></ProtectedRoute>} />
-                    <Route path="/export-test" element={<ProtectedRoute><ExportTestPage /></ProtectedRoute>} />
-                    <Route path="/ai-test" element={<ProtectedRoute><AiTestPage /></ProtectedRoute>} />
+
                 </Routes>
                 <ToastContainer />
             </BrowserRouter>
