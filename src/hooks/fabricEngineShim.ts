@@ -175,12 +175,17 @@ export function createEngineShim(
             if (obj) { (obj as any).__glidName = name; syncState(); }
         },
 
-        // ── Grouping ─────────────────────────────────────
+        // ── Grouping (Figma-style: non-destructive, interactive) ──
         group_elements: (ids: number[], name?: string): number => {
             const objects = ids.map(findById).filter(Boolean) as FabricObject[];
             if (objects.length < 2) return -1;
             const gid = nextId();
-            const group = new Group(objects);
+            // ★ Figma-style: subTargetCheck lets clicks pass through to children,
+            // interactive lets children be independently editable within the group.
+            const group = new Group(objects, {
+                subTargetCheck: true,
+                interactive: true,
+            });
             objects.forEach(o => fc.remove(o));
             (group as any).__glidId = gid;
             (group as any).__glidName = name || `Group #${gid}`;
@@ -192,10 +197,15 @@ export function createEngineShim(
         ungroup: (id: number) => {
             const obj = findById(id);
             if (!obj || !(obj instanceof Group)) return;
-            const items = (obj as Group).getObjects();
+            const items = (obj as Group).getObjects().slice();
+            // ★ Remove children from group, then re-add to canvas with absolute coords
+            // Fabric.js interactive groups: children know their transform within the group.
+            // We use removeAll() to detach children, which resets their transform to absolute.
+            (obj as Group).removeAll();
             fc.remove(obj);
             items.forEach((item, i) => {
-                (item as any).__glidId = nextId();
+                item.setCoords();
+                (item as any).__glidId = (item as any).__glidId || nextId();
                 (item as any).__glidZIndex = userObjects().length + i;
                 patchAceProps(item);
                 fc.add(item);
