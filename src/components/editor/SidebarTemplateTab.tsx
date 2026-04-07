@@ -256,7 +256,13 @@ function applyVariantToCanvas(variant: BannerVariant, actions: CanvasEngineActio
         } else if (el.type === 'text') {
             const scaledFontSize = scaleFontSize(el.fontSize, uniformScale);
             const twBuf = textWidthBuffer(scaledFontSize);
-            nodeId = actions.addText(x, y, el.content ?? 'Text', {
+            // ★ FIX: Compensate x position for center/right-aligned text.
+            // Adding buffer widens the box rightward, shifting visual center.
+            // For center text: shift x left by half the buffer to keep visual center.
+            let textX = x;
+            if (el.textAlign === 'center') textX = Math.max(0, x - Math.round(twBuf / 2));
+            else if (el.textAlign === 'right') textX = Math.max(0, x - twBuf);
+            nodeId = actions.addText(textX, y, el.content ?? 'Text', {
                 fontSize: scaledFontSize,
                 fontFamily: el.fontFamily ?? 'Inter, sans-serif',
                 fontWeight: String(el.fontWeight),

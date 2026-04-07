@@ -169,13 +169,13 @@ describe('scaleFontSize', () => {
 // ═══════════════════════════════════════════════════
 
 describe('textWidthBuffer', () => {
-    it('returns ~1em buffer', () => {
-        expect(textWidthBuffer(20)).toBe(20); // 20 * 1.0
-        expect(textWidthBuffer(25)).toBe(25); // 25 * 1.0
+    it('returns ~0.7em buffer', () => {
+        expect(textWidthBuffer(20)).toBe(14); // round(20 * 0.7)
+        expect(textWidthBuffer(25)).toBe(18); // round(25 * 0.7)
     });
 
     it('returns small buffer for small fonts', () => {
-        expect(textWidthBuffer(6)).toBe(6);
+        expect(textWidthBuffer(6)).toBe(4); // round(6 * 0.7)
     });
 
     it('scales linearly with font size', () => {

@@ -71,10 +71,10 @@ export function scaleFontSize(fontSize: number, uniformScale: number): number {
 }
 
 /**
- * Compute text width buffer (1em) that prevents premature word-wrap.
- * Heavy/bold fonts (weight 700-900) render wider per character at smaller sizes,
- * causing Fabric.js to wrap text earlier than expected after uniform scaling.
+ * Compute text width buffer (0.7em) that prevents premature word-wrap.
+ * Heavy/bold fonts (weight 700-900) render wider per character at smaller sizes.
+ * Center compensation in SidebarTemplateTab ensures this doesn't break alignment.
  */
 export function textWidthBuffer(scaledFontSize: number): number {
-    return Math.round(scaledFontSize * 1.0);
+    return Math.round(scaledFontSize * 0.7);
 }
