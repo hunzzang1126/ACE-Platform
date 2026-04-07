@@ -5,6 +5,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useTemplateStore, type TemplateCategory, type DesignTemplate } from '@/stores/templateStore';
 import { constraintsToAbsolute } from '@/engine/elementConverters';
+import { computeUniformScale, scaleElementRect, scaleFontSize, textWidthBuffer } from './templateScaling';
 import type { CanvasEngineActions } from '@/hooks/canvasTypes';
 import type { BannerVariant } from '@/schema/design.types';
 
@@ -221,45 +222,15 @@ function applyVariantToCanvas(variant: BannerVariant, actions: CanvasEngineActio
     const cW = actions.canvasWidth || 300;
     const cH = actions.canvasHeight || 250;
 
-    // ★ FIX: Uniform scale preserves ALL proportions (gaps, font ratios, aspect ratios).
-    // Non-uniform scale was causing spacing collapse when template aspect ≠ canvas aspect.
-    const uniformScale = Math.min(cW / tW, cH / tH);
-    // Center the scaled template within the canvas
-    const offsetX = Math.round((cW - tW * uniformScale) / 2);
-    const offsetY = Math.round((cH - tH * uniformScale) / 2);
+    const sp = { tW, tH, cW, cH };
+    const { uniformScale, offsetX, offsetY } = computeUniformScale(sp);
 
     for (const el of elements) {
-        // Resolve positions against the TEMPLATE's native size
         const abs = el.constraints
             ? constraintsToAbsolute(el.constraints, tW, tH)
             : { x: 0, y: 0, w: 100, h: 100 };
 
-        // ★ Structural element detection — 4 categories:
-        // 1. Full background (covers both axes) → fill entire canvas
-        // 2. Full-height element (accent bars, dividers) → stretch height, scale x proportionally
-        // 3. Full-width element (top bars) → stretch width, scale y proportionally
-        // 4. Content element → uniform scale + center offset
-        const coversW = abs.w >= tW * 0.98;
-        const coversH = abs.h >= tH * 0.98;
-
-        let x: number, y: number, w: number, h: number;
-        if (coversW && coversH) {
-            x = 0; y = 0; w = cW; h = cH;
-        } else if (coversH) {
-            // Full-height element (e.g., accent bar at x=0) — pin to edge, stretch height
-            x = Math.round(abs.x * (cW / tW)); y = 0;
-            w = Math.max(1, Math.round(abs.w * (cW / tW))); h = cH;
-        } else if (coversW) {
-            // Full-width element (e.g., top bar at y=0) — pin to edge, stretch width
-            x = 0; y = Math.round(abs.y * (cH / tH));
-            w = cW; h = Math.max(1, Math.round(abs.h * (cH / tH)));
-        } else {
-            // Content element — uniform scale + center
-            x = Math.round(abs.x * uniformScale) + offsetX;
-            y = Math.round(abs.y * uniformScale) + offsetY;
-            w = Math.round(abs.w * uniformScale);
-            h = Math.round(abs.h * uniformScale);
-        }
+        const { x, y, w, h } = scaleElementRect(abs, sp, uniformScale, offsetX, offsetY);
         const scaledRadius = Math.round(((el as any).borderRadius ?? 0) * uniformScale);
         let nodeId: number | null = null;
 
@@ -283,10 +254,8 @@ function applyVariantToCanvas(variant: BannerVariant, actions: CanvasEngineActio
                 }
             }
         } else if (el.type === 'text') {
-            const scaledFontSize = Math.max(Math.round(el.fontSize * uniformScale), 6);
-            // ★ FIX: Add ~0.5em buffer to text width. Fabric.js font metrics at smaller sizes
-            // measure slightly wider per character, causing premature word-wrap after scaling.
-            const textWidthBuffer = Math.round(scaledFontSize * 0.5);
+            const scaledFontSize = scaleFontSize(el.fontSize, uniformScale);
+            const twBuf = textWidthBuffer(scaledFontSize);
             nodeId = actions.addText(x, y, el.content ?? 'Text', {
                 fontSize: scaledFontSize,
                 fontFamily: el.fontFamily ?? 'Inter, sans-serif',
@@ -294,7 +263,7 @@ function applyVariantToCanvas(variant: BannerVariant, actions: CanvasEngineActio
                 color: el.color,
                 textAlign: el.textAlign,
                 lineHeight: el.lineHeight,
-                width: w + textWidthBuffer,
+                width: w + twBuf,
             });
         } else if (el.type === 'button') {
             const bgHex = el.backgroundColor || '#7c3aed';
@@ -304,7 +273,7 @@ function applyVariantToCanvas(variant: BannerVariant, actions: CanvasEngineActio
                 Math.round((el.borderRadius ?? 8) * uniformScale),
                 el.name,
             );
-            const scaledFontSize = Math.max(Math.round(el.fontSize * uniformScale), 6);
+            const scaledFontSize = scaleFontSize(el.fontSize, uniformScale);
             actions.addText(x, y, el.label, {
                 fontSize: scaledFontSize,
                 fontFamily: 'Inter, sans-serif',
