@@ -9,27 +9,20 @@ import { Canvas, Textbox, FabricObject, Line, Shadow } from 'fabric';
 import { nextId, isArtboard, patchAceProps } from './fabricHelpers';
 import { snapToGuides, type GuideLine } from './useFabricGuides';
 
-// ★ Auto-shrink: Tighten Textbox bounding box to actual rendered text width + height.
-// Width: shrinks to longest rendered line (prevents right-side gap).
-// Height: trims trailing lineHeight space from last line (equal top/bottom gap).
+// ★ Auto-shrink: Tighten Textbox bounding box height to actual rendered text.
+// Width is NOT shrunk — user/template-defined width must be preserved.
+// Shrinking width caused premature word-wrap because Fabric.js _measuringContext
+// has sub-pixel differences from actual rendering (known Fabric.js issue).
 function autoShrinkTextbox(tb: Textbox): void {
-    if ((tb as any).__autoShrinking) return; // guard: prevent infinite loop
+    if ((tb as any).__autoShrinking) return;
     (tb as any).__autoShrinking = true;
     try {
         tb.initDimensions();
-        const lineWidths: number[] = (tb as any).__lineWidths || [];
-        if (lineWidths.length === 0) return;
-        const longestLine = Math.max(...lineWidths);
-        const minWidth = Math.max(20, longestLine + 2); // 2px breathing room
-        if (tb.width > minWidth) {
-            tb.set({ width: minWidth });
-            tb.initDimensions(); // re-layout after width change
-        }
-        // ★ Trim trailing lineHeight gap: last line should not add extra lineHeight space below
+        // ★ Only trim trailing lineHeight gap: last line should not add extra space below
         const rawHeight = tb.calcTextHeight();
         const fontSize = tb.fontSize ?? 16;
         const lh = tb.lineHeight ?? 1.15;
-        const trailingGap = fontSize * (lh - 1); // extra space after last line
+        const trailingGap = fontSize * (lh - 1);
         const trimmedHeight = Math.max(fontSize, rawHeight - trailingGap);
         tb.set({ height: trimmedHeight });
         tb.setCoords();
