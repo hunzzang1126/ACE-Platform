@@ -200,6 +200,15 @@ export function useFabricCanvas(width: number, height: number, _addDemoShapes = 
         const fc = fabricRef.current; if (!fc) return null;
         const id = nextId();
         const tb = new Textbox(content || 'Type here...', { left: x, top: y, width: opts?.width ?? 200, fontSize: opts?.fontSize ?? 18, fontFamily: opts?.fontFamily ?? 'Inter, system-ui, sans-serif', fontWeight: opts?.fontWeight ?? '400', fill: opts?.color ?? '#000000', textAlign: (opts?.textAlign as any) ?? 'left', lineHeight: opts?.lineHeight ?? 1.15, editable: true, splitByGrapheme: false });
+        // ★ One-time width tightening: align handle edge with Fabric.js internal text measurement.
+        // Uses Fabric's OWN __lineWidths so handle position matches where Fabric will wrap text.
+        tb.initDimensions();
+        const lineWidths: number[] = (tb as any).__lineWidths || [];
+        if (lineWidths.length > 0) {
+            const longestLine = Math.max(...lineWidths);
+            const tightWidth = Math.max(20, Math.ceil(longestLine) + 1);
+            if (tb.width > tightWidth) tb.set({ width: tightWidth });
+        }
         tb.setControlsVisibility({ tl: true, tr: true, bl: true, br: true, mt: false, mb: false, ml: true, mr: true, mtr: false });
         (tb as any).__glidId = id; (tb as any).__glidName = `Text #${id}`; (tb as any).__glidZIndex = getUserObjects().length; patchAceProps(tb);
         fc.add(tb); fc.setActiveObject(tb); fc.renderAll(); syncState();
