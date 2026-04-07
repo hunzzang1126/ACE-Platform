@@ -284,6 +284,9 @@ function applyVariantToCanvas(variant: BannerVariant, actions: CanvasEngineActio
             }
         } else if (el.type === 'text') {
             const scaledFontSize = Math.max(Math.round(el.fontSize * uniformScale), 6);
+            // ★ FIX: Add ~0.5em buffer to text width. Fabric.js font metrics at smaller sizes
+            // measure slightly wider per character, causing premature word-wrap after scaling.
+            const textWidthBuffer = Math.round(scaledFontSize * 0.5);
             nodeId = actions.addText(x, y, el.content ?? 'Text', {
                 fontSize: scaledFontSize,
                 fontFamily: el.fontFamily ?? 'Inter, sans-serif',
@@ -291,7 +294,7 @@ function applyVariantToCanvas(variant: BannerVariant, actions: CanvasEngineActio
                 color: el.color,
                 textAlign: el.textAlign,
                 lineHeight: el.lineHeight,
-                width: w,
+                width: w + textWidthBuffer,
             });
         } else if (el.type === 'button') {
             const bgHex = el.backgroundColor || '#7c3aed';
