@@ -199,6 +199,43 @@ export function createAnimationMethods(
         fc.renderAll();
     }
 
+    /** Visibility-only: show/hide layers based on timeline position without
+     *  applying any transform/opacity offsets. Used during scrub while stopped
+     *  so elements stay at design position. */
+    function applyVisibilityOnly(currentTime: number) {
+        const presets = useAnimPresetStore.getState().presets;
+        const objs = fc.getObjects().filter(o => !isArtboard(o));
+        let needsRender = false;
+        for (const obj of objs) {
+            const aceId = (obj as any).__glidId;
+            if (!aceId) continue;
+            const config = presets[String(aceId)];
+            const orig = (obj as any).__aceOrigPos;
+            if (!orig) continue;
+
+            const st = config?.startTime ?? 0;
+            const rawEt = config?.endTime ?? -1;
+            const et = rawEt < 0 ? state.duration : rawEt;
+
+            // Before in-point → hidden
+            if (currentTime < st) {
+                obj.set({ visible: false });
+                needsRender = true;
+                continue;
+            }
+            // After out-point → hidden
+            if (et > 0 && currentTime > et) {
+                obj.set({ visible: false });
+                needsRender = true;
+                continue;
+            }
+            // Within lifespan → visible at design position
+            obj.set({ visible: true, left: orig.left, top: orig.top, opacity: orig.opacity, scaleX: orig.scaleX, scaleY: orig.scaleY });
+            needsRender = true;
+        }
+        if (needsRender) fc.renderAll();
+    }
+
     const methods = {
         _animState: state,
 
@@ -249,6 +286,9 @@ export function createAnimationMethods(
         anim_pause() {
             state.playing = false;
             cancelAnimationFrame(state.rafId);
+            // ★ Always restore to design position when pausing
+            // — prevents displacement when editing animation settings while paused
+            restoreOriginalPositions();
         },
         anim_stop() {
             state.playing = false;
@@ -262,9 +302,9 @@ export function createAnimationMethods(
                 state.startTs = performance.now();
                 state.startOffset = state.time;
             }
-            // ★ Always apply animation frame — visibility (visible:true/false)
-            // must update even when scrubbing while stopped (AE behavior).
-            // Safe now because out-of-range uses visible:false, not opacity:0.
+            // ★ When NOT playing: only apply visibility (show/hide layers based on
+            // timeline position). Do NOT apply transform/opacity offsets — element
+            // must stay at design position to prevent displacement while editing.
             // Snapshot original positions if not already stored (for scrubbing while stopped).
             const objs = fc.getObjects().filter(o => !isArtboard(o));
             for (const obj of objs) {
@@ -275,7 +315,13 @@ export function createAnimationMethods(
                     };
                 }
             }
-            applyAnimationFrame(state.time);
+            if (state.playing) {
+                // Full animation frame during playback
+                applyAnimationFrame(state.time);
+            } else {
+                // ★ Visibility-only: show/hide layers based on timeline but keep design positions
+                applyVisibilityOnly(state.time);
+            }
         },
         anim_time(): number { return state.time; },
         anim_playing(): boolean { return state.playing; },
