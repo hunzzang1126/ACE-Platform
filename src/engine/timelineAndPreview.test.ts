@@ -186,6 +186,116 @@ describe('computeAnimStyle', () => {
 });
 
 // ═══════════════════════════════════════════════════
+// computeAnimStyle — Out animation tests
+// ═══════════════════════════════════════════════════
+
+describe('computeAnimStyle — Out animation', () => {
+    it('★ REGRESSION: Out fires when endTime is explicit', () => {
+        // outPreset=fade, endTime=3, outDuration=0.5 → Out starts at 2.5
+        const style = computeAnimStyle('none', 2.8, 0.6, 0, 3.0, 'fade', 0.5);
+        expect(style.opacity).toBeDefined();
+        expect(style.opacity as number).toBeLessThan(1);
+    });
+
+    it('★ REGRESSION: Out fires with timelineDuration fallback when endTime is undefined', () => {
+        // No explicit endTime → effectiveEnd = timelineDuration = 5
+        // outPreset=fade, outDuration=0.3 → Out starts at 4.7
+        const style = computeAnimStyle('none', 4.8, 0.6, 0, undefined, 'fade', 0.3, 5);
+        expect(style.opacity).toBeDefined();
+        expect(style.opacity as number).toBeLessThan(1);
+    });
+
+    it('★ REGRESSION: Out does NOT fire without timelineDuration when endTime is undefined', () => {
+        // No endTime, no timelineDuration → effectiveEnd = undefined → Out never fires
+        const style = computeAnimStyle('none', 4.8, 0.6, 0, undefined, 'fade', 0.3);
+        expect(style).toEqual({});
+    });
+
+    it('Out slide-down uses easeIn (slow start)', () => {
+        // endTime=5, outDuration=0.3, outStart=4.7
+        // At t=4.733 (first frame), easeIn(0.11) ≈ 0.001 → translateY ≈ 1px
+        const style = computeAnimStyle('none', 4.733, 0.6, 0, 5, 'slide-down', 0.3);
+        const match = (style.transform as string)?.match(/translateY\(([^)]+)px\)/);
+        expect(match).toBeTruthy();
+        const offset = parseFloat(match![1]);
+        // easeIn should give small offset at start (< 20px)
+        expect(offset).toBeLessThan(20);
+        expect(offset).toBeGreaterThan(0);
+    });
+
+    it('Out slide-down has large offset near end (easeIn accelerates)', () => {
+        // At t=4.967 (last frame), easeIn(0.89) ≈ 0.70 → translateY ≈ 700px
+        const style = computeAnimStyle('none', 4.95, 0.6, 0, 5, 'slide-down', 0.3);
+        const match = (style.transform as string)?.match(/translateY\(([^)]+)px\)/);
+        expect(match).toBeTruthy();
+        const offset = parseFloat(match![1]);
+        expect(offset).toBeGreaterThan(500);
+    });
+
+    it('Out slide-left moves element leftward', () => {
+        const style = computeAnimStyle('none', 4.85, 0.6, 0, 5, 'slide-left', 0.3);
+        const match = (style.transform as string)?.match(/translateX\(([^)]+)px\)/);
+        expect(match).toBeTruthy();
+        expect(parseFloat(match![1])).toBeLessThan(0);
+    });
+
+    it('Out slide-right moves element rightward', () => {
+        const style = computeAnimStyle('none', 4.85, 0.6, 0, 5, 'slide-right', 0.3);
+        const match = (style.transform as string)?.match(/translateX\(([^)]+)px\)/);
+        expect(match).toBeTruthy();
+        expect(parseFloat(match![1])).toBeGreaterThan(0);
+    });
+
+    it('Out slide-up moves element upward', () => {
+        const style = computeAnimStyle('none', 4.85, 0.6, 0, 5, 'slide-up', 0.3);
+        const match = (style.transform as string)?.match(/translateY\(([^)]+)px\)/);
+        expect(match).toBeTruthy();
+        expect(parseFloat(match![1])).toBeLessThan(0);
+    });
+
+    it('Out scale-down reduces scale', () => {
+        const style = computeAnimStyle('none', 4.85, 0.6, 0, 5, 'scale', 0.3);
+        const match = (style.transform as string)?.match(/scale\(([^)]+)\)/);
+        expect(match).toBeTruthy();
+        expect(parseFloat(match![1])).toBeLessThan(1);
+    });
+
+    it('Out fade reduces opacity to 0', () => {
+        // Near end: opacity should be close to 0
+        const style = computeAnimStyle('none', 4.99, 0.6, 0, 5, 'fade', 0.3);
+        expect(style.opacity as number).toBeLessThan(0.3);
+    });
+
+    it('element hidden after effectiveEnd (timelineDuration fallback)', () => {
+        const style = computeAnimStyle('none', 5.1, 0.6, 0, undefined, 'fade', 0.3, 5);
+        expect(style.display).toBe('none');
+    });
+
+    it('Out does not apply before outStart zone', () => {
+        // endTime=5, outDuration=0.3, outStart=4.7 → at t=4.5 Out not active
+        const style = computeAnimStyle('none', 4.5, 0.6, 0, 5, 'slide-down', 0.3);
+        expect(style).toEqual({});
+    });
+
+    it('In and Out coexist: In at start, Out at end', () => {
+        // In=fade at t=0.1, Out=slide-down at t=4.8
+        const styleIn = computeAnimStyle('fade', 0.1, 0.6, 0, 5, 'slide-down', 0.3);
+        expect(styleIn.opacity).toBeDefined(); // In: fade opacity
+
+        const styleOut = computeAnimStyle('fade', 4.85, 0.6, 0, 5, 'slide-down', 0.3);
+        expect(styleOut.transform).toBeDefined(); // Out: slide transform
+    });
+
+    it('In plays normally in mid-timeline (Out not active)', () => {
+        const style = computeAnimStyle('fade', 2.0, 0.6, 0, 5, 'slide-down', 0.3);
+        // far past In end, before Out start → In is complete (opacity=1)
+        expect(style.opacity).toBeCloseTo(1, 1);
+        // No Out transform present
+        expect(style.transform).toBeUndefined();
+    });
+});
+
+// ═══════════════════════════════════════════════════
 // scaleAnimStyle tests
 // ═══════════════════════════════════════════════════
 

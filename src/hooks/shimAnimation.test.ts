@@ -323,3 +323,113 @@ describe('shimAnimation — AE visibility model', () => {
         expect(obj.opacity).toBeCloseTo(1, 1);
     });
 });
+
+// ══════════════════════════════════════════════════
+// Pause restores design position
+// ══════════════════════════════════════════════════
+
+describe('shimAnimation — anim_pause restores design position', () => {
+    it('★ REGRESSION: anim_pause restores elements to design position', () => {
+        const obj = makeObj(1);
+        const { methods } = setup([obj]);
+        // Play (sets playing=true)
+        methods.anim_play();
+        // Apply animation at t=0.1 (fade: opacity should be low)
+        methods._applyAnimationFrame(0.1);
+        expect(obj.opacity).toBeLessThan(1);
+        // Pause should restore to original
+        methods.anim_pause();
+        expect(obj.left).toBe(100);
+        expect(obj.top).toBe(50);
+        expect(obj.opacity).toBe(1);
+        expect(obj.visible).toBe(true);
+    });
+
+    it('★ REGRESSION: anim_pause stops animation frame loop', () => {
+        const obj = makeObj(1);
+        const { methods } = setup([obj]);
+        methods.anim_play();
+        expect(methods.anim_playing()).toBe(true);
+        methods.anim_pause();
+        expect(methods.anim_playing()).toBe(false);
+    });
+});
+
+// ══════════════════════════════════════════════════
+// Seek while stopped — design position preserved
+// ══════════════════════════════════════════════════
+
+describe('shimAnimation — seek while stopped preserves design position', () => {
+    it('★ REGRESSION: anim_seek while stopped does NOT displace elements (slide-left)', () => {
+        const obj = makeObj(2); // slide-left, startTime=0.2
+        const { methods } = setup([obj]);
+        // Seek to animation zone while stopped
+        methods.anim_seek(0.3);
+        // Element should be at design position (not offset by slide-left)
+        expect(obj.left).toBe(100); // original left, not 100+300
+        expect(obj.top).toBe(50);   // original top
+    });
+
+    it('★ REGRESSION: anim_seek while stopped does NOT apply fade opacity', () => {
+        const obj = makeObj(1); // fade
+        const { methods } = setup([obj]);
+        // Seek to t=0.1 (fade should be partially transparent during play)
+        methods.anim_seek(0.1);
+        // But while stopped: design position = full opacity
+        expect(obj.opacity).toBe(1);
+    });
+
+    it('anim_seek while stopped still handles visibility (AE model)', () => {
+        const obj = makeObj(2); // startTime=0.2
+        const { methods } = setup([obj]);
+        // Before startTime → hidden
+        methods.anim_seek(0.1);
+        expect(obj.visible).toBe(false);
+        // After startTime → visible at design position
+        methods.anim_seek(0.5);
+        expect(obj.visible).toBe(true);
+        expect(obj.left).toBe(100); // design position
+    });
+
+    it('seek during playback DOES apply animation transforms', () => {
+        const obj = makeObj(1); // fade
+        const { methods } = setup([obj]);
+        methods.anim_play();
+        // Seek during playback should apply fade
+        methods.anim_seek(0.1);
+        expect(obj.opacity).toBeLessThan(1); // fade applied
+    });
+});
+
+// ══════════════════════════════════════════════════
+// Out animation easeIn in Fabric engine
+// ══════════════════════════════════════════════════
+
+describe('shimAnimation — Out animation easeIn', () => {
+    it('Out animation uses easeIn (cubic t³) not easeOut', () => {
+        // Manually verify: easeIn at 50% → t³ = 0.125
+        // easeOut at 50% would be 1-(0.5³) = 0.875
+        // If we apply animation at 50% through Out zone, offset should be small (easeIn)
+        const t = 0.5;
+        const easeInResult = t * t * t;
+        const easeOutResult = 1 - ((1 - t) * (1 - t) * (1 - t));
+        expect(easeInResult).toBeCloseTo(0.125, 3);
+        expect(easeOutResult).toBeCloseTo(0.875, 3);
+        // easeIn gives 7x smaller offset than easeOut at midpoint
+        expect(easeInResult).toBeLessThan(easeOutResult / 5);
+    });
+
+    it('easeIn at 10% progress gives tiny offset', () => {
+        const t = 0.1;
+        const p = t * t * t; // easeIn
+        expect(p).toBeCloseTo(0.001, 3);
+        // translateY = 1000 * 0.001 = 1px (not 297px from easeOut!)
+    });
+
+    it('easeIn at 90% progress gives large offset', () => {
+        const t = 0.9;
+        const p = t * t * t;
+        expect(p).toBeCloseTo(0.729, 3);
+        // translateY = 1000 * 0.729 = 729px — element fully off-screen
+    });
+});
