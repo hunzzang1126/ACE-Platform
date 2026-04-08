@@ -194,6 +194,13 @@ export async function renderFrameAtTime(
         // Apply animation transform for this time
         const hasIn = anim && anim.preset !== 'none';
         const hasOut = anim && anim.outPreset && anim.outPreset !== 'none';
+        // ★ DEBUG: log animation data for first+last frames to trace Out issue
+        if ((time < 0.04 || time > timelineDuration - 0.4) && anim) {
+            console.log(`[EXPORT DEBUG] t=${time.toFixed(3)} el=${el.id} anim=`, JSON.stringify({
+                preset: anim.preset, outPreset: anim.outPreset, outDuration: anim.outDuration,
+                endTime: anim.endTime, hasIn, hasOut,
+            }));
+        }
         if (hasIn || hasOut) {
             // ★ Use full timeline duration as fallback when element has no custom endTime
             const timelineDur = timelineDuration;
@@ -203,6 +210,10 @@ export async function renderFrameAtTime(
                 anim?.outPreset as any, anim?.outDuration,
                 timelineDur,
             );
+            // ★ DEBUG: log computed style near Out zone
+            if (time > timelineDuration - 0.4) {
+                console.log(`[EXPORT DEBUG] t=${time.toFixed(3)} style=`, JSON.stringify(style));
+            }
             // AE model: element doesn't exist at this time
             if (style.display === 'none') continue;
             if (style.opacity !== undefined) opacity = style.opacity as number;
