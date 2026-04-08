@@ -127,17 +127,19 @@ export function useCanvasSync(variantId: string | undefined, canvasW: number, ca
                 restoreVideo(el as VideoElement, canvasW, canvasH, overlayElements, pendingVideoLoads);
             }
 
-            if (el.animation && (el.animation.preset !== 'none' || (el.animation.outPreset && el.animation.outPreset !== 'none')) && newNodeId != null) {
-                // ★ REGRESSION GUARD: Use the NEW nodeId returned by engine.add_text/add_rect/add_image,
-                // NOT the old saved el.id ("engine-42"). The shimAnimation.ts playback looks up
-                // presets by String(__glidId), which is the new ID assigned during restore.
-                const key = String(newNodeId);
-                useAnimPresetStore.getState().setPreset(key, {
-                    anim: el.animation.preset,
-                    animDuration: el.animation.duration,
-                    startTime: el.animation.startTime,
-                    ...(el.animation.outPreset && el.animation.outPreset !== 'none' ? { animOut: el.animation.outPreset, animOutDuration: el.animation.outDuration ?? 0.3 } : {}),
-                });
+            if (el.animation && newNodeId != null) {
+                const a = el.animation;
+                const hasAny = a.preset !== 'none' || (a.outPreset && a.outPreset !== 'none') || a.startTime !== 0 || (a.endTime != null && a.endTime > 0);
+                if (hasAny) {
+                    const key = String(newNodeId);
+                    useAnimPresetStore.getState().setPreset(key, {
+                        anim: a.preset,
+                        animDuration: a.duration,
+                        startTime: a.startTime,
+                        ...(a.endTime != null && a.endTime > 0 ? { endTime: a.endTime } : {}),
+                        ...(a.outPreset && a.outPreset !== 'none' ? { animOut: a.outPreset, animOutDuration: a.outDuration ?? 0.3 } : {}),
+                    });
+                }
             }
         }
 
@@ -240,13 +242,18 @@ function restoreImage(engine: Engine, img: ImageElement, canvasW: number, canvas
             if (ci.shadow) { try { const [sr, sg, sb, sa] = parseShadow(ci.shadow.color); engine.set_shadow(nodeId, ci.shadow.offsetX, ci.shadow.offsetY, ci.shadow.blur, sr, sg, sb, sa); } catch { /* ok */ } }
             if (ci.constraints.rotation && typeof engine.set_angle === 'function') try { engine.set_angle(nodeId, ci.constraints.rotation); } catch { /* ok */ }
             // ★ Animation for images must be set HERE because nodeId is only known after async load
-            if (animation && (animation.preset !== 'none' || (animation.outPreset && animation.outPreset !== 'none')) && nodeId != null) {
-                useAnimPresetStore.getState().setPreset(String(nodeId), {
-                    anim: animation.preset,
-                    animDuration: animation.duration,
-                    startTime: animation.startTime,
-                    ...(animation.outPreset && animation.outPreset !== 'none' ? { animOut: animation.outPreset, animOutDuration: animation.outDuration ?? 0.3 } : {}),
-                });
+            if (animation && nodeId != null) {
+                const a = animation;
+                const hasAny = a.preset !== 'none' || (a.outPreset && a.outPreset !== 'none') || a.startTime !== 0 || (a.endTime != null && a.endTime > 0);
+                if (hasAny) {
+                    useAnimPresetStore.getState().setPreset(String(nodeId), {
+                        anim: a.preset,
+                        animDuration: a.duration,
+                        startTime: a.startTime,
+                        ...(a.endTime != null && a.endTime > 0 ? { endTime: a.endTime } : {}),
+                        ...(a.outPreset && a.outPreset !== 'none' ? { animOut: a.outPreset, animOutDuration: a.outDuration ?? 0.3 } : {}),
+                    });
+                }
             }
         });
     }

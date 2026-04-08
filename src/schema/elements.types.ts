@@ -20,8 +20,10 @@ export interface TextEffectConfig {
 /** Serializable animation config — persisted with the element */
 export interface ElementAnimation {
     preset: 'none' | 'fade' | 'slide-left' | 'slide-right' | 'slide-up' | 'slide-down' | 'scale' | 'ascend' | 'descend';
-    duration: number;   // seconds
+    duration: number;   // IN animation duration (seconds)
     startTime: number;  // element start time offset (seconds)
+    /** Element end time (seconds). -1 or undefined = full timeline */
+    endTime?: number;
     /** OUT (exit) animation preset */
     outPreset?: 'none' | 'fade' | 'slide-left' | 'slide-right' | 'slide-up' | 'slide-down' | 'scale' | 'ascend' | 'descend';
     /** OUT animation duration (seconds) */

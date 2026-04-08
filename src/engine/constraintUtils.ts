@@ -127,9 +127,19 @@ export function getAnimationForElement(elementId: string): ElementAnimation | un
     const config = presets[elementId]
         || (elementId.startsWith('engine-') ? presets[elementId.slice(7)] : undefined)
         || (!elementId.startsWith('engine-') ? presets[`engine-${elementId}`] : undefined);
-    if (!config || (config.anim === 'none' && (config.animOut ?? 'none') === 'none')) return undefined;
-    const result: ElementAnimation = { preset: config.anim, duration: config.animDuration, startTime: config.startTime };
-    if (config.animOut && config.animOut !== 'none') {
+    if (!config) return undefined;
+    const hasIn = config.anim !== 'none';
+    const hasOut = (config.animOut ?? 'none') !== 'none';
+    const hasCustomTiming = config.startTime !== 0 || (config.endTime > 0 && config.endTime !== -1);
+    // Only skip if truly nothing is configured
+    if (!hasIn && !hasOut && !hasCustomTiming) return undefined;
+    const result: ElementAnimation = {
+        preset: config.anim,
+        duration: config.animDuration,
+        startTime: config.startTime,
+        ...(config.endTime > 0 ? { endTime: config.endTime } : {}),
+    };
+    if (hasOut) {
         result.outPreset = config.animOut;
         result.outDuration = config.animOutDuration;
     }

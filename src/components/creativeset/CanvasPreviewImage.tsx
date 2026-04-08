@@ -30,6 +30,9 @@ interface SpriteData {
     preset: string;
     duration: number;
     startTime: number;
+    endTime?: number;
+    outPreset?: string;
+    outDuration?: number;
 }
 
 /** Scale CSS transform pixel values for preview size */
@@ -53,8 +56,9 @@ export const CanvasPreviewImage = memo(function CanvasPreviewImage({ variant, re
     // ★ Time-controlled elements: have animation OR non-zero startTime
     const timeCtrlEls = variant.elements.filter(el => {
         const hasAnim = el.animation && el.animation.preset !== 'none';
+        const hasOut = el.animation && el.animation.outPreset && el.animation.outPreset !== 'none';
         const hasDelay = el.animation && (el.animation.startTime ?? 0) > 0;
-        return hasAnim || hasDelay;
+        return hasAnim || hasOut || hasDelay;
     });
     const hasTimeCtrl = timeCtrlEls.length > 0;
     const isAnimating = hasTimeCtrl && currentTime !== undefined;
@@ -118,6 +122,9 @@ export const CanvasPreviewImage = memo(function CanvasPreviewImage({ variant, re
                         preset: el.animation?.preset ?? 'none',
                         duration: el.animation?.duration ?? 0.6,
                         startTime: el.animation?.startTime ?? 0,
+                        endTime: el.animation?.endTime,
+                        outPreset: el.animation?.outPreset,
+                        outDuration: el.animation?.outDuration,
                     });
                 } catch { /* skip */ }
             }
@@ -156,7 +163,11 @@ export const CanvasPreviewImage = memo(function CanvasPreviewImage({ variant, re
         <div style={{ position: 'relative', width: width * scale, height: height * scale, overflow: 'hidden' }}>
             <img src={baseUrl || staticUrl} alt="base" width={width * scale} height={height * scale} style={{ display: 'block' }} draggable={false} />
             {sprites.map(sprite => {
-                const animStyle = computeAnimStyle(sprite.preset as AnimPresetType, currentTime, sprite.duration, sprite.startTime);
+                const animStyle = computeAnimStyle(
+                    sprite.preset as AnimPresetType, currentTime, sprite.duration, sprite.startTime,
+                    sprite.endTime && sprite.endTime > 0 ? sprite.endTime : undefined,
+                    sprite.outPreset as AnimPresetType | undefined, sprite.outDuration,
+                );
                 // Scale transform pixel values to match preview size
                 const scaledStyle = scaleAnimStyle(animStyle, scale);
                 return (
