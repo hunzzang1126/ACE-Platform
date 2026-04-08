@@ -130,15 +130,16 @@ export function createAnimationMethods(
                 continue;
             }
             // Layer is within its lifespan — ensure it exists
-            obj.set({ visible: true });
+            // ★ ALWAYS reset ALL properties from orig first to prevent
+            // cross-contamination between In and Out presets that modify
+            // different properties (e.g. slide-left changes left, ascend changes top)
+            obj.set({ visible: true, left: orig.left, top: orig.top, opacity: orig.opacity, scaleX: orig.scaleX, scaleY: orig.scaleY });
 
-            // No animation — just restore original position (visible)
             const hasIn = config && config.anim !== 'none';
             const outPreset = config?.animOut ?? 'none';
             const hasOut = outPreset !== 'none';
 
             if (!hasIn && !hasOut) {
-                obj.set({ left: orig.left, top: orig.top, opacity: orig.opacity, scaleX: orig.scaleX, scaleY: orig.scaleY, visible: true });
                 needsRender = true;
                 continue;
             }
@@ -157,7 +158,7 @@ export function createAnimationMethods(
 
             // ── IN animation ──
             if (!hasIn) {
-                obj.set({ left: orig.left, top: orig.top, opacity: orig.opacity, scaleX: orig.scaleX, scaleY: orig.scaleY });
+                // Already reset above, just continue
                 needsRender = true;
                 continue;
             }

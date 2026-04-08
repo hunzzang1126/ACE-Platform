@@ -47,12 +47,12 @@ export function BottomPanel({ variant, engine, nodes, selection, actions, overla
 
     const getBarLabel = useCallback((elementId: string, fallback: string) => {
         const config = animPresets.getPreset(elementId);
-        const inLabel = config.anim !== 'none' ? presetLabel(config.anim) : '';
-        const outLabel = (config.animOut ?? 'none') !== 'none' ? presetLabel(config.animOut) : '';
-        if (inLabel && outLabel) return `${inLabel} / ${outLabel}`;
-        if (inLabel) return inLabel;
-        if (outLabel) return outLabel;
-        return fallback;
+        return config.anim !== 'none' ? presetLabel(config.anim) : fallback;
+    }, [animPresets]);
+
+    const getBarOutLabel = useCallback((elementId: string) => {
+        const config = animPresets.getPreset(elementId);
+        return (config.animOut ?? 'none') !== 'none' ? presetLabel(config.animOut) : '';
     }, [animPresets]);
 
     const getBarCursor = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -148,9 +148,10 @@ export function BottomPanel({ variant, engine, nodes, selection, actions, overla
                         const barWidth = `${((etTime - stTime) / duration) * 100}%`;
                         const elId = layer.kind === 'overlay' ? layer.overlay?.id ?? '' : String(layer.node?.id ?? '');
                         const label = getBarLabel(layer.id, layer.kind === 'overlay' ? (layer.overlay?.type === 'text' ? 'Text' : 'Image') : nodeLabel(layer.node!));
+                        const outLabel = getBarOutLabel(layer.id);
                         const isSelected = layer.kind === 'overlay' ? layer.overlay?.id === selectedOverlayId : selection.includes(layer.node?.id ?? -1);
                         const nodeId = layer.kind === 'engine' ? (layer.node?.id ?? -1) : -1;
-                        return (<TimelineBar key={`tl-${layer.id}`} elementId={elId} label={label} isSelected={!!isSelected} draggedClass={dc} dropTargetClass={dtc} barLeft={barLeft} barWidth={barWidth} barColor={barColor} currentTime={currentTime} duration={duration} hasAnim={config.anim !== 'none'} opacityStyle={layer.kind === 'overlay' ? 0.7 : undefined} justDragged={justDragged} onSelect={() => layer.kind === 'overlay' ? onOverlaySelect?.(elId) : handleSelect(layer.node!.id)} onBarMouseDown={st.handleBarMouseDown} onBarCursor={getBarCursor} onAnimClick={() => {}} nodeId={nodeId} />);
+                        return (<TimelineBar key={`tl-${layer.id}`} elementId={elId} label={label} outLabel={outLabel} isSelected={!!isSelected} draggedClass={dc} dropTargetClass={dtc} barLeft={barLeft} barWidth={barWidth} barColor={barColor} currentTime={currentTime} duration={duration} hasAnim={config.anim !== 'none'} hasAnimOut={(config.animOut ?? 'none') !== 'none'} opacityStyle={layer.kind === 'overlay' ? 0.7 : undefined} justDragged={justDragged} onSelect={() => layer.kind === 'overlay' ? onOverlaySelect?.(elId) : handleSelect(layer.node!.id)} onBarMouseDown={st.handleBarMouseDown} onBarCursor={getBarCursor} onAnimClick={() => {}} nodeId={nodeId} />);
                     })}
                     {unifiedLayers.length === 0 && <div className="bp-empty">Press R, E, T, or I to add elements</div>}
                 </div>

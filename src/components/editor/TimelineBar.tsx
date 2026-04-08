@@ -15,6 +15,7 @@ interface FlatKeyframe {
 interface TimelineBarProps {
     elementId: string;
     label: string;
+    outLabel?: string;
     isSelected: boolean;
     draggedClass: string;
     dropTargetClass: string;
@@ -24,6 +25,7 @@ interface TimelineBarProps {
     currentTime: number;
     duration: number;
     hasAnim: boolean;
+    hasAnimOut?: boolean;
     opacityStyle?: number;
     justDragged: React.RefObject<boolean>;
     onSelect: () => void;
@@ -45,8 +47,8 @@ const EASING_COLORS: Record<string, string> = {
 };
 
 export function TimelineBar({
-    elementId, label, isSelected, draggedClass, dropTargetClass,
-    barLeft, barWidth, barColor, currentTime, duration, hasAnim,
+    elementId, label, outLabel, isSelected, draggedClass, dropTargetClass,
+    barLeft, barWidth, barColor, currentTime, duration, hasAnim, hasAnimOut,
     opacityStyle, justDragged, onSelect,
     onBarMouseDown, onBarCursor, onAnimClick, nodeId,
     onKeyframeSelect,
@@ -89,11 +91,21 @@ export function TimelineBar({
                 <div className="bp-bar-handle bp-bar-handle-left" title="Drag to resize start" />
                 <span
                     className="bp-bar-anim-label"
-                    title={hasAnim ? 'Animation applied (edit in Animate panel)' : label}
+                    title={hasAnim ? 'In animation' : label}
                 >
                     {hasAnim && <span className="bp-anim-dot" />}
                     {label}
                 </span>
+
+                {outLabel && (
+                    <span
+                        className="bp-bar-anim-label bp-bar-out-label"
+                        title="Out animation"
+                    >
+                        {outLabel}
+                        {hasAnimOut && <span className="bp-anim-dot" />}
+                    </span>
+                )}
 
                 {/* Keyframe diamond markers */}
                 {keyframes.map((kf) => {
