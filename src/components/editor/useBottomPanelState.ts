@@ -126,7 +126,7 @@ export function useBottomPanelState(
     // ── Engine sync ──
     const syncTime = useCallback(() => {
         if (!engine) return;
-        try { const t = engine.anim_time?.() ?? 0; const p = engine.anim_playing?.() ?? false; setCurrentTime(t); setPlaying(p); setDuration(engine.anim_duration?.() ?? 5.0); setLooping(engine.anim_looping?.() ?? false); animPresets.setCurrentTime(t); animPresets.setIsPlaying(p); } catch { /* */ }
+        try { const t = engine.anim_time?.() ?? 0; const p = engine.anim_playing?.() ?? false; const d = engine.anim_duration?.() ?? 5.0; setCurrentTime(t); setPlaying(p); setDuration(d); setLooping(engine.anim_looping?.() ?? false); animPresets.setCurrentTime(t); animPresets.setIsPlaying(p); animPresets.setDuration(d); } catch { /* */ }
     }, [engine, animPresets]);
 
     useEffect(() => {

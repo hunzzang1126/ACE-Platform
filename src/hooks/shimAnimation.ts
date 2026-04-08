@@ -116,7 +116,9 @@ export function createAnimationMethods(
             if (!orig) continue;
 
             const st = config?.startTime ?? 0;
-            const et = config?.endTime ?? -1;
+            // ★ endTime=-1 means "full timeline" — resolve to actual duration for Out check
+            const rawEt = config?.endTime ?? -1;
+            const et = rawEt < 0 ? state.duration : rawEt;
 
             // ★ AE model: before in-point, layer does NOT EXIST (not just invisible)
             if (currentTime < st) {
@@ -146,7 +148,7 @@ export function createAnimationMethods(
 
             // ── OUT animation check (takes priority near endTime) ──
             const outDur = config?.animOutDuration ?? 0.3;
-            const outStart = et > 0 ? et - outDur : -1;
+            const outStart = et - outDur;
             if (hasOut && outStart > 0 && currentTime >= outStart && currentTime <= et) {
                 const outProgress = (currentTime - outStart) / outDur; // 0→1
                 const invO = 1 - outProgress;

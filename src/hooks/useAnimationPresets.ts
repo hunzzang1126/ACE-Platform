@@ -52,12 +52,15 @@ interface AnimPresetStore {
     currentTime: number;
     /** Whether timeline is playing */
     isPlaying: boolean;
+    /** Timeline duration — needed to resolve endTime=-1 */
+    duration: number;
     setPreset: (elementId: string, config: Partial<AnimPresetConfig>) => void;
     getPreset: (elementId: string) => AnimPresetConfig;
     removePreset: (elementId: string) => void;
     setTiming: (elementId: string, startTime: number, endTime: number) => void;
     setCurrentTime: (time: number) => void;
     setIsPlaying: (playing: boolean) => void;
+    setDuration: (d: number) => void;
     /** Get CSS style overrides for an element at the current timeline time */
     getAnimStyle: (elementId: string) => CSSProperties;
 }
@@ -175,6 +178,7 @@ export const useAnimPresetStore = create<AnimPresetStore>()((set, get) => ({
     presets: {},
     currentTime: 0,
     isPlaying: false,
+    duration: 5,
 
     setPreset: (elementId, config) => set((s) => ({
         presets: {
@@ -203,24 +207,26 @@ export const useAnimPresetStore = create<AnimPresetStore>()((set, get) => ({
 
     setCurrentTime: (time) => set({ currentTime: time }),
     setIsPlaying: (playing) => set({ isPlaying: playing }),
+    setDuration: (d) => set({ duration: d }),
 
     getAnimStyle: (elementId) => {
         const state = get();
         const config = state.presets[elementId] ?? DEFAULT_CONFIG;
         // ★ AE model: visibility must apply even when scrubbing while stopped.
-        // Elements outside their timeline range must not exist (display:none).
         const st = config.startTime;
-        const et = config.endTime;
+        const rawEt = config.endTime;
+        // Resolve endTime=-1 to timeline duration
+        const et = rawEt < 0 ? state.duration : rawEt;
         if (state.currentTime < st) return { display: 'none' };
         if (et > 0 && state.currentTime > et) return { display: 'none' };
-        // Within range but not playing — show at design position (no animation offset)
+        // Within range but not playing — show at design position
         const hasIn = config.anim !== 'none';
         const hasOut = (config.animOut ?? 'none') !== 'none';
         if (!hasIn && !hasOut) return {};
         if (!state.isPlaying) return {};
         return computeAnimStyle(
             config.anim, state.currentTime, config.animDuration, config.startTime,
-            config.endTime > 0 ? config.endTime : undefined,
+            et > 0 ? et : undefined,
             config.animOut, config.animOutDuration,
         );
     },
