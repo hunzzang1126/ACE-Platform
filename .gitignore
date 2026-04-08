@@ -39,3 +39,4 @@ DEV REPORT/
 supabase/.temp/
 .vercel
 coverage/
+.env*.local

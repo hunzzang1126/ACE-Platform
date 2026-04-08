@@ -16,6 +16,33 @@ enableMapSet();
 import { v4 as uuid } from 'uuid';
 import type { CreativeSetSummary, Folder } from '@/schema/design.types';
 
+// ── Reliable cloud deletion (await + retry) ──
+// ★ REGRESSION GUARD: fire-and-forget caused ghost resurrection
+const MAX_DELETE_RETRIES = 3;
+async function _deleteFromCloud(id: string): Promise<void> {
+    try {
+        const { deleteProjectPermanently, deleteCreativeSetCloud } = await import('@/services/cloudSync');
+        for (let attempt = 1; attempt <= MAX_DELETE_RETRIES; attempt++) {
+            try {
+                await Promise.all([
+                    deleteProjectPermanently(id),
+                    deleteCreativeSetCloud(id),
+                ]);
+                console.log(`[projectStore] Cloud delete success: ${id}`);
+                return;
+            } catch (e) {
+                console.warn(`[projectStore] Cloud delete attempt ${attempt}/${MAX_DELETE_RETRIES} failed for ${id}:`, e);
+                if (attempt < MAX_DELETE_RETRIES) {
+                    await new Promise(r => setTimeout(r, 1000 * attempt)); // exponential backoff
+                }
+            }
+        }
+        console.error(`[projectStore] Cloud delete FAILED after ${MAX_DELETE_RETRIES} retries: ${id}`);
+    } catch (e) {
+        console.error('[projectStore] Cloud delete import failed:', e);
+    }
+}
+
 // ── Trash item type ──
 export interface TrashedItem {
     item: CreativeSetSummary;
@@ -247,13 +274,8 @@ export const useProjectStore = create<ProjectState>()(
                 set((state) => {
                     state.trash = state.trash.filter((t) => t.item.id !== id);
                 });
-                // 3) Broadcast to other tabs
-                // ★ Cross-tab sync is now handled by subscribe() — no manual broadcast needed
-                // 4) ★ Clean up Supabase (fire-and-forget)
-                import('@/services/cloudSync').then(({ deleteProjectPermanently, deleteCreativeSetCloud }) => {
-                    deleteProjectPermanently(id).catch(() => {});
-                    deleteCreativeSetCloud(id).catch(() => {});
-                }).catch(() => {});
+                // 3) ★ Reliably delete from Supabase (await + retry)
+                _deleteFromCloud(id);
             },
 
             emptyTrash: () => {
@@ -268,15 +290,10 @@ export const useProjectStore = create<ProjectState>()(
                 set((state) => {
                     state.trash = [];
                 });
-                // 4) Broadcast to other tabs
-                // ★ Cross-tab sync is now handled by subscribe() — no manual broadcast needed
-                // 5) ★ Clean up Supabase for ALL trashed items (fire-and-forget)
-                import('@/services/cloudSync').then(({ deleteProjectPermanently, deleteCreativeSetCloud }) => {
-                    for (const t of currentTrash) {
-                        deleteProjectPermanently(t.item.id).catch(() => {});
-                        deleteCreativeSetCloud(t.item.id).catch(() => {});
-                    }
-                }).catch(() => {});
+                // 4) ★ Reliably delete ALL from Supabase
+                for (const t of currentTrash) {
+                    _deleteFromCloud(t.item.id);
+                }
             },
         })),
         {

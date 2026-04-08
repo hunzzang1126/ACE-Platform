@@ -65,21 +65,25 @@ export function useCloudSync() {
                 }
 
                 if (merged) {
-                    // ★ ORPHAN PURGE REMOVED — was causing real data loss.
-                    // The purge read localProjects/localCS from Zustand stores,
-                    // but on page refresh, IDB hydration hasn't completed yet,
-                    // so local state is EMPTY → every cloud project looked like
-                    // an orphan → all real projects got deleted.
-                    // TODO: Implement safe orphan cleanup after confirming
-                    // Zustand hydration is complete (use onRehydrateStorage callback).
+                    // ★ ANTI-RESURRECTION GUARD: If a project is in local trash
+                    // (user permanently deleted it), never bring it back from cloud.
+                    // This catches the case where cloud delete failed silently.
+                    const localTrash = useProjectStore.getState().trash;
+                    const trashedIds = new Set(localTrash.map(t => t.item.id));
+
+                    const safeProjects = merged.projects.filter(p => !trashedIds.has(p.id));
+                    const safeCS: Record<string, typeof merged.creativeSets[string]> = {};
+                    for (const [id, cs] of Object.entries(merged.creativeSets)) {
+                        if (!trashedIds.has(id)) safeCS[id] = cs;
+                    }
 
                     // Apply merged data to stores
                     useProjectStore.setState({
-                        creativeSets: merged.projects,
+                        creativeSets: safeProjects,
                         folders: merged.folders,
                     });
                     useDesignStore.setState({
-                        allCreativeSets: merged.creativeSets,
+                        allCreativeSets: safeCS,
                     });
                     console.log('[useCloudSync] Sync complete — stores updated');
                 }
