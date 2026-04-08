@@ -194,12 +194,16 @@ export function setupCanvasEvents({
     fc.on('mouse:up', () => { transformMode = 'none'; });
 
     fc.on('after:render', () => {
+        const ctx = (fc as any).contextTop as CanvasRenderingContext2D | null;
+        if (!ctx) return;
+
+        // ★ Always clear contextTop to remove stale badge renders
+        const upperEl = ctx.canvas;
+        ctx.clearRect(0, 0, upperEl.width, upperEl.height);
+
         if (transformMode === 'none') return;
         const obj = fc.getActiveObject();
         if (!obj || isArtboard(obj)) return;
-
-        const ctx = (fc as any).contextTop as CanvasRenderingContext2D | null;
-        if (!ctx) return;
 
         const vpt = fc.viewportTransform!;
         const zoom = vpt[0];
