@@ -184,4 +184,74 @@ export function setupCanvasEvents({
         guideLines.current = [];
         fc.renderAll();
     }
+
+    // ── Figma-style transform badges (rotation + dimensions) ──
+    let transformMode: 'none' | 'rotating' | 'scaling' = 'none';
+
+    fc.on('object:rotating', () => { transformMode = 'rotating'; });
+    fc.on('object:scaling', () => { transformMode = 'scaling'; });
+    fc.on('object:modified', () => { transformMode = 'none'; });
+    fc.on('mouse:up', () => { transformMode = 'none'; });
+
+    fc.on('after:render', () => {
+        if (transformMode === 'none') return;
+        const obj = fc.getActiveObject();
+        if (!obj || isArtboard(obj)) return;
+
+        const ctx = (fc as any).contextTop as CanvasRenderingContext2D | null;
+        if (!ctx) return;
+
+        const vpt = fc.viewportTransform!;
+        const zoom = vpt[0];
+        // Fabric v6: getBoundingRect() returns coords in canvas space (before viewport)
+        const br = obj.getBoundingRect();
+        const screenX = br.left * zoom + vpt[4];
+        const screenY = br.top * zoom + vpt[5];
+        const screenW = br.width * zoom;
+        const screenH = br.height * zoom;
+        const centerX = screenX + screenW / 2;
+
+        // Badge style
+        const fontSize = 11;
+        const paddingH = 7;
+        const paddingV = 3;
+        const radius = 4;
+        const bgColor = '#0D99FF';
+        ctx.save();
+        ctx.font = `500 ${fontSize}px Inter, system-ui, sans-serif`;
+
+        let text = '';
+        let badgeY = 0;
+
+        if (transformMode === 'rotating') {
+            const angle = Math.round((obj.angle ?? 0) % 360);
+            text = `${angle >= 0 ? angle : 360 + angle}\u00B0`;
+            badgeY = screenY - 12; // above the object
+        } else {
+            // Scaling — show actual pixel dimensions
+            const w = Math.round((obj.width ?? 0) * (obj.scaleX ?? 1));
+            const h = Math.round((obj.height ?? 0) * (obj.scaleY ?? 1));
+            text = `${w} \u00D7 ${h}`;
+            badgeY = screenY + screenH + 8; // below the object
+        }
+
+        const metrics = ctx.measureText(text);
+        const badgeW = metrics.width + paddingH * 2;
+        const badgeH = fontSize + paddingV * 2;
+        const badgeX = centerX - badgeW / 2;
+
+        // Draw rounded rect background
+        ctx.beginPath();
+        ctx.roundRect(badgeX, badgeY, badgeW, badgeH, radius);
+        ctx.fillStyle = bgColor;
+        ctx.fill();
+
+        // Draw text
+        ctx.fillStyle = '#FFFFFF';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, centerX, badgeY + badgeH / 2);
+        ctx.restore();
+    });
 }
+
