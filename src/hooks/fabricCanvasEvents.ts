@@ -49,13 +49,21 @@ export function setupCanvasEvents({
         const corner = (obj as any).__corner;
         const isCorner = corner && ['tl', 'tr', 'bl', 'br'].includes(corner);
         if (isCorner) {
-            const uniformScale = Math.max(obj.scaleX ?? 1, obj.scaleY ?? 1);
+            // ★ Uniform scale: lock aspect ratio on corner drag (like shapes/images)
+            const sx = obj.scaleX ?? 1;
+            const sy = obj.scaleY ?? 1;
+            // Use the axis with greater change as the uniform factor
+            const uniformScale = Math.abs(sx - 1) >= Math.abs(sy - 1) ? sx : sy;
+            // Force both axes to the same scale (prevents distortion)
+            obj.set({ scaleX: uniformScale, scaleY: uniformScale });
+
             const origFontSize = (obj as any).__glidOrigFontSize ?? obj.fontSize ?? 18;
             if (!(obj as any).__glidOrigFontSize) (obj as any).__glidOrigFontSize = obj.fontSize ?? 18;
             const newFontSize = Math.max(6, Math.min(400, Math.round(origFontSize * uniformScale)));
-            const newWidth = (obj.width ?? 200) * (obj.scaleX ?? 1);
+            const newWidth = (obj.width ?? 200) * uniformScale;
             obj.set({ fontSize: newFontSize, width: Math.max(20, newWidth), scaleX: 1, scaleY: 1 });
         } else {
+            // Side handles (ml/mr): only adjust width, no font size change
             const newWidth = (obj.width ?? 200) * (obj.scaleX ?? 1);
             obj.set({ width: Math.max(20, newWidth), scaleX: 1, scaleY: 1 });
         }
