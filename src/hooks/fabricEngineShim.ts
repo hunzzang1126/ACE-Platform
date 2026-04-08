@@ -59,6 +59,12 @@ export function createEngineShim(
             return result;
         },
         get_canvas_size: () => ({ width: artboardW, height: artboardH }),
+        /** Read artboard fill color for template save */
+        get_artboard_color: (): string | null => {
+            const ab = fc.getObjects().find(o => (o as any).__glidArtboard);
+            if (!ab) return null;
+            return typeof ab.fill === 'string' ? ab.fill : null;
+        },
         getCanvasJSON: (): string => JSON.stringify(fc.toObject(GLID_CUSTOM_PROPS)),
         loadCanvasJSON: async (jsonStr: string): Promise<void> => {
             await fc.loadFromJSON(jsonStr);

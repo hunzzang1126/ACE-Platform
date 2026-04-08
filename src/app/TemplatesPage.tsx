@@ -120,7 +120,6 @@ export function TemplatesPage() {
     }, [newName, newCategory, addCustomTemplate, handleEdit]);
 
     const handleDelete = useCallback((t: DesignTemplate) => {
-        if (t.isBuiltIn) return;
         if (!window.confirm(`Delete "${t.name}"? This cannot be undone.`)) return;
         deleteCustomTemplate(t.id);
     }, [deleteCustomTemplate]);
@@ -133,7 +132,7 @@ export function TemplatesPage() {
             <div style={S.main}>
                 {/* Header */}
                 <div style={S.header}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 16, justifyContent: 'space-between' }}>
                         <div>
                             <h1 style={S.title}>Templates</h1>
                             <p style={S.subtitle}>
@@ -229,8 +228,8 @@ export function TemplatesPage() {
                                         </svg>
                                     </button>
                                 )}
-                                {/* Admin delete button — custom templates only */}
-                                {adminMode && !t.isBuiltIn && (
+                                {/* Admin delete button */}
+                                {adminMode && (
                                     <button
                                         onClick={() => handleDelete(t)}
                                         title="Delete template"

@@ -44,10 +44,16 @@ export function TemplatePreview({ template }: { template: DesignTemplate }) {
                         ? constraintsToAbsolute(el.constraints, tw, th)
                         : { x: 0, y: 0, w: 0, h: 0 };
 
+                    const shadow = el.shadow;
+                    const shadowCSS = shadow
+                        ? `${shadow.offsetX}px ${shadow.offsetY}px ${shadow.blur}px ${shadow.color}`
+                        : undefined;
+
                     const baseStyle: React.CSSProperties = {
                         position: 'absolute', left: pos.x, top: pos.y, width: pos.w, height: pos.h,
                         opacity: el.opacity ?? 1, zIndex: el.zIndex ?? 0,
-                        overflow: 'hidden', pointerEvents: 'none',
+                        overflow: 'visible', pointerEvents: 'none',
+                        boxShadow: el.type !== 'text' ? shadowCSS : undefined,
                     };
 
                     if (el.type === 'shape') {
@@ -67,6 +73,7 @@ export function TemplatePreview({ template }: { template: DesignTemplate }) {
                                 textAlign: (el.textAlign as React.CSSProperties['textAlign']) || 'left',
                                 lineHeight: el.lineHeight || 1.2,
                                 whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                                textShadow: shadowCSS,
                             }}>
                                 {el.content}
                             </div>

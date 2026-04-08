@@ -50,6 +50,8 @@ interface TemplateState {
     templates: DesignTemplate[];
     /** Admin overrides: maps template ID -> serialized variantSnapshot JSON */
     templateOverrides: Record<string, string>;
+    /** Built-in template IDs hidden by admin */
+    hiddenBuiltInIds: string[];
     /** Template currently being edited in canvas (admin only) */
     editingTemplateId: string | null;
     /** Temp creative set ID created for template editing (cleanup after save) */
@@ -110,6 +112,7 @@ export const useTemplateStore = create<TemplateState>()(
         immer((set, get) => ({
             templates: [],
             templateOverrides: {} as Record<string, string>,
+            hiddenBuiltInIds: [] as string[],
             editingTemplateId: null as string | null,
             editingTempCsId: null as string | null,
 
@@ -301,20 +304,19 @@ export const useTemplateStore = create<TemplateState>()(
                 return id;
             },
 
-            // ── Admin: delete custom template ──
+            // ── Admin: delete any template (built-in = hide, custom = remove) ──
             deleteCustomTemplate: (id) => {
                 const tmpl = get().templates.find(t => t.id === id);
-                if (!tmpl || tmpl.isBuiltIn) {
-                    console.warn('[templateStore] Cannot delete built-in template:', id);
-                    return;
-                }
                 set(state => {
                     state.templates = state.templates.filter(t => t.id !== id);
                     delete state.templateOverrides[id];
+                    // If built-in, persist as hidden so it doesn't reappear on reload
+                    if (tmpl?.isBuiltIn && !state.hiddenBuiltInIds.includes(id)) {
+                        state.hiddenBuiltInIds.push(id);
+                    }
                 });
-                // Remove from Supabase
                 deleteTemplateOverride(id).catch(e => {
-                    console.warn('[templateStore] Failed to delete custom template from cloud:', e);
+                    console.warn('[templateStore] Failed to delete template from cloud:', e);
                 });
             },
 
@@ -369,11 +371,12 @@ export const useTemplateStore = create<TemplateState>()(
                 // ★ Clean up orphaned template creative sets (deferred)
                 setTimeout(() => cleanupOrphanedTemplateCS(), 1000);
 
-                // ★ Refresh built-in templates with latest code definitions
+                // Refresh built-in templates (exclude hidden)
+                const hiddenSet = new Set(state.hiddenBuiltInIds ?? []);
                 const userTemplates = state.templates.filter(t => !t.isBuiltIn);
                 const builtInIds = new Set(BUILT_IN_TEMPLATES.map(t => t.id));
                 state.templates = [
-                    ...BUILT_IN_TEMPLATES,
+                    ...BUILT_IN_TEMPLATES.filter(t => !hiddenSet.has(t.id)),
                     ...userTemplates.filter(t => !builtInIds.has(t.id)),
                 ];
 

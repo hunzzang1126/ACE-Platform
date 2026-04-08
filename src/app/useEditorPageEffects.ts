@@ -54,14 +54,15 @@ export function useEditorPageSave(
                     const elements = readNodesFromEngine(engine, width, height);
                     addOverlaysAndSort(elements, overlayElements, width, height);
 
-                    // Construct variant directly from live canvas data
+                    // ★ Read bg color from LIVE artboard, not stale variant
                     const cs = useDesignStore.getState().creativeSet;
                     const existingVariant = cs?.variants.find(vi => vi.id === variantId);
+                    const liveBg = engine.get_artboard_color?.() ?? existingVariant?.backgroundColor ?? '#ffffff';
                     const directVariant = {
                         id: variantId ?? 'tmpl-direct',
                         preset: existingVariant?.preset ?? { id: 'tmpl', name: `${width}x${height}`, width, height, category: 'display' as const },
                         elements,
-                        backgroundColor: existingVariant?.backgroundColor ?? '#ffffff',
+                        backgroundColor: liveBg,
                         overriddenElementIds: [],
                         syncLocked: false,
                     };
