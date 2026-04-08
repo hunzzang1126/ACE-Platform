@@ -152,6 +152,8 @@ export function fabricToEngineNode(obj: FabricObject): EngineNode {
     // after save/restore cycle. Fabric resize changes scaleY, not fontSize.
     // Same applies to charSpacing (must scale with scaleX).
     if (aceType === 'text' && obj instanceof Textbox) {
+        // ★ DEBUG: Trace text width during save (remove after fix confirmed)
+        console.log(`[fabricToEngineNode] text="${(obj as any).__glidName}" obj.width=${obj.width} scaleX=${scaleX} saved_w=${(obj.width ?? 0) * scaleX} obj.height=${obj.height} scaleY=${scaleY}`);
         node.content = obj.text ?? '';
         node.fontSize = Math.round((obj.fontSize ?? 16) * scaleY);
         node.fontFamily = obj.fontFamily ?? 'Inter';

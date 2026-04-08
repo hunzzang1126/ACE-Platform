@@ -193,6 +193,8 @@ function restoreText(engine: Engine, text: TextElement, canvasW: number, canvasH
     if (x < -w) x = 0; if (y < -textH) y = 0;
     if (x > canvasW) x = Math.max(0, canvasW - w); if (y > canvasH) y = Math.max(0, canvasH - textH);
     if (w <= 0) w = canvasW * 0.85;
+    // ★ DEBUG: Trace text width during restore (remove after fix confirmed)
+    console.log(`[restoreText] "${text.name}" content="${text.content?.slice(0,30)}" w=${w} h=${h} fontSize=${text.fontSize} canvasW=${canvasW} _absOrigin=${JSON.stringify(text.constraints._absOrigin)} sizeW=${text.constraints.size.width} sizeMode=${text.constraints.size.widthMode}`);
     const [tr, tg, tb] = hexToRgbFloat(text.color || '#ffffff');
     const nodeId = engine.add_text(x, y, text.content || '', text.fontSize || 16, text.fontFamily || 'Inter', String(text.fontWeight || 400), tr, tg, tb, 1.0, w, text.textAlign || 'center', text.name, text.lineHeight, text.letterSpacing, text.fontStyle);
     if (text.opacity !== undefined && text.opacity !== 1) try { engine.set_opacity(nodeId, text.opacity); } catch { /* ok */ }
