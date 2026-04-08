@@ -188,6 +188,10 @@ export const useAnimPresetStore = create<AnimPresetStore>()((set, get) => ({
         const state = get();
         const config = state.presets[elementId] ?? DEFAULT_CONFIG;
         if (config.anim === 'none') return {};
+        // ★ FIX: When not playing, elements must stay at their design position.
+        // Without this, elements with startTime>0 or slide animations become
+        // invisible/off-screen in the editor even when timeline is stopped.
+        if (!state.isPlaying) return {};
         return computeAnimStyle(config.anim, state.currentTime, config.animDuration, config.startTime);
     },
 }));

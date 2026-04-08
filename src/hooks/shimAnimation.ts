@@ -195,8 +195,11 @@ export function createAnimationMethods(
             if (state.playing) {
                 state.startTs = performance.now();
                 state.startOffset = state.time;
+                applyAnimationFrame(state.time);
             }
-            applyAnimationFrame(state.time);
+            // ★ FIX: When not playing, do NOT apply animation offsets.
+            // Without this guard, seeking to t=0 while stopped moves
+            // slide elements off-screen (e.g. +300px for slide-left).
         },
         anim_time(): number { return state.time; },
         anim_playing(): boolean { return state.playing; },

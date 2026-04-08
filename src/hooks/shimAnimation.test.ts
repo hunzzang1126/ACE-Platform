@@ -146,9 +146,21 @@ describe('shimAnimation — seek', () => {
         expect(methods.anim_time()).toBe(0);
     });
 
-    it('anim_seek applies animation frame', () => {
+    it('★ REGRESSION: anim_seek while stopped does NOT apply animation offsets', () => {
+        // This was the root cause of the "element disappears after applying animation" bug.
+        // When stopped, seeking should NOT move elements off-screen.
         const obj = makeObj(1);
         const { fc, methods } = setup([obj]);
+        methods.anim_seek(0.25);
+        // renderAll should NOT be called — element stays at design position
+        expect(fc.renderAll).not.toHaveBeenCalled();
+    });
+
+    it('anim_seek while playing applies animation frame', () => {
+        const obj = makeObj(1);
+        const { fc, methods } = setup([obj]);
+        methods.anim_play();
+        fc.renderAll.mockClear();
         methods.anim_seek(0.25);
         expect(fc.renderAll).toHaveBeenCalled();
     });
