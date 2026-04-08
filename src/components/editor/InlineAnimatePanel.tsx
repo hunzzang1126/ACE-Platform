@@ -16,17 +16,20 @@ interface Props {
 
 export function InlineAnimatePanel({ selectedNode, onClose }: Props) {
     const setPreset = useAnimPresetStore((s) => s.setPreset);
-    const getPreset = useAnimPresetStore((s) => s.getPreset);
 
     const nodeId = selectedNode?.id ? String(selectedNode.id) : '';
-    const current = nodeId ? getPreset(nodeId) : null;
+    // ★ FIX: Subscribe to the actual preset data, not just the getter function.
+    // This makes the panel re-render immediately when preset changes elsewhere
+    // (e.g. from timeline bar interaction or undo).
+    const current = useAnimPresetStore((s) =>
+        nodeId ? (s.presets[nodeId] ?? null) : null
+    );
     const [duration, setDuration] = useState(current?.animDuration ?? 0.3);
 
     // ★ Re-sync duration when switching elements or preset changes
     useEffect(() => {
-        const preset = nodeId ? getPreset(nodeId) : null;
-        setDuration(preset?.animDuration ?? 0.3);
-    }, [nodeId, getPreset]);
+        setDuration(current?.animDuration ?? 0.3);
+    }, [nodeId, current?.animDuration]);
 
     const handleSelect = useCallback((preset: AnimPresetType) => {
         if (!nodeId) return;
