@@ -99,6 +99,11 @@ export function useCanvasSync(variantId: string | undefined, canvasW: number, ca
         const variant = cs.variants.find((v) => v.id === variantId);
         if (!variant?.elements?.length) return { restoredShapes: 0, overlayElements: [] };
 
+        // ★ Apply variant background color to the artboard
+        if (variant.backgroundColor && typeof engine.set_artboard_color === 'function') {
+            engine.set_artboard_color(variant.backgroundColor);
+        }
+
         let restoredShapes = 0;
         const overlayElements: OverlayElement[] = [];
         const pendingImageLoads: (() => Promise<void>)[] = [];

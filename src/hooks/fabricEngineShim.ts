@@ -65,6 +65,11 @@ export function createEngineShim(
             if (!ab) return null;
             return typeof ab.fill === 'string' ? ab.fill : null;
         },
+        /** Set artboard fill color (used during restore) */
+        set_artboard_color: (color: string): void => {
+            const ab = fc.getObjects().find(o => (o as any).__glidArtboard);
+            if (ab) { ab.set({ fill: color }); fc.renderAll(); }
+        },
         getCanvasJSON: (): string => JSON.stringify(fc.toObject(GLID_CUSTOM_PROPS)),
         loadCanvasJSON: async (jsonStr: string): Promise<void> => {
             await fc.loadFromJSON(jsonStr);
