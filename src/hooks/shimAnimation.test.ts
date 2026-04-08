@@ -147,14 +147,14 @@ describe('shimAnimation — seek', () => {
         expect(methods.anim_time()).toBe(0);
     });
 
-    it('★ REGRESSION: anim_seek while stopped does NOT apply animation offsets', () => {
-        // This was the root cause of the "element disappears after applying animation" bug.
-        // When stopped, seeking should NOT move elements off-screen.
+    it('★ AE MODEL: anim_seek while stopped DOES apply visibility', () => {
+        // AE behavior: scrubbing timeline while stopped must still show/hide
+        // elements based on their in/out points.
         const obj = makeObj(1);
         const { fc, methods } = setup([obj]);
         methods.anim_seek(0.25);
-        // renderAll should NOT be called — element stays at design position
-        expect(fc.renderAll).not.toHaveBeenCalled();
+        // renderAll IS called — visibility updates even when stopped
+        expect(fc.renderAll).toHaveBeenCalled();
     });
 
     it('anim_seek while playing applies animation frame', () => {

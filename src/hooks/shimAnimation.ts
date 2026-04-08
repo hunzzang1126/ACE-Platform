@@ -194,11 +194,21 @@ export function createAnimationMethods(
             if (state.playing) {
                 state.startTs = performance.now();
                 state.startOffset = state.time;
-                applyAnimationFrame(state.time);
             }
-            // ★ FIX: When not playing, do NOT apply animation offsets.
-            // Without this guard, seeking to t=0 while stopped moves
-            // slide elements off-screen (e.g. +300px for slide-left).
+            // ★ Always apply animation frame — visibility (visible:true/false)
+            // must update even when scrubbing while stopped (AE behavior).
+            // Safe now because out-of-range uses visible:false, not opacity:0.
+            // Snapshot original positions if not already stored (for scrubbing while stopped).
+            const objs = fc.getObjects().filter(o => !isArtboard(o));
+            for (const obj of objs) {
+                if (!(obj as any).__aceOrigPos) {
+                    (obj as any).__aceOrigPos = {
+                        left: obj.left ?? 0, top: obj.top ?? 0,
+                        opacity: obj.opacity ?? 1, scaleX: obj.scaleX ?? 1, scaleY: obj.scaleY ?? 1,
+                    };
+                }
+            }
+            applyAnimationFrame(state.time);
         },
         anim_time(): number { return state.time; },
         anim_playing(): boolean { return state.playing; },

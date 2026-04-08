@@ -187,10 +187,14 @@ export const useAnimPresetStore = create<AnimPresetStore>()((set, get) => ({
     getAnimStyle: (elementId) => {
         const state = get();
         const config = state.presets[elementId] ?? DEFAULT_CONFIG;
+        // ★ AE model: visibility must apply even when scrubbing while stopped.
+        // Elements outside their timeline range must not exist (display:none).
+        const st = config.startTime;
+        const et = config.endTime;
+        if (state.currentTime < st) return { display: 'none' };
+        if (et > 0 && state.currentTime > et) return { display: 'none' };
+        // Within range but not playing — show at design position (no animation offset)
         if (config.anim === 'none') return {};
-        // ★ FIX: When not playing, elements must stay at their design position.
-        // Without this, elements with startTime>0 or slide animations become
-        // invisible/off-screen in the editor even when timeline is stopped.
         if (!state.isPlaying) return {};
         return computeAnimStyle(config.anim, state.currentTime, config.animDuration, config.startTime);
     },

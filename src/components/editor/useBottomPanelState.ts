@@ -93,6 +93,9 @@ export function useBottomPanelState(
                 newEnd = Math.min(MAX_DURATION, Math.max(barDrag.origStart + MIN_BAR, barDrag.origEnd + dt));
             }
             animPresets.setTiming(barDrag.elementId, newStart, newEnd);
+            // ★ AE model: re-apply visibility after timing change so Fabric
+            // hides/shows elements based on their new in/out points.
+            try { engine?.anim_seek(engine.anim_time?.()); } catch { /* ok */ }
             // Auto-extend/shrink duration in real-time during drag
             const store = useAnimPresetStore.getState();
             const allBarIds = [...overlayElements.map(el => el.id), ...nodes.map(n => String(n.id))];
