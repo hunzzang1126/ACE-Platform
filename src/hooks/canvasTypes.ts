@@ -138,6 +138,8 @@ export interface CanvasEngineActions {
     // Canvas dimensions (for alignment)
     canvasWidth: number;
     canvasHeight: number;
+    /** Refresh text coordinate calculations after font loading */
+    refreshTextCoords?: () => void;
 }
 
 export interface UseCanvasEngineResult {

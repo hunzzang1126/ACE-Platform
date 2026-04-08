@@ -7,6 +7,7 @@ import { useTemplateStore, type TemplateCategory, type DesignTemplate } from '@/
 import { constraintsToAbsolute } from '@/engine/elementConverters';
 import { computeUniformScale, scaleElementRect, scaleFontSize } from './templateScaling';
 import type { CanvasEngineActions } from '@/hooks/canvasTypes';
+import { ensureGoogleFont } from './contextToolbarConstants';
 import type { BannerVariant } from '@/schema/design.types';
 
 const CATEGORIES = ['all', 'display', 'social', 'email', 'video'] as const;
@@ -225,6 +226,19 @@ function applyVariantToCanvas(variant: BannerVariant, actions: CanvasEngineActio
     const sp = { tW, tH, cW, cH };
     const { uniformScale, offsetX, offsetY } = computeUniformScale(sp);
 
+    // ★ FIX: Preload ALL fonts used by text elements BEFORE creating Textboxes.
+    // Fabric.js Textbox calculates line breaks at creation time using current font metrics.
+    // If the font isn't loaded yet, it uses fallback metrics → wrong wrapping.
+    const textFonts = new Set<string>();
+    for (const el of elements) {
+        if ((el.type === 'text' || el.type === 'button') && (el as any).fontFamily) {
+            textFonts.add(((el as any).fontFamily as string).split(',')[0].trim());
+        }
+    }
+    for (const font of textFonts) {
+        ensureGoogleFont(font);
+    }
+
     for (const el of elements) {
         const abs = el.constraints
             ? constraintsToAbsolute(el.constraints, tW, tH)
@@ -289,6 +303,22 @@ function applyVariantToCanvas(variant: BannerVariant, actions: CanvasEngineActio
         if (nodeId != null && el.opacity !== undefined && el.opacity !== 1) {
             actions.setNodeOpacity(nodeId, el.opacity);
         }
+    }
+
+    // ★ FIX: After all elements are created, wait for SPECIFIC fonts to load then
+    // recalculate Textbox dimensions. document.fonts.ready can resolve immediately
+    // if no new fonts were requested. We explicitly load each font to force waiting.
+    if (typeof document !== 'undefined' && textFonts.size > 0 && actions.refreshTextCoords) {
+        const fontPromises = [...textFonts].map(f =>
+            document.fonts.load(`bold 48px "${f}"`).catch(() => { /* font may not exist */ })
+        );
+        Promise.all(fontPromises).then(() => {
+            actions.refreshTextCoords?.();
+            console.log('[templateDrop] Fonts loaded — refreshed text dimensions');
+        });
+        // ★ Safety net: delayed refresh in case font load takes longer than expected
+        setTimeout(() => { actions.refreshTextCoords?.(); }, 500);
+        setTimeout(() => { actions.refreshTextCoords?.(); }, 1500);
     }
 }
 
