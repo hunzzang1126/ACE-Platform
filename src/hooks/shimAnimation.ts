@@ -20,7 +20,7 @@ interface AnimState {
     rafId: number;
 }
 
-/** Shared: apply a preset at progress t (0→1) to a Fabric object */
+/** IN: apply preset at progress t (0=hidden, 1=visible) to Fabric object */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function applyFabricPreset(obj: any, preset: string, t: number, orig: any) {
     switch (preset) {
@@ -47,6 +47,40 @@ function applyFabricPreset(obj: any, preset: string, t: number, orig: any) {
             break;
         case 'descend':
             obj.set({ top: orig.top + (-200 * (1 - t)), opacity: t * orig.opacity });
+            break;
+        default:
+            obj.set({ left: orig.left, top: orig.top, opacity: orig.opacity, scaleX: orig.scaleX, scaleY: orig.scaleY });
+    }
+}
+
+/** OUT: apply preset at progress p (0=at position, 1=fully exited).
+ *  "Slide to Bottom" = exit DOWNWARD = top goes from orig → orig+300 */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function applyFabricOutPreset(obj: any, preset: string, p: number, orig: any) {
+    switch (preset) {
+        case 'fade':
+            obj.set({ opacity: (1 - p) * orig.opacity });
+            break;
+        case 'slide-left':
+            obj.set({ left: orig.left - (300 * p), opacity: orig.opacity });
+            break;
+        case 'slide-right':
+            obj.set({ left: orig.left + (300 * p), opacity: orig.opacity });
+            break;
+        case 'slide-up':
+            obj.set({ top: orig.top - (300 * p), opacity: orig.opacity });
+            break;
+        case 'slide-down':
+            obj.set({ top: orig.top + (300 * p), opacity: orig.opacity });
+            break;
+        case 'scale':
+            obj.set({ scaleX: orig.scaleX * (1 - p), scaleY: orig.scaleY * (1 - p), opacity: orig.opacity });
+            break;
+        case 'ascend':
+            obj.set({ top: orig.top - (200 * p), opacity: (1 - p) * orig.opacity });
+            break;
+        case 'descend':
+            obj.set({ top: orig.top + (200 * p), opacity: (1 - p) * orig.opacity });
             break;
         default:
             obj.set({ left: orig.left, top: orig.top, opacity: orig.opacity, scaleX: orig.scaleX, scaleY: orig.scaleY });
@@ -113,11 +147,10 @@ export function createAnimationMethods(
             const outDur = config?.animOutDuration ?? 0.3;
             const outStart = et > 0 ? et - outDur : -1;
             if (hasOut && outStart > 0 && currentTime >= outStart && currentTime <= et) {
-                const outProgress = (currentTime - outStart) / outDur;
+                const outProgress = (currentTime - outStart) / outDur; // 0→1
                 const invO = 1 - outProgress;
-                const tOut = 1 - (invO * invO * invO); // easeOut on exit progress
-                const t = 1 - tOut; // reverse: 1→0
-                applyFabricPreset(obj, outPreset, t, orig);
+                const p = 1 - (invO * invO * invO); // easeOut: 0→1
+                applyFabricOutPreset(obj, outPreset, p, orig);
                 needsRender = true;
                 continue;
             }

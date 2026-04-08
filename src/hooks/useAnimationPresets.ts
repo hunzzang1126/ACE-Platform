@@ -85,7 +85,7 @@ export function computeAnimStyle(
     startTime: number,
     /** Optional endTime — if provided, element hidden after this time */
     endTime?: number,
-    /** Optional OUT preset — plays in reverse before endTime */
+    /** Optional OUT preset — plays before endTime */
     outPreset?: AnimPresetType,
     outDuration?: number,
 ): CSSProperties {
@@ -95,15 +95,15 @@ export function computeAnimStyle(
         return { display: 'none' };
     }
 
-    // ── OUT animation check (before IN, since OUT takes priority near endTime) ──
+    // ── OUT animation check (takes priority near endTime) ──
     const resolvedOut = outPreset ?? 'none';
     const resolvedOutDur = outDuration ?? 0.3;
     if (resolvedOut !== 'none' && endTime !== undefined && endTime > 0) {
         const outStart = endTime - resolvedOutDur;
         if (currentTime >= outStart && currentTime <= endTime) {
-            const outProgress = (currentTime - outStart) / resolvedOutDur;
-            const t = 1 - easeOut(Math.max(0, Math.min(1, outProgress))); // 1→0
-            return computePresetStyle(resolvedOut, t);
+            const outProgress = (currentTime - outStart) / resolvedOutDur; // 0→1
+            const p = easeOut(Math.max(0, Math.min(1, outProgress)));
+            return computeOutPresetStyle(resolvedOut, p);
         }
     }
 
@@ -122,7 +122,7 @@ export function computeAnimStyle(
     return computePresetStyle(preset, t);
 }
 
-/** Shared: convert a preset + progress (0→1) into CSS properties */
+/** IN: convert preset + progress (0→1 = hidden→visible) into CSS */
 function computePresetStyle(preset: AnimPresetType, t: number): CSSProperties {
     switch (preset) {
         case 'fade':
@@ -141,6 +141,31 @@ function computePresetStyle(preset: AnimPresetType, t: number): CSSProperties {
             return { opacity: t, transform: `translateY(${1000 * (1 - t)}px)` };
         case 'descend':
             return { opacity: t, transform: `translateY(${-1000 * (1 - t)}px)` };
+        default:
+            return {};
+    }
+}
+
+/** OUT: convert preset + progress (0→1 = at position → fully exited) into CSS.
+ *  "Slide to Bottom" = exit DOWNWARD = translateY goes 0→+1000 */
+function computeOutPresetStyle(preset: AnimPresetType, p: number): CSSProperties {
+    switch (preset) {
+        case 'fade':
+            return { opacity: 1 - p };
+        case 'slide-left':
+            return { transform: `translateX(${-1000 * p}px)` };
+        case 'slide-right':
+            return { transform: `translateX(${1000 * p}px)` };
+        case 'slide-up':
+            return { transform: `translateY(${-1000 * p}px)` };
+        case 'slide-down':
+            return { transform: `translateY(${1000 * p}px)` };
+        case 'scale':
+            return { transform: `scale(${1 - p})` };
+        case 'ascend':
+            return { opacity: 1 - p, transform: `translateY(${-1000 * p}px)` };
+        case 'descend':
+            return { opacity: 1 - p, transform: `translateY(${1000 * p}px)` };
         default:
             return {};
     }

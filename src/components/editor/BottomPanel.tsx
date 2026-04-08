@@ -47,7 +47,12 @@ export function BottomPanel({ variant, engine, nodes, selection, actions, overla
 
     const getBarLabel = useCallback((elementId: string, fallback: string) => {
         const config = animPresets.getPreset(elementId);
-        return config.anim !== 'none' ? presetLabel(config.anim) : fallback;
+        const inLabel = config.anim !== 'none' ? presetLabel(config.anim) : '';
+        const outLabel = (config.animOut ?? 'none') !== 'none' ? presetLabel(config.animOut) : '';
+        if (inLabel && outLabel) return `${inLabel} / ${outLabel}`;
+        if (inLabel) return inLabel;
+        if (outLabel) return outLabel;
+        return fallback;
     }, [animPresets]);
 
     const getBarCursor = useCallback((e: React.MouseEvent<HTMLDivElement>) => {

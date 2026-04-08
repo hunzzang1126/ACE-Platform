@@ -237,4 +237,33 @@ describe('computeAnimStyle — Out animation', () => {
         const style = computeAnimStyle('fade', 0, 0.3, 1, 5, 'fade', 0.5);
         expect(style.display).toBe('none');
     });
+
+    it('★ DIRECTION: slide-down out exits DOWNWARD (positive translateY)', () => {
+        // At t=4.7, out is in progress. Slide to Bottom = exit DOWN = positive Y
+        const style = computeAnimStyle('none', 4.7, 0.3, 0, 5, 'slide-down', 0.5);
+        const match = style.transform?.match(/translateY\((.+?)px\)/);
+        expect(match).toBeTruthy();
+        expect(parseFloat(match![1])).toBeGreaterThan(0); // positive = downward
+    });
+
+    it('★ DIRECTION: slide-left out exits LEFT (negative translateX)', () => {
+        const style = computeAnimStyle('none', 4.7, 0.3, 0, 5, 'slide-left', 0.5);
+        const match = style.transform?.match(/translateX\((.+?)px\)/);
+        expect(match).toBeTruthy();
+        expect(parseFloat(match![1])).toBeLessThan(0); // negative = leftward
+    });
+
+    it('★ DIRECTION: slide-up out exits UPWARD (negative translateY)', () => {
+        const style = computeAnimStyle('none', 4.7, 0.3, 0, 5, 'slide-up', 0.5);
+        const match = style.transform?.match(/translateY\((.+?)px\)/);
+        expect(match).toBeTruthy();
+        expect(parseFloat(match![1])).toBeLessThan(0); // negative = upward
+    });
+
+    it('★ DIRECTION: slide-right out exits RIGHT (positive translateX)', () => {
+        const style = computeAnimStyle('none', 4.7, 0.3, 0, 5, 'slide-right', 0.5);
+        const match = style.transform?.match(/translateX\((.+?)px\)/);
+        expect(match).toBeTruthy();
+        expect(parseFloat(match![1])).toBeGreaterThan(0); // positive = rightward
+    });
 });
