@@ -38,7 +38,11 @@ export async function pullAllProjectsRaw(userId: string): Promise<{ id: string; 
 }
 export async function trashProject(projectId: string): Promise<void> { const sb = getSupabase(); if (!sb) return; await sb.from('projects').update({ deleted_at: new Date().toISOString() }).eq('id', projectId); }
 export async function restoreProject(projectId: string): Promise<void> { const sb = getSupabase(); if (!sb) return; await sb.from('projects').update({ deleted_at: null }).eq('id', projectId); }
-export async function deleteProjectPermanently(projectId: string): Promise<void> { const sb = getSupabase(); if (!sb) return; await sb.from('projects').delete().eq('id', projectId); }
+export async function deleteProjectPermanently(projectId: string): Promise<void> {
+    const sb = getSupabase(); if (!sb) return;
+    const { error } = await sb.from('projects').delete().eq('id', projectId);
+    if (error) throw new Error(`[cloudSync] deleteProject failed: ${error.message}`);
+}
 
 // ── Creative Sets ──
 export async function pushCreativeSet(userId: string, cs: CreativeSet): Promise<void> {
@@ -64,4 +68,8 @@ export async function pullAllCreativeSets(userId: string): Promise<Record<string
     for (const row of data as CloudCreativeSet[]) { if (row.data) result[row.id] = row.data; }
     return result;
 }
-export async function deleteCreativeSetCloud(csId: string): Promise<void> { const sb = getSupabase(); if (!sb) return; await sb.from('creative_sets').delete().eq('id', csId); }
+export async function deleteCreativeSetCloud(csId: string): Promise<void> {
+    const sb = getSupabase(); if (!sb) return;
+    const { error } = await sb.from('creative_sets').delete().eq('id', csId);
+    if (error) throw new Error(`[cloudSync] deleteCreativeSet failed: ${error.message}`);
+}
