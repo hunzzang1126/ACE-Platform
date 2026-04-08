@@ -21,6 +21,8 @@ interface Props {
     videoUrls: Record<string, string>;
     scale: number;
     currentTime?: number;
+    /** Timeline total duration — needed for Out animation fallback when endTime is not set */
+    timelineDuration?: number;
 }
 
 interface SpriteData {
@@ -46,7 +48,7 @@ function scaleAnimStyle(style: React.CSSProperties, s: number): React.CSSPropert
     return result;
 }
 
-export const CanvasPreviewImage = memo(function CanvasPreviewImage({ variant, resolvedImageUrls, scale, currentTime }: Props) {
+export const CanvasPreviewImage = memo(function CanvasPreviewImage({ variant, resolvedImageUrls, scale, currentTime, timelineDuration = 5 }: Props) {
     const [staticUrl, setStaticUrl] = useState<string | null>(null);
     const [baseUrl, setBaseUrl] = useState<string | null>(null);
     const [sprites, setSprites] = useState<SpriteData[]>([]);
@@ -167,6 +169,7 @@ export const CanvasPreviewImage = memo(function CanvasPreviewImage({ variant, re
                     sprite.preset as AnimPresetType, currentTime, sprite.duration, sprite.startTime,
                     sprite.endTime && sprite.endTime > 0 ? sprite.endTime : undefined,
                     sprite.outPreset as AnimPresetType | undefined, sprite.outDuration,
+                    timelineDuration,
                 );
                 // Scale transform pixel values to match preview size
                 const scaledStyle = scaleAnimStyle(animStyle, scale);

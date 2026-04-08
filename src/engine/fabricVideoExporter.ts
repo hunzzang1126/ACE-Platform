@@ -108,7 +108,7 @@ export async function exportVariantToMp4(
         const time = i / fps;
 
         // Render one frame with animation offsets
-        const frameDataUrl = await renderFrameAtTime(sorted, w, h, time, variant.backgroundColor, imageCache, resolvedSrcs);
+        const frameDataUrl = await renderFrameAtTime(sorted, w, h, time, variant.backgroundColor, imageCache, resolvedSrcs, duration);
 
         // Convert data URL → ImageBitmap → VideoFrame
         const img = new Image();
@@ -162,7 +162,7 @@ export async function renderVariantAtTime(variant: BannerVariant, time: number):
         } catch { /* skip */ }
     }
 
-    return renderFrameAtTime(sorted, w, h, time, variant.backgroundColor, imageCache, {});
+    return renderFrameAtTime(sorted, w, h, time, variant.backgroundColor, imageCache, {}, 5);
 }
 
 /**
@@ -175,6 +175,7 @@ export async function renderFrameAtTime(
     bgColor: string | undefined,
     imageCache: Record<string, HTMLImageElement>,
     resolvedSrcs: Record<string, string>,
+    timelineDuration: number = 5,
 ): Promise<string> {
     const canvasEl = document.createElement('canvas');
     canvasEl.width = w;
@@ -191,8 +192,19 @@ export async function renderFrameAtTime(
         let offsetX = 0, offsetY = 0, opacity = el.opacity ?? 1, scaleM = 1;
 
         // Apply animation transform for this time
-        if (anim && anim.preset !== 'none') {
-            const style = computeAnimStyle(anim.preset as any, time, anim.duration, anim.startTime ?? 0);
+        const hasIn = anim && anim.preset !== 'none';
+        const hasOut = anim && anim.outPreset && anim.outPreset !== 'none';
+        if (hasIn || hasOut) {
+            // ★ Use full timeline duration as fallback when element has no custom endTime
+            const timelineDur = timelineDuration;
+            const style = computeAnimStyle(
+                (anim?.preset ?? 'none') as any, time, anim?.duration ?? 0.3, anim?.startTime ?? 0,
+                anim?.endTime && anim.endTime > 0 ? anim.endTime : undefined,
+                anim?.outPreset as any, anim?.outDuration,
+                timelineDur,
+            );
+            // AE model: element doesn't exist at this time
+            if (style.display === 'none') continue;
             if (style.opacity !== undefined) opacity = style.opacity as number;
             if (style.transform) {
                 const tx = style.transform.match(/translateX\(([^)]+)px\)/);

@@ -109,19 +109,24 @@ export function computeAnimStyle(
     /** Optional OUT preset — plays before endTime */
     outPreset?: AnimPresetType,
     outDuration?: number,
+    /** Timeline total duration — fallback for Out when endTime is undefined */
+    timelineDuration?: number,
 ): CSSProperties {
+    // Resolve effective endTime: explicit > timeline duration > undefined
+    const effectiveEnd = endTime ?? timelineDuration;
+
     // ★ AE model: element doesn't exist before its in-point
     if (currentTime < startTime) return { display: 'none' };
-    if (endTime !== undefined && endTime > 0 && currentTime > endTime) {
+    if (effectiveEnd !== undefined && effectiveEnd > 0 && currentTime > effectiveEnd) {
         return { display: 'none' };
     }
 
     // ── OUT animation check (takes priority near endTime) ──
     const resolvedOut = outPreset ?? 'none';
     const resolvedOutDur = outDuration ?? 0.3;
-    if (resolvedOut !== 'none' && endTime !== undefined && endTime > 0) {
-        const outStart = endTime - resolvedOutDur;
-        if (currentTime >= outStart && currentTime <= endTime) {
+    if (resolvedOut !== 'none' && effectiveEnd !== undefined && effectiveEnd > 0) {
+        const outStart = effectiveEnd - resolvedOutDur;
+        if (currentTime >= outStart && currentTime <= effectiveEnd) {
             const outProgress = (currentTime - outStart) / resolvedOutDur; // 0→1
             const p = easeOut(Math.max(0, Math.min(1, outProgress)));
             return computeOutPresetStyle(resolvedOut, p);
@@ -246,6 +251,7 @@ export const useAnimPresetStore = create<AnimPresetStore>()((set, get) => ({
             config.anim, state.currentTime, config.animDuration, config.startTime,
             et > 0 ? et : undefined,
             config.animOut, config.animOutDuration,
+            state.duration,
         );
     },
 }));
