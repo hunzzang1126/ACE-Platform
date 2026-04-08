@@ -1,12 +1,6 @@
-// ─────────────────────────────────────────────────
-// templateStore — Design template library
-// ─────────────────────────────────────────────────
-// Save any design as a reusable template.
-// Templates include layout, elements, animations, brand settings.
-// ─────────────────────────────────────────────────
+// templateStore — Design template library (save, override, admin CRUD)
 
 import { idbStorage } from './idbStorageAdapter';
-import { v4 as uuid } from 'uuid';
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
@@ -17,6 +11,7 @@ import {
     upsertTemplateOverride,
     deleteTemplateOverride,
 } from '@/services/supabaseClient';
+import { cleanupOrphanedTemplateCS } from './templateStoreCleanup';
 
 // ── Types ──
 
@@ -86,6 +81,11 @@ interface TemplateState {
     setEditingTemplateId: (id: string | null) => void;
     /** Set temp creative set ID for cleanup */
     setEditingTempCsId: (id: string | null) => void;
+
+    /** Admin: add a brand-new custom template (1080×1080) */
+    addCustomTemplate: (opts: { name: string; category: TemplateCategory; variant: BannerVariant }) => string;
+    /** Admin: permanently delete a custom (non-built-in) template */
+    deleteCustomTemplate: (id: string) => void;
 
     // Query
     getByCategory: (category: TemplateCategory) => DesignTemplate[];
@@ -203,25 +203,14 @@ export const useTemplateStore = create<TemplateState>()(
             },
 
             overrideTemplate: (id, variant, width, height) => {
-                // ★ CRITICAL: Strip locked state from ALL elements before saving.
-                // Templates should always be fully editable. If admin accidentally
-                // locks elements during editing, the lock MUST NOT persist into the
-                // template override. Otherwise all future users get locked elements.
+                // ★ Strip locked state — templates must be fully editable
                 const cleanVariant = {
                     ...variant,
                     elements: [...variant.elements]
-                        .map(el => ({ ...el, locked: false })) // ★ Force-unlock: template overrides may have stale locked state
+                        .map(el => ({ ...el, locked: false }))
                         .sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0)),
                 };
                 const snapshot = JSON.stringify(cleanVariant);
-                console.log('[overrideTemplate] Saving override:', id, '| elements:', cleanVariant.elements.length, '| snapshot size:', snapshot.length);
-                // ★ DEBUG: dump first text element to verify data
-                for (const el of cleanVariant.elements) {
-                    if (el.type === 'text') {
-                        console.log('[overrideTemplate] TEXT element:', el.name, '| content:', (el as any).content?.substring(0, 30), '| fontFamily:', (el as any).fontFamily, '| fontSize:', (el as any).fontSize, '| x:', el.constraints?.horizontal?.offset, '| y:', el.constraints?.vertical?.offset, '| w:', el.constraints?.size?.width, '| h:', el.constraints?.size?.height);
-                    }
-                }
-                // ★ Save locally first (immediate)
                 set(state => {
                     state.templateOverrides[id] = snapshot;
                     const tmpl = state.templates.find(t => t.id === id);
@@ -230,23 +219,17 @@ export const useTemplateStore = create<TemplateState>()(
                         if (width) tmpl.width = width;
                         if (height) tmpl.height = height;
                         tmpl.updatedAt = new Date().toISOString();
-                        console.log('[overrideTemplate] Updated template in store:', tmpl.name, '| new snapshot elements:', cleanVariant.elements.length);
-                    } else {
-                        console.warn('[overrideTemplate] Template NOT found in store:', id);
                     }
                     state.editingTemplateId = null;
                 });
-                // ★ Push to Supabase (fire-and-forget) so ALL users see the change
+                // Push to Supabase (fire-and-forget)
                 (async () => {
                     try {
                         const { useAuthStore } = await import('@/stores/authStore');
                         const userId = useAuthStore.getState().user?.id;
                         if (userId) {
                             const tmpl = get().templates.find(t => t.id === id);
-                            const result = await upsertTemplateOverride(id, snapshot, userId, tmpl?.width, tmpl?.height);
-                            if (result.error) {
-                                console.error('[overrideTemplate] Cloud save FAILED:', result.error);
-                            }
+                            await upsertTemplateOverride(id, snapshot, userId, tmpl?.width, tmpl?.height);
                         }
                     } catch (e) {
                         console.warn('[templateStore] Failed to push override to cloud:', e);
@@ -281,6 +264,60 @@ export const useTemplateStore = create<TemplateState>()(
                 set(state => { state.editingTempCsId = id; });
             },
 
+            // ── Admin: add custom template ──
+            addCustomTemplate: (opts) => {
+                const id = `tmpl-custom-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+                const now = new Date().toISOString();
+                // Embed metadata in variant for cloud sync
+                const variantWithMeta = {
+                    ...opts.variant,
+                    __customMeta: { name: opts.name, category: opts.category },
+                };
+                const snapshot = JSON.stringify(variantWithMeta);
+                set(state => {
+                    state.templates.push({
+                        id, name: opts.name, description: '',
+                        category: opts.category, tags: ['custom'],
+                        thumbnailSrc: '', width: 1080, height: 1080,
+                        variantSnapshot: snapshot,
+                        usageCount: 0, isBuiltIn: false, isFavorite: false,
+                        createdAt: now, updatedAt: now,
+                    });
+                    state.templateOverrides[id] = snapshot;
+                });
+                // Push to Supabase so all users see it
+                (async () => {
+                    try {
+                        const { useAuthStore } = await import('@/stores/authStore');
+                        const userId = useAuthStore.getState().user?.id;
+                        if (userId) {
+                            await upsertTemplateOverride(id, snapshot, userId, 1080, 1080);
+                            console.log('[templateStore] Custom template pushed to cloud:', id);
+                        }
+                    } catch (e) {
+                        console.warn('[templateStore] Failed to push custom template:', e);
+                    }
+                })();
+                return id;
+            },
+
+            // ── Admin: delete custom template ──
+            deleteCustomTemplate: (id) => {
+                const tmpl = get().templates.find(t => t.id === id);
+                if (!tmpl || tmpl.isBuiltIn) {
+                    console.warn('[templateStore] Cannot delete built-in template:', id);
+                    return;
+                }
+                set(state => {
+                    state.templates = state.templates.filter(t => t.id !== id);
+                    delete state.templateOverrides[id];
+                });
+                // Remove from Supabase
+                deleteTemplateOverride(id).catch(e => {
+                    console.warn('[templateStore] Failed to delete custom template from cloud:', e);
+                });
+            },
+
             syncOverridesFromCloud: async () => {
                 try {
                     const cloudOverrides = await fetchTemplateOverrides();
@@ -288,14 +325,29 @@ export const useTemplateStore = create<TemplateState>()(
 
                     set(state => {
                         for (const [id, override] of Object.entries(cloudOverrides)) {
-                            // ★ Cloud overrides take precedence over local
                             state.templateOverrides[id] = override.snapshot;
                             const tmpl = state.templates.find(t => t.id === id);
                             if (tmpl) {
+                                // Existing template — update snapshot
                                 tmpl.variantSnapshot = override.snapshot;
                                 if (override.width) tmpl.width = override.width;
                                 if (override.height) tmpl.height = override.height;
                                 tmpl.updatedAt = new Date().toISOString();
+                            } else if (id.startsWith('tmpl-custom-')) {
+                                // ★ Custom admin template from cloud — create locally
+                                let meta = { name: 'Custom Template', category: 'social' as TemplateCategory };
+                                try {
+                                    const parsed = JSON.parse(override.snapshot);
+                                    if (parsed.__customMeta) meta = parsed.__customMeta;
+                                } catch { /* use defaults */ }
+                                state.templates.push({
+                                    id, name: meta.name, description: '',
+                                    category: meta.category, tags: ['custom'],
+                                    thumbnailSrc: '', width: override.width ?? 1080, height: override.height ?? 1080,
+                                    variantSnapshot: override.snapshot,
+                                    usageCount: 0, isBuiltIn: false, isFavorite: false,
+                                    createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+                                });
                             }
                         }
                     });
@@ -314,30 +366,8 @@ export const useTemplateStore = create<TemplateState>()(
                 state.editingTemplateId = null;
                 state.editingTempCsId = null;
 
-                // ★ REGRESSION GUARD: Clean up orphaned template creative sets.
-                // If the app crashed or refreshed mid-template-edit, temp CSs named
-                // "[Template] X" may be left behind in designStore/projectStore.
-                // Deferred to avoid blocking rehydration and cross-store deadlock.
-                // ★ REGRESSION GUARD: Use dynamic import() — NOT require().
-                // Vite/ESM has no require(). require() causes ReferenceError crash.
-                setTimeout(async () => {
-                    try {
-                        const { useDesignStore } = await import('@/stores/designStore');
-                        const { useProjectStore } = await import('@/stores/projectStore');
-                        const allCS = useDesignStore.getState().getAllCreativeSets();
-                        for (const cs of allCS) {
-                            if (cs.name.startsWith('[Template]')) {
-                                console.log('[templateStore] Cleaning up orphaned template CS:', cs.id, cs.name);
-                                useDesignStore.getState().deleteCreativeSet(cs.id);
-                                useProjectStore.setState((s: any) => {
-                                    s.creativeSets = s.creativeSets.filter((x: any) => x.id !== cs.id);
-                                });
-                            }
-                        }
-                    } catch (e) {
-                        console.warn('[templateStore] Orphan cleanup failed:', e);
-                    }
-                }, 1000);
+                // ★ Clean up orphaned template creative sets (deferred)
+                setTimeout(() => cleanupOrphanedTemplateCS(), 1000);
 
                 // ★ Refresh built-in templates with latest code definitions
                 const userTemplates = state.templates.filter(t => !t.isBuiltIn);
@@ -347,7 +377,7 @@ export const useTemplateStore = create<TemplateState>()(
                     ...userTemplates.filter(t => !builtInIds.has(t.id)),
                 ];
 
-                // ★ Re-apply LOCAL persisted overrides immediately (fast)
+                // Re-apply LOCAL persisted overrides
                 if (state.templateOverrides && Object.keys(state.templateOverrides).length > 0) {
                     for (const [id, snapshot] of Object.entries(state.templateOverrides)) {
                         const tmpl = state.templates.find(t => t.id === id);
@@ -356,14 +386,10 @@ export const useTemplateStore = create<TemplateState>()(
                             tmpl.updatedAt = tmpl.updatedAt || new Date().toISOString();
                         }
                     }
-                    console.log('[templateStore] Re-applied', Object.keys(state.templateOverrides).length, 'local overrides');
                 }
 
-                // ★ Then fetch CLOUD overrides async (updates all users)
-                // This runs AFTER hydration, so non-admin users get admin edits
-                setTimeout(() => {
-                    useTemplateStore.getState().syncOverridesFromCloud();
-                }, 500); // slight delay to not block initial render
+                // Fetch CLOUD overrides async (all users get admin edits)
+                setTimeout(() => useTemplateStore.getState().syncOverridesFromCloud(), 500);
             },
         },
     ),

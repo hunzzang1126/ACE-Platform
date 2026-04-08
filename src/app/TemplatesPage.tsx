@@ -11,7 +11,7 @@ import { useTemplateStore, type TemplateCategory, type DesignTemplate } from '@/
 import { useDesignStore } from '@/stores/designStore';
 import { useAuthStore } from '@/stores/authStore';
 import { AppSidebar } from '@/components/layout/AppSidebar';
-import { constraintsToAbsolute } from '@/engine/elementConverters';
+import { TemplatePreview } from './TemplatePreviewCard';
 import type { BannerVariant, BannerPreset } from '@/schema/design.types';
 
 const CATEGORIES = ['all', 'display', 'social', 'email', 'video'] as const;
@@ -20,6 +20,8 @@ export function TemplatesPage() {
     const navigate = useNavigate();
     const { templates, search, getByCategory, instantiate } = useTemplateStore();
     const setEditingTemplateId = useTemplateStore(s => s.setEditingTemplateId);
+    const addCustomTemplate = useTemplateStore(s => s.addCustomTemplate);
+    const deleteCustomTemplate = useTemplateStore(s => s.deleteCustomTemplate);
     const isAdmin = useAuthStore(s => s.isAdmin);
     const createCreativeSet = useDesignStore(s => s.createCreativeSet);
 
@@ -93,6 +95,36 @@ export function TemplatesPage() {
         navigate(`/editor/detail/${tempVariantId}`);
     }, [setEditingTemplateId, navigate]);
 
+    // ★ Admin: create new blank template
+    const [showCreateForm, setShowCreateForm] = useState(false);
+    const [newName, setNewName] = useState('');
+    const [newCategory, setNewCategory] = useState<TemplateCategory>('social');
+
+    const handleCreate = useCallback(() => {
+        const name = newName.trim() || 'New Template';
+        // Create an empty variant
+        const emptyVariant: BannerVariant = {
+            id: `empty-${Date.now()}`,
+            preset: { id: 'custom-1080', name: '1080x1080', width: 1080, height: 1080, category: 'social' as const },
+            elements: [],
+            backgroundColor: '#0f172a',
+            overriddenElementIds: [],
+            syncLocked: false,
+        };
+        const newId = addCustomTemplate({ name, category: newCategory, variant: emptyVariant });
+        setShowCreateForm(false);
+        setNewName('');
+        // Open in editor immediately
+        const tmpl = useTemplateStore.getState().getById(newId);
+        if (tmpl) handleEdit(tmpl);
+    }, [newName, newCategory, addCustomTemplate, handleEdit]);
+
+    const handleDelete = useCallback((t: DesignTemplate) => {
+        if (t.isBuiltIn) return;
+        if (!window.confirm(`Delete "${t.name}"? This cannot be undone.`)) return;
+        deleteCustomTemplate(t.id);
+    }, [deleteCustomTemplate]);
+
     const adminMode = isAdmin();
 
     return (
@@ -101,11 +133,50 @@ export function TemplatesPage() {
             <div style={S.main}>
                 {/* Header */}
                 <div style={S.header}>
-                    <h1 style={S.title}>Templates</h1>
-                    <p style={S.subtitle}>
-                        Browse and apply design templates to your projects.
-                        {adminMode && ' As an admin, you can edit templates directly.'}
-                    </p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                        <div>
+                            <h1 style={S.title}>Templates</h1>
+                            <p style={S.subtitle}>
+                                Browse and apply design templates to your projects.
+                                {adminMode && ' As an admin, you can edit templates directly.'}
+                            </p>
+                        </div>
+                        {adminMode && (
+                            <button
+                                onClick={() => setShowCreateForm(v => !v)}
+                                style={S.addBtn}
+                            >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                                Add Template
+                            </button>
+                        )}
+                    </div>
+                    {/* Admin: inline create form */}
+                    {adminMode && showCreateForm && (
+                        <div style={S.createForm}>
+                            <input
+                                style={S.search}
+                                placeholder="Template name..."
+                                value={newName}
+                                onChange={e => setNewName(e.target.value)}
+                                autoFocus
+                                onKeyDown={e => e.key === 'Enter' && handleCreate()}
+                            />
+                            <select
+                                style={{ ...S.search, width: 120 }}
+                                value={newCategory}
+                                onChange={e => setNewCategory(e.target.value as TemplateCategory)}
+                            >
+                                <option value="display">Display</option>
+                                <option value="social">Social</option>
+                                <option value="email">Email</option>
+                                <option value="video">Video</option>
+                            </select>
+                            <span style={{ fontSize: 11, color: '#86868b' }}>1080 x 1080</span>
+                            <button onClick={handleCreate} style={S.addBtn}>Create</button>
+                            <button onClick={() => setShowCreateForm(false)} style={{ ...S.pill, cursor: 'pointer' }}>Cancel</button>
+                        </div>
+                    )}
                 </div>
 
                 {/* Search + Filters */}
@@ -158,10 +229,28 @@ export function TemplatesPage() {
                                         </svg>
                                     </button>
                                 )}
+                                {/* Admin delete button — custom templates only */}
+                                {adminMode && !t.isBuiltIn && (
+                                    <button
+                                        onClick={() => handleDelete(t)}
+                                        title="Delete template"
+                                        style={S.deleteBtn}
+                                        onMouseEnter={e => { e.currentTarget.style.opacity = '1'; }}
+                                        onMouseLeave={e => { e.currentTarget.style.opacity = '0.7'; }}
+                                    >
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                            <polyline points="3 6 5 6 21 6" />
+                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                        </svg>
+                                    </button>
+                                )}
                             </div>
                             <div style={S.cardInfo}>
                                 <span style={S.cardName}>{t.name}</span>
-                                <span style={S.cardMeta}>{t.width} x {t.height}</span>
+                                <span style={S.cardMeta}>
+                                    {t.width} x {t.height}
+                                    {!t.isBuiltIn && ' · Custom'}
+                                </span>
                             </div>
                         </div>
                     ))}
@@ -171,103 +260,8 @@ export function TemplatesPage() {
     );
 }
 
-// ═══════════════════════════════════════════════════
-// CSS-based template preview (shared with SidebarTemplateTab)
-// ═══════════════════════════════════════════════════
 
-function TemplatePreview({ template }: { template: DesignTemplate }) {
-    let variant: BannerVariant | null = null;
-    try {
-        variant = JSON.parse(template.variantSnapshot);
-        // ★ DEBUG: log what data the preview is reading
-        if (template.id === 'builtin-bold-dark') {
-            console.log('[TemplatePreview] Rendering builtin-bold-dark | elements:', variant?.elements?.length, '| snapshot size:', template.variantSnapshot.length);
-            for (const el of variant?.elements ?? []) {
-                if (el.type === 'text') {
-                    console.log('[TemplatePreview] TEXT:', el.name, '| content:', (el as any).content?.substring(0, 30), '| fontFamily:', (el as any).fontFamily, '| fontSize:', (el as any).fontSize);
-                }
-            }
-        }
-    } catch { /* noop */ }
-
-    if (!variant) {
-        return (
-            <div style={S.thumbPlaceholder}>
-                {template.width} x {template.height}
-            </div>
-        );
-    }
-
-    const tw = template.width;
-    const th = template.height;
-    const previewW = 220;
-    const scale = previewW / tw;
-    const previewH = th * scale;
-
-    return (
-        <div style={{ width: previewW, height: previewH, position: 'relative', overflow: 'hidden', borderRadius: 8 }}>
-            <div style={{
-                width: tw, height: th,
-                position: 'absolute', left: 0, top: 0,
-                transform: `scale(${scale})`,
-                transformOrigin: 'top left',
-                backgroundColor: variant.backgroundColor || '#f0f0f0',
-            }}>
-                {variant.elements.map((el) => {
-                    // ★ Use constraintsToAbsolute — single source of truth for positions
-                    const pos = el.constraints
-                        ? constraintsToAbsolute(el.constraints, tw, th)
-                        : { x: 0, y: 0, w: 0, h: 0 };
-
-                    const baseStyle: React.CSSProperties = {
-                        position: 'absolute', left: pos.x, top: pos.y, width: pos.w, height: pos.h,
-                        opacity: el.opacity ?? 1, zIndex: el.zIndex ?? 0,
-                        overflow: 'hidden', pointerEvents: 'none',
-                    };
-
-                    if (el.type === 'shape') {
-                        const bg = el.gradientStart && el.gradientEnd
-                            ? `linear-gradient(${el.gradientAngle ?? 0}deg, ${el.gradientStart}, ${el.gradientEnd})`
-                            : el.fill;
-                        return <div key={el.id} style={{ ...baseStyle, background: bg, borderRadius: el.borderRadius ?? 0 }} />;
-                    }
-
-                    if (el.type === 'text') {
-                        return (
-                            <div key={el.id} style={{
-                                ...baseStyle,
-                                color: el.color, fontSize: el.fontSize,
-                                fontWeight: el.fontWeight,
-                                fontFamily: el.fontFamily || 'Inter, sans-serif',
-                                textAlign: (el.textAlign as React.CSSProperties['textAlign']) || 'left',
-                                lineHeight: el.lineHeight || 1.2,
-                                whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                            }}>
-                                {el.content}
-                            </div>
-                        );
-                    }
-
-                    if (el.type === 'button') {
-                        return (
-                            <div key={el.id} style={{
-                                ...baseStyle,
-                                backgroundColor: el.backgroundColor, color: el.color,
-                                fontSize: el.fontSize, fontWeight: 700,
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                borderRadius: el.borderRadius ?? 6,
-                            }}>
-                                {el.label}
-                            </div>
-                        );
-                    }
-
-                    return null;
-                })}
-            </div>
-        </div>
-    );
-}
+// TemplatePreview extracted to TemplatePreviewCard.tsx
 
 // ═══════════════════════════════════════════════════
 // Styles
@@ -362,5 +356,28 @@ const S: Record<string, React.CSSProperties> = {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         color: '#555', fontSize: 16, fontWeight: 600,
         background: 'rgba(255,255,255,0.02)', borderRadius: 8,
+    },
+    addBtn: {
+        display: 'flex', alignItems: 'center', gap: 6,
+        padding: '8px 16px', background: 'linear-gradient(135deg, #818cf8, #6366f1)',
+        border: 'none', borderRadius: 8, color: '#fff',
+        fontSize: 13, fontWeight: 600, cursor: 'pointer',
+        transition: 'opacity 0.15s', whiteSpace: 'nowrap',
+    },
+    deleteBtn: {
+        position: 'absolute', top: 8, left: 8, zIndex: 5,
+        width: 32, height: 32, borderRadius: 8,
+        border: 'none', background: 'rgba(239,68,68,0.8)',
+        color: '#fff', cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        opacity: 0.7, transition: 'opacity 0.15s',
+        backdropFilter: 'blur(8px)',
+    },
+    createForm: {
+        display: 'flex', gap: 10, alignItems: 'center',
+        padding: '12px 16px', marginTop: 8,
+        background: 'rgba(255,255,255,0.03)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        borderRadius: 10,
     },
 };
