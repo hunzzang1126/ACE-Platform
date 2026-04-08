@@ -231,3 +231,112 @@ describe('★ REGRESSION: New project flow — card-first UX', () => {
     });
 });
 
+// ═══════════════════════════════════════════════════
+// ★ REGRESSION GUARD: Reliable cloud deletion (v415)
+// Prevents ghost project resurrection after permanent delete
+// ═══════════════════════════════════════════════════
+
+describe('★ REGRESSION: Reliable cloud deletion — anti-resurrection', () => {
+
+    it('permanentDelete calls _deleteFromCloud (code-level verification)', () => {
+        const src = readFileSync(resolve(__dirname, './projectStore.ts'), 'utf-8');
+        // Must contain await _deleteFromCloud in permanentDelete
+        expect(src).toContain('_deleteFromCloud');
+        // Must have retry logic
+        expect(src).toContain('MAX_DELETE_RETRIES');
+        // Must have exponential backoff
+        expect(src).toContain('1000 * attempt');
+    });
+
+    it('emptyTrash calls _deleteFromCloud for each item (code-level verification)', () => {
+        const src = readFileSync(resolve(__dirname, './projectStore.ts'), 'utf-8');
+        // emptyTrash should iterate and delete from cloud
+        const emptyTrashSection = src.slice(src.indexOf('emptyTrash'));
+        expect(emptyTrashSection).toContain('_deleteFromCloud');
+    });
+
+    it('_deleteFromCloud retries up to MAX_DELETE_RETRIES times', () => {
+        const src = readFileSync(resolve(__dirname, './projectStore.ts'), 'utf-8');
+        expect(src).toContain('const MAX_DELETE_RETRIES = 3');
+        expect(src).toContain('attempt <= MAX_DELETE_RETRIES');
+        // After all retries fail, it should log an error
+        expect(src).toContain('Cloud delete FAILED after');
+    });
+
+    it('permanentDelete removes from both trash and creativeSets locally', () => {
+        const id = useProjectStore.getState().createCreativeSet('To Delete');
+        useProjectStore.getState().deleteCreativeSet(id);
+        expect(useProjectStore.getState().trash).toHaveLength(1);
+
+        useProjectStore.getState().permanentDelete(id);
+
+        expect(useProjectStore.getState().trash).toHaveLength(0);
+        expect(useProjectStore.getState().creativeSets).toHaveLength(0);
+    });
+
+    it('emptyTrash removes all items from trash', () => {
+        const id1 = useProjectStore.getState().createCreativeSet('A');
+        const id2 = useProjectStore.getState().createCreativeSet('B');
+        useProjectStore.getState().deleteCreativeSet(id1);
+        useProjectStore.getState().deleteCreativeSet(id2);
+        expect(useProjectStore.getState().trash).toHaveLength(2);
+
+        useProjectStore.getState().emptyTrash();
+        expect(useProjectStore.getState().trash).toHaveLength(0);
+    });
+});
+
+// ═══════════════════════════════════════════════════
+// ★ REGRESSION GUARD: Anti-resurrection in useCloudSync (v415)
+// Trash IDs must never be re-imported from cloud
+// ═══════════════════════════════════════════════════
+
+describe('★ REGRESSION: Anti-resurrection guard — useCloudSync', () => {
+
+    it('useCloudSync filters out trashed IDs before merging cloud data (code-level)', () => {
+        const src = readFileSync(resolve(__dirname, '../hooks/useCloudSync.ts'), 'utf-8');
+        // Must build a Set of trashed IDs
+        expect(src).toContain('trashedIds');
+        expect(src).toContain('new Set(localTrash.map');
+        // Must filter projects
+        expect(src).toContain('safeProjects');
+        expect(src).toContain('!trashedIds.has(p.id)');
+        // Must filter creative sets
+        expect(src).toContain('safeCS');
+        expect(src).toContain('!trashedIds.has(id)');
+    });
+
+    it('useCloudSync reads trash from projectStore before applying merged data (code-level)', () => {
+        const src = readFileSync(resolve(__dirname, '../hooks/useCloudSync.ts'), 'utf-8');
+        // The guard must read local trash BEFORE writing merged data
+        const guardIdx = src.indexOf('ANTI-RESURRECTION GUARD');
+        const writeIdx = src.indexOf('useProjectStore.setState({');
+        expect(guardIdx).toBeGreaterThan(-1);
+        expect(writeIdx).toBeGreaterThan(-1);
+        expect(guardIdx).toBeLessThan(writeIdx);
+    });
+});
+
+// ═══════════════════════════════════════════════════
+// ★ REGRESSION GUARD: Cloud delete error checking (v415)
+// deleteProjectPermanently and deleteCreativeSetCloud must throw on error
+// ═══════════════════════════════════════════════════
+
+describe('★ REGRESSION: Cloud delete error checking — cloudSyncProjects', () => {
+
+    it('deleteProjectPermanently throws on Supabase error (code-level)', () => {
+        const src = readFileSync(resolve(__dirname, '../services/cloudSyncProjects.ts'), 'utf-8');
+        const fn = src.slice(src.indexOf('export async function deleteProjectPermanently'), src.indexOf('// ── Creative Sets ──'));
+        expect(fn).toContain('const { error }');
+        expect(fn).toContain('if (error) throw');
+        expect(fn).toContain('[cloudSync] deleteProject failed');
+    });
+
+    it('deleteCreativeSetCloud throws on Supabase error (code-level)', () => {
+        const src = readFileSync(resolve(__dirname, '../services/cloudSyncProjects.ts'), 'utf-8');
+        const fn = src.slice(src.indexOf('export async function deleteCreativeSetCloud'));
+        expect(fn).toContain('const { error }');
+        expect(fn).toContain('if (error) throw');
+        expect(fn).toContain('[cloudSync] deleteCreativeSet failed');
+    });
+});
