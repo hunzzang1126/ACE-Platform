@@ -22,6 +22,10 @@ export interface ElementAnimation {
     preset: 'none' | 'fade' | 'slide-left' | 'slide-right' | 'slide-up' | 'slide-down' | 'scale' | 'ascend' | 'descend';
     duration: number;   // seconds
     startTime: number;  // element start time offset (seconds)
+    /** OUT (exit) animation preset */
+    outPreset?: 'none' | 'fade' | 'slide-left' | 'slide-right' | 'slide-up' | 'slide-down' | 'scale' | 'ascend' | 'descend';
+    /** OUT animation duration (seconds) */
+    outDuration?: number;
 }
 
 /** 기본 요소 공통 속성 */

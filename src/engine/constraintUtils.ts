@@ -127,6 +127,11 @@ export function getAnimationForElement(elementId: string): ElementAnimation | un
     const config = presets[elementId]
         || (elementId.startsWith('engine-') ? presets[elementId.slice(7)] : undefined)
         || (!elementId.startsWith('engine-') ? presets[`engine-${elementId}`] : undefined);
-    if (!config || config.anim === 'none') return undefined;
-    return { preset: config.anim, duration: config.animDuration, startTime: config.startTime };
+    if (!config || (config.anim === 'none' && (config.animOut ?? 'none') === 'none')) return undefined;
+    const result: ElementAnimation = { preset: config.anim, duration: config.animDuration, startTime: config.startTime };
+    if (config.animOut && config.animOut !== 'none') {
+        result.outPreset = config.animOut;
+        result.outDuration = config.animOutDuration;
+    }
+    return result;
 }
