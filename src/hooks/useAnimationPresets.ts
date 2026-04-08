@@ -82,10 +82,10 @@ export function computeAnimStyle(
     /** Optional endTime — if provided, element hidden after this time */
     endTime?: number,
 ): CSSProperties {
-    // ★ Element visibility: hidden before startTime, hidden after endTime
-    if (currentTime < startTime) return { opacity: 0, pointerEvents: 'none' };
+    // ★ AE model: element doesn't exist before its in-point
+    if (currentTime < startTime) return { display: 'none' };
     if (endTime !== undefined && endTime > 0 && currentTime > endTime) {
-        return { opacity: 0, pointerEvents: 'none' };
+        return { display: 'none' };
     }
 
     // No animation preset — just visible within time range

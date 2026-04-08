@@ -37,6 +37,7 @@ function makeObj(id: number, ov: Record<string, any> = {}) {
         __glidId: id,
         __glidArtboard: false,
         left: 100, top: 50, opacity: 1, scaleX: 1, scaleY: 1,
+        visible: true,
         __aceOrigPos: { left: 100, top: 50, opacity: 1, scaleX: 1, scaleY: 1 },
         set(props: any) { Object.assign(this, props); },
         ...ov,
@@ -187,6 +188,22 @@ describe('shimAnimation — applyAnimationFrame', () => {
         expect(obj.left).toBe(100 + 300); // orig.left + 300*(1-0)
         methods._applyAnimationFrame(1.0); // past end
         expect(obj.left).toBe(100); // restored to orig
+    });
+
+    it('★ REGRESSION: slide-left restores opacity from orig', () => {
+        const obj = makeObj(2);
+        const { methods } = setup([obj]);
+        methods._applyAnimationFrame(0.2); // at animation start
+        expect(obj.opacity).toBe(1); // opacity must be restored, not stuck at 0
+    });
+
+    it('★ AE MODEL: visible=false before startTime, visible=true at startTime', () => {
+        const obj = makeObj(2); // startTime=0.2
+        const { methods } = setup([obj]);
+        methods._applyAnimationFrame(0); // before startTime
+        expect(obj.visible).toBe(false); // layer does NOT EXIST
+        methods._applyAnimationFrame(0.3); // after startTime
+        expect(obj.visible).toBe(true); // layer exists now
     });
 
     it('none preset: restores original position', () => {

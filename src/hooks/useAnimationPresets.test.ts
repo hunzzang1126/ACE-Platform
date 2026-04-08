@@ -40,14 +40,14 @@ describe('presetLabel', () => {
 });
 
 describe('computeAnimStyle', () => {
-    it('returns hidden before startTime', () => {
+    it('returns display:none before startTime (AE model)', () => {
         const style = computeAnimStyle('fade', 0, 0.3, 0.5);
-        expect(style.opacity).toBe(0);
+        expect(style.display).toBe('none');
     });
 
-    it('returns hidden after endTime', () => {
+    it('returns display:none after endTime (AE model)', () => {
         const style = computeAnimStyle('fade', 5, 0.3, 0, 2);
-        expect(style.opacity).toBe(0);
+        expect(style.display).toBe('none');
     });
 
     it('returns empty for none preset', () => {

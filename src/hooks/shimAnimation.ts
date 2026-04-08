@@ -51,21 +51,23 @@ export function createAnimationMethods(
             const st = config?.startTime ?? 0;
             const et = config?.endTime ?? -1;
 
-            // ★ Element visibility: hidden before startTime, hidden after endTime
+            // ★ AE model: before in-point, layer does NOT EXIST (not just invisible)
             if (currentTime < st) {
-                obj.set({ opacity: 0 });
+                obj.set({ visible: false });
                 needsRender = true;
                 continue;
             }
             if (et > 0 && currentTime > et) {
-                obj.set({ opacity: 0 });
+                obj.set({ visible: false });
                 needsRender = true;
                 continue;
             }
+            // Layer is within its lifespan — ensure it exists
+            obj.set({ visible: true });
 
             // No animation — just restore original position (visible)
             if (!config || config.anim === 'none') {
-                obj.set({ left: orig.left, top: orig.top, opacity: orig.opacity, scaleX: orig.scaleX, scaleY: orig.scaleY });
+                obj.set({ left: orig.left, top: orig.top, opacity: orig.opacity, scaleX: orig.scaleX, scaleY: orig.scaleY, visible: true });
                 needsRender = true;
                 continue;
             }
@@ -85,23 +87,19 @@ export function createAnimationMethods(
                     obj.set({ opacity: t * orig.opacity });
                     break;
                 case 'slide-left':
-                    // "Slide to Left" = enters from right → slides leftward to position
-                    obj.set({ left: orig.left + (300 * (1 - t)) });
+                    obj.set({ left: orig.left + (300 * (1 - t)), opacity: orig.opacity });
                     break;
                 case 'slide-right':
-                    // "Slide to Right" = enters from left → slides rightward to position
-                    obj.set({ left: orig.left + (-300 * (1 - t)) });
+                    obj.set({ left: orig.left + (-300 * (1 - t)), opacity: orig.opacity });
                     break;
                 case 'slide-up':
-                    // "Slide to Top" = enters from below → slides upward to position
-                    obj.set({ top: orig.top + (300 * (1 - t)) });
+                    obj.set({ top: orig.top + (300 * (1 - t)), opacity: orig.opacity });
                     break;
                 case 'slide-down':
-                    // "Slide to Bottom" = enters from above → slides downward to position
-                    obj.set({ top: orig.top + (-300 * (1 - t)) });
+                    obj.set({ top: orig.top + (-300 * (1 - t)), opacity: orig.opacity });
                     break;
                 case 'scale':
-                    obj.set({ scaleX: orig.scaleX * t, scaleY: orig.scaleY * t });
+                    obj.set({ scaleX: orig.scaleX * t, scaleY: orig.scaleY * t, opacity: orig.opacity });
                     break;
                 case 'ascend':
                     obj.set({ top: orig.top + (200 * (1 - t)), opacity: t * orig.opacity });
@@ -126,6 +124,7 @@ export function createAnimationMethods(
                     opacity: orig.opacity,
                     scaleX: orig.scaleX,
                     scaleY: orig.scaleY,
+                    visible: true,
                 });
                 delete (obj as any).__aceOrigPos;
             }

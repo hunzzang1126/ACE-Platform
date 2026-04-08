@@ -119,10 +119,10 @@ describe('computeAnimStyle', () => {
         expect(style.transform).toContain('translateY');
     });
 
-    it('respects startTime — before startTime, progress is 0', () => {
+    it('respects startTime — before startTime, element does not exist', () => {
         const style = computeAnimStyle('fade', 1.0, 0.6, 2.0);
-        // currentTime=1.0, startTime=2.0 → animation hasn't started
-        expect(style.opacity).toBeCloseTo(0, 1);
+        // currentTime=1.0, startTime=2.0 → layer does not exist yet
+        expect(style.display).toBe('none');
     });
 
     it('respects startTime — at startTime + duration, progress is 1', () => {
@@ -142,10 +142,10 @@ describe('computeAnimStyle', () => {
 
     // ── Visibility based on startTime/endTime ──
 
-    it('★ REGRESSION: none preset hides element before startTime', () => {
+    it('★ REGRESSION: none preset — layer does not exist before startTime', () => {
         const style = computeAnimStyle('none', 0.2, 0.6, 0.5);
-        // currentTime=0.2, startTime=0.5 → should be hidden
-        expect(style.opacity).toBe(0);
+        // currentTime=0.2, startTime=0.5 → layer does not exist
+        expect(style.display).toBe('none');
     });
 
     it('none preset shows element at startTime', () => {
@@ -159,9 +159,9 @@ describe('computeAnimStyle', () => {
         expect(style).toEqual({});
     });
 
-    it('hides element after endTime', () => {
+    it('element does not exist after endTime', () => {
         const style = computeAnimStyle('none', 4.0, 0.6, 0, 3.0);
-        expect(style.opacity).toBe(0);
+        expect(style.display).toBe('none');
     });
 
     it('shows element before endTime', () => {
@@ -169,19 +169,19 @@ describe('computeAnimStyle', () => {
         expect(style).toEqual({});
     });
 
-    it('hides fade element before startTime', () => {
+    it('fade element does not exist before startTime', () => {
         const style = computeAnimStyle('fade', 0.1, 0.6, 0.5);
-        expect(style.opacity).toBe(0);
+        expect(style.display).toBe('none');
     });
 
-    it('hides slide-left element before startTime', () => {
+    it('slide-left element does not exist before startTime', () => {
         const style = computeAnimStyle('slide-left', 0.1, 0.6, 0.5);
-        expect(style.opacity).toBe(0);
+        expect(style.display).toBe('none');
     });
 
-    it('hides any preset after endTime', () => {
+    it('any preset element does not exist after endTime', () => {
         const style = computeAnimStyle('fade', 5.0, 0.6, 0, 3.0);
-        expect(style.opacity).toBe(0);
+        expect(style.display).toBe('none');
     });
 });
 
