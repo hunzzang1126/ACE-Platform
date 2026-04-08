@@ -39,6 +39,20 @@ export function SidebarElementsTab({ actions }: Props) {
             case 'rect': actions.addRect?.(); break;
             case 'rounded': actions.addRoundedRect?.(); break;
             case 'ellipse': actions.addEllipse?.(); break;
+            case 'line': {
+                // Line = thin rect (h=3). Uses existing rect system for save/load compatibility.
+                const cw = actions.canvasWidth || 300;
+                const ch = actions.canvasHeight || 250;
+                const w = Math.round(cw * 0.6);
+                const x = Math.round((cw - w) / 2);
+                const y = Math.round(ch / 2);
+                const nodeId = actions.addRect?.(x, y);
+                if (nodeId != null) {
+                    actions.setNodeSize(nodeId, w, 3);
+                    actions.setFillColor(nodeId, 0.96, 0.62, 0.04, 1); // amber #f59e0b
+                }
+                break;
+            }
         }
     }, [actions]);
 
