@@ -40,9 +40,27 @@ export const ANIM_PRESETS: { label: string; value: AnimPresetType }[] = [
     { label: 'Drop Down (Fade)', value: 'descend' },
 ];
 
+/** OUT preset labels — exit-appropriate wording */
+export const ANIM_OUT_PRESETS: { label: string; value: AnimPresetType }[] = [
+    { label: 'None', value: 'none' },
+    { label: 'Fade Out', value: 'fade' },
+    { label: 'Slide to Left', value: 'slide-left' },
+    { label: 'Slide to Right', value: 'slide-right' },
+    { label: 'Slide to Top', value: 'slide-up' },
+    { label: 'Slide to Bottom', value: 'slide-down' },
+    { label: 'Scale Down', value: 'scale' },
+    { label: 'Rise Up (Fade)', value: 'ascend' },
+    { label: 'Drop Down (Fade)', value: 'descend' },
+];
+
 /** Human-readable label for a preset type */
 export function presetLabel(preset: AnimPresetType): string {
     return ANIM_PRESETS.find(p => p.value === preset)?.label ?? 'None';
+}
+
+/** Human-readable label for an OUT preset */
+export function outPresetLabel(preset: AnimPresetType): string {
+    return ANIM_OUT_PRESETS.find(p => p.value === preset)?.label ?? 'None';
 }
 
 interface AnimPresetStore {

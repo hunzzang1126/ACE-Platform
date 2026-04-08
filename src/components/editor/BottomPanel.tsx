@@ -8,7 +8,7 @@ import type { BannerVariant } from '@/schema/design.types';
 import type { CanvasEngineActions, EngineNode } from '@/hooks/useCanvasEngine';
 import type { OverlayElement } from '@/hooks/useOverlayElements';
 import { IcStop, IcPlay, IcPause, IcLoop } from '@/components/ui/Icons';
-import { presetLabel } from '@/hooks/useAnimationPresets';
+import { presetLabel, outPresetLabel } from '@/hooks/useAnimationPresets';
 import { useLayerDrag } from '@/hooks/useLayerDrag';
 import { type Engine, type UnifiedLayer, BAR_COLORS, nodeLabel } from './bottomPanelHelpers';
 import { OverlayLayerRow, EngineLayerRow } from './LayerRow';
@@ -52,7 +52,7 @@ export function BottomPanel({ variant, engine, nodes, selection, actions, overla
 
     const getBarOutLabel = useCallback((elementId: string) => {
         const config = animPresets.getPreset(elementId);
-        return (config.animOut ?? 'none') !== 'none' ? presetLabel(config.animOut) : '';
+        return (config.animOut ?? 'none') !== 'none' ? outPresetLabel(config.animOut) : '';
     }, [animPresets]);
 
     const getBarCursor = useCallback((e: React.MouseEvent<HTMLDivElement>) => {

@@ -6,7 +6,7 @@
 // ─────────────────────────────────────────────────
 
 import { useState, useCallback, useEffect } from 'react';
-import { ANIM_PRESETS, useAnimPresetStore, type AnimPresetType } from '@/hooks/useAnimationPresets';
+import { ANIM_PRESETS, ANIM_OUT_PRESETS, useAnimPresetStore, type AnimPresetType } from '@/hooks/useAnimationPresets';
 import type { EngineNode } from '@/hooks/canvasTypes';
 
 interface Props {
@@ -86,7 +86,7 @@ export function InlineAnimatePanel({ selectedNode, onClose }: Props) {
 
                 <p className="sidebar-section-label">Presets</p>
                 <div className="inline-preset-grid anim-grid">
-                    {ANIM_PRESETS.map((preset) => (
+                    {(activeTab === 'in' ? ANIM_PRESETS : ANIM_OUT_PRESETS).map((preset) => (
                         <button
                             key={preset.value}
                             className={`inline-preset-btn ${currentPreset === preset.value ? 'active' : ''}`}
