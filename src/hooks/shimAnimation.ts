@@ -151,8 +151,7 @@ export function createAnimationMethods(
             const outStart = et - outDur;
             if (hasOut && outStart > 0 && currentTime >= outStart && currentTime <= et) {
                 const outProgress = (currentTime - outStart) / outDur; // 0→1
-                const invO = 1 - outProgress;
-                const p = 1 - (invO * invO * invO); // easeOut: 0→1
+                const p = outProgress * outProgress * outProgress; // easeIn: slow start→fast exit
                 applyFabricOutPreset(obj, outPreset, p, orig);
                 needsRender = true;
                 continue;

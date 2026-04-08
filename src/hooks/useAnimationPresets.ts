@@ -92,10 +92,15 @@ const DEFAULT_CONFIG: AnimPresetConfig = {
     endTime: -1, // -1 = use timeline duration
 };
 
-/** Simple ease-out curve: t => 1 - (1-t)^3 */
+/** Simple ease-out curve: t => 1 - (1-t)^3 — fast start, slow finish (for IN) */
 function easeOut(t: number): number {
     const inv = 1 - t;
     return 1 - inv * inv * inv;
+}
+
+/** Simple ease-in curve: t => t^3 — slow start, fast finish (for OUT) */
+function easeIn(t: number): number {
+    return t * t * t;
 }
 
 /** Compute animation style at given time for a preset — exported for preview grid */
@@ -128,7 +133,7 @@ export function computeAnimStyle(
         const outStart = effectiveEnd - resolvedOutDur;
         if (currentTime >= outStart && currentTime <= effectiveEnd) {
             const outProgress = (currentTime - outStart) / resolvedOutDur; // 0→1
-            const p = easeOut(Math.max(0, Math.min(1, outProgress)));
+            const p = easeIn(Math.max(0, Math.min(1, outProgress)));
             return computeOutPresetStyle(resolvedOut, p);
         }
     }
