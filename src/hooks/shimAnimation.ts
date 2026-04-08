@@ -20,6 +20,39 @@ interface AnimState {
     rafId: number;
 }
 
+/** Shared: apply a preset at progress t (0→1) to a Fabric object */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function applyFabricPreset(obj: any, preset: string, t: number, orig: any) {
+    switch (preset) {
+        case 'fade':
+            obj.set({ opacity: t * orig.opacity });
+            break;
+        case 'slide-left':
+            obj.set({ left: orig.left + (300 * (1 - t)), opacity: orig.opacity });
+            break;
+        case 'slide-right':
+            obj.set({ left: orig.left + (-300 * (1 - t)), opacity: orig.opacity });
+            break;
+        case 'slide-up':
+            obj.set({ top: orig.top + (300 * (1 - t)), opacity: orig.opacity });
+            break;
+        case 'slide-down':
+            obj.set({ top: orig.top + (-300 * (1 - t)), opacity: orig.opacity });
+            break;
+        case 'scale':
+            obj.set({ scaleX: orig.scaleX * t, scaleY: orig.scaleY * t, opacity: orig.opacity });
+            break;
+        case 'ascend':
+            obj.set({ top: orig.top + (200 * (1 - t)), opacity: t * orig.opacity });
+            break;
+        case 'descend':
+            obj.set({ top: orig.top + (-200 * (1 - t)), opacity: t * orig.opacity });
+            break;
+        default:
+            obj.set({ left: orig.left, top: orig.top, opacity: orig.opacity, scaleX: orig.scaleX, scaleY: orig.scaleY });
+    }
+}
+
 /** Create animation methods for the Fabric engine shim */
 export function createAnimationMethods(
     fc: Canvas,
@@ -66,8 +99,32 @@ export function createAnimationMethods(
             obj.set({ visible: true });
 
             // No animation — just restore original position (visible)
-            if (!config || config.anim === 'none') {
+            const hasIn = config && config.anim !== 'none';
+            const outPreset = config?.animOut ?? 'none';
+            const hasOut = outPreset !== 'none';
+
+            if (!hasIn && !hasOut) {
                 obj.set({ left: orig.left, top: orig.top, opacity: orig.opacity, scaleX: orig.scaleX, scaleY: orig.scaleY, visible: true });
+                needsRender = true;
+                continue;
+            }
+
+            // ── OUT animation check (takes priority near endTime) ──
+            const outDur = config?.animOutDuration ?? 0.3;
+            const outStart = et > 0 ? et - outDur : -1;
+            if (hasOut && outStart > 0 && currentTime >= outStart && currentTime <= et) {
+                const outProgress = (currentTime - outStart) / outDur;
+                const invO = 1 - outProgress;
+                const tOut = 1 - (invO * invO * invO); // easeOut on exit progress
+                const t = 1 - tOut; // reverse: 1→0
+                applyFabricPreset(obj, outPreset, t, orig);
+                needsRender = true;
+                continue;
+            }
+
+            // ── IN animation ──
+            if (!hasIn) {
+                obj.set({ left: orig.left, top: orig.top, opacity: orig.opacity, scaleX: orig.scaleX, scaleY: orig.scaleY });
                 needsRender = true;
                 continue;
             }
@@ -82,32 +139,7 @@ export function createAnimationMethods(
             const inv = 1 - progress;
             const t = 1 - inv * inv * inv;
 
-            switch (config.anim) {
-                case 'fade':
-                    obj.set({ opacity: t * orig.opacity });
-                    break;
-                case 'slide-left':
-                    obj.set({ left: orig.left + (300 * (1 - t)), opacity: orig.opacity });
-                    break;
-                case 'slide-right':
-                    obj.set({ left: orig.left + (-300 * (1 - t)), opacity: orig.opacity });
-                    break;
-                case 'slide-up':
-                    obj.set({ top: orig.top + (300 * (1 - t)), opacity: orig.opacity });
-                    break;
-                case 'slide-down':
-                    obj.set({ top: orig.top + (-300 * (1 - t)), opacity: orig.opacity });
-                    break;
-                case 'scale':
-                    obj.set({ scaleX: orig.scaleX * t, scaleY: orig.scaleY * t, opacity: orig.opacity });
-                    break;
-                case 'ascend':
-                    obj.set({ top: orig.top + (200 * (1 - t)), opacity: t * orig.opacity });
-                    break;
-                case 'descend':
-                    obj.set({ top: orig.top + (-200 * (1 - t)), opacity: t * orig.opacity });
-                    break;
-            }
+            applyFabricPreset(obj, config.anim, t, orig);
             needsRender = true;
         }
         if (needsRender) fc.renderAll();

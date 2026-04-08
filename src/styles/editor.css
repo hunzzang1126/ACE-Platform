@@ -883,6 +883,23 @@
 .inline-panel-body { padding: 12px 14px; overflow-y: auto; flex: 1; }
 .inline-divider { height: 1px; background: var(--border); margin: 12px 0; }
 
+/* Animation In/Out tab toggle */
+.anim-tab-row {
+    display: flex; gap: 4px; margin-bottom: 12px;
+    background: var(--bg-base); border-radius: 8px; padding: 3px;
+}
+.anim-tab-btn {
+    flex: 1; padding: 6px 0; border: none; border-radius: 6px;
+    background: transparent; color: var(--text-secondary);
+    font-size: 13px; font-weight: 600; cursor: pointer;
+    transition: all 0.15s;
+}
+.anim-tab-btn:hover { color: var(--text-primary); background: var(--bg-hover); }
+.anim-tab-btn.active {
+    background: var(--accent); color: #fff;
+    box-shadow: 0 1px 3px rgba(124, 58, 237, 0.3);
+}
+
 /* Preset grid */
 .inline-preset-grid {
     display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;

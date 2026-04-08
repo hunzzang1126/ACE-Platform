@@ -163,4 +163,78 @@ describe('useAnimPresetStore', () => {
         const style = useAnimPresetStore.getState().getAnimStyle('el-4');
         expect(typeof style).toBe('object');
     });
+
+    it('setPreset merges animOut field', () => {
+        useAnimPresetStore.getState().setPreset('el-out', { anim: 'slide-left', animOut: 'fade', animOutDuration: 0.5 });
+        const p = useAnimPresetStore.getState().getPreset('el-out');
+        expect(p.animOut).toBe('fade');
+        expect(p.animOutDuration).toBe(0.5);
+    });
+
+    it('getPreset returns animOut=none by default', () => {
+        const p = useAnimPresetStore.getState().getPreset('unknown-out');
+        expect(p.animOut).toBe('none');
+    });
+});
+
+// ══════════════════════════════════════════════════
+// computeAnimStyle — OUT animation
+// ══════════════════════════════════════════════════
+
+describe('computeAnimStyle — Out animation', () => {
+    it('fade out: opacity decreases near endTime', () => {
+        // endTime=5, outDuration=0.5 → out starts at 4.5
+        const style = computeAnimStyle('none', 4.7, 0.3, 0, 5, 'fade', 0.5);
+        expect(style.opacity).toBeDefined();
+        expect(style.opacity as number).toBeLessThan(1);
+        expect(style.opacity as number).toBeGreaterThan(0);
+    });
+
+    it('fade out: opacity ~0 at endTime', () => {
+        const style = computeAnimStyle('none', 5.0, 0.3, 0, 5, 'fade', 0.5);
+        expect(style.opacity).toBeCloseTo(0, 1);
+    });
+
+    it('fade out: no effect before out zone', () => {
+        // endTime=5, outDuration=0.5 → out starts at 4.5
+        // At t=3, should be normal (no out effect)
+        const style = computeAnimStyle('none', 3.0, 0.3, 0, 5, 'fade', 0.5);
+        expect(style).toEqual({}); // none preset, not in out zone
+    });
+
+    it('slide-left out: translateX negative near endTime', () => {
+        const style = computeAnimStyle('none', 4.7, 0.3, 0, 5, 'slide-left', 0.5);
+        expect(style.transform).toContain('translateX');
+    });
+
+    it('no regression: animOut=none behaves exactly like before', () => {
+        const withoutOut = computeAnimStyle('fade', 0.15, 0.3, 0, 5);
+        const withNoneOut = computeAnimStyle('fade', 0.15, 0.3, 0, 5, 'none', 0.3);
+        expect(withoutOut).toEqual(withNoneOut);
+    });
+
+    it('In + Out coexist: fade in at start, fade out at end', () => {
+        // t=0 → in zone → opacity near 0
+        const inStyle = computeAnimStyle('fade', 0, 0.3, 0, 5, 'fade', 0.5);
+        expect(inStyle.opacity).toBeCloseTo(0, 1);
+
+        // t=2 → normal zone → opacity 1 (no animation active)
+        const midStyle = computeAnimStyle('fade', 2, 0.3, 0, 5, 'fade', 0.5);
+        expect(midStyle.opacity).toBeCloseTo(1, 1);
+
+        // t=4.8 → out zone → opacity decreasing
+        const outStyle = computeAnimStyle('fade', 4.8, 0.3, 0, 5, 'fade', 0.5);
+        expect(outStyle.opacity as number).toBeLessThan(1);
+        expect(outStyle.opacity as number).toBeGreaterThan(0);
+    });
+
+    it('display:none after endTime even with animOut', () => {
+        const style = computeAnimStyle('fade', 6.0, 0.3, 0, 5, 'fade', 0.5);
+        expect(style.display).toBe('none');
+    });
+
+    it('display:none before startTime even with animOut', () => {
+        const style = computeAnimStyle('fade', 0, 0.3, 1, 5, 'fade', 0.5);
+        expect(style.display).toBe('none');
+    });
 });

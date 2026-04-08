@@ -16,34 +16,49 @@ interface Props {
 
 export function InlineAnimatePanel({ selectedNode, onClose }: Props) {
     const setPreset = useAnimPresetStore((s) => s.setPreset);
+    const [activeTab, setActiveTab] = useState<'in' | 'out'>('in');
 
     const nodeId = selectedNode?.id ? String(selectedNode.id) : '';
-    // ★ FIX: Subscribe to the actual preset data, not just the getter function.
-    // This makes the panel re-render immediately when preset changes elsewhere
-    // (e.g. from timeline bar interaction or undo).
+    // ★ Subscribe to actual preset data for real-time sync
     const current = useAnimPresetStore((s) =>
         nodeId ? (s.presets[nodeId] ?? null) : null
     );
-    const [duration, setDuration] = useState(current?.animDuration ?? 0.3);
 
-    // ★ Re-sync duration when switching elements or preset changes
+    // Derive current values based on active tab
+    const currentPreset = activeTab === 'in'
+        ? (current?.anim ?? 'none')
+        : (current?.animOut ?? 'none');
+    const currentDuration = activeTab === 'in'
+        ? (current?.animDuration ?? 0.3)
+        : (current?.animOutDuration ?? 0.3);
+
+    const [duration, setDuration] = useState(currentDuration);
+
+    // Re-sync duration when switching elements, tab, or preset changes
     useEffect(() => {
-        setDuration(current?.animDuration ?? 0.3);
-    }, [nodeId, current?.animDuration]);
+        setDuration(currentDuration);
+    }, [nodeId, activeTab, currentDuration]);
 
     const handleSelect = useCallback((preset: AnimPresetType) => {
         if (!nodeId) return;
-        setPreset(nodeId, { anim: preset, animDuration: duration });
-    }, [nodeId, setPreset, duration]);
+        if (activeTab === 'in') {
+            setPreset(nodeId, { anim: preset, animDuration: duration });
+        } else {
+            setPreset(nodeId, { animOut: preset, animOutDuration: duration });
+        }
+    }, [nodeId, setPreset, duration, activeTab]);
 
     const handleDuration = useCallback((val: number) => {
         setDuration(val);
-        if (nodeId) {
+        if (!nodeId) return;
+        if (activeTab === 'in') {
             setPreset(nodeId, { animDuration: val });
+        } else {
+            setPreset(nodeId, { animOutDuration: val });
         }
-    }, [nodeId, setPreset]);
+    }, [nodeId, setPreset, activeTab]);
 
-    const currentPreset = current?.anim ?? 'none';
+    const showDurationSlider = currentPreset !== 'none';
 
     return (
         <div className="inline-panel">
@@ -57,6 +72,18 @@ export function InlineAnimatePanel({ selectedNode, onClose }: Props) {
             </div>
 
             <div className="inline-panel-body">
+                {/* ── In/Out Tab Toggle ── */}
+                <div className="anim-tab-row">
+                    <button
+                        className={`anim-tab-btn ${activeTab === 'in' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('in')}
+                    >In</button>
+                    <button
+                        className={`anim-tab-btn ${activeTab === 'out' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('out')}
+                    >Out</button>
+                </div>
+
                 <p className="sidebar-section-label">Presets</p>
                 <div className="inline-preset-grid anim-grid">
                     {ANIM_PRESETS.map((preset) => (
@@ -73,45 +100,23 @@ export function InlineAnimatePanel({ selectedNode, onClose }: Props) {
                     ))}
                 </div>
 
-                {currentPreset !== 'none' && (
-                    <>
-                        <div className="inline-divider" />
-                        <p className="sidebar-section-label">Duration</p>
-                        <div className="inline-slider-row">
-                            <input
-                                type="range"
-                                className="inline-slider"
-                                min={0.1}
-                                max={2.0}
-                                step={0.1}
-                                value={duration}
-                                onChange={(e) => handleDuration(Number(e.target.value))}
-                            />
-                            <span className="inline-slider-value">{duration.toFixed(1)}s</span>
-                        </div>
-                    </>
-                )}
-
-                {/* Duration always visible as read-only hint when no preset selected */}
-                {currentPreset === 'none' && (
-                    <>
-                        <div className="inline-divider" />
-                        <p className="sidebar-section-label">Duration</p>
-                        <div className="inline-slider-row">
-                            <input
-                                type="range"
-                                className="inline-slider"
-                                min={0.1}
-                                max={2.0}
-                                step={0.1}
-                                value={duration}
-                                onChange={(e) => handleDuration(Number(e.target.value))}
-                                style={{ opacity: 0.4 }}
-                            />
-                            <span className="inline-slider-value" style={{ opacity: 0.4 }}>{duration.toFixed(1)}s</span>
-                        </div>
-                    </>
-                )}
+                <div className="inline-divider" />
+                <p className="sidebar-section-label">Duration</p>
+                <div className="inline-slider-row">
+                    <input
+                        type="range"
+                        className="inline-slider"
+                        min={0.1}
+                        max={2.0}
+                        step={0.1}
+                        value={duration}
+                        onChange={(e) => handleDuration(Number(e.target.value))}
+                        style={showDurationSlider ? {} : { opacity: 0.4 }}
+                    />
+                    <span className="inline-slider-value" style={showDurationSlider ? {} : { opacity: 0.4 }}>
+                        {duration.toFixed(1)}s
+                    </span>
+                </div>
             </div>
         </div>
     );

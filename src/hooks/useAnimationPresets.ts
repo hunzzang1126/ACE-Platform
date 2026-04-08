@@ -20,8 +20,10 @@ export type AnimPresetType =
     | 'descend';
 
 export interface AnimPresetConfig {
-    anim: AnimPresetType;       // single animation per element
-    animDuration: number;       // seconds (default 0.3)
+    anim: AnimPresetType;       // IN animation per element
+    animDuration: number;       // IN duration in seconds (default 0.3)
+    animOut: AnimPresetType;    // OUT (exit) animation
+    animOutDuration: number;    // OUT duration in seconds (default 0.3)
     startTime: number;          // element start time in seconds (default 0)
     endTime: number;            // element end time in seconds (default = timeline duration, -1 means full)
 }
@@ -63,6 +65,8 @@ interface AnimPresetStore {
 const DEFAULT_CONFIG: AnimPresetConfig = {
     anim: 'none',
     animDuration: 0.3,
+    animOut: 'none',
+    animOutDuration: 0.3,
     startTime: 0,
     endTime: -1, // -1 = use timeline duration
 };
@@ -81,6 +85,9 @@ export function computeAnimStyle(
     startTime: number,
     /** Optional endTime — if provided, element hidden after this time */
     endTime?: number,
+    /** Optional OUT preset — plays in reverse before endTime */
+    outPreset?: AnimPresetType,
+    outDuration?: number,
 ): CSSProperties {
     // ★ AE model: element doesn't exist before its in-point
     if (currentTime < startTime) return { display: 'none' };
@@ -88,64 +95,52 @@ export function computeAnimStyle(
         return { display: 'none' };
     }
 
-    // No animation preset — just visible within time range
-    if (preset === 'none') return {};
-
-    // Animation runs from startTime to startTime+animDuration
-    const animStart = startTime;
-    const animEnd = animStart + animDuration;
-
-    // Before animation starts: show starting state
-    // During animation: interpolate
-    // After animation ends: show final state (normal)
-    let progress: number;
-    if (currentTime <= animStart) {
-        progress = 0;
-    } else if (currentTime >= animEnd) {
-        progress = 1;
-    } else {
-        progress = (currentTime - animStart) / (animEnd - animStart);
+    // ── OUT animation check (before IN, since OUT takes priority near endTime) ──
+    const resolvedOut = outPreset ?? 'none';
+    const resolvedOutDur = outDuration ?? 0.3;
+    if (resolvedOut !== 'none' && endTime !== undefined && endTime > 0) {
+        const outStart = endTime - resolvedOutDur;
+        if (currentTime >= outStart && currentTime <= endTime) {
+            const outProgress = (currentTime - outStart) / resolvedOutDur;
+            const t = 1 - easeOut(Math.max(0, Math.min(1, outProgress))); // 1→0
+            return computePresetStyle(resolvedOut, t);
+        }
     }
 
-    const t = easeOut(Math.max(0, Math.min(1, progress)));
+    // No IN animation preset — just visible within time range
+    if (preset === 'none') return {};
 
+    // ── IN animation ──
+    const animStart = startTime;
+    const animEnd = animStart + animDuration;
+    let progress: number;
+    if (currentTime <= animStart) progress = 0;
+    else if (currentTime >= animEnd) progress = 1;
+    else progress = (currentTime - animStart) / (animEnd - animStart);
+
+    const t = easeOut(Math.max(0, Math.min(1, progress)));
+    return computePresetStyle(preset, t);
+}
+
+/** Shared: convert a preset + progress (0→1) into CSS properties */
+function computePresetStyle(preset: AnimPresetType, t: number): CSSProperties {
     switch (preset) {
         case 'fade':
             return { opacity: t };
-
         case 'slide-left':
-            // Element slides leftward into position (enters from right)
             return { transform: `translateX(${1000 * (1 - t)}px)` };
-
         case 'slide-right':
-            // Element slides rightward into position (enters from left)
             return { transform: `translateX(${-1000 * (1 - t)}px)` };
-
         case 'slide-up':
-            // Element slides upward into position (enters from below)
             return { transform: `translateY(${1000 * (1 - t)}px)` };
-
         case 'slide-down':
-            // Element slides downward into position (enters from above)
             return { transform: `translateY(${-1000 * (1 - t)}px)` };
-
         case 'scale':
             return { transform: `scale(${t})` };
-
         case 'ascend':
-            // Rises upward with fade (enters from below)
-            return {
-                opacity: t,
-                transform: `translateY(${1000 * (1 - t)}px)`,
-            };
-
+            return { opacity: t, transform: `translateY(${1000 * (1 - t)}px)` };
         case 'descend':
-            // Falls downward with fade (enters from above)
-            return {
-                opacity: t,
-                transform: `translateY(${-1000 * (1 - t)}px)`,
-            };
-
+            return { opacity: t, transform: `translateY(${-1000 * (1 - t)}px)` };
         default:
             return {};
     }
@@ -194,9 +189,15 @@ export const useAnimPresetStore = create<AnimPresetStore>()((set, get) => ({
         if (state.currentTime < st) return { display: 'none' };
         if (et > 0 && state.currentTime > et) return { display: 'none' };
         // Within range but not playing — show at design position (no animation offset)
-        if (config.anim === 'none') return {};
+        const hasIn = config.anim !== 'none';
+        const hasOut = (config.animOut ?? 'none') !== 'none';
+        if (!hasIn && !hasOut) return {};
         if (!state.isPlaying) return {};
-        return computeAnimStyle(config.anim, state.currentTime, config.animDuration, config.startTime);
+        return computeAnimStyle(
+            config.anim, state.currentTime, config.animDuration, config.startTime,
+            config.endTime > 0 ? config.endTime : undefined,
+            config.animOut, config.animOutDuration,
+        );
     },
 }));
 
