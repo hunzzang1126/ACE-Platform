@@ -208,3 +208,124 @@ describe('templateStore — syncOverridesFromCloud', () => {
         await expect(useTemplateStore.getState().syncOverridesFromCloud()).resolves.toBeUndefined();
     });
 });
+
+// ─────────────────────────────────────────────────
+// ★ REGRESSION: deleteCustomTemplate + hiddenBuiltInIds (v424)
+// ─────────────────────────────────────────────────
+describe('templateStore — ★ REGRESSION: deleteCustomTemplate (v424)', () => {
+    beforeEach(() => {
+        useTemplateStore.setState({
+            templates: [...useTemplateStore.getState().templates.filter(t => t.isBuiltIn)],
+            templateOverrides: {},
+            hiddenBuiltInIds: [],
+            editingTemplateId: null,
+            editingTempCsId: null,
+        });
+    });
+
+    it('deletes a custom (non-built-in) template', () => {
+        const id = useTemplateStore.getState().addCustomTemplate({
+            name: 'My Custom', category: 'display', variant: mockVariant,
+        });
+        expect(useTemplateStore.getState().templates.some(t => t.id === id)).toBe(true);
+
+        useTemplateStore.getState().deleteCustomTemplate(id);
+        expect(useTemplateStore.getState().templates.some(t => t.id === id)).toBe(false);
+    });
+
+    it('★ REGRESSION: deletes a built-in template (was blocked before v424)', () => {
+        const builtIn = useTemplateStore.getState().templates.find(t => t.isBuiltIn);
+        if (!builtIn) return;
+
+        useTemplateStore.getState().deleteCustomTemplate(builtIn.id);
+        expect(useTemplateStore.getState().templates.some(t => t.id === builtIn.id)).toBe(false);
+    });
+
+    it('★ REGRESSION: adds built-in ID to hiddenBuiltInIds when deleting built-in', () => {
+        const builtIn = useTemplateStore.getState().templates.find(t => t.isBuiltIn);
+        if (!builtIn) return;
+
+        useTemplateStore.getState().deleteCustomTemplate(builtIn.id);
+        expect(useTemplateStore.getState().hiddenBuiltInIds).toContain(builtIn.id);
+    });
+
+    it('does NOT add custom template ID to hiddenBuiltInIds', () => {
+        const id = useTemplateStore.getState().addCustomTemplate({
+            name: 'Custom', category: 'social', variant: mockVariant,
+        });
+
+        useTemplateStore.getState().deleteCustomTemplate(id);
+        expect(useTemplateStore.getState().hiddenBuiltInIds).not.toContain(id);
+    });
+
+    it('removes templateOverrides entry on delete', () => {
+        const builtIn = useTemplateStore.getState().templates.find(t => t.isBuiltIn);
+        if (!builtIn) return;
+
+        // Override first, then delete
+        useTemplateStore.getState().overrideTemplate(builtIn.id, mockVariant);
+        expect(useTemplateStore.getState().templateOverrides[builtIn.id]).toBeDefined();
+
+        useTemplateStore.getState().deleteCustomTemplate(builtIn.id);
+        expect(useTemplateStore.getState().templateOverrides[builtIn.id]).toBeUndefined();
+    });
+
+    it('hiddenBuiltInIds does not duplicate on repeated delete', () => {
+        const builtIn = useTemplateStore.getState().templates.find(t => t.isBuiltIn);
+        if (!builtIn) return;
+
+        useTemplateStore.getState().deleteCustomTemplate(builtIn.id);
+        // Manually re-add to templates and delete again
+        useTemplateStore.setState({ templates: [...useTemplateStore.getState().templates, { ...builtIn }] });
+        useTemplateStore.getState().deleteCustomTemplate(builtIn.id);
+
+        const count = useTemplateStore.getState().hiddenBuiltInIds.filter(id => id === builtIn.id).length;
+        expect(count).toBe(1);
+    });
+});
+
+// ─────────────────────────────────────────────────
+// ★ REGRESSION: addCustomTemplate (v424)
+// ─────────────────────────────────────────────────
+describe('templateStore — addCustomTemplate (v424)', () => {
+    it('creates a custom template with tmpl-custom- prefix', () => {
+        const id = useTemplateStore.getState().addCustomTemplate({
+            name: 'Test Custom', category: 'display', variant: mockVariant,
+        });
+        expect(id).toMatch(/^tmpl-custom-/);
+    });
+
+    it('sets isBuiltIn to false', () => {
+        const id = useTemplateStore.getState().addCustomTemplate({
+            name: 'Not Built In', category: 'social', variant: mockVariant,
+        });
+        const tmpl = useTemplateStore.getState().getById(id);
+        expect(tmpl!.isBuiltIn).toBe(false);
+    });
+
+    it('stores snapshot in templateOverrides', () => {
+        const id = useTemplateStore.getState().addCustomTemplate({
+            name: 'Override Test', category: 'display', variant: mockVariant,
+        });
+        expect(useTemplateStore.getState().templateOverrides[id]).toBeDefined();
+    });
+
+    it('embeds __customMeta in variant snapshot', () => {
+        const id = useTemplateStore.getState().addCustomTemplate({
+            name: 'Meta Test', category: 'email', variant: mockVariant,
+        });
+        const snapshot = JSON.parse(useTemplateStore.getState().templateOverrides[id]);
+        expect(snapshot.__customMeta).toBeDefined();
+        expect(snapshot.__customMeta.name).toBe('Meta Test');
+        expect(snapshot.__customMeta.category).toBe('email');
+    });
+
+    it('sets width/height to 1080×1080', () => {
+        const id = useTemplateStore.getState().addCustomTemplate({
+            name: 'Size Test', category: 'display', variant: mockVariant,
+        });
+        const tmpl = useTemplateStore.getState().getById(id);
+        expect(tmpl!.width).toBe(1080);
+        expect(tmpl!.height).toBe(1080);
+    });
+});
