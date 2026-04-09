@@ -44,7 +44,7 @@ export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
     starter: {
         maxCreativeSets: 3,
         aiTokensPerMonth: 50, // 50 AI generations/month
-        allowedModels: ['anthropic/claude-3.5-haiku', 'anthropic/claude-sonnet-4'],
+        allowedModels: ['anthropic/claude-sonnet-4'],
         defaultModel: 'anthropic/claude-sonnet-4',
         maxVariantsPerSet: 3,
         allowedExports: ['png'],
