@@ -55,12 +55,12 @@ describe('useFabricCanvas — engine shim', () => {
 });
 
 describe('useFabricCanvas — Textbox controls', () => {
-    it('configures Textbox controls: corners + side handles, no mtr', () => {
-        // tl/tr/bl/br = corners, ml/mr = side, mt/mb/mtr = disabled
+    it('configures Textbox controls: corners + side handles + rotation', () => {
+        // tl/tr/bl/br = corners, ml/mr = side, mt/mb = disabled, mtr = enabled
         expect(src).toContain('tl: true, tr: true, bl: true, br: true');
         expect(src).toContain('mt: false, mb: false');
         expect(src).toContain('ml: true, mr: true');
-        expect(src).toContain('mtr: false');
+        expect(src).toContain('mtr: true');
     });
 
     it('normalizes Textbox scaleX/Y to 1 on add', () => {

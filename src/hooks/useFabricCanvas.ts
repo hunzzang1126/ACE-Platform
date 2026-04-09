@@ -286,7 +286,7 @@ export function useFabricCanvas(width: number, height: number, _addDemoShapes = 
             if ((obj as any).__glidArtboard) obj.set({ selectable: false, evented: false, hasControls: false, hasBorders: false, lockMovementX: true, lockMovementY: true, hoverCursor: 'default' });
             else if (!(obj as any).__glidId) { (obj as any).__glidId = nextId(); (obj as any).__glidZIndex = 0; }
             if (obj instanceof Textbox) {
-                obj.setControlsVisibility({ tl: true, tr: true, bl: true, br: true, mt: false, mb: false, ml: true, mr: true, mtr: false });
+                obj.setControlsVisibility({ tl: true, tr: true, bl: true, br: true, mt: false, mb: false, ml: true, mr: true, mtr: true });
                 if ((obj.scaleX ?? 1) !== 1 || (obj.scaleY ?? 1) !== 1) obj.set({ width: Math.max(20, (obj.width ?? 200) * (obj.scaleX ?? 1)), scaleX: 1, scaleY: 1 });
                 // ★ Auto-shrink height to fit actual text (prevents empty space below)
                 obj.set({ height: obj.calcTextHeight() });
