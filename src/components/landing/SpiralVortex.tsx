@@ -69,8 +69,8 @@ const fragmentShader = /* glsl */ `
     float sv = clamp(uScrollVelocity, 0.0, 2.0);
     float vs = uVariant * 0.35;
 
-    // Deep dark base
-    vec3 color = vec3(0.02, 0.025, 0.055);
+    // Subtle dark base
+    vec3 color = vec3(0.018, 0.02, 0.04);
 
     // ── Center positioned BELOW viewport center ──
     // This naturally keeps text area clear while rings stay bright
@@ -80,84 +80,58 @@ const fragmentShader = /* glsl */ `
       -0.35 - vs + cos(t * orbitSpeed * 0.7) * 0.06 + mouse.y
     );
 
-    // ── 5 concentric rings with even spacing ──
-    float baseRadius = 0.18;
-    float spacing = 0.14;
+    // ── 3 concentric rings (subtle, not busy) ──
+    float baseRadius = 0.22;
+    float spacing = 0.18;
 
-    // Vibrant palette
-    vec3 colors[5];
-    colors[0] = vec3(0.14, 0.40, 0.55);  // bright cyan
-    colors[1] = vec3(0.11, 0.34, 0.50);  // teal
-    colors[2] = vec3(0.16, 0.18, 0.48);  // indigo
-    colors[3] = vec3(0.18, 0.12, 0.42);  // violet
-    colors[4] = vec3(0.09, 0.28, 0.48);  // teal-blue
+    // Muted palette
+    vec3 colors[3];
+    colors[0] = vec3(0.10, 0.30, 0.42);  // muted cyan
+    colors[1] = vec3(0.12, 0.14, 0.38);  // indigo
+    colors[2] = vec3(0.07, 0.22, 0.38);  // teal-blue
 
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 3; i++) {
       float fi = float(i);
 
-      // ── Breathing / pulsing radius — each ring breathes at different phase ──
-      float breathSpeed = 0.15 + fi * 0.03;
-      float breathAmp = 0.012 + fi * 0.005;
+      // Gentle breathing
+      float breathSpeed = 0.10 + fi * 0.02;
+      float breathAmp = 0.008 + fi * 0.003;
       float breath = sin(t * breathSpeed + fi * 1.2) * breathAmp;
       float r = baseRadius + spacing * fi + breath;
 
-      // Subtle individual wobble (wider orbit for dynamic feel)
+      // Subtle wobble
       vec2 c = center + vec2(
-        sin(t * 0.12 + fi * 1.5) * (0.015 + fi * 0.005),
-        cos(t * 0.10 + fi * 1.9) * (0.012 + fi * 0.004)
+        sin(t * 0.08 + fi * 1.5) * (0.01 + fi * 0.003),
+        cos(t * 0.07 + fi * 1.9) * (0.008 + fi * 0.003)
       );
 
-      float crisp = ring(p, c, r, 0.002);
-      float glow  = ringGlow(p, c, r, 45.0);
-      float glow2 = ringGlow(p, c, r, 8.0);
+      float crisp = ring(p, c, r, 0.0015);
+      float glow  = ringGlow(p, c, r, 55.0);
+      float glow2 = ringGlow(p, c, r, 10.0);
 
-      // Outer rings slightly dimmer
-      float brightness = 1.0 - fi * 0.08;
+      float brightness = 1.0 - fi * 0.1;
 
       vec3 col = colors[i];
-      color += col * crisp * 0.8 * brightness;
-      color += col * glow * 0.32 * brightness;
-      color += col * glow2 * 0.12 * brightness;
+      color += col * crisp * 0.5 * brightness;
+      color += col * glow * 0.15 * brightness;
+      color += col * glow2 * 0.06 * brightness;
     }
 
-    // ── Traveling light dots on each ring ──
-    // Variant dims these for mid-page subtlety
-    float dotBright = 1.0 - uVariant * 0.6;
-    for (int i = 0; i < 5; i++) {
-      float fi = float(i);
-      float r = baseRadius + spacing * fi;
-      vec2 c = center;
-
-      // 2 dots per ring, different speeds
-      float speed1 = 0.2 + fi * 0.05;
-      float speed2 = 0.15 + fi * 0.04;
-      float angle1 = t * speed1 + fi * 1.3;
-      float angle2 = t * speed2 + fi * 2.7 + 3.14159;
-
-      float dot1 = ringDot(p, c, r, angle1, 0.012);
-      float dot2 = ringDot(p, c, r, angle2, 0.009);
-
-      vec3 dotCol = vec3(0.25, 0.55, 0.75);
-      color += dotCol * dot1 * 0.5 * dotBright;
-      color += dotCol * dot2 * 0.3 * dotBright;
-    }
-
-    // ── Floating micro particles (cosmic dust) ──
-    for (int i = 0; i < 12; i++) {
+    // ── Sparse floating particles (minimal) ──
+    for (int i = 0; i < 4; i++) {
       float fi = float(i);
       float px = hash(fi * 13.7) * aspect * 2.0 - aspect;
       float py = hash(fi * 17.3) * 2.0 - 1.0;
-      // Slow drift
-      px += sin(t * 0.05 + fi * 2.1) * 0.04;
-      py += cos(t * 0.04 + fi * 1.8) * 0.03;
+      px += sin(t * 0.03 + fi * 2.1) * 0.03;
+      py += cos(t * 0.025 + fi * 1.8) * 0.02;
       float pd = length(p - vec2(px, py));
-      float sparkle = exp(-pd * pd * 800.0) * (0.3 + 0.2 * sin(t * 0.3 + fi * 5.0));
-      color += vec3(0.20, 0.35, 0.50) * sparkle * (1.0 - uVariant * 0.5);
+      float sparkle = exp(-pd * pd * 1000.0) * (0.15 + 0.1 * sin(t * 0.2 + fi * 5.0));
+      color += vec3(0.15, 0.25, 0.38) * sparkle * (1.0 - uVariant * 0.5);
     }
 
-    // ── Ambient center glow (follows ring center) ──
+    // ── Very subtle center glow ──
     float cDist = length(p - center);
-    color += vec3(0.14, 0.08, 0.28) * exp(-cDist * 2.0) * 0.12;
+    color += vec3(0.10, 0.06, 0.20) * exp(-cDist * 2.5) * 0.06;
 
     // ── Output ──
     // For variant 0 (hero): fully opaque dark background
