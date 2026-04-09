@@ -166,7 +166,7 @@ describe('★ REGRESSION: Landing Page Brand', () => {
         expect(buttonGrads!.length).toBeGreaterThanOrEqual(1);
     });
 
-    it('landing page has dynamic aurora animation', () => {
+    it('landing page has dynamic mesh animation', () => {
         const content = readFileSafe('src/app/landing.css');
         expect(content).toContain('auroraDrift');
         expect(content).toContain('@keyframes auroraDrift');
