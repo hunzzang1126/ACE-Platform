@@ -138,7 +138,7 @@ export function PlugCanvas({ variants, cardRefs, containerRef }: PlugCanvasProps
             className="plug-canvas-svg"
             width={svgW}
             height={svgH}
-            style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none', zIndex: 50, overflow: 'visible' }}
+            style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none', zIndex: -1, overflow: 'visible' }}
         >
             {/* ── Connected cables: animated flowing dotted lines ── */}
             {connections.map(conn => (
@@ -147,7 +147,7 @@ export function PlugCanvas({ variants, cardRefs, containerRef }: PlugCanvasProps
                     <path
                         d={bezierPath(conn.from, conn.to)}
                         fill="none"
-                        stroke="rgba(99, 102, 241, 0.5)"
+                        stroke="rgba(99, 102, 241, 0.3)"
                         strokeWidth={1.5}
                         strokeDasharray="6 4"
                         strokeLinecap="round"

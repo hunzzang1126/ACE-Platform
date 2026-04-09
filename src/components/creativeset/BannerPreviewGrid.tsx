@@ -16,6 +16,7 @@ import { downloadDataURL } from './previewRenderer';
 import { renderVariantWithFabric } from './fabricHeadlessRenderer';
 import { PreviewContextMenu } from './PreviewContextMenu';
 import { CanvasPreviewImage } from './CanvasPreviewImage';
+import { LinkedBadge } from './LinkedBadge';
 
 interface ContextMenuState { x: number; y: number; variantId: string; }
 
@@ -238,7 +239,7 @@ export function BannerPreviewGrid({ variants, visibleIds, externalPlaying }: Pro
                             style={{ position: 'absolute', left: pos.x, top: pos.y, outline: selectedIds.has(variant.id) ? '2px solid #4a9eff' : '2px solid transparent', outlineOffset: -2, transition: 'outline-color 0.15s ease, background 0.15s ease', background: selectedIds.has(variant.id) ? 'rgba(74,158,255,0.06)' : undefined }}
                         >
                             <div className="banner-card-header" style={{ cursor: draggingId ? 'grabbing' : 'grab' }}>
-                                <span className="banner-card-dims">{width} x {height}{(variant.id in plugConnections) && <span className="banner-card-plugged">  PLUGGED</span>}</span>
+                                <span className="banner-card-dims">{width} x {height}{(variant.id in plugConnections) && <LinkedBadge variantId={variant.id} />}</span>
                                 {selectedIds.has(variant.id) && (
                                     <span style={{ width: 16, height: 16, borderRadius: '50%', background: '#4a9eff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
                                         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
