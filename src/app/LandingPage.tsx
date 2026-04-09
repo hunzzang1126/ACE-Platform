@@ -4,7 +4,7 @@
 // Hero → BentoGrid → SmartSizing → Pricing → CTA
 // ─────────────────────────────────────────────────
 
-import { useEffect, useRef, lazy, Suspense } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import gsap from 'gsap';
@@ -15,16 +15,14 @@ import { GlidLogo } from '@/components/brand/GlidLogo';
 import { BentoGrid } from '@/components/landing/BentoGrid';
 import { SmartSizingShowcase } from '@/components/landing/SmartSizingShowcase';
 import { LandingPricing } from './LandingPricing';
-import { setScrollVelocity } from '@/components/landing/SpiralVortex';
+
 import { LandingI18nProvider, useLandingI18n } from '@/components/landing/landingI18n';
 import { LangSelector } from '@/components/landing/LangSelector';
 import './landing.css';
 
 gsap.registerPlugin(ScrollTrigger);
 
-const SpiralVortex = lazy(() =>
-    import('@/components/landing/SpiralVortex').then(m => ({ default: m.SpiralVortex })),
-);
+
 
 const Arrow = () => (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -78,20 +76,7 @@ function LandingPageContent() {
         };
     }, []);
 
-    // ★ GSAP — scroll velocity → vortex
-    useEffect(() => {
-        const ctx = gsap.context(() => {
-            let lastScroll = window.scrollY;
-            const velocityTicker = () => {
-                const cur = window.scrollY;
-                setScrollVelocity(Math.abs(cur - lastScroll) / 16);
-                lastScroll = cur;
-            };
-            gsap.ticker.add(velocityTicker);
-            return () => gsap.ticker.remove(velocityTicker);
-        }, lpRef);
-        return () => ctx.revert();
-    }, []);
+
 
     // ── Hero parallax ──
     const { scrollYProgress } = useScroll({ target: heroRef, offset: ['start start', 'end start'] });
@@ -123,9 +108,7 @@ function LandingPageContent() {
 
             {/* ── Hero ── */}
             <section className="lp-hero" ref={heroRef} style={{ position: 'relative', overflow: 'hidden' }}>
-                <Suspense fallback={null}>
-                    <SpiralVortex />
-                </Suspense>
+
 
                 <motion.div className="lp-hero-content" style={{ y: heroY, opacity: heroOpacity }}>
                     <motion.div className="lp-hero-badge" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3, duration: 0.5 }}>
