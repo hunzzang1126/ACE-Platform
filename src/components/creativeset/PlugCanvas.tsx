@@ -134,17 +134,17 @@ export function PlugCanvas({ variants, cardRefs, containerRef }: PlugCanvasProps
     }
 
     return (
-        <svg
-            className="plug-canvas-svg"
-            width={svgW}
-            height={svgH}
-            style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none', zIndex: -1, overflow: 'visible' }}
-        >
-            {/* ── Connected cables: animated flowing dotted lines ── */}
-            {connections.map(conn => (
-                <g key={conn.id}>
-                    {/* Cable: thin dotted line with flowing animation */}
+        <>
+            {/* ── Background layer: lines BEHIND cards ── */}
+            <svg
+                className="plug-canvas-svg"
+                width={svgW}
+                height={svgH}
+                style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none', zIndex: -1, overflow: 'visible' }}
+            >
+                {connections.map(conn => (
                     <path
+                        key={conn.id}
                         d={bezierPath(conn.from, conn.to)}
                         fill="none"
                         stroke="rgba(99, 102, 241, 0.3)"
@@ -153,91 +153,62 @@ export function PlugCanvas({ variants, cardRefs, containerRef }: PlugCanvasProps
                         strokeLinecap="round"
                         className="plug-cable-flow"
                     />
-                    {/* Disconnect hit area at midpoint */}
-                    <circle
-                        cx={(conn.from.x + conn.to.x) / 2}
-                        cy={(conn.from.y + conn.to.y) / 2}
-                        r={14}
-                        fill="transparent"
-                        style={{ cursor: 'pointer', pointerEvents: 'auto' }}
-                        onClick={(e) => { e.stopPropagation(); disconnectPlug(conn.targetId); recalcPositions(); }}
+                ))}
+            </svg>
+
+            {/* ── Foreground layer: port dots + drag preview ABOVE cards ── */}
+            <svg
+                className="plug-canvas-svg-fg"
+                width={svgW}
+                height={svgH}
+                style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none', zIndex: 50, overflow: 'visible' }}
+            >
+                {/* ── Drag preview: dashed line following mouse ── */}
+                {dragging && (
+                    <path
+                        d={bezierPath(dragging.from, dragging.mouse)}
+                        fill="none"
+                        stroke="rgba(99, 102, 241, 0.6)"
+                        strokeWidth={1.5}
+                        strokeDasharray="6 4"
+                        className="plug-cable-flow"
                     />
-                    {/* Disconnect X — visible on hover only (via CSS) */}
-                    <g
-                        className="plug-disconnect-hint"
-                        style={{ pointerEvents: 'none' }}
-                    >
-                        <circle
-                            cx={(conn.from.x + conn.to.x) / 2}
-                            cy={(conn.from.y + conn.to.y) / 2}
-                            r={8}
-                            fill="rgba(30, 34, 49, 0.95)"
-                            stroke="rgba(255, 100, 100, 0.7)"
-                            strokeWidth={1.5}
-                        />
-                        <line
-                            x1={(conn.from.x + conn.to.x) / 2 - 3}
-                            y1={(conn.from.y + conn.to.y) / 2 - 3}
-                            x2={(conn.from.x + conn.to.x) / 2 + 3}
-                            y2={(conn.from.y + conn.to.y) / 2 + 3}
-                            stroke="rgba(255,100,100,0.8)" strokeWidth={1.5}
-                        />
-                        <line
-                            x1={(conn.from.x + conn.to.x) / 2 + 3}
-                            y1={(conn.from.y + conn.to.y) / 2 - 3}
-                            x2={(conn.from.x + conn.to.x) / 2 - 3}
-                            y2={(conn.from.y + conn.to.y) / 2 + 3}
-                            stroke="rgba(255,100,100,0.8)" strokeWidth={1.5}
-                        />
-                    </g>
-                </g>
-            ))}
+                )}
 
-            {/* ── Drag preview: dashed line following mouse ── */}
-            {dragging && (
-                <path
-                    d={bezierPath(dragging.from, dragging.mouse)}
-                    fill="none"
-                    stroke="rgba(99, 102, 241, 0.6)"
-                    strokeWidth={1.5}
-                    strokeDasharray="6 4"
-                    className="plug-cable-flow"
-                />
-            )}
+                {/* ── Port dots: tiny 4px circles on card edges ── */}
+                {variants.map(v => {
+                    const isPlugged = v.id in plugConnections;
+                    const oPort = positions.origins[v.id];
+                    const tPort = positions.targets[v.id];
 
-            {/* ── Port dots: tiny 4px circles on card edges ── */}
-            {variants.map(v => {
-                const isPlugged = v.id in plugConnections;
-                const oPort = positions.origins[v.id];
-                const tPort = positions.targets[v.id];
+                    return (
+                        <g key={`ports-${v.id}`}>
+                            {/* Output dot (right edge) — draggable */}
+                            {oPort && (
+                                <g
+                                    style={{ cursor: 'crosshair', pointerEvents: 'auto' }}
+                                    onMouseDown={(e) => handlePortMouseDown(e as unknown as React.MouseEvent, v.id)}
+                                >
+                                    <circle cx={oPort.x} cy={oPort.y} r={4} fill="#6366f1" opacity={0.9} />
+                                    {/* Invisible hit area */}
+                                    <circle cx={oPort.x} cy={oPort.y} r={12} fill="transparent" />
+                                </g>
+                            )}
 
-                return (
-                    <g key={`ports-${v.id}`}>
-                        {/* Output dot (right edge) — draggable */}
-                        {oPort && (
-                            <g
-                                style={{ cursor: 'crosshair', pointerEvents: 'auto' }}
-                                onMouseDown={(e) => handlePortMouseDown(e as unknown as React.MouseEvent, v.id)}
-                            >
-                                <circle cx={oPort.x} cy={oPort.y} r={4} fill="#6366f1" opacity={0.9} />
-                                {/* Invisible hit area */}
-                                <circle cx={oPort.x} cy={oPort.y} r={12} fill="transparent" />
-                            </g>
-                        )}
-
-                        {/* Input dot (left edge) */}
-                        {tPort && (
-                            <circle
-                                cx={tPort.x} cy={tPort.y} r={4}
-                                fill={isPlugged ? '#a78bfa' : 'rgba(148, 163, 184, 0.3)'}
-                                strokeDasharray={isPlugged ? undefined : '2 2'}
-                                stroke={isPlugged ? undefined : 'rgba(148,163,184,0.4)'}
-                                strokeWidth={isPlugged ? 0 : 1}
-                            />
-                        )}
-                    </g>
-                );
-            })}
-        </svg>
+                            {/* Input dot (left edge) */}
+                            {tPort && (
+                                <circle
+                                    cx={tPort.x} cy={tPort.y} r={4}
+                                    fill={isPlugged ? '#a78bfa' : 'rgba(148, 163, 184, 0.3)'}
+                                    strokeDasharray={isPlugged ? undefined : '2 2'}
+                                    stroke={isPlugged ? undefined : 'rgba(148,163,184,0.4)'}
+                                    strokeWidth={isPlugged ? 0 : 1}
+                                />
+                            )}
+                        </g>
+                    );
+                })}
+            </svg>
+        </>
     );
 }
