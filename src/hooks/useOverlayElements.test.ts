@@ -128,3 +128,37 @@ describe('useOverlayElements — video save integration', () => {
         expect(src).toContain('saveToUploadLibrary');
     });
 });
+
+// ═════════════════════════════════════════════════
+// ★ REGRESSION GUARD: Image upload = gallery only (v464)
+// triggerImageUpload must NOT create overlay elements.
+// Images go to gallery → user clicks → Fabric engine adds to canvas.
+// ═════════════════════════════════════════════════
+describe('★ REGRESSION: triggerImageUpload is gallery-only', () => {
+    it('triggerImageUpload calls saveToUploadLibrary (gallery)', () => {
+        // Extract the triggerImageUpload function body
+        const fnStart = src.indexOf('const triggerImageUpload');
+        const fnBody = src.slice(fnStart, fnStart + 800);
+        expect(fnBody).toContain('saveToUploadLibrary');
+    });
+
+    it('triggerImageUpload does NOT call addImage (no canvas placement)', () => {
+        // The triggerImageUpload body should not reference addImage
+        const fnStart = src.indexOf('const triggerImageUpload');
+        const fnBody = src.slice(fnStart, fnStart + 800);
+        expect(fnBody).not.toContain('addImage(');
+    });
+
+    it('triggerImageUpload supports multiple files (input.multiple)', () => {
+        const fnStart = src.indexOf('const triggerImageUpload');
+        const fnBody = src.slice(fnStart, fnStart + 800);
+        expect(fnBody).toContain('multiple = true');
+    });
+
+    it('triggerImageUpload has no x/y position parameters', () => {
+        // Should be () => not (x, y) =>
+        const fnStart = src.indexOf('const triggerImageUpload');
+        const signature = src.slice(fnStart, fnStart + 100);
+        expect(signature).toContain('useCallback(() =>');
+    });
+});

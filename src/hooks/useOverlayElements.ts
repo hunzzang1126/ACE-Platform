@@ -127,25 +127,36 @@ export function useOverlayElements(canvasWidth = 300, canvasHeight = 250) {
     }, [canvasWidth, canvasHeight]);
 
     // ── Trigger file input for image ──
-    // Accepts optional (x, y); if omitted, centers on canvas
-    const triggerImageUpload = useCallback((x?: number, y?: number) => {
-        const cx = x ?? Math.round(canvasWidth * 0.1);
-        const cy = y ?? Math.round(canvasHeight * 0.1);
+    // ★ Upload-only: saves to gallery. User clicks gallery item to add to canvas.
+    // This ensures all images go through the Fabric engine path (fill-to-page, etc.)
+    const triggerImageUpload = useCallback(() => {
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = 'image/*';
+        input.multiple = true;
         input.style.display = 'none';
         input.onchange = (e) => {
-            const file = (e.target as HTMLInputElement).files?.[0];
-            if (file) {
-                addImage(cx, cy, file);
+            const files = (e.target as HTMLInputElement).files;
+            if (files) {
+                Array.from(files).forEach(file => {
+                    const reader = new FileReader();
+                    reader.onload = (evt) => {
+                        const src = evt.target?.result as string;
+                        const img = new Image();
+                        img.onload = () => {
+                            saveToUploadLibrary(src, file.name, img.width, img.height, 'user').catch(console.error);
+                        };
+                        img.src = src;
+                    };
+                    reader.readAsDataURL(file);
+                });
             }
             document.body.removeChild(input);
         };
         document.body.appendChild(input);
         input.click();
         fileInputRef.current = input;
-    }, [addImage, canvasWidth, canvasHeight]);
+    }, []);
 
     // ── Add video (from file) ──
     // Scales to fit 80% of canvas (preserving aspect ratio), no arbitrary cap

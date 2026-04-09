@@ -22,11 +22,11 @@ interface Props {
     engineRef?: React.RefObject<unknown>; state: CanvasEngineState; actions: CanvasEngineActions; retryInit?: () => void;
     overlayElements?: OverlayElement[]; selectedOverlayId?: string | null;
     onOverlaySelect?: (id: string | null) => void; onOverlayUpdate?: (id: string, updates: Partial<OverlayElement>) => void; onOverlayDelete?: (id: string) => void;
-    onAddText?: (x: number, y: number) => void; onTriggerImageUpload?: (x: number, y: number) => void; onTriggerVideoUpload?: (x: number, y: number) => void;
+    onAddText?: (x: number, y: number) => void; onTriggerVideoUpload?: (x: number, y: number) => void;
     children?: React.ReactNode;
 }
 
-export function EditorCanvas({ variant, canvasRef, overlayRef, engineRef, state, actions, retryInit, overlayElements = [], selectedOverlayId, onOverlaySelect, onOverlayUpdate, onOverlayDelete, onAddText, onTriggerImageUpload, onTriggerVideoUpload, children }: Props) {
+export function EditorCanvas({ variant, canvasRef, overlayRef, engineRef, state, actions, retryInit, overlayElements = [], selectedOverlayId, onOverlaySelect, onOverlayUpdate, onOverlayDelete, onAddText, onTriggerVideoUpload, children }: Props) {
     const { width, height } = variant.preset;
     const activeTool = useEditorStore(s => s.activeTool);
     const setTool = useEditorStore(s => s.setTool);
