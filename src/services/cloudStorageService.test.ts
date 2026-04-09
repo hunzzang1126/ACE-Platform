@@ -34,11 +34,13 @@ Object.defineProperty(globalThis, 'crypto', {
 import {
     isStorageRef, isCloudUrl, getCurrentUserId,
     resolveCloudUrl, deleteFromCloud, uploadToCloud,
+    clearSignedUrlCache,
 } from './cloudStorageService';
 
 describe('cloudStorageService', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        clearSignedUrlCache();  // ★ Prevent cache hits from previous tests
     });
 
     describe('isStorageRef', () => {

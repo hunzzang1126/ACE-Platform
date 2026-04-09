@@ -149,7 +149,7 @@ export function BannerPreviewGrid({ variants, visibleIds, externalPlaying }: Pro
         return () => { cancelled = true; };
     }, [visibleVariants]);
 
-    // Resolve idb:// and storage:// image URLs
+    // Resolve idb:// and storage:// image URLs — ★ PARALLEL for speed
     useEffect(() => {
         let cancelled = false;
         const toResolve: { elId: string; src: string }[] = [];
@@ -157,9 +157,19 @@ export function BannerPreviewGrid({ variants, visibleIds, externalPlaying }: Pro
         if (toResolve.length === 0) return;
         (async () => {
             const { resolveAsset } = await import('@/services/assetService');
-            for (const { elId, src } of toResolve) {
-                if (cancelled) break;
-                try { const blobUrl = await resolveAsset(src); if (!cancelled && blobUrl !== src) setResolvedImageUrls(prev => ({ ...prev, [elId]: blobUrl })); } catch { /* skip */ }
+            const results = await Promise.all(
+                toResolve.map(async ({ elId, src }) => {
+                    try { return { elId, blobUrl: await resolveAsset(src) }; }
+                    catch { return { elId, blobUrl: src }; }
+                })
+            );
+            if (!cancelled) {
+                const resolved: Record<string, string> = {};
+                for (const { elId, blobUrl } of results) {
+                    const orig = toResolve.find(r => r.elId === elId);
+                    if (blobUrl !== orig?.src) resolved[elId] = blobUrl;
+                }
+                if (Object.keys(resolved).length > 0) setResolvedImageUrls(prev => ({ ...prev, ...resolved }));
             }
         })();
         return () => { cancelled = true; };

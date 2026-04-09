@@ -58,12 +58,20 @@ export async function uploadToCloud(
     return ref;
 }
 
+// ── Signed URL Cache (55min TTL — 5min safety margin before 1hr expiry) ──
+const _signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
+const CACHE_TTL_MS = 55 * 60 * 1000;
+
 /**
  * Resolve a storage:// ref to a signed URL for display.
- * Returns a time-limited URL (1 hour). Re-resolve on each session.
+ * ★ Cached in-memory with 55min TTL — avoids redundant network calls.
  */
 export async function resolveCloudUrl(ref: string): Promise<string | null> {
     if (!isStorageRef(ref)) return null;
+
+    // ★ Cache hit — return instantly
+    const cached = _signedUrlCache.get(ref);
+    if (cached && Date.now() < cached.expiresAt) return cached.url;
 
     const sb = getSupabase();
     if (!sb) return null;
@@ -76,8 +84,15 @@ export async function resolveCloudUrl(ref: string): Promise<string | null> {
         return null;
     }
 
+    // ★ Cache the result
+    _signedUrlCache.set(ref, { url: data.signedUrl, expiresAt: Date.now() + CACHE_TTL_MS });
     return data.signedUrl;
 }
+
+/** Clear signed URL cache. Exported for testing. */
+export function clearSignedUrlCache(): void { _signedUrlCache.clear(); }
+/** Get cache size. Exported for testing. */
+export function getSignedUrlCacheSize(): number { return _signedUrlCache.size; }
 
 /**
  * Delete a file from Supabase Storage by storage:// ref.
