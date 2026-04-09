@@ -200,7 +200,7 @@ export function useFabricCanvas(width: number, height: number, _addDemoShapes = 
         const fc = fabricRef.current; if (!fc) return null;
         const id = nextId();
         const tb = new Textbox(content || 'Type here...', { left: x, top: y, width: opts?.width ?? 200, fontSize: opts?.fontSize ?? 18, fontFamily: opts?.fontFamily ?? 'Inter, system-ui, sans-serif', fontWeight: opts?.fontWeight ?? '400', fill: opts?.color ?? '#000000', textAlign: (opts?.textAlign as any) ?? 'left', lineHeight: opts?.lineHeight ?? 1.15, editable: true, splitByGrapheme: false });
-        tb.setControlsVisibility({ tl: true, tr: true, bl: true, br: true, mt: false, mb: false, ml: true, mr: true, mtr: false });
+        tb.setControlsVisibility({ tl: true, tr: true, bl: true, br: true, mt: false, mb: false, ml: true, mr: true, mtr: true });
         (tb as any).__glidId = id; (tb as any).__glidName = `Text #${id}`; (tb as any).__glidZIndex = getUserObjects().length; patchAceProps(tb);
         fc.add(tb); fc.setActiveObject(tb); fc.renderAll(); syncState();
         return id;

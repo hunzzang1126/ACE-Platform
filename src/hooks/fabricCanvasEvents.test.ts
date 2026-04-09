@@ -81,6 +81,30 @@ describe('★ REGRESSION: Figma-style transform badges', () => {
 });
 
 // ═════════════════════════════════════════════════
+// ★ REGRESSION GUARD: Rotation handle enabled (v463)
+// mtr: true must be set so users can rotate all elements
+// ═════════════════════════════════════════════════
+describe('★ REGRESSION: Rotation handle (mtr) enabled (v463)', () => {
+    const srcCanvas = readFileSync(resolve(__dirname, './useFabricCanvas.ts'), 'utf-8');
+
+    it('fabricCanvasEvents sets mtr: true for Textbox', () => {
+        expect(src).toContain('mtr: true');
+    });
+
+    it('fabricCanvasEvents does NOT set mtr: false', () => {
+        expect(src).not.toContain('mtr: false');
+    });
+
+    it('useFabricCanvas sets mtr: true for addText', () => {
+        expect(srcCanvas).toContain('mtr: true');
+    });
+
+    it('useFabricCanvas does NOT set mtr: false anywhere', () => {
+        expect(srcCanvas).not.toContain('mtr: false');
+    });
+});
+
+// ═════════════════════════════════════════════════
 // ★ REGRESSION GUARD: Line element handler (v420)
 // ═════════════════════════════════════════════════
 
@@ -142,22 +166,31 @@ describe('★ REGRESSION: Transform badge ghost trail fix (v426)', () => {
 // ★ REGRESSION GUARD: Text uniform corner scaling (v427)
 // Corner handles should lock aspect ratio like shapes
 // ═════════════════════════════════════════════════
-describe('★ REGRESSION: Text uniform corner scaling (v427)', () => {
+describe('★ REGRESSION: Text proportional corner scaling', () => {
 
-    it('forces scaleX === scaleY on corner drag', () => {
-        expect(src).toContain('obj.set({ scaleX: uniformScale, scaleY: uniformScale })');
+    it('saves original fontSize at drag start (__glidOrigFontSize)', () => {
+        const saveIdx = src.indexOf('if (!(obj as any).__glidOrigFontSize)');
+        expect(saveIdx).toBeGreaterThan(-1);
+        expect(src).toContain('__glidOrigFontSize = obj.fontSize');
     });
 
-    it('uses larger axis change for uniform factor (not Math.max)', () => {
-        // v427 replaced Math.max(scaleX, scaleY) with axis-change-based logic
-        expect(src).toContain('Math.abs(sx - 1) >= Math.abs(sy - 1) ? sx : sy');
-        // Old pattern should NOT exist
-        expect(src).not.toContain('Math.max(obj.scaleX ?? 1, obj.scaleY ?? 1)');
+    it('saves original width at drag start (__glidOrigWidth)', () => {
+        expect(src).toContain('__glidOrigWidth = obj.width');
+    });
+
+    it('computes new fontSize from origFontSize * scale', () => {
+        expect(src).toContain('origFontSize * scale');
+    });
+
+    it('computes new width from origWidth * scale', () => {
+        expect(src).toContain('origWidth * scale');
+    });
+
+    it('uses Math.max(sx, sy) for uniform scale factor', () => {
+        expect(src).toContain('Math.max(sx, sy)');
     });
 
     it('side handles only adjust width (no uniform scaling)', () => {
-        // The else branch should only set width, not fontSize
-        // Check that 'Side handles' comment exists for documentation
         expect(src).toContain('Side handles (ml/mr): only adjust width');
     });
 
@@ -165,12 +198,16 @@ describe('★ REGRESSION: Text uniform corner scaling (v427)', () => {
         expect(src).toContain('Math.max(6, Math.min(400');
     });
 
-    it('stores original font size for proportional calculation', () => {
-        expect(src).toContain('__glidOrigFontSize');
+    it('resets scaleX/scaleY to 1 after applying', () => {
+        expect(src).toContain('scaleX: 1, scaleY: 1');
     });
 
-    it('resets __glidOrigFontSize on object:modified', () => {
+    it('cleans up __glidOrigFontSize on object:modified', () => {
         expect(src).toContain("delete (opt.target as any).__glidOrigFontSize");
+    });
+
+    it('cleans up __glidOrigWidth on object:modified', () => {
+        expect(src).toContain("delete (opt.target as any).__glidOrigWidth");
     });
 });
 

@@ -49,19 +49,24 @@ export function setupCanvasEvents({
         const corner = (obj as any).__corner;
         const isCorner = corner && ['tl', 'tr', 'bl', 'br'].includes(corner);
         if (isCorner) {
-            // ★ Uniform scale: lock aspect ratio on corner drag (like shapes/images)
+            // ★ Corner drag = proportional font+width scaling (Figma behavior)
+            // Save originals at drag start
+            if (!(obj as any).__glidOrigFontSize) {
+                (obj as any).__glidOrigFontSize = obj.fontSize ?? 18;
+                (obj as any).__glidOrigWidth = obj.width ?? 200;
+            }
+            const origFontSize = (obj as any).__glidOrigFontSize as number;
+            const origWidth = (obj as any).__glidOrigWidth as number;
+
+            // Use the larger scale factor for uniform scaling
             const sx = obj.scaleX ?? 1;
             const sy = obj.scaleY ?? 1;
-            // Use the axis with greater change as the uniform factor
-            const uniformScale = Math.abs(sx - 1) >= Math.abs(sy - 1) ? sx : sy;
-            // Force both axes to the same scale (prevents distortion)
-            obj.set({ scaleX: uniformScale, scaleY: uniformScale });
+            const scale = Math.max(sx, sy);
 
-            const origFontSize = (obj as any).__glidOrigFontSize ?? obj.fontSize ?? 18;
-            if (!(obj as any).__glidOrigFontSize) (obj as any).__glidOrigFontSize = obj.fontSize ?? 18;
-            const newFontSize = Math.max(6, Math.min(400, Math.round(origFontSize * uniformScale)));
-            const newWidth = (obj.width ?? 200) * uniformScale;
-            obj.set({ fontSize: newFontSize, width: Math.max(20, newWidth), scaleX: 1, scaleY: 1 });
+            const newFontSize = Math.max(6, Math.min(400, Math.round(origFontSize * scale)));
+            const newWidth = Math.max(20, origWidth * scale);
+
+            obj.set({ fontSize: newFontSize, width: newWidth, scaleX: 1, scaleY: 1 });
         } else {
             // Side handles (ml/mr): only adjust width, no font size change
             const newWidth = (obj.width ?? 200) * (obj.scaleX ?? 1);
@@ -69,10 +74,11 @@ export function setupCanvasEvents({
         }
     });
 
-    // Reset original font size ref after scaling ends
+    // Reset original dimension refs after scaling ends
     fc.on('object:modified', (opt) => {
         if (opt.target instanceof Textbox) {
             delete (opt.target as any).__glidOrigFontSize;
+            delete (opt.target as any).__glidOrigWidth;
         }
     });
 
