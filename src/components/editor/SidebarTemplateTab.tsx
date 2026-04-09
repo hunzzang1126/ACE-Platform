@@ -278,6 +278,16 @@ function applyVariantToCanvas(variant: BannerVariant, actions: CanvasEngineActio
                 lineHeight: el.lineHeight,
                 width: w,
             });
+
+            // ★ FIX: Apply textEffect (glow, outline, neon, etc.) — previously not carried over from templates
+            if (nodeId != null && el.textEffect && el.textEffect.type !== 'none') {
+                actions.setTextEffect(nodeId, el.textEffect.type, el.textEffect.intensity ?? 50, el.textEffect.color ?? '#ffffff');
+            }
+            // ★ FIX: Apply shadow — previously not carried over from templates
+            if (nodeId != null && el.shadow) {
+                const sc = parseShadowColorLocal(el.shadow.color);
+                actions.setShadow(nodeId, el.shadow.offsetX, el.shadow.offsetY, el.shadow.blur, sc[0], sc[1], sc[2], sc[3]);
+            }
         } else if (el.type === 'button') {
             const bgHex = el.backgroundColor || '#7c3aed';
             nodeId = actions.addGradientRect(
@@ -302,6 +312,13 @@ function applyVariantToCanvas(variant: BannerVariant, actions: CanvasEngineActio
         // ★ FIX: Apply opacity AFTER creation — previously lost for ALL element types
         if (nodeId != null && el.opacity !== undefined && el.opacity !== 1) {
             actions.setNodeOpacity(nodeId, el.opacity);
+        }
+
+        // ★ FIX: Apply shadow for non-text elements (shapes, images) — previously not carried over
+        if (nodeId != null && el.type !== 'text' && (el as any).shadow) {
+            const s = (el as any).shadow;
+            const sc = parseShadowColorLocal(s.color);
+            actions.setShadow(nodeId, s.offsetX, s.offsetY, s.blur, sc[0], sc[1], sc[2], sc[3]);
         }
     }
 
@@ -344,4 +361,13 @@ function parseColor(c: string): { r: number; g: number; b: number } | null {
         };
     }
     return null;
+}
+
+// ── Parse shadow color → [r,g,b,a] floats (same logic as canvasSyncHelpers.parseShadowColor) ──
+function parseShadowColorLocal(color: string): [number, number, number, number] {
+    const m = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+    if (m) return [parseInt(m[1]!) / 255, parseInt(m[2]!) / 255, parseInt(m[3]!) / 255, m[4] !== undefined ? parseFloat(m[4]!) : 1.0];
+    const hex = color.replace('#', '');
+    if (hex.length >= 6) return [parseInt(hex.slice(0, 2), 16) / 255, parseInt(hex.slice(2, 4), 16) / 255, parseInt(hex.slice(4, 6), 16) / 255, 1.0];
+    return [0, 0, 0, 0.5];
 }
