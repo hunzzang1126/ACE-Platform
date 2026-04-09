@@ -152,7 +152,7 @@ function LandingPageContent() {
                     </motion.div>
                 </motion.div>
 
-                {/* 3D Floating Canvas Preview */}
+                {/* 3D Floating Demo Video */}
                 <motion.div
                     className="hero-canvas-3d"
                     style={{ scale: canvasScale, y: canvasY, rotateX: canvasRotateX }}
@@ -160,29 +160,24 @@ function LandingPageContent() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 1.1, duration: 1, ease: [0.16, 1, 0.3, 1] }}
                 >
-                    <div className="hero-canvas-frame">
-                        <div className="hero-canvas-toolbar">
+                    <div className="hero-video-frame">
+                        <div className="hero-video-chrome">
                             <div className="hero-canvas-dots"><span /><span /><span /></div>
-                            <div className="hero-canvas-tabs">
-                                <span className="active">Canvas</span>
-                                <span>Layers</span>
-                                <span>AI</span>
-                            </div>
+                            <span className="hero-video-url">glid.ai</span>
                         </div>
-                        <div className="hero-canvas-body">
-                            <div className="hero-canvas-sidebar">
-                                <div className="hc-layer" /><div className="hc-layer" /><div className="hc-layer short" />
-                            </div>
-                            <div className="hero-canvas-main">
-                                <div className="hc-shape hc-rect" />
-                                <div className="hc-shape hc-circle" />
-                                <div className="hc-shape hc-text">Headline</div>
-                            </div>
-                            <div className="hero-canvas-props">
-                                <div className="hc-prop" /><div className="hc-prop" /><div className="hc-prop short" />
-                            </div>
+                        <div className="hero-video-container">
+                            <video
+                                className="hero-demo-video"
+                                src="/video/glid_DEMO.mp4"
+                                autoPlay
+                                muted
+                                loop
+                                playsInline
+                                preload="auto"
+                            />
                         </div>
                     </div>
+                    <div className="hero-video-glow" />
                 </motion.div>
             </section>
 

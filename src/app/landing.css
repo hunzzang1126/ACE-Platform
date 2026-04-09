@@ -246,21 +246,25 @@
     margin: 0 auto;
     perspective: 1200px;
 }
-.hero-canvas-frame {
-    background: rgba(255,255,255,0.03);
+.hero-video-frame {
+    position: relative;
+    background: rgba(15, 15, 20, 0.85);
     border: 1px solid rgba(255,255,255,0.08);
     border-radius: 16px;
     overflow: hidden;
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    box-shadow: 0 40px 120px rgba(0,0,0,0.6), 0 0 60px rgba(0,255,214,0.03);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    box-shadow:
+        0 40px 120px rgba(0,0,0,0.6),
+        0 0 0 1px rgba(255,255,255,0.03) inset;
 }
-.hero-canvas-toolbar {
+.hero-video-chrome {
     display: flex;
     align-items: center;
     padding: 12px 16px;
     border-bottom: 1px solid rgba(255,255,255,0.06);
     gap: 16px;
+    background: rgba(255,255,255,0.02);
 }
 .hero-canvas-dots {
     display: flex;
@@ -275,83 +279,38 @@
 .hero-canvas-dots span:first-child { background: rgba(255,59,48,0.5); }
 .hero-canvas-dots span:nth-child(2) { background: rgba(255,204,0,0.5); }
 .hero-canvas-dots span:last-child { background: rgba(52,199,89,0.5); }
-.hero-canvas-tabs {
-    display: flex;
-    gap: 4px;
-}
-.hero-canvas-tabs span {
-    padding: 4px 12px;
+.hero-video-url {
     font-size: 11px;
-    color: #64748b;
+    font-weight: 600;
+    color: rgba(255,255,255,0.3);
+    letter-spacing: 0.5px;
+    padding: 3px 16px;
+    background: rgba(255,255,255,0.03);
     border-radius: 6px;
-    font-weight: 500;
+    border: 1px solid rgba(255,255,255,0.04);
 }
-.hero-canvas-tabs span.active {
-    color: #e2e8f0;
-    background: rgba(255,255,255,0.06);
-}
-.hero-canvas-body {
-    display: grid;
-    grid-template-columns: 140px 1fr 120px;
-    height: 280px;
-}
-.hero-canvas-sidebar {
-    border-right: 1px solid rgba(255,255,255,0.04);
-    padding: 16px 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-.hc-layer {
-    height: 28px;
-    border-radius: 6px;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.06);
-}
-.hc-layer.short { width: 70%; }
-.hero-canvas-main {
+.hero-video-container {
     position: relative;
-    background: rgba(0,0,0,0.3);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 20px;
-    padding: 20px;
+    line-height: 0;
 }
-.hc-shape { transition: all 0.3s; }
-.hc-rect {
-    width: 80px;
-    height: 60px;
-    border-radius: 8px;
-    background: linear-gradient(135deg, rgba(0,255,214,0.1), rgba(0,255,214,0.04));
-    border: 1px solid rgba(0,255,214,0.2);
+.hero-demo-video {
+    width: 100%;
+    height: auto;
+    display: block;
+    object-fit: cover;
 }
-.hc-circle {
-    width: 50px;
-    height: 50px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, rgba(129,140,248,0.15), rgba(129,140,248,0.05));
-    border: 1px solid rgba(129,140,248,0.2);
+/* Cinematic glow underneath */
+.hero-video-glow {
+    position: absolute;
+    bottom: -60px;
+    left: 10%;
+    right: 10%;
+    height: 120px;
+    background: radial-gradient(ellipse, rgba(99,102,241,0.12) 0%, rgba(0,255,214,0.06) 40%, transparent 70%);
+    filter: blur(40px);
+    pointer-events: none;
+    z-index: -1;
 }
-.hc-text {
-    font-size: 18px;
-    font-weight: 700;
-    color: rgba(255,255,255,0.6);
-    letter-spacing: -0.02em;
-}
-.hero-canvas-props {
-    border-left: 1px solid rgba(255,255,255,0.04);
-    padding: 16px 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-.hc-prop {
-    height: 20px;
-    border-radius: 4px;
-    background: rgba(255,255,255,0.04);
-}
-.hc-prop.short { width: 60%; }
 
 /* ════════════════════════════
    BENTO GRID
@@ -792,9 +751,7 @@
     .lp-nav-links { display: none; }
     .lp-hero-title { font-size: 48px; }
     .lp-hero { padding: 120px 24px 40px; }
-    .hero-canvas-body { grid-template-columns: 1fr; height: auto; }
-    .hero-canvas-sidebar,
-    .hero-canvas-props { display: none; }
+    .hero-video-frame { border-radius: 12px; }
     .bento-grid { grid-template-columns: 1fr; }
     .bento-card--wide { grid-column: span 1; }
     .bento-section { padding: 80px 24px; }
