@@ -675,7 +675,7 @@
 
 .sidebar-drop-zone.dragging {
     border-color: var(--accent);
-    background: rgba(124, 58, 237, 0.04);
+    background: rgba(99, 102, 241, 0.04);
 }
 
 .drop-zone-hint {
@@ -709,7 +709,7 @@
 }
 
 .uploads-ai-badge {
-    background: linear-gradient(135deg, #7c3aed20, #a78bfa30);
+    background: linear-gradient(135deg, #6366F120, #818CF830);
     color: var(--accent);
 }
 
@@ -765,7 +765,7 @@
     font-weight: 700;
     padding: 1px 5px;
     border-radius: 4px;
-    background: linear-gradient(135deg, #7c3aed, #a78bfa);
+    background: linear-gradient(135deg, #6366F1, #818CF8);
     color: #fff;
     letter-spacing: 0.04em;
     text-transform: uppercase;
@@ -897,7 +897,7 @@
 .anim-tab-btn:hover { color: var(--text-primary); background: var(--bg-hover); }
 .anim-tab-btn.active {
     background: var(--accent); color: #fff;
-    box-shadow: 0 1px 3px rgba(124, 58, 237, 0.3);
+    box-shadow: 0 1px 3px rgba(99, 102, 241, 0.3);
 }
 
 /* Preset grid */
@@ -912,7 +912,7 @@
     cursor: pointer; transition: all 0.15s;
 }
 .inline-preset-btn:hover { background: var(--bg-hover); }
-.inline-preset-btn.active { border-color: var(--accent); background: rgba(124, 58, 237, 0.08); }
+.inline-preset-btn.active { border-color: var(--accent); background: rgba(99, 102, 241, 0.08); }
 .inline-preset-label { font-size: 10px; color: var(--text-secondary); white-space: nowrap; }
 .inline-preset-preview {
     width: 40px; height: 40px; border-radius: 6px;

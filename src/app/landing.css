@@ -5,7 +5,7 @@
 
 /* ── Base ── */
 .lp {
-    background: #050505;
+    background: #0B0F1A;
     color: #e2e8f0;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     overflow-x: hidden;
@@ -14,25 +14,36 @@
     position: relative;
 }
 
-/* ── Ambient glow background (subtle) ── */
+/* ── Dynamic gradient mesh background ── */
 .lp::before {
     content: '';
     position: fixed;
     inset: 0;
     z-index: 1;
     pointer-events: none;
-    mix-blend-mode: screen;
     background:
-        radial-gradient(ellipse 600px 600px at 25% 40%, rgba(45,212,191,0.05), transparent 70%),
-        radial-gradient(ellipse 500px 500px at 75% 55%, rgba(99,102,241,0.04), transparent 70%);
-    animation: ambientDrift 30s ease-in-out infinite alternate;
+        radial-gradient(ellipse 700px 700px at 20% 30%, rgba(45,212,191,0.10), transparent 65%),
+        radial-gradient(ellipse 500px 500px at 70% 60%, rgba(99,102,241,0.08), transparent 65%),
+        radial-gradient(ellipse 400px 400px at 50% 80%, rgba(45,212,191,0.05), transparent 70%),
+        radial-gradient(ellipse 300px 300px at 80% 15%, rgba(99,102,241,0.04), transparent 70%);
+    animation: meshDrift 20s ease-in-out infinite alternate;
 }
-@keyframes ambientDrift {
+@keyframes meshDrift {
     0% {
-        background-position: 0% 0%, 100% 50%;
+        transform: translate(0, 0) scale(1);
+        opacity: 0.8;
+    }
+    33% {
+        transform: translate(-30px, 20px) scale(1.05);
+        opacity: 1;
+    }
+    66% {
+        transform: translate(20px, -15px) scale(0.97);
+        opacity: 0.9;
     }
     100% {
-        background-position: 15% 15%, 85% 65%;
+        transform: translate(-10px, 30px) scale(1.03);
+        opacity: 1;
     }
 }
 /* Film grain overlay */
@@ -51,7 +62,7 @@
 
 /* ── Shared Typography ── */
 .lp-gradient-text {
-    background: linear-gradient(135deg, #2DD4BF, #818cf8, #c084fc);
+    background: linear-gradient(135deg, #2DD4BF 0%, #6366F1 60%, #818cf8 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -93,7 +104,7 @@
 .lp-nav-actions { display: flex; gap: 8px; align-items: center; }
 .lp-nav-cta {
     padding: 8px 18px;
-    background: linear-gradient(135deg, #2DD4BF, #818cf8);
+    background: linear-gradient(135deg, #6366F1, #2DD4BF);
     color: #050505; font-size: 13px; font-weight: 700;
     border: none; border-radius: 8px; cursor: pointer;
     transition: opacity 0.2s, transform 0.2s;
@@ -211,7 +222,7 @@
     align-items: center;
     gap: 8px;
     padding: 14px 28px;
-    background: linear-gradient(135deg, #2DD4BF, #818cf8);
+    background: linear-gradient(135deg, #6366F1, #2DD4BF);
     color: #050505;
     font-weight: 700;
     font-size: 14px;
@@ -602,7 +613,7 @@
     position: absolute;
     top: -12px; left: 50%; transform: translateX(-50%);
     padding: 4px 14px;
-    background: linear-gradient(135deg, #2DD4BF, #818cf8);
+    background: linear-gradient(135deg, #6366F1, #2DD4BF);
     color: #050505;
     font-size: 10px; font-weight: 800;
     text-transform: uppercase;
@@ -643,7 +654,7 @@
     border-color: rgba(255,255,255,0.15);
 }
 .lp-price-cta--primary {
-    background: linear-gradient(135deg, #2DD4BF, #818cf8);
+    background: linear-gradient(135deg, #6366F1, #2DD4BF);
     border: none;
     color: #050505;
 }

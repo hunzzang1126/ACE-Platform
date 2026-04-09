@@ -23,26 +23,26 @@ export const colors = {
         default: 'rgba(0, 0, 0, 0.03)',
         hover: '#f3f0ff',
         active: '#ede9fe',
-        selected: 'rgba(124, 58, 237, 0.08)',
+        selected: 'rgba(99, 102, 241, 0.08)',
     },
     border: {
         default: 'rgba(0, 0, 0, 0.08)',
         subtle: 'rgba(0, 0, 0, 0.04)',
         strong: 'rgba(0, 0, 0, 0.15)',
-        focus: '#7c3aed',
+        focus: '#6366F1',
     },
     text: {
         primary: '#1a1a2e',
         secondary: '#64748b',
         muted: '#94a3b8',
-        link: '#7c3aed',
+        link: '#6366F1',
         inverse: '#ffffff',
     },
     // ── Semantic ──
     accent: {
-        blue: '#7c3aed',
-        blueHover: '#6d28d9',
-        blueSubtle: 'rgba(124, 58, 237, 0.08)',
+        blue: '#6366F1',
+        blueHover: '#818CF8',
+        blueSubtle: 'rgba(99, 102, 241, 0.08)',
     },
     success: {
         default: '#10b981',
@@ -61,10 +61,10 @@ export const colors = {
     },
     // ── Canvas ──
     canvas: {
-        selection: '#7c3aed',
-        selectionFill: 'rgba(124, 58, 237, 0.08)',
+        selection: '#6366F1',
+        selectionFill: 'rgba(99, 102, 241, 0.08)',
         guideEdge: '#f43f5e',
-        guideCenter: '#06b6d4',
+        guideCenter: '#2DD4BF',
         guideSpacing: '#f59e0b',
     },
 } as const;

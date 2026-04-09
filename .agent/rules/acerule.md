@@ -42,6 +42,33 @@ trigger: always_on
 
 ---
 
+# BRAND IDENTITY — GLID DESIGN SYSTEM (ABSOLUTE RULE)
+
+> **Official Brand Palette — derived from the product demo video:**
+>
+> | Role | Color | HEX | Usage |
+> |------|-------|-----|-------|
+> | **Primary** | Mint Teal | `#2DD4BF` | Main accent, badges, active states |
+> | **Secondary** | Indigo | `#6366F1` | Buttons (gradient start), links, focus rings |
+> | **Dark BG** | Deep Navy | `#0B0F1A` | Dark theme background, landing page |
+> | **Light BG** | Soft Gray | `#F0F2F5` | Light theme background |
+> | **Text Dark** | Near Black | `#1A1A2E` | Text on light backgrounds |
+> | **Text Light** | Soft White | `#F1F5F9` | Text on dark backgrounds |
+> | **Canvas BG** | Warm White | `#FFFFFF` | Canvas/card surfaces |
+>
+> **Gradient Rules:**
+> - **CTA/Button gradient**: `linear-gradient(135deg, #6366F1, #2DD4BF)` (Indigo → Mint)
+> - **Gradient text**: `linear-gradient(135deg, #2DD4BF, #818cf8, #c084fc)` — purple (#c084fc) is **only** the tail end
+> - **Purple usage**: `#c084fc` / `#818cf8` may appear ONLY as a subtle gradient endpoint. **NEVER as a primary or dominant color.**
+> - **No standalone purple**: No `#7c3aed`, no purple backgrounds, no purple text. If purple is visible, it must be blended with teal/indigo in a gradient.
+>
+> **Contrast Rules:**
+> - Light mode: dark text (`#1A1A2E`) on light backgrounds (`#F0F2F5`)
+> - Dark mode: light text (`#F1F5F9`) on dark backgrounds (`#0B0F1A`)
+> - Buttons with gradient backgrounds → **always white text** (`#FFFFFF`)
+
+---
+
 # AI AGENT QUALITY STANDARD — CURSOR IS THE MINIMUM BENCHMARK
 
 > **ACE's AI agent MUST surpass Cursor-level quality. This is non-negotiable.**

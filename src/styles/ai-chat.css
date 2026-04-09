@@ -23,7 +23,7 @@
     width: 220px;
     height: 220px;
     border-radius: 50%;
-    background: radial-gradient(circle, rgba(124, 58, 237, 0.12) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(99, 102, 241, 0.12) 0%, transparent 70%);
     filter: blur(40px);
     pointer-events: none;
     z-index: 0;
@@ -41,7 +41,7 @@
     justify-content: space-between;
     align-items: center;
     padding: 14px 16px;
-    border-bottom: 1px solid rgba(124, 58, 237, 0.08);
+    border-bottom: 1px solid rgba(99, 102, 241, 0.08);
     background: rgba(255, 255, 255, 0.5);
     backdrop-filter: blur(12px);
     z-index: 2;
@@ -58,11 +58,11 @@
     width: 32px;
     height: 32px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #7c3aed, #06b6d4);
+    background: linear-gradient(135deg, #6366F1, #2DD4BF);
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 0 16px rgba(124, 58, 237, 0.3);
+    box-shadow: 0 0 16px rgba(99, 102, 241, 0.3);
 }
 
 .ai-orb-inner {
@@ -114,7 +114,7 @@
     height: 32px;
     border-radius: 8px;
     border: none;
-    background: rgba(124, 58, 237, 0.06);
+    background: rgba(99, 102, 241, 0.06);
     color: #64748b;
     cursor: pointer;
     display: flex;
@@ -124,14 +124,14 @@
 }
 
 .ai-header-btn:hover {
-    background: rgba(124, 58, 237, 0.12);
-    color: #7c3aed;
+    background: rgba(99, 102, 241, 0.12);
+    color: #6366F1;
 }
 
 /* ── Settings ── */
 .ai-settings {
     padding: 14px 16px;
-    border-bottom: 1px solid rgba(124, 58, 237, 0.08);
+    border-bottom: 1px solid rgba(99, 102, 241, 0.08);
     background: rgba(255, 255, 255, 0.6);
     display: flex;
     flex-direction: column;
@@ -151,7 +151,7 @@
 
 .ai-settings-input {
     background: rgba(255, 255, 255, 0.8);
-    border: 1px solid rgba(124, 58, 237, 0.1);
+    border: 1px solid rgba(99, 102, 241, 0.1);
     border-radius: 8px;
     padding: 6px 10px;
     color: #1e293b;
@@ -162,12 +162,12 @@
 }
 
 .ai-settings-input:focus {
-    border-color: #7c3aed;
+    border-color: #6366F1;
 }
 
 .ai-settings-save {
     align-self: flex-end;
-    background: linear-gradient(135deg, #7c3aed, #06b6d4);
+    background: linear-gradient(135deg, #6366F1, #2DD4BF);
     border: none;
     border-radius: 8px;
     padding: 6px 16px;
@@ -214,11 +214,11 @@
     width: 64px;
     height: 64px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #7c3aed, #06b6d4, #10b981);
+    background: linear-gradient(135deg, #6366F1, #2DD4BF, #10b981);
     background-size: 200% 200%;
     animation: aiOrbShift 4s ease-in-out infinite;
     box-shadow:
-        0 0 30px rgba(124, 58, 237, 0.25),
+        0 0 30px rgba(99, 102, 241, 0.25),
         0 0 60px rgba(6, 182, 212, 0.15);
 }
 
@@ -262,11 +262,11 @@
 
 .ai-bubble-user {
     align-self: flex-end;
-    background: linear-gradient(135deg, #7c3aed, #6d28d9) !important;
+    background: linear-gradient(135deg, #6366F1, #818CF8) !important;
     border-radius: 16px 16px 4px 16px;
     padding: 10px 16px;
     color: #fff !important;
-    box-shadow: 0 2px 8px rgba(124, 58, 237, 0.2);
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.2);
 }
 
 .ai-bubble-content {
@@ -286,13 +286,13 @@
     width: 24px;
     height: 24px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #7c3aed, #06b6d4);
+    background: linear-gradient(135deg, #6366F1, #2DD4BF);
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
     margin-top: 2px;
-    box-shadow: 0 0 8px rgba(124, 58, 237, 0.2);
+    box-shadow: 0 0 8px rgba(99, 102, 241, 0.2);
 }
 
 .ai-mini-orb {
@@ -320,7 +320,7 @@
     display: inline-block;
     width: 2px;
     height: 1em;
-    background: linear-gradient(180deg, #7c3aed, #06b6d4);
+    background: linear-gradient(180deg, #6366F1, #2DD4BF);
     margin-left: 1px;
     vertical-align: text-bottom;
     animation: aiCursorBlink 0.8s step-end infinite;
@@ -338,7 +338,7 @@
     gap: 3px;
     padding: 12px 14px;
     background: rgba(255, 255, 255, 0.7);
-    border: 1px solid rgba(124, 58, 237, 0.08);
+    border: 1px solid rgba(99, 102, 241, 0.08);
     border-radius: 12px;
     cursor: pointer;
     text-align: left;
@@ -348,8 +348,8 @@
 
 .ai-suggestion-card:hover {
     background: rgba(255, 255, 255, 0.95);
-    border-color: rgba(124, 58, 237, 0.2);
-    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.08);
+    border-color: rgba(99, 102, 241, 0.2);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.08);
     transform: translateY(-1px);
 }
 
@@ -366,7 +366,7 @@
 
 .ai-suggestion-action {
     font-size: 11px;
-    color: #7c3aed;
+    color: #6366F1;
     font-weight: 500;
     margin-top: 2px;
 }
@@ -389,7 +389,7 @@
     padding: 12px 14px 10px;
     background: rgba(255, 255, 255, 0.6);
     backdrop-filter: blur(12px);
-    border-top: 1px solid rgba(124, 58, 237, 0.06);
+    border-top: 1px solid rgba(99, 102, 241, 0.06);
     z-index: 2;
     position: relative;
 }
@@ -403,7 +403,7 @@
 .ai-input-field {
     flex: 1;
     background: rgba(255, 255, 255, 0.85) !important;
-    border: 1.5px solid rgba(124, 58, 237, 0.1);
+    border: 1.5px solid rgba(99, 102, 241, 0.1);
     border-radius: 12px;
     padding: 10px 14px;
     color: #1e293b !important;
@@ -418,15 +418,15 @@
 }
 
 .ai-input-field:focus {
-    border-color: rgba(124, 58, 237, 0.3);
-    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.06);
+    border-color: rgba(99, 102, 241, 0.3);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.06);
 }
 
 .ai-send-btn {
     width: 38px;
     height: 38px;
     border-radius: 12px;
-    background: rgba(124, 58, 237, 0.08);
+    background: rgba(99, 102, 241, 0.08);
     border: none;
     color: #94a3b8;
     cursor: pointer;
@@ -437,9 +437,9 @@
 }
 
 .ai-send-btn.active {
-    background: linear-gradient(135deg, #7c3aed, #06b6d4);
+    background: linear-gradient(135deg, #6366F1, #2DD4BF);
     color: #fff;
-    box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
 }
 
 .ai-send-btn.active:hover {
@@ -459,7 +459,7 @@
 /* ── Progress Card (Gemini-style) ── */
 .ai-progress-card {
     background: rgba(255, 255, 255, 0.7);
-    border: 1px solid rgba(124, 58, 237, 0.08);
+    border: 1px solid rgba(99, 102, 241, 0.08);
     border-radius: 14px;
     overflow: hidden;
     animation: aiBubbleFadeIn 0.3s ease-out;
@@ -471,7 +471,7 @@
     align-items: center;
     gap: 8px;
     padding: 10px 14px;
-    border-bottom: 1px solid rgba(124, 58, 237, 0.05);
+    border-bottom: 1px solid rgba(99, 102, 241, 0.05);
 }
 
 .ai-phase-text {
@@ -483,7 +483,7 @@
 }
 
 .ai-phase-text.animating {
-    background: linear-gradient(90deg, #7c3aed, #06b6d4, #7c3aed);
+    background: linear-gradient(90deg, #6366F1, #2DD4BF, #6366F1);
     background-size: 200% auto;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -499,7 +499,7 @@
     background: none;
     border: none;
     font-size: 11px;
-    color: #7c3aed;
+    color: #6366F1;
     cursor: pointer;
     padding: 0;
     font-family: inherit;
@@ -533,7 +533,7 @@
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #7c3aed, #06b6d4);
+    background: linear-gradient(135deg, #6366F1, #2DD4BF);
     animation: aiEntryPulse 1.4s ease-in-out infinite;
 }
 
@@ -587,7 +587,7 @@
     width: 4px;
     height: 4px;
     border-radius: 50%;
-    background: #7c3aed;
+    background: #6366F1;
     animation: aiDotFade 1.4s ease-in-out infinite;
 }
 
@@ -600,7 +600,7 @@
 .ai-shimmer-bar {
     height: 3px;
     width: 100%;
-    background: rgba(124, 58, 237, 0.05);
+    background: rgba(99, 102, 241, 0.05);
     border-radius: 2px;
     overflow: hidden;
     position: relative;
@@ -613,7 +613,7 @@
     left: -100%;
     width: 60%;
     height: 100%;
-    background: linear-gradient(90deg, transparent, #7c3aed, #06b6d4, transparent);
+    background: linear-gradient(90deg, transparent, #6366F1, #2DD4BF, transparent);
     animation: aiShimmerSweep 1.8s ease-in-out infinite;
 }
 
@@ -657,7 +657,7 @@
     display: inline-block;
     width: 2px;
     height: 1.1em;
-    background: linear-gradient(180deg, #7c3aed, #a78bfa);
+    background: linear-gradient(180deg, #6366F1, #818CF8);
     margin-left: 1px;
     vertical-align: text-bottom;
     border-radius: 1px;

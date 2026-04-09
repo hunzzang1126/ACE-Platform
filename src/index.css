@@ -20,7 +20,7 @@
   /* ── Border ── */
   --border: rgba(0, 0, 0, 0.08);
   --border-subtle: rgba(0, 0, 0, 0.04);
-  --border-focus: rgba(124, 58, 237, 0.5);
+  --border-focus: rgba(99, 102, 241, 0.5);
 
   /* ── Text ── */
   --text-primary: #1a1a2e;
@@ -28,12 +28,12 @@
   --text-muted: #94a3b8;
   --text-inverse: #ffffff;
 
-  /* ── Accent (Purple → Cyan gradient — trendy) ── */
-  --accent: #7c3aed;
-  --accent-hover: #6d28d9;
-  --accent-muted: rgba(124, 58, 237, 0.08);
-  --accent-glow: rgba(124, 58, 237, 0.15);
-  --accent-gradient: linear-gradient(135deg, #7c3aed, #06b6d4);
+  /* ── Accent (Indigo → Mint Teal — brand) ── */
+  --accent: #6366F1;
+  --accent-hover: #818CF8;
+  --accent-muted: rgba(99, 102, 241, 0.08);
+  --accent-glow: rgba(99, 102, 241, 0.15);
+  --accent-gradient: linear-gradient(135deg, #6366F1, #2DD4BF);
 
   /* ── Status ── */
   --success: #10b981;
@@ -193,6 +193,6 @@ button:active {
 }
 
 .glow-border:hover {
-  border-color: rgba(124, 58, 237, 0.25);
+  border-color: rgba(99, 102, 241, 0.25);
   box-shadow: 0 0 16px var(--accent-glow);
 }
