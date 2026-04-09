@@ -33,7 +33,7 @@ describe('★ REGRESSION: template textEffect carry-over', () => {
 
         if (src) {
             expect(src).toContain('setShadow');
-            expect(src).toContain('parseShadowColorLocal');
+            expect(src).toContain('parseShadowColorForEngine');
         }
     });
 

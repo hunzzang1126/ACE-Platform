@@ -6,6 +6,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { useTemplateStore, type TemplateCategory, type DesignTemplate } from '@/stores/templateStore';
 import { constraintsToAbsolute } from '@/engine/elementConverters';
 import { computeUniformScale, scaleElementRect, scaleFontSize } from './templateScaling';
+import { textEffectToCSS, parseShadowColorForEngine } from './templateEffectHelpers';
 import type { CanvasEngineActions } from '@/hooks/canvasTypes';
 import { ensureGoogleFont } from './contextToolbarConstants';
 import type { BannerVariant } from '@/schema/design.types';
@@ -140,6 +141,11 @@ function TemplatePreview({ template }: { template: DesignTemplate }) {
                         ? constraintsToAbsolute(el.constraints, tw, th)
                         : { x: 0, y: 0, w: 0, h: 0 };
 
+                    const shadow = el.shadow;
+                    const shadowCSS = shadow
+                        ? `${shadow.offsetX}px ${shadow.offsetY}px ${shadow.blur}px ${shadow.color}`
+                        : undefined;
+
                     const baseStyle: React.CSSProperties = {
                         position: 'absolute',
                         left: pos.x,
@@ -148,8 +154,9 @@ function TemplatePreview({ template }: { template: DesignTemplate }) {
                         height: pos.h,
                         opacity: el.opacity ?? 1,
                         zIndex: el.zIndex ?? 0,
-                        overflow: 'hidden',
+                        overflow: 'visible',
                         pointerEvents: 'none',
+                        boxShadow: el.type !== 'text' ? shadowCSS : undefined,
                     };
 
                     if (el.type === 'shape') {
@@ -166,6 +173,12 @@ function TemplatePreview({ template }: { template: DesignTemplate }) {
                     }
 
                     if (el.type === 'text') {
+                        // ★ FIX: Convert textEffect to CSS text-shadow for preview (glow, neon, etc.)
+                        const effectShadow = el.textEffect && el.textEffect.type !== 'none'
+                            ? textEffectToCSS(el.textEffect.type, el.textEffect.intensity ?? 50, el.textEffect.color ?? '#ffffff')
+                            : undefined;
+                        const finalTextShadow = [effectShadow, shadowCSS].filter(Boolean).join(', ') || undefined;
+
                         return (
                             <div key={el.id} style={{
                                 ...baseStyle,
@@ -177,6 +190,10 @@ function TemplatePreview({ template }: { template: DesignTemplate }) {
                                 lineHeight: el.lineHeight || 1.2,
                                 whiteSpace: 'pre-wrap',
                                 wordBreak: 'break-word',
+                                textShadow: finalTextShadow,
+                                ...(el.textEffect?.type === 'outline' || el.textEffect?.type === 'splice'
+                                    ? { WebkitTextStroke: `${Math.max(1, 2 * (el.textEffect.intensity / 50))}px ${el.textEffect.color}` }
+                                    : {}),
                             }}>
                                 {el.content}
                             </div>
@@ -285,7 +302,7 @@ function applyVariantToCanvas(variant: BannerVariant, actions: CanvasEngineActio
             }
             // ★ FIX: Apply shadow — previously not carried over from templates
             if (nodeId != null && el.shadow) {
-                const sc = parseShadowColorLocal(el.shadow.color);
+                const sc = parseShadowColorForEngine(el.shadow.color);
                 actions.setShadow(nodeId, el.shadow.offsetX, el.shadow.offsetY, el.shadow.blur, sc[0], sc[1], sc[2], sc[3]);
             }
         } else if (el.type === 'button') {
@@ -317,7 +334,7 @@ function applyVariantToCanvas(variant: BannerVariant, actions: CanvasEngineActio
         // ★ FIX: Apply shadow for non-text elements (shapes, images) — previously not carried over
         if (nodeId != null && el.type !== 'text' && (el as any).shadow) {
             const s = (el as any).shadow;
-            const sc = parseShadowColorLocal(s.color);
+            const sc = parseShadowColorForEngine(s.color);
             actions.setShadow(nodeId, s.offsetX, s.offsetY, s.blur, sc[0], sc[1], sc[2], sc[3]);
         }
     }
@@ -361,13 +378,4 @@ function parseColor(c: string): { r: number; g: number; b: number } | null {
         };
     }
     return null;
-}
-
-// ── Parse shadow color → [r,g,b,a] floats (same logic as canvasSyncHelpers.parseShadowColor) ──
-function parseShadowColorLocal(color: string): [number, number, number, number] {
-    const m = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
-    if (m) return [parseInt(m[1]!) / 255, parseInt(m[2]!) / 255, parseInt(m[3]!) / 255, m[4] !== undefined ? parseFloat(m[4]!) : 1.0];
-    const hex = color.replace('#', '');
-    if (hex.length >= 6) return [parseInt(hex.slice(0, 2), 16) / 255, parseInt(hex.slice(2, 4), 16) / 255, parseInt(hex.slice(4, 6), 16) / 255, 1.0];
-    return [0, 0, 0, 0.5];
 }

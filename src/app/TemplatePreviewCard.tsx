@@ -2,6 +2,7 @@
 // Used by TemplatesPage for visual template cards
 
 import { constraintsToAbsolute } from '@/engine/elementConverters';
+import { textEffectToCSS } from '@/components/editor/templateEffectHelpers';
 import type { DesignTemplate } from '@/stores/templateStore';
 import type { BannerVariant } from '@/schema/design.types';
 
@@ -64,6 +65,13 @@ export function TemplatePreview({ template }: { template: DesignTemplate }) {
                     }
 
                     if (el.type === 'text') {
+                        // ★ FIX: Convert textEffect to CSS text-shadow for preview (glow, neon, etc.)
+                        const effectShadow = el.textEffect && el.textEffect.type !== 'none'
+                            ? textEffectToCSS(el.textEffect.type, el.textEffect.intensity ?? 50, el.textEffect.color ?? '#ffffff')
+                            : undefined;
+                        // Combine element shadow + textEffect shadow
+                        const finalTextShadow = [effectShadow, shadowCSS].filter(Boolean).join(', ') || undefined;
+
                         return (
                             <div key={el.id} style={{
                                 ...baseStyle,
@@ -73,7 +81,11 @@ export function TemplatePreview({ template }: { template: DesignTemplate }) {
                                 textAlign: (el.textAlign as React.CSSProperties['textAlign']) || 'left',
                                 lineHeight: el.lineHeight || 1.2,
                                 whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                                textShadow: shadowCSS,
+                                textShadow: finalTextShadow,
+                                // ★ outline/splice effects use CSS stroke (webkit)
+                                ...(el.textEffect?.type === 'outline' || el.textEffect?.type === 'splice'
+                                    ? { WebkitTextStroke: `${Math.max(1, 2 * (el.textEffect.intensity / 50))}px ${el.textEffect.color}` }
+                                    : {}),
                             }}>
                                 {el.content}
                             </div>
