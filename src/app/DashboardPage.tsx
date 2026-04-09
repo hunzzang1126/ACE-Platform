@@ -225,9 +225,9 @@ export function DashboardPage() {
                         padding: '4px 12px', borderRadius: 6, fontWeight: 700, fontSize: 11,
                         letterSpacing: '0.05em', textTransform: 'uppercase' as const,
                         background: isAdmin ? 'linear-gradient(135deg, #f59e0b, #d97706)' :
-                                   isStarter ? 'rgba(0,0,0,0.05)' :
-                                   'rgba(124,58,237,0.1)',
-                        color: isAdmin ? '#fff' : isStarter ? '#64748b' : '#7c3aed',
+                                   isStarter ? 'var(--bg-hover)' :
+                                   'var(--accent-muted)',
+                        color: isAdmin ? '#fff' : isStarter ? 'var(--text-muted)' : 'var(--accent)',
                     }}>
                         {planName}
                     </span>
@@ -241,10 +241,10 @@ export function DashboardPage() {
                                 <div style={{
                                     width: `${Math.min(100, aiUsagePercent)}%`, height: '100%', borderRadius: 3,
                                     transition: 'width 0.3s ease',
-                                    background: aiUsagePercent > 80 ? '#ef4444' : aiUsagePercent > 50 ? '#f59e0b' : '#7c3aed',
+                                    background: aiUsagePercent > 80 ? 'var(--error)' : aiUsagePercent > 50 ? '#f59e0b' : 'var(--accent)',
                                 }} />
                             </div>
-                            <span style={{ color: aiUsagePercent > 80 ? '#ef4444' : '#1a1a2e', fontWeight: 600, fontSize: 12 }}>
+                            <span style={{ color: aiUsagePercent > 80 ? 'var(--error)' : 'var(--text-primary)', fontWeight: 600, fontSize: 12 }}>
                                 {remainingTokens.toLocaleString()} left
                             </span>
                         </div>
@@ -253,12 +253,12 @@ export function DashboardPage() {
                     <button
                         onClick={() => navigate('/pricing')}
                         style={{
-                            background: 'none', border: '1px solid rgba(124,58,237,0.25)',
-                            color: '#7c3aed', fontSize: 12, cursor: 'pointer',
+                            background: 'none', border: '1px solid var(--accent-muted)',
+                            color: 'var(--accent)', fontSize: 12, cursor: 'pointer',
                             padding: '4px 12px', borderRadius: 6, marginLeft: 'auto',
                             transition: 'all 0.2s ease', fontWeight: 500,
                         }}
-                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(124,58,237,0.06)'; }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent-muted)'; }}
                         onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}
                     >
                         {isStarter ? 'Upgrade' : 'Manage Plan'}

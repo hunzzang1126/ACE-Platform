@@ -4,10 +4,11 @@
 
 import type React from 'react';
 
-export type SettingsTab = 'general' | 'account' | 'billing' | 'brand' | 'connections';
+export type SettingsTab = 'general' | 'appearance' | 'account' | 'billing' | 'brand' | 'connections';
 
 export const SETTINGS_TABS: { key: SettingsTab; label: string }[] = [
     { key: 'general', label: 'General' },
+    { key: 'appearance', label: 'Appearance' },
     { key: 'account', label: 'Account' },
     { key: 'billing', label: 'Billing' },
     { key: 'brand', label: 'Brand' },

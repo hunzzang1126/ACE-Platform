@@ -79,6 +79,60 @@
   font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
 }
 
+/* ═══════════════════════════════════════════════
+   DARK THEME — Activated via [data-theme="dark"]
+   Brand: Indigo #6366F1 + Mint Teal #2DD4BF
+   ═══════════════════════════════════════════════ */
+html[data-theme="dark"] {
+  /* ── Surface hierarchy (dark) ── */
+  --bg-base: #0B0F1A;
+  --bg-surface: #111827;
+  --bg-elevated: #1E293B;
+  --bg-hover: rgba(99, 102, 241, 0.08);
+  --bg-active: rgba(99, 102, 241, 0.12);
+
+  /* ── Border ── */
+  --border: rgba(255, 255, 255, 0.08);
+  --border-subtle: rgba(255, 255, 255, 0.04);
+  --border-focus: rgba(99, 102, 241, 0.6);
+
+  /* ── Text ── */
+  --text-primary: #F1F5F9;
+  --text-secondary: #94A3B8;
+  --text-muted: #64748B;
+  --text-inverse: #0B0F1A;
+
+  /* ── Accent (same brand — works on dark) ── */
+  --accent: #6366F1;
+  --accent-hover: #818CF8;
+  --accent-muted: rgba(99, 102, 241, 0.12);
+  --accent-glow: rgba(99, 102, 241, 0.2);
+  --accent-gradient: linear-gradient(135deg, #6366F1, #2DD4BF);
+
+  /* ── Status ── */
+  --success: #34D399;
+  --success-muted: rgba(52, 211, 153, 0.12);
+  --warning: #FBBF24;
+  --warning-muted: rgba(251, 191, 36, 0.12);
+  --error: #F87171;
+  --error-muted: rgba(248, 113, 113, 0.12);
+
+  /* ── Shadows (stronger for dark) ── */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
+  --shadow-glow: 0 0 20px var(--accent-glow);
+
+  /* ── Glass (dark frosted glass) ── */
+  --glass-bg: rgba(17, 24, 39, 0.85);
+  --glass-blur: 16px;
+  --glass-border: rgba(255, 255, 255, 0.06);
+
+  /* ── Editor-specific ── */
+  --border-editor: rgba(255, 255, 255, 0.06);
+  --canvas-bg: #1A1A2E;
+}
+
 /* ── Reset ── */
 * {
   box-sizing: border-box;
@@ -121,6 +175,14 @@ canvas {
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 0, 0, 0.25);
+}
+
+/* Dark scrollbar */
+html[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+}
+html[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.22);
 }
 
 /* ── Global Interactive States ── */

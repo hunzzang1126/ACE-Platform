@@ -1,7 +1,11 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './app/App';
+import { initTheme } from '@/stores/themeStore';
 import './index.css';
+
+// ★ Initialize theme BEFORE React renders (prevents FOUC)
+initTheme();
 
 // ★ Force-preload template fonts at startup.
 // Google Fonts display=swap only downloads font files when a DOM element uses the font.

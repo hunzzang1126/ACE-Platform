@@ -21,6 +21,7 @@ import { SettingsAccount } from './settings/SettingsAccount';
 import { SettingsBilling } from './settings/SettingsBilling';
 import { SettingsBrand } from './settings/SettingsBrand';
 import { SettingsConnections } from './settings/SettingsConnections';
+import { SettingsAppearance } from './settings/SettingsAppearance';
 
 interface Props { isOpen: boolean; onClose: () => void; }
 
@@ -119,6 +120,7 @@ export function SettingsPanel({ isOpen, onClose }: Props) {
                     </button>
 
                     {activeTab === 'general' && <SettingsGeneral prefs={prefs} onUpdate={update} />}
+                    {activeTab === 'appearance' && <SettingsAppearance />}
                     {activeTab === 'account' && <SettingsAccount user={user} prefs={prefs} onSignOut={() => { signOut(); onClose(); }} />}
                     {activeTab === 'billing' && <SettingsBilling user={user} />}
                     {activeTab === 'brand' && <SettingsBrand prefs={prefs} onUpdate={update} />}
