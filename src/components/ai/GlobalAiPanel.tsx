@@ -34,12 +34,9 @@ const QUICK_ACTIONS = [
 export function GlobalAiPanel() {
     const [open, setOpen] = useState(false);
     const [showDropZone, setShowDropZone] = useState(false);
-    const [selectedRole, setSelectedRole] = useState<AceModelRole>(() => {
-        const plan = useAuthStore.getState().user?.plan ?? 'starter';
-        return plan === 'starter' ? 'executor' : 'design';
-    });
+    const [selectedRole, setSelectedRole] = useState<AceModelRole>('design');
     const userPlan = useAuthStore(s => s.user?.plan ?? 'starter');
-    useEffect(() => { if (userPlan === 'starter' && selectedRole === 'design') setSelectedRole('executor'); }, [userPlan, selectedRole]);
+    // ★ All plans use Sonnet 4 (design role) — no starter enforcement needed
     const [showModelDropdown, setShowModelDropdown] = useState(false);
 
     const activeModel = getModelForRole(selectedRole);
