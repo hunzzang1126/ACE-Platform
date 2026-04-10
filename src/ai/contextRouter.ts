@@ -161,15 +161,13 @@ For project CRUD: use execute_dynamic_action with useProjectStore/useDesignStore
         case 'size-dashboard':
             return `${header}
 ${snapshot}
-Tools: execute_dynamic_action, add_text, add_button, analyze_scene
-For variants: useDesignStore.getState().addVariant({ width, height, label })
-Common sizes: 300x250, 728x90, 160x600, 320x50, 970x250, 300x600
-Localization: To translate text to another language:
-1. Read text from ORIGINAL locale elements ONLY (never from a derived/translated locale)
-2. Translate content (marketing-appropriate, not literal)
-3. Call setLocaleData with originalLocale set to the source language code:
-  useDesignStore.getState().setLocaleData({ locales: { originalCode: {elementName: originalText, ...}, targetCode: {elementName: translatedText, ...} }, activeLocale: targetCode, originalLocale: originalCode })
-  useDesignStore.getState().switchLocale(targetCode)${mem}`;
+Tools: update_element_text, update_element_property, execute_dynamic_action, analyze_scene
+CRITICAL: You are on the SIZE DASHBOARD. Work with EXISTING elements ONLY.
+- To change text: update_element_text(element_name, new_text) — applies to ALL variants
+- To change style: update_element_property(element_name, property, value) — applies to ALL variants
+- NEVER create new elements. If user asks to add elements, tell them to open the canvas editor.
+For localization: use execute_dynamic_action with setLocaleData.
+For variants: useDesignStore.getState().addVariant({ width, height, label })${mem}`;
 
         case 'canvas-editor': {
             const empty = ctx.elementCount === 0;

@@ -1,9 +1,9 @@
 // ─────────────────────────────────────────────────
-// agentTools.test.ts — Tests (v2 eval-first: 7 tools)
+// agentTools.test.ts — Tests (v2 eval-first: 9 tools)
 // ─────────────────────────────────────────────────
 
 import { describe, it, expect } from 'vitest';
-import { ALL_TOOLS, getToolByName, getToolsForApi, getToolsForClaude } from '@/ai/agentTools';
+import { ALL_TOOLS, getToolByName, getToolsForApi, getToolsForClaude, getToolsForPage } from '@/ai/agentTools';
 import type { ToolDefinition } from '@/ai/agentTools';
 
 describe('agentTools', () => {
@@ -32,8 +32,8 @@ describe('agentTools', () => {
             }
         });
 
-        it('has exactly 7 essential tools', () => {
-            expect(ALL_TOOLS.length).toBe(7);
+        it('has exactly 9 tools (7 original + 2 update tools)', () => {
+            expect(ALL_TOOLS.length).toBe(9);
         });
 
         it('includes execute_dynamic_action as primary tool', () => {
@@ -195,6 +195,57 @@ describe('agentTools', () => {
         it('execute_dynamic_action description mentions store access', () => {
             const tool = getToolByName('execute_dynamic_action');
             expect(tool!.description.toLowerCase()).toContain('designstore');
+        });
+    });
+
+    // ── Update Tools ──
+
+    describe('update tools', () => {
+        it('update_element_text exists with required params', () => {
+            const tool = getToolByName('update_element_text');
+            expect(tool).toBeDefined();
+            expect(tool!.parameters.required).toContain('element_name');
+            expect(tool!.parameters.required).toContain('new_text');
+            expect(tool!.category).toBe('transform');
+        });
+
+        it('update_element_property exists with required params', () => {
+            const tool = getToolByName('update_element_property');
+            expect(tool).toBeDefined();
+            expect(tool!.parameters.required).toContain('element_name');
+            expect(tool!.parameters.required).toContain('property');
+            expect(tool!.parameters.required).toContain('value');
+        });
+    });
+
+    // ── Page Tool Filtering ──
+
+    describe('getToolsForPage', () => {
+        it('★ REGRESSION: size-dashboard has NO creation tools', () => {
+            const tools = getToolsForPage('size-dashboard');
+            const names = tools.map(t => t.name);
+            expect(names).not.toContain('add_text');
+            expect(names).not.toContain('add_button');
+            expect(names).not.toContain('generate_image');
+            expect(names).not.toContain('generate_full_design');
+        });
+
+        it('size-dashboard has update and analyze tools', () => {
+            const tools = getToolsForPage('size-dashboard');
+            const names = tools.map(t => t.name);
+            expect(names).toContain('update_element_text');
+            expect(names).toContain('update_element_property');
+            expect(names).toContain('execute_dynamic_action');
+            expect(names).toContain('analyze_scene');
+        });
+
+        it('canvas-editor has ALL tools including creation', () => {
+            const tools = getToolsForPage('canvas-editor');
+            const names = tools.map(t => t.name);
+            expect(names).toContain('add_text');
+            expect(names).toContain('add_button');
+            expect(names).toContain('generate_full_design');
+            expect(names).toContain('update_element_text');
         });
     });
 });

@@ -154,6 +154,39 @@ const analyze_scene: ToolDefinition = {
     category: 'compound',
 };
 
+// ── 8. Update Element Text (modify-only) ──────────
+
+const update_element_text: ToolDefinition = {
+    name: 'update_element_text',
+    description: 'Update the text content of an existing element by name. Applies to ALL size variants automatically. Use this to change headlines, sublines, body text, or button labels.',
+    parameters: {
+        type: 'object',
+        properties: {
+            element_name: { type: 'string', description: 'Name (or partial name) of the element to update' },
+            new_text: { type: 'string', description: 'New text content' },
+        },
+        required: ['element_name', 'new_text'],
+    },
+    category: 'transform',
+};
+
+// ── 9. Update Element Property (modify-only) ──────
+
+const update_element_property: ToolDefinition = {
+    name: 'update_element_property',
+    description: 'Change a property (color, fontSize, fontFamily, fontWeight, opacity, borderRadius, lineHeight, letterSpacing) of an existing element. Applies to ALL size variants.',
+    parameters: {
+        type: 'object',
+        properties: {
+            element_name: { type: 'string', description: 'Name (or partial name) of the element to update' },
+            property: { type: 'string', description: 'Property to change (e.g. color, fontSize, fontFamily)' },
+            value: { type: 'string', description: 'New value for the property' },
+        },
+        required: ['element_name', 'property', 'value'],
+    },
+    category: 'transform',
+};
+
 // ── All Tools Registry ────────────────────────────
 
 export const ALL_TOOLS: ToolDefinition[] = [
@@ -164,6 +197,8 @@ export const ALL_TOOLS: ToolDefinition[] = [
     add_button,
     execute_dynamic_action,
     analyze_scene,
+    update_element_text,
+    update_element_property,
 ];
 
 /**
@@ -232,8 +267,9 @@ export function getToolsForPage(page: PageContext): ToolDefinition[] {
             return ALL_TOOLS.filter(t => !CANVAS_ONLY_TOOLS.has(t.name));
 
         case 'size-dashboard':
-            // Size dashboard: store tools + element tools, no design generation
-            return ALL_TOOLS.filter(t => t.name !== 'generate_full_design' && t.name !== 'replace_background_image');
+            // Size dashboard: MODIFY-ONLY tools. No creation (add_text, add_button, generate_*).
+            // AI must modify existing elements, not create new ones.
+            return ALL_TOOLS.filter(t => ['execute_dynamic_action', 'analyze_scene', 'update_element_text', 'update_element_property'].includes(t.name));
 
         case 'canvas-editor':
             // Full access
