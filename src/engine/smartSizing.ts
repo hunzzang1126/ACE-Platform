@@ -70,29 +70,6 @@ export function smartSizeElements(
             continue;
         }
 
-        // ★ Non-background images: cover fill + center (same as background)
-        // Prevents decorative images (glow, overlays) from shrinking to tiny size
-        // on extreme aspect ratio changes (e.g., 300×250 → 468×60)
-        if (role === 'image' && el.type === 'image' && abs.w > 0 && abs.h > 0) {
-            const imgAspect = abs.w / abs.h;
-            const canvasAspect = targetW / targetH;
-            let imgW: number, imgH: number, imgX: number, imgY: number;
-            if (imgAspect > canvasAspect) {
-                imgH = targetH; imgW = Math.round(targetH * imgAspect);
-                imgX = -Math.round((imgW - targetW) / 2); // ★ 가로 센터
-                imgY = 0;
-            } else {
-                imgW = targetW; imgH = Math.round(targetW / imgAspect);
-                imgX = 0;
-                imgY = -Math.round((imgH - targetH) / 2); // ★ 세로 센터
-            }
-            result.push({
-                ...JSON.parse(JSON.stringify(el)),
-                constraints: { horizontal: { anchor: 'left' as const, offset: imgX }, vertical: { anchor: 'top' as const, offset: imgY }, size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width: imgW, height: imgH }, rotation: el.constraints.rotation },
-            } as DesignElement);
-            continue;
-        }
-
         const newX = Math.round(abs.x * uniformScale);
         const newY = Math.round(abs.y * uniformScale);
         const newW = Math.max(4, Math.round(abs.w * uniformScale));
@@ -179,27 +156,6 @@ function edgePinSizeElements(
                 ...JSON.parse(JSON.stringify(el)),
                 constraints: { horizontal: { anchor: 'left' as const, offset: bgX }, vertical: { anchor: 'top' as const, offset: bgY }, size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width: bgW, height: bgH }, rotation: el.constraints.rotation },
             } as DesignElement);
-        } else if (role === 'image' && el.type === 'image') {
-            // ★ Non-background images: cover fill + center (same as uniform mode)
-            const abs = constraintsToAbsolute(el.constraints, originW, originH);
-            if (abs.w > 0 && abs.h > 0) {
-                const imgAspect = abs.w / abs.h;
-                const canvasAspect = targetW / targetH;
-                let imgW: number, imgH: number, imgX: number, imgY: number;
-                if (imgAspect > canvasAspect) {
-                    imgH = targetH; imgW = Math.round(targetH * imgAspect);
-                    imgX = -Math.round((imgW - targetW) / 2); imgY = 0;
-                } else {
-                    imgW = targetW; imgH = Math.round(targetW / imgAspect);
-                    imgX = 0; imgY = -Math.round((imgH - targetH) / 2);
-                }
-                result.push({
-                    ...JSON.parse(JSON.stringify(el)),
-                    constraints: { horizontal: { anchor: 'left' as const, offset: imgX }, vertical: { anchor: 'top' as const, offset: imgY }, size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width: imgW, height: imgH }, rotation: el.constraints.rotation },
-                } as DesignElement);
-            } else {
-                nonBgElements.push(el);
-            }
         } else {
             nonBgElements.push(el);
         }
