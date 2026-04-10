@@ -242,3 +242,105 @@ describe('Locale Layer — switchLocale', () => {
         expect(useDesignStore.getState().creativeSet!.localeData!.activeLocale).toBeNull();
     });
 });
+
+describe('Locale Layer — multi-language regression', () => {
+    beforeEach(() => {
+        useDesignStore.setState({ allCreativeSets: {}, activeCreativeSetId: null, creativeSet: null });
+    });
+
+    it('★ REGRESSION: adding 3rd language does not overwrite original', () => {
+        // Simulate: English original → add KO → add DE
+        // The bug was: after switchLocale('ko'), canvas shows Korean.
+        // Adding DE would read canvas (Korean) and save it as 'en' original.
+        const store = useDesignStore.getState();
+        store.createCreativeSet('Test', {
+            id: 'p1', name: '300x250', width: 300, height: 250, category: 'display',
+        });
+        store.addElementToMaster({
+            id: 'el-1', name: 'Headline', type: 'text',
+            content: 'Design Is not Hard', fontFamily: 'Inter', fontSize: 32, fontWeight: 700,
+            fontStyle: 'normal', color: '#fff', textAlign: 'center',
+            lineHeight: 1.2, letterSpacing: 0, autoShrink: false,
+            constraints: { horizontal: { anchor: 'center', offset: 0 }, vertical: { anchor: 'top', offset: 40 }, size: { widthMode: 'fixed', heightMode: 'fixed', width: 200, height: 40 }, rotation: 0 },
+            opacity: 1, visible: true, locked: false, zIndex: 1,
+        } as any);
+
+        // Step 1: Add Korean translation
+        store.setLocaleData({
+            locales: {
+                en: { Headline: 'Design Is not Hard' },
+                ko: { Headline: '디자인은 어렵지 않습니다' },
+            },
+            activeLocale: 'ko',
+            originalLocale: 'en',
+        });
+        store.switchLocale('ko');
+
+        // Verify canvas now shows Korean
+        const afterKO = useDesignStore.getState().creativeSet!;
+        const masterAfterKO = afterKO.variants.find(v => v.id === afterKO.masterVariantId)!;
+        expect((masterAfterKO.elements.find(e => e.name === 'Headline') as any).content).toBe('디자인은 어렵지 않습니다');
+
+        // Step 2: Add German (simulating what LocalePickerPopover does)
+        // The CORRECT behavior: read originalTexts from localeData.en, NOT from canvas
+        const existingOriginal = afterKO.localeData?.locales['en'];
+        expect(existingOriginal).toBeDefined();
+        expect(existingOriginal!.Headline).toBe('Design Is not Hard'); // ★ MUST be English!
+
+        store.setLocaleData({
+            locales: {
+                en: existingOriginal!, // preserved from store
+                de: { Headline: 'Design ist nicht schwer' },
+            },
+            activeLocale: 'de',
+            originalLocale: 'en',
+        });
+
+        // Step 3: Verify original English is preserved
+        const final = useDesignStore.getState().creativeSet!.localeData!;
+        expect(final.locales['en']!.Headline).toBe('Design Is not Hard'); // NOT Korean!
+        expect(final.locales['ko']!.Headline).toBe('디자인은 어렵지 않습니다');
+        expect(final.locales['de']!.Headline).toBe('Design ist nicht schwer');
+
+        // Step 4: switchLocale back to EN shows English
+        store.switchLocale(null); // revert to original
+        const reverted = useDesignStore.getState().creativeSet!;
+        const masterReverted = reverted.variants.find(v => v.id === reverted.masterVariantId)!;
+        expect((masterReverted.elements.find(e => e.name === 'Headline') as any).content).toBe('Design Is not Hard');
+    });
+
+    it('★ REGRESSION: round-trip EN→KO→DE→EN→KO all preserve correctly', () => {
+        const store = useDesignStore.getState();
+        store.createCreativeSet('Test', {
+            id: 'p1', name: '300x250', width: 300, height: 250, category: 'display',
+        });
+        store.addElementToMaster({
+            id: 'el-1', name: 'HL', type: 'text',
+            content: 'Hello World', fontFamily: 'Inter', fontSize: 32, fontWeight: 700,
+            fontStyle: 'normal', color: '#fff', textAlign: 'center',
+            lineHeight: 1.2, letterSpacing: 0, autoShrink: false,
+            constraints: { horizontal: { anchor: 'center', offset: 0 }, vertical: { anchor: 'top', offset: 40 }, size: { widthMode: 'fixed', heightMode: 'fixed', width: 200, height: 40 }, rotation: 0 },
+            opacity: 1, visible: true, locked: false, zIndex: 1,
+        } as any);
+
+        store.setLocaleData({
+            locales: {
+                en: { HL: 'Hello World' },
+                ko: { HL: '안녕하세요' },
+                de: { HL: 'Hallo Welt' },
+            },
+            activeLocale: null,
+            originalLocale: 'en',
+        });
+
+        // Switch through all languages and verify content
+        store.switchLocale('ko');
+        expect((useDesignStore.getState().creativeSet!.variants[0]!.elements[0] as any).content).toBe('안녕하세요');
+        store.switchLocale('de');
+        expect((useDesignStore.getState().creativeSet!.variants[0]!.elements[0] as any).content).toBe('Hallo Welt');
+        store.switchLocale(null); // back to original
+        expect((useDesignStore.getState().creativeSet!.variants[0]!.elements[0] as any).content).toBe('Hello World');
+        store.switchLocale('ko'); // back to KO
+        expect((useDesignStore.getState().creativeSet!.variants[0]!.elements[0] as any).content).toBe('안녕하세요');
+    });
+});
