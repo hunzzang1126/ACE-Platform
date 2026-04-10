@@ -309,9 +309,36 @@ export function executeAnimateAll(
 // ── analyze_scene ───────────────────────────────
 
 import { STORE_API_REFERENCE } from './contextRouter';
+import { useDesignStore } from '@/stores/designStore';
 
 export function analyzeScene(trackedNodes: SceneNodeInfo[]): string {
+    // ★ Size Dashboard fallback: no engine → read from designStore
     if (trackedNodes.length === 0) {
+        const cs = useDesignStore.getState().creativeSet;
+        if (cs) {
+            const master = cs.variants.find(v => v.id === cs.masterVariantId) ?? cs.variants[0];
+            if (master && master.elements.length > 0) {
+                const lines: string[] = [];
+                lines.push(`**Design Elements** (from store, ${master.elements.length} elements on ${master.preset?.width}x${master.preset?.height} canvas):`);
+                for (const el of master.elements) {
+                    const raw = el as any;
+                    const content = raw.content || raw.label || '';
+                    const info = [
+                        `name="${el.name}"`,
+                        `type=${el.type}`,
+                        content ? `content="${content}"` : '',
+                        raw.fontSize ? `fontSize=${raw.fontSize}` : '',
+                        raw.color ? `color=${raw.color}` : '',
+                        raw.fill ? `fill=${raw.fill}` : '',
+                        raw.fontFamily ? `font=${raw.fontFamily}` : '',
+                    ].filter(Boolean).join(', ');
+                    lines.push(`• ${info}`);
+                }
+                lines.push('', `Variants: ${cs.variants.length} (${cs.variants.map(v => `${v.preset.width}x${v.preset.height}`).join(', ')})`);
+                lines.push('', STORE_API_REFERENCE);
+                return lines.join('\n');
+            }
+        }
         return `Canvas is empty. No elements to analyze.\n\n${STORE_API_REFERENCE}`;
     }
 
