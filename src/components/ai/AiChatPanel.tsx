@@ -35,7 +35,7 @@ export default function AiChatPanel({ aiService, engine, trackedNodes, onSendMes
     const inputRef = useRef<HTMLInputElement>(null);
 
     const suggestions = generateSuggestions(trackedNodes);
-    const { canUseAI, recordAIUsage, remainingTokens } = usePlanLimits();
+    const { canUseAI, recordAIUsage, remainingTokens, limits } = usePlanLimits();
 
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -48,7 +48,7 @@ export default function AiChatPanel({ aiService, engine, trackedNodes, onSendMes
         if (!canUseAI()) {
             const limitMsg: AgentMessage = {
                 role: 'assistant',
-                content: 'You have reached your monthly AI generation limit. Please upgrade your plan for more AI generations.',
+                content: `You've used all ${limits.aiTokensPerMonth} AI generations this month.\n\nUpgrade to Creator ($15/mo) for 200 generations, or Pro ($50/mo) for 500.\n\n→ Visit Settings or go to /pricing to upgrade.`,
                 timestamp: Date.now(),
             };
             setMessages(prev => [...prev, { role: 'user', content: msg, timestamp: Date.now() }, limitMsg]);

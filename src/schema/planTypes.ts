@@ -43,7 +43,7 @@ export interface PlanInfo {
 export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
     starter: {
         maxCreativeSets: 3,
-        aiTokensPerMonth: 50, // 50 AI generations/month
+        aiTokensPerMonth: 10, // 10 AI generations/month (Sonnet 4)
         allowedModels: ['anthropic/claude-sonnet-4'],
         defaultModel: 'anthropic/claude-sonnet-4',
         maxVariantsPerSet: 3,
