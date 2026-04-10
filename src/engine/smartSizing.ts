@@ -131,6 +131,10 @@ function postStretchTextFit(elements: DesignElement[], targetW: number, targetH:
                 textEl.fontSize = Math.max(MIN_FONT, Math.floor(c.size.height / lineH));
             }
         }
+        // ★ Skip clamping for elements intentionally larger than canvas (cover fill)
+        const overflowsCanvas = c.size.width > targetW || c.size.height > targetH;
+        if (overflowsCanvas) continue;
+
         const x = c.horizontal.offset, y = c.vertical.offset, curW = c.size.width, curH = c.size.height;
         if (x + curW > targetW) c.horizontal = { anchor: 'left' as const, offset: Math.max(MARGIN, targetW - curW - MARGIN) };
         if (x < 0) c.horizontal = { anchor: 'left' as const, offset: MARGIN };
