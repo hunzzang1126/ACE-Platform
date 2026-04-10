@@ -57,6 +57,37 @@ describe('planTypes', () => {
             expect(PLAN_LIMITS.creator.brandCloudEnabled).toBe(false);
             expect(PLAN_LIMITS.enterprise.brandCloudEnabled).toBe(true);
         });
+
+        // ═════════════════════════════════════════════════
+        // ★ REGRESSION GUARD: Sonnet 4 for all plans (v471)
+        // ═════════════════════════════════════════════════
+        it('★ REGRESSION: all plans include Sonnet 4 in allowedModels', () => {
+            for (const tier of ALL_TIERS) {
+                expect(PLAN_LIMITS[tier].allowedModels).toContain('anthropic/claude-sonnet-4');
+            }
+        });
+
+        it('★ REGRESSION: all plans default to Sonnet 4', () => {
+            for (const tier of ALL_TIERS) {
+                expect(PLAN_LIMITS[tier].defaultModel).toBe('anthropic/claude-sonnet-4');
+            }
+        });
+
+        it('★ REGRESSION: starter does NOT have Haiku in allowedModels', () => {
+            expect(PLAN_LIMITS.starter.allowedModels).not.toContain('anthropic/claude-3.5-haiku');
+        });
+
+        it('starter AI budget is 10 (Sonnet 4 tier)', () => {
+            expect(PLAN_LIMITS.starter.aiTokensPerMonth).toBe(10);
+        });
+
+        it('creator AI budget is 50', () => {
+            expect(PLAN_LIMITS.creator.aiTokensPerMonth).toBe(50);
+        });
+
+        it('pro AI budget is 300', () => {
+            expect(PLAN_LIMITS.pro.aiTokensPerMonth).toBe(300);
+        });
     });
 
     describe('PLANS', () => {
