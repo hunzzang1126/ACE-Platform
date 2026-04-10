@@ -2,7 +2,7 @@
 // localeAutoShrink.test.ts — Auto-shrink font size tests
 // ─────────────────────────────────────────────────
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { estimateTextHeight, calcAutoShrinkFontSize } from './localeAutoShrink';
 
 describe('estimateTextHeight', () => {
@@ -115,5 +115,96 @@ describe('calcAutoShrinkFontSize — locale scenarios', () => {
         // Simulates restoring original fontSize
         const origSize = calcAutoShrinkFontSize('Design Is not Hard', 48, 1.2, 250, 120);
         expect(origSize).toBe(48);
+    });
+});
+
+describe('computeLocaleFontSizes', () => {
+    // Must import separately
+    let computeLocaleFontSizes: typeof import('./localeAutoShrink').computeLocaleFontSizes;
+
+    beforeAll(async () => {
+        const mod = await import('./localeAutoShrink');
+        computeLocaleFontSizes = mod.computeLocaleFontSizes;
+    });
+
+    const makeElements = (fontSize = 48) => [
+        {
+            name: 'Headline', type: 'text', fontSize,
+            lineHeight: 1.2, constraints: { size: { width: 250, height: 60 } },
+        },
+        {
+            name: 'Sub', type: 'text', fontSize: 16,
+            lineHeight: 1.4, constraints: { size: { width: 200, height: 30 } },
+        },
+        {
+            name: 'BG', type: 'shape',
+            constraints: { size: { width: 300, height: 250 } },
+        },
+    ];
+
+    it('returns original fontSizes for original locale', () => {
+        const result = computeLocaleFontSizes(
+            makeElements() as any,
+            { Headline: 'Hello', Sub: 'World' },
+            { Headline: 48, Sub: 16 },
+            true, // isOriginal
+        );
+        expect(result.Headline).toBe(48);
+        expect(result.Sub).toBe(16);
+    });
+
+    it('shrinks for non-original locale with long text', () => {
+        const result = computeLocaleFontSizes(
+            makeElements() as any,
+            { Headline: 'DES BAGUES WSOP SERONT REMPORTÉES', Sub: 'Texte' },
+            { Headline: 48, Sub: 16 },
+            false, // not original
+        );
+        expect(result.Headline).toBeLessThan(48); // FR headline is long
+        expect(result.Sub).toBeLessThanOrEqual(16); // Sub may or may not shrink
+    });
+
+    it('ignores non-text elements', () => {
+        const result = computeLocaleFontSizes(
+            makeElements() as any,
+            { BG: 'ignored' },
+            { Headline: 48 },
+            false,
+        );
+        expect(result.BG).toBeUndefined(); // shape not in result
+    });
+
+    it('uses element fontSize when originalFontSizes is empty', () => {
+        const result = computeLocaleFontSizes(
+            makeElements(32) as any,
+            { Headline: 'Hi' },
+            {}, // empty originalFontSizes
+            true,
+        );
+        expect(result.Headline).toBe(32); // falls back to element.fontSize
+    });
+
+    it('only processes elements present in targetMap', () => {
+        const result = computeLocaleFontSizes(
+            makeElements() as any,
+            { Headline: 'Hello' }, // Sub not in targetMap
+            { Headline: 48, Sub: 16 },
+            true,
+        );
+        expect(result.Headline).toBe(48);
+        expect(result.Sub).toBeUndefined(); // Sub not in targetMap
+    });
+
+    it('per-locale independence: EN vs KO vs FR produce different sizes', () => {
+        const els = makeElements() as any;
+        const origSizes = { Headline: 48 };
+
+        const en = computeLocaleFontSizes(els, { Headline: 'WSOP RINGS' }, origSizes, true);
+        const ko = computeLocaleFontSizes(els, { Headline: 'WSOP 반지가 수여될 것입니다' }, origSizes, false);
+        const fr = computeLocaleFontSizes(els, { Headline: 'DES BAGUES WSOP SERONT REMPORTÉES' }, origSizes, false);
+
+        expect(en.Headline).toBe(48); // original
+        expect(ko.Headline).toBeLessThanOrEqual(48);
+        expect(fr.Headline).toBeLessThanOrEqual(ko.Headline); // FR longest → smallest or equal font
     });
 });

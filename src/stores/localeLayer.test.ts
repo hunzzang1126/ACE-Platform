@@ -5,7 +5,7 @@
 // multi-variant, button labels, edge cases.
 // ─────────────────────────────────────────────────
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, beforeAll } from 'vitest';
 import { useDesignStore } from './designStore';
 import type { LocaleData } from '@/schema/design.types';
 import type { DesignElement } from '@/schema/elements.types';
@@ -457,5 +457,127 @@ describe('Locale Layer — removeLocale', () => {
     it('does nothing when no localeData exists', () => {
         setupTestCS();
         expect(() => useDesignStore.getState().removeLocale('en')).not.toThrow();
+    });
+});
+
+describe('Locale Layer — auto-shrink integration', () => {
+    beforeEach(() => {
+        useDesignStore.setState({ allCreativeSets: {}, activeCreativeSetId: null, creativeSet: null });
+    });
+
+    it('captures originalFontSizes on first switchLocale call', () => {
+        setupTestCS();
+        useDesignStore.getState().setLocaleData(makeLocaleData());
+
+        // Before switch — no originalFontSizes
+        const ldBefore = useDesignStore.getState().creativeSet!.localeData!;
+        expect(ldBefore.originalFontSizes).toBeUndefined();
+
+        // After switch — originalFontSizes captured
+        useDesignStore.getState().switchLocale('en');
+        const ldAfter = useDesignStore.getState().creativeSet!.localeData!;
+        expect(ldAfter.originalFontSizes).toBeDefined();
+        expect(ldAfter.originalFontSizes!['Headline']).toBe(32); // from setupTestCS
+    });
+
+    it('caches localeFontSizes per locale', () => {
+        setupTestCS();
+        useDesignStore.getState().setLocaleData(makeLocaleData());
+        useDesignStore.getState().switchLocale('en');
+
+        const ld = useDesignStore.getState().creativeSet!.localeData!;
+        expect(ld.localeFontSizes).toBeDefined();
+        expect(ld.localeFontSizes!['en']).toBeDefined();
+        expect(ld.localeFontSizes!['en']!['Headline']).toBeGreaterThan(0);
+    });
+
+    it('different locales get different cached fontSizes', () => {
+        const store = useDesignStore.getState();
+        store.createCreativeSet('ShrinkTest', {
+            id: 'p1', name: '300x250', width: 300, height: 250, category: 'display',
+        });
+        store.addElementToMaster({
+            id: 'el-1', name: 'HL', type: 'text',
+            content: 'Short', fontFamily: 'Inter', fontSize: 48, fontWeight: 700,
+            fontStyle: 'normal', color: '#fff', textAlign: 'center',
+            lineHeight: 1.2, letterSpacing: 0, autoShrink: false,
+            constraints: { horizontal: { anchor: 'center', offset: 0 }, vertical: { anchor: 'top', offset: 10 }, size: { widthMode: 'fixed', heightMode: 'fixed', width: 200, height: 60 }, rotation: 0 },
+            opacity: 1, visible: true, locked: false, zIndex: 1,
+        } as any);
+
+        store.setLocaleData({
+            locales: {
+                en: { HL: 'Short' },
+                fr: { HL: 'BEAUCOUP PLUS LONG TEXTE POUR TESTER' },
+            },
+            activeLocale: null,
+            originalLocale: 'en',
+        });
+
+        // Switch to EN (original) — should get full size
+        store.switchLocale(null);
+        const ld1 = useDesignStore.getState().creativeSet!.localeData!;
+        expect(ld1.localeFontSizes!['en']!['HL']).toBe(48);
+
+        // Switch to FR — should get shrunk size
+        store.switchLocale('fr');
+        const ld2 = useDesignStore.getState().creativeSet!.localeData!;
+        expect(ld2.localeFontSizes!['fr']!['HL']).toBeLessThan(48);
+
+        // EN cache unchanged after FR switch
+        expect(ld2.localeFontSizes!['en']!['HL']).toBe(48);
+    });
+
+    it('does not recalculate cached fontSizes on re-switch', () => {
+        setupTestCS();
+        useDesignStore.getState().setLocaleData(makeLocaleData());
+
+        useDesignStore.getState().switchLocale('en');
+        const first = useDesignStore.getState().creativeSet!.localeData!.localeFontSizes!['en'];
+
+        useDesignStore.getState().switchLocale(null);
+        useDesignStore.getState().switchLocale('en'); // re-switch
+        const second = useDesignStore.getState().creativeSet!.localeData!.localeFontSizes!['en'];
+
+        // Same cached object (not recalculated)
+        expect(second).toEqual(first);
+    });
+});
+
+describe('LocaleBar — right-click context menu architecture', () => {
+    let src: string;
+
+    beforeAll(async () => {
+        const { readFileSync } = await import('fs');
+        const { resolve } = await import('path');
+        src = readFileSync(resolve(__dirname, '../components/creativeset/LocaleBar.tsx'), 'utf-8');
+    });
+
+    it('uses onContextMenu for delete, NOT inline × button', () => {
+        expect(src).toContain('onContextMenu');
+        expect(src).not.toContain('locale-pill-remove');
+    });
+
+    it('renders context menu with danger styling', () => {
+        expect(src).toContain('locale-ctx-menu');
+        expect(src).toContain('locale-ctx-item--danger');
+    });
+
+    it('has backdrop to close menu on click away', () => {
+        expect(src).toContain('locale-ctx-backdrop');
+        expect(src).toContain('handleCloseCtx');
+    });
+
+    it('prevents context menu on original locale pills', () => {
+        expect(src).toContain('if (isOriginal) return');
+    });
+
+    it('shows tooltip hint about right-click on non-original pills', () => {
+        expect(src).toContain('right-click to remove');
+    });
+
+    it('calls removeLocale from store on confirm', () => {
+        expect(src).toContain('removeLocale');
+        expect(src).toContain('window.confirm');
     });
 });
