@@ -465,7 +465,12 @@ describe('Locale Layer — auto-shrink integration', () => {
         useDesignStore.setState({ allCreativeSets: {}, activeCreativeSetId: null, creativeSet: null });
     });
 
-    it('captures originalFontSizes on first switchLocale call', () => {
+    function getMasterVid() {
+        const cs = useDesignStore.getState().creativeSet!;
+        return cs.masterVariantId;
+    }
+
+    it('captures per-variant originalFontSizes on first switchLocale call', () => {
         setupTestCS();
         useDesignStore.getState().setLocaleData(makeLocaleData());
 
@@ -473,22 +478,26 @@ describe('Locale Layer — auto-shrink integration', () => {
         const ldBefore = useDesignStore.getState().creativeSet!.localeData!;
         expect(ldBefore.originalFontSizes).toBeUndefined();
 
-        // After switch — originalFontSizes captured
+        // After switch — per-variant originalFontSizes captured
         useDesignStore.getState().switchLocale('en');
         const ldAfter = useDesignStore.getState().creativeSet!.localeData!;
         expect(ldAfter.originalFontSizes).toBeDefined();
-        expect(ldAfter.originalFontSizes!['Headline']).toBe(32); // from setupTestCS
+        const vid = getMasterVid();
+        expect(ldAfter.originalFontSizes![vid]).toBeDefined();
+        expect(ldAfter.originalFontSizes![vid]!['Headline']).toBe(32);
     });
 
-    it('caches localeFontSizes per locale', () => {
+    it('caches localeFontSizes per locale per variant', () => {
         setupTestCS();
         useDesignStore.getState().setLocaleData(makeLocaleData());
         useDesignStore.getState().switchLocale('en');
 
         const ld = useDesignStore.getState().creativeSet!.localeData!;
+        const vid = getMasterVid();
         expect(ld.localeFontSizes).toBeDefined();
         expect(ld.localeFontSizes!['en']).toBeDefined();
-        expect(ld.localeFontSizes!['en']!['Headline']).toBeGreaterThan(0);
+        expect(ld.localeFontSizes!['en']![vid]).toBeDefined();
+        expect(ld.localeFontSizes!['en']![vid]!['Headline']).toBeGreaterThan(0);
     });
 
     it('different locales get different cached fontSizes', () => {
@@ -514,33 +523,100 @@ describe('Locale Layer — auto-shrink integration', () => {
             originalLocale: 'en',
         });
 
+        const vid = getMasterVid();
+
         // Switch to EN (original) — should get full size
         store.switchLocale(null);
         const ld1 = useDesignStore.getState().creativeSet!.localeData!;
-        expect(ld1.localeFontSizes!['en']!['HL']).toBe(48);
+        expect(ld1.localeFontSizes!['en']![vid]!['HL']).toBe(48);
 
         // Switch to FR — should get shrunk size
         store.switchLocale('fr');
         const ld2 = useDesignStore.getState().creativeSet!.localeData!;
-        expect(ld2.localeFontSizes!['fr']!['HL']).toBeLessThan(48);
+        expect(ld2.localeFontSizes!['fr']![vid]!['HL']).toBeLessThan(48);
 
         // EN cache unchanged after FR switch
-        expect(ld2.localeFontSizes!['en']!['HL']).toBe(48);
+        expect(ld2.localeFontSizes!['en']![vid]!['HL']).toBe(48);
     });
 
     it('does not recalculate cached fontSizes on re-switch', () => {
         setupTestCS();
         useDesignStore.getState().setLocaleData(makeLocaleData());
+        const vid = getMasterVid();
 
         useDesignStore.getState().switchLocale('en');
-        const first = useDesignStore.getState().creativeSet!.localeData!.localeFontSizes!['en'];
+        const first = useDesignStore.getState().creativeSet!.localeData!.localeFontSizes!['en']![vid];
 
         useDesignStore.getState().switchLocale(null);
         useDesignStore.getState().switchLocale('en'); // re-switch
-        const second = useDesignStore.getState().creativeSet!.localeData!.localeFontSizes!['en'];
+        const second = useDesignStore.getState().creativeSet!.localeData!.localeFontSizes!['en']![vid];
 
         // Same cached object (not recalculated)
         expect(second).toEqual(first);
+    });
+
+    it('★ per-variant: 1080x1080 gets larger fontSize than 300x250 for same locale', () => {
+        const store = useDesignStore.getState();
+        store.createCreativeSet('MultiSize', {
+            id: 'p1', name: '300x250', width: 300, height: 250, category: 'display',
+        });
+        // Add headline to master (300×250)
+        store.addElementToMaster({
+            id: 'el-1', name: 'HL', type: 'text',
+            content: 'WSOP RINGS WILL BE WON', fontFamily: 'Inter', fontSize: 48, fontWeight: 700,
+            fontStyle: 'normal', color: '#fff', textAlign: 'center',
+            lineHeight: 1.2, letterSpacing: 0, autoShrink: false,
+            constraints: { horizontal: { anchor: 'center', offset: 0 }, vertical: { anchor: 'top', offset: 10 },
+                size: { widthMode: 'fixed', heightMode: 'fixed', width: 250, height: 60 }, rotation: 0 },
+            opacity: 1, visible: true, locked: false, zIndex: 1,
+        } as any);
+
+        // Add a second variant (1080×1080)
+        store.addVariant({ id: 'p2', name: '1080x1080', width: 1080, height: 1080, category: 'social' });
+        const cs1 = useDesignStore.getState().creativeSet!;
+        const bigVariant = cs1.variants.find(v => v.id !== cs1.masterVariantId)!;
+
+        // Add element to big variant — must update BOTH allCreativeSets and creativeSet
+        const csSnap = JSON.parse(JSON.stringify(useDesignStore.getState().creativeSet!));
+        const bv = csSnap.variants.find((v: any) => v.id === bigVariant.id);
+        bv.elements = [{
+            id: 'el-1b', name: 'HL', type: 'text',
+            content: 'WSOP RINGS WILL BE WON', fontFamily: 'Inter', fontSize: 48, fontWeight: 700,
+            fontStyle: 'normal', color: '#fff', textAlign: 'center',
+            lineHeight: 1.2, letterSpacing: 0, autoShrink: false,
+            constraints: { horizontal: { anchor: 'center', offset: 0 }, vertical: { anchor: 'top', offset: 50 },
+                size: { widthMode: 'fixed', heightMode: 'fixed', width: 900, height: 200 }, rotation: 0 },
+            opacity: 1, visible: true, locked: false, zIndex: 1,
+        }];
+        const csId = useDesignStore.getState().activeCreativeSetId!;
+        useDesignStore.setState({
+            creativeSet: csSnap,
+            allCreativeSets: { [csId]: csSnap },
+        });
+
+        // Set locale data with long FR text
+        store.setLocaleData({
+            locales: {
+                en: { HL: 'WSOP RINGS WILL BE WON' },
+                fr: { HL: 'DES BAGUES WSOP SERONT REMPORTÉES LORS DU TOURNOI' },
+            },
+            activeLocale: null,
+            originalLocale: 'en',
+        });
+
+        // Switch to FR
+        store.switchLocale('fr');
+        const ld = useDesignStore.getState().creativeSet!.localeData!;
+        const masterVid = useDesignStore.getState().creativeSet!.masterVariantId;
+
+        const smallFontSize = ld.localeFontSizes!['fr']![masterVid]!['HL'];
+        const bigFontSize = ld.localeFontSizes!['fr']![bigVariant.id]!['HL'];
+
+        // Big variant has 900px box → should get LARGER fontSize than 250px master
+        expect(bigFontSize).toBeGreaterThan(smallFontSize);
+        // Both should be <= original
+        expect(smallFontSize).toBeLessThanOrEqual(48);
+        expect(bigFontSize).toBeLessThanOrEqual(48);
     });
 });
 

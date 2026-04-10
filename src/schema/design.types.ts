@@ -53,10 +53,10 @@ export interface LocaleData {
     activeLocale: string | null;
     /** The original content language (auto-detected or user-set) */
     originalLocale: string;
-    /** Original font sizes before auto-shrink (elementName → fontSize) */
-    originalFontSizes?: Record<string, number>;
-    /** Per-locale cached font sizes (localeCode → elementName → fontSize) */
-    localeFontSizes?: Record<string, Record<string, number>>;
+    /** Per-variant original font sizes (variantId → elementName → fontSize) */
+    originalFontSizes?: Record<string, Record<string, number>>;
+    /** Per-locale, per-variant cached font sizes (localeCode → variantId → elementName → fontSize) */
+    localeFontSizes?: Record<string, Record<string, Record<string, number>>>;
 }
 
 /** Smart sizing mode: how elements are repositioned across variants */

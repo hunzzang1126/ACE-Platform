@@ -23,6 +23,12 @@ import { setupDesignStoreSync, _broadcastDesignSync } from './designStoreSync';
 export type { DesignState };
 export { _broadcastDesignSync };
 
+/** Detect old flat originalFontSizes: { Headline: 48 } vs new nested: { variantId: { Headline: 48 } } */
+function _isLegacyFlatMap(obj: Record<string, any>): boolean {
+    const firstVal = Object.values(obj)[0];
+    return typeof firstVal === 'number'; // flat = number values, nested = object values
+}
+
 export const useDesignStore = create<DesignState>()(
     subscribeWithSelector(
         persist(
@@ -277,48 +283,44 @@ export const useDesignStore = create<DesignState>()(
                         const targetMap = localeCode ? ld.locales[localeCode] : ld.locales[ld.originalLocale];
                         if (!targetMap) return;
 
-                        // ★ Store original font sizes on first locale switch
-                        if (!ld.originalFontSizes) {
-                            const sizes: Record<string, number> = {};
-                            const master = cs.variants.find(v => v.id === cs.masterVariantId);
-                            if (master) {
-                                for (const el of master.elements) {
+                        // ★ Capture per-variant original font sizes on first switch
+                        if (!ld.originalFontSizes || _isLegacyFlatMap(ld.originalFontSizes)) {
+                            const perVariant: Record<string, Record<string, number>> = {};
+                            for (const v of cs.variants) {
+                                const sizes: Record<string, number> = {};
+                                for (const el of v.elements) {
                                     if (el.type === 'text' && 'fontSize' in el) {
                                         sizes[el.name] = (el as any).fontSize;
                                     }
                                 }
+                                perVariant[v.id] = sizes;
                             }
-                            ld.originalFontSizes = sizes;
+                            ld.originalFontSizes = perVariant;
                         }
 
-                        // ★ Per-locale font size cache
+                        // ★ Per-locale, per-variant font size cache
                         if (!ld.localeFontSizes) ld.localeFontSizes = {};
-                        const targetLocaleKey = localeCode ?? ld.originalLocale;
+                        const localeKey = localeCode ?? ld.originalLocale;
+                        if (!ld.localeFontSizes[localeKey]) ld.localeFontSizes[localeKey] = {};
 
-                        // Compute and cache auto-shrink fontSize for this locale (once)
-                        if (!ld.localeFontSizes[targetLocaleKey]) {
-                            const master = cs.variants.find(v => v.id === cs.masterVariantId);
-                            if (master) {
-                                ld.localeFontSizes[targetLocaleKey] = computeLocaleFontSizes(
-                                    master.elements as any, targetMap, ld.originalFontSizes ?? {}, isOriginal
+                        // Apply content + per-variant fontSize across ALL variants
+                        for (const variant of cs.variants) {
+                            // Compute cache for this variant if missing
+                            if (!ld.localeFontSizes[localeKey]![variant.id]) {
+                                const origSizes = ld.originalFontSizes[variant.id] ?? {};
+                                ld.localeFontSizes[localeKey]![variant.id] = computeLocaleFontSizes(
+                                    variant.elements as any, targetMap, origSizes, isOriginal
                                 );
                             }
-                        }
+                            const cachedSizes = ld.localeFontSizes[localeKey]![variant.id] ?? {};
 
-                        const cachedSizes = ld.localeFontSizes[targetLocaleKey] ?? {};
-
-                        // Apply translated content + cached fontSize across ALL variants
-                        for (const variant of cs.variants) {
                             for (const el of variant.elements) {
                                 const key = el.name;
                                 if (!key || !(key in targetMap)) continue;
                                 if (el.type === 'text' && 'content' in el) {
                                     (el as any).content = targetMap[key];
-                                    // ★ Apply per-locale cached fontSize
                                     const cachedSize = cachedSizes[key];
-                                    if (cachedSize) {
-                                        (el as any).fontSize = cachedSize;
-                                    }
+                                    if (cachedSize) (el as any).fontSize = cachedSize;
                                 } else if (el.type === 'button' && 'label' in el) {
                                     (el as any).label = targetMap[key];
                                 }
