@@ -30,12 +30,16 @@
 /* ── Sidebar (200px, Figma-style) ── */
 .sidebar {
     width: 200px;
+    height: 100vh;
     background: var(--bg-surface);
     border-right: 1px solid var(--border);
     display: flex;
     flex-direction: column;
     padding: 16px 0;
     flex-shrink: 0;
+    overflow: hidden;
+    position: sticky;
+    top: 0;
 }
 
 .sidebar-logo {

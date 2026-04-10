@@ -266,4 +266,29 @@ describe('analyzeScene', () => {
         const r = analyzeScene(tracked);
         expect(r).not.toContain('overlaps');
     });
+
+    it('★ REGRESSION: falls back to designStore when trackedNodes is empty', async () => {
+        // Import the actual store (not mocked)
+        const { useDesignStore } = await vi.importActual<typeof import('@/stores/designStore')>('@/stores/designStore');
+        useDesignStore.setState({ allCreativeSets: {}, activeCreativeSetId: null, creativeSet: null });
+        useDesignStore.getState().createCreativeSet('Test', {
+            id: 'p1', name: '300x250', width: 300, height: 250, category: 'display',
+        });
+        useDesignStore.getState().addElementToMaster({
+            id: 'el-1', name: 'Headline', type: 'text',
+            content: 'Hello World', fontFamily: 'Inter', fontSize: 32, fontWeight: 700,
+            fontStyle: 'normal', color: '#fff', textAlign: 'center',
+            lineHeight: 1.2, letterSpacing: 0, autoShrink: false,
+            constraints: { horizontal: { anchor: 'center', offset: 0 }, vertical: { anchor: 'top', offset: 40 }, size: { widthMode: 'fixed', heightMode: 'fixed', width: 200, height: 40 }, rotation: 0 },
+            opacity: 1, visible: true, locked: false, zIndex: 1,
+        });
+
+        const result = analyzeScene([]);
+        // Should NOT say "empty"
+        expect(result).toContain('Headline');
+        expect(result).toContain('Hello World');
+        expect(result).toContain('from store');
+        // Cleanup
+        useDesignStore.setState({ allCreativeSets: {}, activeCreativeSetId: null, creativeSet: null });
+    });
 });
