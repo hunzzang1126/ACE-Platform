@@ -13,6 +13,7 @@ import { immer } from 'zustand/middleware/immer';
 import { v4 as uuid } from 'uuid';
 import type { CreativeSet, BannerVariant, BannerPreset } from '@/schema/design.types';
 import type { DesignElement } from '@/schema/elements.types';
+import { calcAutoShrinkFontSize } from './localeAutoShrink';
 import { smartSizeElements } from '@/engine/smartSizing';
 import type { DesignState } from './designStoreTypes';
 import { getActiveCS, mergePropertyChanges } from './designStoreTypes';
@@ -272,8 +273,23 @@ export const useDesignStore = create<DesignState>()(
                         const cs = getActiveCS(state);
                         if (!cs || !cs.localeData) return;
                         const ld = cs.localeData;
+                        const isOriginal = !localeCode;
                         const targetMap = localeCode ? ld.locales[localeCode] : ld.locales[ld.originalLocale];
                         if (!targetMap) return;
+
+                        // ★ Store original font sizes on first locale switch
+                        if (!ld.originalFontSizes) {
+                            const sizes: Record<string, number> = {};
+                            const master = cs.variants.find(v => v.id === cs.masterVariantId);
+                            if (master) {
+                                for (const el of master.elements) {
+                                    if (el.type === 'text' && 'fontSize' in el) {
+                                        sizes[el.name] = (el as any).fontSize;
+                                    }
+                                }
+                            }
+                            ld.originalFontSizes = sizes;
+                        }
 
                         // Apply translated content across ALL variants
                         for (const variant of cs.variants) {
@@ -282,6 +298,23 @@ export const useDesignStore = create<DesignState>()(
                                 if (!key || !(key in targetMap)) continue;
                                 if (el.type === 'text' && 'content' in el) {
                                     (el as any).content = targetMap[key];
+                                    // ★ Auto-shrink: restore original fontSize first, then shrink if needed
+                                    const origFontSize = ld.originalFontSizes?.[key];
+                                    if (origFontSize) {
+                                        (el as any).fontSize = origFontSize; // always restore first
+                                        if (!isOriginal) {
+                                            // Shrink if new text overflows the box
+                                            const boxW = el.constraints.size.width ?? 200;
+                                            const boxH = el.constraints.size.height ?? 200;
+                                            const lineH = (el as any).lineHeight ?? 1.2;
+                                            const newSize = calcAutoShrinkFontSize(
+                                                targetMap[key]!, origFontSize, lineH, boxW, boxH
+                                            );
+                                            if (newSize < origFontSize) {
+                                                (el as any).fontSize = newSize;
+                                            }
+                                        }
+                                    }
                                 } else if (el.type === 'button' && 'label' in el) {
                                     (el as any).label = targetMap[key];
                                 }

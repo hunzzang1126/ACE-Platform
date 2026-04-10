@@ -53,6 +53,8 @@ export interface LocaleData {
     activeLocale: string | null;
     /** The original content language (auto-detected or user-set) */
     originalLocale: string;
+    /** Original font sizes before auto-shrink (elementName → fontSize) */
+    originalFontSizes?: Record<string, number>;
 }
 
 /** Smart sizing mode: how elements are repositioned across variants */
