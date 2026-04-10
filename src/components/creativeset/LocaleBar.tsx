@@ -44,19 +44,29 @@ export function LocaleBar() {
     const removeLocale = useDesignStore(s => s.removeLocale);
     const [pickerOpen, setPickerOpen] = useState(false);
     const [translating, setTranslating] = useState(false);
+    const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; code: string } | null>(null);
 
     const handleSwitch = useCallback((code: string | null) => {
         switchLocale(code);
     }, [switchLocale]);
 
-    const handleRemove = useCallback((e: React.MouseEvent, code: string) => {
-        e.stopPropagation(); // prevent triggering the pill switch
-        const display = getDisplay(code);
-        if (window.confirm(`Remove ${display.label} (${display.code}) translation?`)) {
-            removeLocale(code);
-        }
-    }, [removeLocale]);
+    const handleContextMenu = useCallback((e: React.MouseEvent, code: string, isOriginal: boolean) => {
+        if (isOriginal) return; // no context menu for original
+        e.preventDefault();
+        e.stopPropagation();
+        setCtxMenu({ x: e.clientX, y: e.clientY, code });
+    }, []);
 
+    const handleRemoveFromCtx = useCallback(() => {
+        if (!ctxMenu) return;
+        const display = getDisplay(ctxMenu.code);
+        setCtxMenu(null);
+        if (window.confirm(`Remove ${display.label} (${display.code}) translation?`)) {
+            removeLocale(ctxMenu.code);
+        }
+    }, [ctxMenu, removeLocale]);
+
+    const handleCloseCtx = useCallback(() => setCtxMenu(null), []);
     const handlePickerClose = useCallback(() => setPickerOpen(false), []);
     const handleTranslating = useCallback((v: boolean) => setTranslating(v), []);
 
@@ -83,7 +93,7 @@ export function LocaleBar() {
     const active = localeData.activeLocale;
 
     return (
-        <div className="locale-bar">
+        <div className="locale-bar" onClick={ctxMenu ? handleCloseCtx : undefined}>
             {localeCodes.map(code => {
                 const display = getDisplay(code);
                 const isActive = active === code || (active === null && code === localeData.originalLocale);
@@ -93,19 +103,11 @@ export function LocaleBar() {
                         key={code}
                         className={`locale-pill ${isActive ? 'locale-pill--active' : ''}`}
                         onClick={() => handleSwitch(isOriginal ? null : code)}
-                        title={display.label}
+                        onContextMenu={(e) => handleContextMenu(e, code, isOriginal)}
+                        title={isOriginal ? display.label : `${display.label} · right-click to remove`}
                     >
                         <span className="locale-pill-code">{display.code}</span>
                         {isOriginal && <span className="locale-pill-tag">original</span>}
-                        {!isOriginal && (
-                            <span
-                                className="locale-pill-remove"
-                                onClick={(e) => handleRemove(e, code)}
-                                title={`Remove ${display.label}`}
-                            >
-                                ×
-                            </span>
-                        )}
                     </button>
                 );
             })}
@@ -126,6 +128,24 @@ export function LocaleBar() {
             </button>
 
             {pickerOpen && <LocalePickerPopover existingLocales={localeCodes} onClose={handlePickerClose} onTranslating={handleTranslating} />}
+
+            {/* ── Right-click context menu ── */}
+            {ctxMenu && (
+                <>
+                    <div className="locale-ctx-backdrop" onClick={handleCloseCtx} />
+                    <div
+                        className="locale-ctx-menu"
+                        style={{ left: ctxMenu.x, top: ctxMenu.y }}
+                    >
+                        <button className="locale-ctx-item locale-ctx-item--danger" onClick={handleRemoveFromCtx}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                                <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6" /><path d="M14 11v6" />
+                            </svg>
+                            Remove {getDisplay(ctxMenu.code).label}
+                        </button>
+                    </div>
+                </>
+            )}
         </div>
     );
 }
