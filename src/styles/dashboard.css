@@ -5,8 +5,9 @@
 /* ── Layout ── */
 .dashboard-layout {
     display: flex;
-    min-height: 100vh;
+    height: 100%;
     width: 100%;
+    min-width: 0;
     background: var(--bg-base);
     color: var(--text-primary);
     overflow: hidden;
