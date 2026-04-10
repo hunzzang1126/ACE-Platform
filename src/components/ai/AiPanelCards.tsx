@@ -112,8 +112,7 @@ export function ImageGalleryCard({ images, onSelect }: { images: Array<{ id: str
 // ── Model Dropdown ───────────────────────────────
 
 const MODEL_OPTIONS: Array<{ role: AceModelRole; label: string; minPlan: 'starter' | 'creator' | 'pro' }> = [
-    { role: 'design', label: 'Claude Sonnet 4', minPlan: 'creator' },
-    { role: 'executor', label: 'Claude 3.5 Haiku (Fast)', minPlan: 'starter' },
+    { role: 'design', label: 'Claude Sonnet 4', minPlan: 'starter' },
 ];
 
 const PLAN_RANK: Record<string, number> = { starter: 0, creator: 1, pro: 2, enterprise: 3, admin: 4 };

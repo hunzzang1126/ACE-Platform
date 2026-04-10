@@ -235,8 +235,8 @@ export default function PricingPage() {
                                 />
                                 <Feature
                                     label="AI Model"
-                                    value={plan.limits.allowedModels.some(m => m.includes('sonnet')) ? 'Sonnet 4 (Premium)' : 'Haiku 3.5 (Fast)'}
-                                    highlight={plan.limits.allowedModels.some(m => m.includes('sonnet'))}
+                                    value="Claude Sonnet 4"
+                                    highlight={true}
                                 />
                                 <Feature
                                     label="Size Variants"

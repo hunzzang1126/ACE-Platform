@@ -137,7 +137,7 @@ export class AiService {
         const { PLAN_LIMITS } = await import('@/schema/planTypes');
         const userPlan = useAuthStore.getState().user?.plan ?? 'starter';
         const planDefaults = PLAN_LIMITS[userPlan];
-        let model = this.config.model || planDefaults?.defaultModel || 'anthropic/claude-3.5-haiku';
+        let model = this.config.model || planDefaults?.defaultModel || 'anthropic/claude-sonnet-4';
         const requestedModel = model;
         if (planDefaults?.allowedModels && !planDefaults.allowedModels.includes(model)) { model = planDefaults.defaultModel; }
         console.info(`[AiService] Model selection: requested="${requestedModel}" → actual="${model}" | plan="${userPlan}" | allowed=[${planDefaults?.allowedModels?.join(', ')}]`);
