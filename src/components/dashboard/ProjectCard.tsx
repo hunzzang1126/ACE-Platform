@@ -46,7 +46,10 @@ export function ProjectCard({ id, name, variantCount, createdAt, createdBy, type
 
     const handleContextMenu = useCallback((e: React.MouseEvent) => {
         e.preventDefault();
-        setMenuPos({ x: e.clientX, y: e.clientY });
+        const MENU_W = 170; const MENU_H = 170;
+        const x = Math.min(e.clientX, window.innerWidth - MENU_W);
+        const y = Math.min(e.clientY, window.innerHeight - MENU_H);
+        setMenuPos({ x, y });
         setMenuOpen(true);
     }, []);
 
