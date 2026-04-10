@@ -6,6 +6,7 @@
 
 import { useCallback } from 'react';
 import { isAssetRef, resolveAsset } from '@/services/assetService';
+import { isCloudUrl, resolveCloudUrl } from '@/services/cloudStorageService';
 import { useDesignStore } from '@/stores/designStore';
 import { loadVideoBlob } from '@/stores/videoStorage';
 import type { DesignElement, ShapeElement, TextElement, ImageElement, VideoElement, ElementAnimation } from '@/schema/elements.types';
@@ -226,10 +227,26 @@ function restoreImage(engine: Engine, img: ImageElement, canvasW: number, canvas
         // ★ DATA INTEGRITY: Remember the stored src (idb:// or data:) BEFORE resolving.
         // After resolve, the blob: URL is transient and session-scoped.
         // __glidPersistSrc preserves the stable ref for subsequent saves.
-        const stableSrc = img.src;
+        let stableSrc = img.src;
         const cx = x, cy = y, cw = w, ch = h, ci = img;
         pendingLoads.push(async () => {
-            const resolved = isAssetRef(ci.src!) ? await resolveAsset(ci.src!) : ci.src!;
+            let srcToResolve = ci.src!;
+            // ★ REGRESSION FIX: Recover expired signed Supabase URLs.
+            // If the stored src is a signed URL (not storage://), extract the
+            // storage path and re-sign it. This fixes images saved before v0.0.0.488.
+            if (!isAssetRef(srcToResolve) && isCloudUrl(srcToResolve)) {
+                try {
+                    const url = new URL(srcToResolve);
+                    const match = url.pathname.match(/\/storage\/v1\/object\/sign\/ace-assets\/(.+)/);
+                    if (match?.[1]) {
+                        const recoveredRef = `storage://${match[1]}`;
+                        stableSrc = recoveredRef; // ★ Fix the persist ref too
+                        srcToResolve = recoveredRef;
+                        console.log(`[restoreImage] Recovered signed URL → ${recoveredRef}`);
+                    }
+                } catch { /* invalid URL */ }
+            }
+            const resolved = isAssetRef(srcToResolve) ? await resolveAsset(srcToResolve) : srcToResolve;
             const nodeId = await engine.add_image(cx, cy, resolved, cw, ch, ci.name, ci.zIndex, ci.naturalWidth, ci.naturalHeight, ci.fit);
             // ★ Set persistent src on the Fabric object so save reads idb:// not blob:
             if (nodeId != null && engine._findById) {
