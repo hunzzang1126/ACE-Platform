@@ -102,7 +102,8 @@ const _blobUrlCache = new Map<string, string>();
 
 /**
  * Extract all base64 data URLs from elements and store them as blobs.
- * Returns a new elements array with `idb://` references.
+ * Returns a new elements array with stable references (storage:// or idb://).
+ * ★ Also converts signed Supabase URLs back to storage:// refs — signed URLs expire!
  * Non-image elements and already-extracted elements pass through unchanged.
  */
 export async function extractAssets(
@@ -111,15 +112,46 @@ export async function extractAssets(
     const results: DesignElement[] = [];
 
     for (const el of elements) {
-        if (el.type === 'image' && isDataUrl(el.src)) {
-            const ref = await storeAsset(el.src);
+        if (el.type !== 'image') { results.push(el); continue; }
+
+        const src = el.src;
+        if (isDataUrl(src)) {
+            // data: → upload to cloud or store in IDB
+            const ref = await storeAsset(src);
             results.push({ ...el, src: ref } as ImageElement);
+        } else if (isCloudUrl(src)) {
+            // ★ REGRESSION FIX: Signed Supabase URL leaked into element src.
+            // These expire after 1 hour. Convert back to storage:// ref.
+            const storageRef = signedUrlToStorageRef(src);
+            if (storageRef) {
+                console.log(`[extractAssets] Converted signed URL → ${storageRef}`);
+                results.push({ ...el, src: storageRef } as ImageElement);
+            } else {
+                // Can't extract storage path — keep as-is (will break after expiry)
+                console.warn('[extractAssets] Could not convert signed URL to storage ref:', src.slice(0, 80));
+                results.push(el);
+            }
         } else {
             results.push(el);
         }
     }
 
     return results;
+}
+
+/**
+ * Convert a signed Supabase URL back to a storage:// ref.
+ * Input: https://xxx.supabase.co/storage/v1/object/sign/ace-assets/{userId}/designs/{hash}.{ext}?token=...
+ * Output: storage://{userId}/designs/{hash}.{ext}
+ */
+function signedUrlToStorageRef(signedUrl: string): string | null {
+    try {
+        const url = new URL(signedUrl);
+        // Path format: /storage/v1/object/sign/ace-assets/{userId}/{folder}/{file}
+        const match = url.pathname.match(/\/storage\/v1\/object\/sign\/ace-assets\/(.+)/);
+        if (match?.[1]) return `storage://${match[1]}`;
+    } catch { /* invalid URL */ }
+    return null;
 }
 
 /**

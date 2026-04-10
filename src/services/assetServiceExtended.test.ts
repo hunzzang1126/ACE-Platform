@@ -215,3 +215,21 @@ describe('resolveAssets — non-idb passthrough', () => {
     });
 });
 
+describe('extractAssets — signed URL recovery', () => {
+    beforeEach(() => vi.clearAllMocks());
+
+    it('★ REGRESSION: converts signed Supabase URL back to storage:// ref', async () => {
+        mockIsCloudUrl.mockReturnValue(true);
+        const signedUrl = 'https://bitcbtdydnbbfavbncvt.supabase.co/storage/v1/object/sign/ace-assets/78472fb3-5ce8-4a3a-8d3e-3b1a0b233a61/designs/2ce059c85b9a105d.jpg?token=expired';
+        const elements = [{ id: 'img1', type: 'image' as const, src: signedUrl }] as any[];
+        const result = await extractAssets(elements);
+        expect(result[0].src).toBe('storage://78472fb3-5ce8-4a3a-8d3e-3b1a0b233a61/designs/2ce059c85b9a105d.jpg');
+    });
+
+    it('★ REGRESSION: keeps non-supabase cloud URLs unchanged', async () => {
+        mockIsCloudUrl.mockReturnValue(false);
+        const elements = [{ id: 'img1', type: 'image' as const, src: 'https://cdn.example.com/img.png' }] as any[];
+        const result = await extractAssets(elements);
+        expect(result[0].src).toBe('https://cdn.example.com/img.png');
+    });
+});

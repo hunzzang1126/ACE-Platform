@@ -179,8 +179,10 @@ export function createCreatorMethods(ctx: ShimContext) {
                 (img as any).__glidId = id;
                 (img as any).__glidName = name || `Image #${id}`;
                 // ★ DATA INTEGRITY: Capture original src before any blob: conversion.
-                // data: URLs and http(s): URLs are stable, blob: URLs are not.
-                if (src.startsWith('data:') || src.startsWith('idb://')) {
+                // data: URLs, idb:// refs, and storage:// refs are stable.
+                // Signed Supabase URLs (https://...supabase.co/storage/...) are NOT stable — they expire.
+                // The restore path in useCanvasSync sets __glidPersistSrc from the stored element's stable ref.
+                if (src.startsWith('data:') || src.startsWith('idb://') || src.startsWith('storage://')) {
                     (img as any).__glidPersistSrc = src;
                 }
                 const targetZIndex = zIndex ?? userObjects().length;
