@@ -98,6 +98,31 @@ describe('Locale Layer — setLocaleData', () => {
         useDesignStore.getState().setLocaleData(ld);
         expect(useDesignStore.getState().creativeSet).toBeNull();
     });
+
+    it('★ REGRESSION: merges new locale without losing existing ones', () => {
+        setupTestCS();
+        // First: add Korean → English
+        useDesignStore.getState().setLocaleData(makeLocaleData());
+        // Then: add French
+        useDesignStore.getState().setLocaleData({
+            locales: {
+                en: { Headline: 'JUST DO IT', Subline: 'BREAK YOUR LIMITS.', CTA: 'SHOP NOW' },
+                fr: { Headline: 'FAITES-LE', Subline: 'DÉPASSEZ VOS LIMITES.', CTA: 'ACHETEZ' },
+            },
+            activeLocale: 'fr',
+            originalLocale: 'en',
+        });
+
+        const ld = useDesignStore.getState().creativeSet!.localeData!;
+        // Korean must still exist
+        expect(ld.locales['ko']).toBeDefined();
+        expect(ld.locales['ko']!.Headline).toBe('그냥 해');
+        // French must be added
+        expect(ld.locales['fr']).toBeDefined();
+        expect(ld.locales['fr']!.Headline).toBe('FAITES-LE');
+        // English still there
+        expect(ld.locales['en']).toBeDefined();
+    });
 });
 
 describe('Locale Layer — switchLocale', () => {

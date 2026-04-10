@@ -250,7 +250,18 @@ export const useDesignStore = create<DesignState>()(
                     set((state) => {
                         const cs = getActiveCS(state);
                         if (!cs) return;
-                        cs.localeData = data;
+                        // ★ MERGE with existing localeData — never overwrite
+                        // Adding French must NOT erase existing Korean data
+                        const existing = cs.localeData;
+                        if (existing) {
+                            cs.localeData = {
+                                originalLocale: data.originalLocale ?? existing.originalLocale,
+                                activeLocale: data.activeLocale ?? existing.activeLocale,
+                                locales: { ...existing.locales, ...data.locales },
+                            };
+                        } else {
+                            cs.localeData = data;
+                        }
                         cs.updatedAt = new Date().toISOString();
                         state.creativeSet = cs;
                     });
