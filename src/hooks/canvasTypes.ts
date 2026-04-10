@@ -95,7 +95,7 @@ export interface CanvasEngineActions {
     }>) => void;
     getTextContent: (id: number) => string | null;
     // Image creation
-    addImage: (x: number, y: number, src: string, w?: number, h?: number) => Promise<number | null>;
+    addImage: (x: number, y: number, src: string, w?: number, h?: number, persistRef?: string) => Promise<number | null>;
     // Common actions
     deleteSelected: () => void;
     /** Remove ALL user objects from canvas (preserves artboard) */

@@ -222,7 +222,7 @@ export function useFabricCanvas(width: number, height: number, _addDemoShapes = 
     const getTextContent = useCallback((id: number) => { const obj = findById(id); return obj instanceof Textbox ? obj.text ?? null : null; }, [findById]);
 
     // ── Image ──
-    const addImage = useCallback(async (x: number, y: number, src: string, w?: number, h?: number) => {
+    const addImage = useCallback(async (x: number, y: number, src: string, w?: number, h?: number, persistRef?: string) => {
         const fc = fabricRef.current; if (!fc) return null;
         const id = nextId();
         try {
@@ -231,6 +231,9 @@ export function useFabricCanvas(width: number, height: number, _addDemoShapes = 
             const targetW = w ?? Math.min(natW, width * 0.6); const scale = targetW / natW;
             img.set({ left: x, top: y, scaleX: targetW / natW, scaleY: (h ?? natH * scale) / natH });
             (img as any).__glidId = id; (img as any).__glidName = `Image #${id}`; (img as any).__glidZIndex = getUserObjects().length; patchAceProps(img);
+            // ★ DATA INTEGRITY: Store stable idb:// ref so fabricToEngineNode
+            // uses it instead of the transient blob: URL. Prevents image loss on session end.
+            if (persistRef) (img as any).__glidPersistSrc = persistRef;
             fc.add(img); fc.setActiveObject(img); fc.renderAll(); syncState();
             return id;
         } catch (err) { console.error('[Fabric] Failed to load image:', err); return null; }

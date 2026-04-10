@@ -198,7 +198,9 @@ export function EditorSidebar({ actions, nodes = [], selection = [], onTriggerIm
                                 onTriggerVideoUpload={onTriggerVideoUpload}
                                 onImageSelect={(blobUrl, entry) => {
                                     if (actions?.addImage) {
-                                        actions.addImage(0, 0, blobUrl, entry.width, entry.height);
+                                        // ★ DATA INTEGRITY: Pass idbRef so the stable reference
+                                        // is stored on the Fabric object, preventing image loss.
+                                        actions.addImage(0, 0, blobUrl, entry.width, entry.height, entry.idbRef);
                                     }
                                 }}
                             />
