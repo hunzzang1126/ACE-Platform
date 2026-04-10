@@ -13,7 +13,7 @@ import { immer } from 'zustand/middleware/immer';
 import { v4 as uuid } from 'uuid';
 import type { CreativeSet, BannerVariant, BannerPreset } from '@/schema/design.types';
 import type { DesignElement } from '@/schema/elements.types';
-import { calcAutoShrinkFontSize, computeLocaleFontSizes } from './localeAutoShrink';
+import { computeLocaleFontSizes, isLegacyFlatFontSizes, migrateLegacyFontSizes } from './localeAutoShrink';
 import { smartSizeElements } from '@/engine/smartSizing';
 import type { DesignState } from './designStoreTypes';
 import { getActiveCS, mergePropertyChanges } from './designStoreTypes';
@@ -23,11 +23,7 @@ import { setupDesignStoreSync, _broadcastDesignSync } from './designStoreSync';
 export type { DesignState };
 export { _broadcastDesignSync };
 
-/** Detect old flat originalFontSizes: { Headline: 48 } vs new nested: { variantId: { Headline: 48 } } */
-function _isLegacyFlatMap(obj: Record<string, any>): boolean {
-    const firstVal = Object.values(obj)[0];
-    return typeof firstVal === 'number'; // flat = number values, nested = object values
-}
+
 
 export const useDesignStore = create<DesignState>()(
     subscribeWithSelector(
@@ -283,8 +279,9 @@ export const useDesignStore = create<DesignState>()(
                         const targetMap = localeCode ? ld.locales[localeCode] : ld.locales[ld.originalLocale];
                         if (!targetMap) return;
 
-                        // ★ Capture per-variant original font sizes on first switch
-                        if (!ld.originalFontSizes || _isLegacyFlatMap(ld.originalFontSizes)) {
+                        // ★ Capture per-variant original font sizes
+                        if (!ld.originalFontSizes) {
+                            // First ever switch — capture from current elements
                             const perVariant: Record<string, Record<string, number>> = {};
                             for (const v of cs.variants) {
                                 const sizes: Record<string, number> = {};
@@ -296,6 +293,11 @@ export const useDesignStore = create<DesignState>()(
                                 perVariant[v.id] = sizes;
                             }
                             ld.originalFontSizes = perVariant;
+                        } else if (isLegacyFlatFontSizes(ld.originalFontSizes)) {
+                            // ★ Legacy migration: flat → per-variant (extracted helper)
+                            const flatSizes = ld.originalFontSizes as unknown as Record<string, number>;
+                            ld.originalFontSizes = migrateLegacyFontSizes(flatSizes, cs.variants, cs.masterVariantId);
+                            ld.localeFontSizes = {}; // Clear stale flat cache
                         }
 
                         // ★ Per-locale, per-variant font size cache

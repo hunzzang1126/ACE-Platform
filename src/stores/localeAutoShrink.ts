@@ -132,3 +132,34 @@ export function computeLocaleFontSizes(
     }
     return cached;
 }
+
+/** Detect old flat originalFontSizes: { Headline: 48 } vs new nested: { variantId: { Headline: 48 } } */
+export function isLegacyFlatFontSizes(obj: Record<string, any>): boolean {
+    const firstVal = Object.values(obj)[0];
+    return typeof firstVal === 'number';
+}
+
+/** Migrate legacy flat originalFontSizes to per-variant structure. */
+export function migrateLegacyFontSizes(
+    flatSizes: Record<string, number>,
+    variants: Array<{ id: string; preset: { width: number; height: number } }>,
+    masterVariantId: string,
+): Record<string, Record<string, number>> {
+    const master = variants.find(v => v.id === masterVariantId);
+    const masterW = master?.preset.width ?? 300;
+    const masterH = master?.preset.height ?? 250;
+    const perVariant: Record<string, Record<string, number>> = {};
+    for (const v of variants) {
+        if (v.id === masterVariantId) {
+            perVariant[v.id] = { ...flatSizes };
+        } else {
+            const uniformScale = Math.min(v.preset.width / masterW, v.preset.height / masterH);
+            const scaled: Record<string, number> = {};
+            for (const [name, size] of Object.entries(flatSizes)) {
+                scaled[name] = Math.max(8, Math.round(size * uniformScale));
+            }
+            perVariant[v.id] = scaled;
+        }
+    }
+    return perVariant;
+}
