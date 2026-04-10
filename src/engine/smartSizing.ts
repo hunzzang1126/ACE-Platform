@@ -103,6 +103,15 @@ export function smartSizeElements(
                 el.constraints.vertical = { anchor: 'top' as const, offset: el.constraints.vertical.offset + offsetY };
             }
         }
+
+        // ★ Individual image centering — overrides group position for images only.
+        // Images are centered horizontally on canvas regardless of where group landed.
+        for (const { el } of contentElements) {
+            if (el.type === 'image') {
+                const imgW = el.constraints.size.width;
+                el.constraints.horizontal = { anchor: 'left' as const, offset: Math.round((targetW - imgW) / 2) };
+            }
+        }
     }
 
     return postStretchTextFit(result, targetW, targetH);
@@ -240,6 +249,14 @@ function edgePinSizeElements(
             }
         }
         // else: padding ratio already applied, no shift needed
+    }
+
+    // ★ Individual image centering (same as uniform mode)
+    for (const { el } of contentItems) {
+        if (el.type === 'image') {
+            const imgW = el.constraints.size.width;
+            el.constraints.horizontal = { anchor: 'left' as const, offset: Math.round((targetW - imgW) / 2) };
+        }
     }
 
     for (const { el } of contentItems) result.push(el);
