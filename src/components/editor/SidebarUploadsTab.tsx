@@ -6,7 +6,7 @@
 // ─────────────────────────────────────────────────
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useUploadStore, type UploadEntry } from '@/stores/uploadStore';
+import { useUploadStore, type UploadEntry, saveToUploadLibrary } from '@/stores/uploadStore';
 import { resolveAsset, isAssetRef } from '@/services/assetService';
 import { saveToBrandKit } from '@/stores/brandKitHelpers';
 
@@ -86,15 +86,34 @@ export function SidebarUploadsTab({ onTriggerImageUpload, onTriggerVideoUpload, 
     const handleDrop = useCallback((e: React.DragEvent) => {
         e.preventDefault();
         setIsDragging(false);
-        // Drop triggers the file input via callback
-        if (onTriggerImageUpload) onTriggerImageUpload();
-    }, [onTriggerImageUpload]);
+        const files = e.dataTransfer.files;
+        if (!files || files.length === 0) return;
+        // Process dropped files directly into upload library
+        Array.from(files).forEach(file => {
+            if (!file.type.startsWith('image/')) return;
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                const src = evt.target?.result as string;
+                const img = new Image();
+                img.onload = () => {
+                    saveToUploadLibrary(src, file.name, img.width, img.height, 'user').catch(console.error);
+                };
+                img.src = src;
+            };
+            reader.readAsDataURL(file);
+        });
+    }, []);
 
     const aiCount = uploads.filter(u => u.source === 'ai').length;
     const userCount = uploads.filter(u => u.source === 'user').length;
 
     return (
-        <div className="sidebar-uploads">
+        <div
+            className={`sidebar-uploads ${isDragging ? 'drag-active' : ''}`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+        >
             <div className="sidebar-upload-actions">
                 <button className="sidebar-upload-btn primary" onClick={onTriggerImageUpload}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
