@@ -99,3 +99,36 @@ export function calcAutoShrinkFontSize(
     // Round to 1 decimal place for clean values
     return Math.round(best * 10) / 10;
 }
+
+/**
+ * Compute per-locale cached font sizes for a set of elements.
+ * Returns a map of { elementName → fontSize } for the given locale.
+ *
+ * @param elements - Master variant elements
+ * @param targetMap - Locale content map (elementName → text)
+ * @param originalFontSizes - Stored original font sizes
+ * @param isOriginal - Whether this is the original locale
+ */
+export function computeLocaleFontSizes(
+    elements: Array<{ name: string; type: string; constraints: any; [k: string]: any }>,
+    targetMap: Record<string, string>,
+    originalFontSizes: Record<string, number>,
+    isOriginal: boolean,
+): Record<string, number> {
+    const cached: Record<string, number> = {};
+    for (const el of elements) {
+        if (el.type !== 'text' || !('fontSize' in el)) continue;
+        const key = el.name;
+        if (!key || !(key in targetMap)) continue;
+        const origFontSize = originalFontSizes[key] ?? el.fontSize;
+        if (isOriginal) {
+            cached[key] = origFontSize;
+        } else {
+            const boxW = el.constraints.size.width ?? 200;
+            const boxH = el.constraints.size.height ?? 200;
+            const lineH = el.lineHeight ?? 1.2;
+            cached[key] = calcAutoShrinkFontSize(targetMap[key]!, origFontSize, lineH, boxW, boxH);
+        }
+    }
+    return cached;
+}

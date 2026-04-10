@@ -13,7 +13,7 @@ import { immer } from 'zustand/middleware/immer';
 import { v4 as uuid } from 'uuid';
 import type { CreativeSet, BannerVariant, BannerPreset } from '@/schema/design.types';
 import type { DesignElement } from '@/schema/elements.types';
-import { calcAutoShrinkFontSize } from './localeAutoShrink';
+import { calcAutoShrinkFontSize, computeLocaleFontSizes } from './localeAutoShrink';
 import { smartSizeElements } from '@/engine/smartSizing';
 import type { DesignState } from './designStoreTypes';
 import { getActiveCS, mergePropertyChanges } from './designStoreTypes';
@@ -297,27 +297,12 @@ export const useDesignStore = create<DesignState>()(
 
                         // Compute and cache auto-shrink fontSize for this locale (once)
                         if (!ld.localeFontSizes[targetLocaleKey]) {
-                            const cached: Record<string, number> = {};
                             const master = cs.variants.find(v => v.id === cs.masterVariantId);
                             if (master) {
-                                for (const el of master.elements) {
-                                    if (el.type !== 'text' || !('fontSize' in el)) continue;
-                                    const key = el.name;
-                                    if (!key || !(key in targetMap)) continue;
-                                    const origFontSize = ld.originalFontSizes?.[key] ?? (el as any).fontSize;
-                                    if (isOriginal) {
-                                        cached[key] = origFontSize; // original always uses full size
-                                    } else {
-                                        const boxW = el.constraints.size.width ?? 200;
-                                        const boxH = el.constraints.size.height ?? 200;
-                                        const lineH = (el as any).lineHeight ?? 1.2;
-                                        cached[key] = calcAutoShrinkFontSize(
-                                            targetMap[key]!, origFontSize, lineH, boxW, boxH
-                                        );
-                                    }
-                                }
+                                ld.localeFontSizes[targetLocaleKey] = computeLocaleFontSizes(
+                                    master.elements as any, targetMap, ld.originalFontSizes ?? {}, isOriginal
+                                );
                             }
-                            ld.localeFontSizes[targetLocaleKey] = cached;
                         }
 
                         const cachedSizes = ld.localeFontSizes[targetLocaleKey] ?? {};
