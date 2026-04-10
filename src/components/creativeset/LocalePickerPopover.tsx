@@ -57,11 +57,47 @@ export function LocalePickerPopover({ existingLocales, onClose }: Props) {
 
     const handleSelect = useCallback((code: string) => {
         const lang = LOCALE_OPTIONS.find(l => l.code === code);
-        // ★ Always translate from originalLocale — never from a derived locale
-        // This prevents chain-translation corruption (EN→KO→JA drift)
-        const prompt = `Translate all text content to ${lang?.english ?? code}. Use marketing-appropriate copy, not literal translation. IMPORTANT: Always translate from the ORIGINAL locale text, not the currently active locale. Store the result using setLocaleData with locale code "${code}".`;
 
-        // Use global bridge (no DOM selectors — immune to class name changes)
+        // ★ Read text elements directly from the store — avoids engine dependency
+        // Size Dashboard has no canvas engine, so analyze_scene fails there.
+        let textElements = '';
+        let originalLocale = 'en';
+        try {
+            const { useDesignStore } = require('@/stores/designStore');
+            const cs = useDesignStore.getState().creativeSet;
+            if (cs) {
+                originalLocale = cs.localeData?.originalLocale || 'en';
+                const master = cs.variants.find((v: any) => v.id === cs.masterVariantId);
+                if (master) {
+                    const texts = master.elements
+                        .filter((el: any) => el.type === 'text' && el.content)
+                        .map((el: any) => `  "${el.name}": "${el.content}"`);
+                    if (texts.length > 0) textElements = `\nCurrent text elements:\n${texts.join('\n')}`;
+                }
+            }
+        } catch { /* ok */ }
+
+        const prompt = `Translate all text content to ${lang?.english ?? code}. Use marketing-appropriate copy, not literal translation.${textElements}
+
+Execute this code:
+\`\`\`
+const cs = useDesignStore.getState().creativeSet;
+const master = cs.variants.find(v => v.id === cs.masterVariantId);
+const originalTexts = {};
+const translatedTexts = {};
+master.elements.filter(el => el.type === 'text' && el.content).forEach(el => {
+  originalTexts[el.name] = el.content;
+  translatedTexts[el.name] = /* YOUR ${lang?.english ?? code} TRANSLATION */;
+});
+useDesignStore.getState().setLocaleData({
+  locales: { "${originalLocale}": originalTexts, "${code}": translatedTexts },
+  activeLocale: "${code}",
+  originalLocale: "${originalLocale}"
+});
+useDesignStore.getState().switchLocale("${code}");
+return "Translated to ${lang?.english ?? code}";
+\`\`\``;
+
         // @ts-expect-error — global bridge
         const bridge = window.__aceGlobalAi;
         if (bridge?.send) {

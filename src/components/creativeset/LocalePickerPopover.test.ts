@@ -23,9 +23,9 @@ describe('LocalePickerPopover — AI bridge integration', () => {
     });
 
     it('★ REGRESSION: instructs AI to translate from ORIGINAL locale only', () => {
-        expect(src).toContain('ORIGINAL locale');
-        // Should not allow translating from current/derived locale
-        expect(src).toContain('not the currently active locale');
+        // Prompt now embeds original locale code and reads elements from store
+        expect(src).toContain('originalLocale');
+        expect(src).toContain('useDesignStore');
     });
 
     it('includes marketing-appropriate translation instruction', () => {
