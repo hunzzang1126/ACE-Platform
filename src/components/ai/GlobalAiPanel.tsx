@@ -68,7 +68,12 @@ export function GlobalAiPanel() {
         // @ts-expect-error — global bridge
         const existing = window.__aceGlobalAi ?? {};
         // @ts-expect-error — global bridge
-        window.__aceGlobalAi = { ...existing, setEngine: (e: any) => agent.setEngine(e) };
+        window.__aceGlobalAi = {
+            ...existing,
+            setEngine: (e: any) => agent.setEngine(e),
+            // ★ Locale / external callers can send messages directly
+            send: (msg: string) => { setOpen(true); setTimeout(() => agent.send(msg), 200); },
+        };
     }, [agent.setEngine]);
 
     // Auto-scroll

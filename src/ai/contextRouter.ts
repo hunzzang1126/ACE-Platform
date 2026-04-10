@@ -164,7 +164,10 @@ ${snapshot}
 Tools: execute_dynamic_action, add_text, add_button, analyze_scene
 For variants: useDesignStore.getState().addVariant({ width, height, label })
 Common sizes: 300x250, 728x90, 160x600, 320x50, 970x250, 300x600
-Localization: To translate text to another language, read all text/button elements from cs.variants, translate content (marketing-appropriate, not literal), then call:
+Localization: To translate text to another language:
+1. Read text from ORIGINAL locale elements ONLY (never from a derived/translated locale)
+2. Translate content (marketing-appropriate, not literal)
+3. Call setLocaleData with originalLocale set to the source language code:
   useDesignStore.getState().setLocaleData({ locales: { originalCode: {elementName: originalText, ...}, targetCode: {elementName: translatedText, ...} }, activeLocale: targetCode, originalLocale: originalCode })
   useDesignStore.getState().switchLocale(targetCode)${mem}`;
 

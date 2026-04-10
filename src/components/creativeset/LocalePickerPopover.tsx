@@ -56,19 +56,18 @@ export function LocalePickerPopover({ existingLocales, onClose }: Props) {
     }, [onClose]);
 
     const handleSelect = useCallback((code: string) => {
-        // Build the translation prompt and send to AI chat
-        const aiChatInput = document.querySelector<HTMLTextAreaElement>('.ai-panel-textarea');
-        if (aiChatInput) {
-            const lang = LOCALE_OPTIONS.find(l => l.code === code);
-            const prompt = `Translate all text content to ${lang?.english ?? code}. Use marketing-appropriate copy, not literal translation. Store the result using setLocaleData with locale code "${code}".`;
-            // Set value and dispatch to trigger React state update  
-            const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
-            if (nativeInputValueSetter) {
-                nativeInputValueSetter.call(aiChatInput, prompt);
-                aiChatInput.dispatchEvent(new Event('input', { bubbles: true }));
-            }
-            // Focus the input
-            aiChatInput.focus();
+        const lang = LOCALE_OPTIONS.find(l => l.code === code);
+        // ★ Always translate from originalLocale — never from a derived locale
+        // This prevents chain-translation corruption (EN→KO→JA drift)
+        const prompt = `Translate all text content to ${lang?.english ?? code}. Use marketing-appropriate copy, not literal translation. IMPORTANT: Always translate from the ORIGINAL locale text, not the currently active locale. Store the result using setLocaleData with locale code "${code}".`;
+
+        // Use global bridge (no DOM selectors — immune to class name changes)
+        // @ts-expect-error — global bridge
+        const bridge = window.__aceGlobalAi;
+        if (bridge?.send) {
+            bridge.send(prompt);
+        } else {
+            console.warn('[LocalePicker] AI panel bridge not available');
         }
         onClose();
     }, [onClose]);
