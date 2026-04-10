@@ -291,29 +291,48 @@ export const useDesignStore = create<DesignState>()(
                             ld.originalFontSizes = sizes;
                         }
 
-                        // Apply translated content across ALL variants
+                        // ★ Per-locale font size cache
+                        if (!ld.localeFontSizes) ld.localeFontSizes = {};
+                        const targetLocaleKey = localeCode ?? ld.originalLocale;
+
+                        // Compute and cache auto-shrink fontSize for this locale (once)
+                        if (!ld.localeFontSizes[targetLocaleKey]) {
+                            const cached: Record<string, number> = {};
+                            const master = cs.variants.find(v => v.id === cs.masterVariantId);
+                            if (master) {
+                                for (const el of master.elements) {
+                                    if (el.type !== 'text' || !('fontSize' in el)) continue;
+                                    const key = el.name;
+                                    if (!key || !(key in targetMap)) continue;
+                                    const origFontSize = ld.originalFontSizes?.[key] ?? (el as any).fontSize;
+                                    if (isOriginal) {
+                                        cached[key] = origFontSize; // original always uses full size
+                                    } else {
+                                        const boxW = el.constraints.size.width ?? 200;
+                                        const boxH = el.constraints.size.height ?? 200;
+                                        const lineH = (el as any).lineHeight ?? 1.2;
+                                        cached[key] = calcAutoShrinkFontSize(
+                                            targetMap[key]!, origFontSize, lineH, boxW, boxH
+                                        );
+                                    }
+                                }
+                            }
+                            ld.localeFontSizes[targetLocaleKey] = cached;
+                        }
+
+                        const cachedSizes = ld.localeFontSizes[targetLocaleKey] ?? {};
+
+                        // Apply translated content + cached fontSize across ALL variants
                         for (const variant of cs.variants) {
                             for (const el of variant.elements) {
                                 const key = el.name;
                                 if (!key || !(key in targetMap)) continue;
                                 if (el.type === 'text' && 'content' in el) {
                                     (el as any).content = targetMap[key];
-                                    // ★ Auto-shrink: restore original fontSize first, then shrink if needed
-                                    const origFontSize = ld.originalFontSizes?.[key];
-                                    if (origFontSize) {
-                                        (el as any).fontSize = origFontSize; // always restore first
-                                        if (!isOriginal) {
-                                            // Shrink if new text overflows the box
-                                            const boxW = el.constraints.size.width ?? 200;
-                                            const boxH = el.constraints.size.height ?? 200;
-                                            const lineH = (el as any).lineHeight ?? 1.2;
-                                            const newSize = calcAutoShrinkFontSize(
-                                                targetMap[key]!, origFontSize, lineH, boxW, boxH
-                                            );
-                                            if (newSize < origFontSize) {
-                                                (el as any).fontSize = newSize;
-                                            }
-                                        }
+                                    // ★ Apply per-locale cached fontSize
+                                    const cachedSize = cachedSizes[key];
+                                    if (cachedSize) {
+                                        (el as any).fontSize = cachedSize;
                                     }
                                 } else if (el.type === 'button' && 'label' in el) {
                                     (el as any).label = targetMap[key];

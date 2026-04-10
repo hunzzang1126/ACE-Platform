@@ -55,6 +55,8 @@ export interface LocaleData {
     originalLocale: string;
     /** Original font sizes before auto-shrink (elementName → fontSize) */
     originalFontSizes?: Record<string, number>;
+    /** Per-locale cached font sizes (localeCode → elementName → fontSize) */
+    localeFontSizes?: Record<string, Record<string, number>>;
 }
 
 /** Smart sizing mode: how elements are repositioned across variants */

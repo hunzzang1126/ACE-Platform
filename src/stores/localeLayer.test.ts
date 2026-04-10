@@ -343,6 +343,54 @@ describe('Locale Layer — multi-language regression', () => {
         store.switchLocale('ko'); // back to KO
         expect((useDesignStore.getState().creativeSet!.variants[0]!.elements[0] as any).content).toBe('안녕하세요');
     });
+
+    it('★ REGRESSION: per-locale fontSize — FR shrink does not affect EN or KO', () => {
+        const store = useDesignStore.getState();
+        store.createCreativeSet('FontTest', {
+            id: 'p1', name: '300x250', width: 300, height: 250, category: 'display',
+        });
+        store.addElementToMaster({
+            id: 'el-1', name: 'Headline', type: 'text',
+            content: 'WSOP RINGS', fontFamily: 'Inter', fontSize: 48, fontWeight: 700,
+            fontStyle: 'normal', color: '#fff', textAlign: 'center',
+            lineHeight: 1.2, letterSpacing: 0, autoShrink: false,
+            // Box: 250w × 60h — EN "WSOP RINGS" fits at 48px (1 line)
+            constraints: { horizontal: { anchor: 'center', offset: 0 }, vertical: { anchor: 'top', offset: 40 }, size: { widthMode: 'fixed', heightMode: 'fixed', width: 250, height: 60 }, rotation: 0 },
+            opacity: 1, visible: true, locked: false, zIndex: 1,
+        } as any);
+
+        store.setLocaleData({
+            locales: {
+                en: { Headline: 'WSOP RINGS' },
+                ko: { Headline: 'WSOP 반지' },
+                // FR is significantly longer → will trigger auto-shrink
+                fr: { Headline: 'DES BAGUES WSOP SERONT REMPORTÉES' },
+            },
+            activeLocale: null,
+            originalLocale: 'en',
+        });
+
+        // Switch to FR — should get shrunk fontSize
+        store.switchLocale('fr');
+        const frFontSize = (useDesignStore.getState().creativeSet!.variants[0]!.elements[0] as any).fontSize;
+        expect(frFontSize).toBeLessThan(48); // FR text is long → must shrink
+
+        // Switch to EN — should restore original 48px
+        store.switchLocale(null);
+        const enFontSize = (useDesignStore.getState().creativeSet!.variants[0]!.elements[0] as any).fontSize;
+        expect(enFontSize).toBe(48); // ★ EN must NOT be affected by FR shrink
+
+        // Switch to KO — should get KO-specific fontSize (not FR's)
+        store.switchLocale('ko');
+        const koFontSize = (useDesignStore.getState().creativeSet!.variants[0]!.elements[0] as any).fontSize;
+        expect(koFontSize).toBeGreaterThanOrEqual(frFontSize); // KO is shorter than FR
+        expect(koFontSize).toBeLessThanOrEqual(48); // KO may or may not need shrink
+
+        // Switch back to FR — should be same shrunk value as before (cached)
+        store.switchLocale('fr');
+        const frFontSize2 = (useDesignStore.getState().creativeSet!.variants[0]!.elements[0] as any).fontSize;
+        expect(frFontSize2).toBe(frFontSize); // cached — identical
+    });
 });
 
 describe('Locale Layer — removeLocale', () => {
