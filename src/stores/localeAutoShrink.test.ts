@@ -208,3 +208,77 @@ describe('computeLocaleFontSizes', () => {
         expect(fr.Headline).toBeLessThanOrEqual(ko.Headline); // FR longest → smallest or equal font
     });
 });
+
+describe('isLegacyFlatFontSizes', () => {
+    let isLegacyFlatFontSizes: typeof import('./localeAutoShrink').isLegacyFlatFontSizes;
+
+    beforeAll(async () => {
+        const mod = await import('./localeAutoShrink');
+        isLegacyFlatFontSizes = mod.isLegacyFlatFontSizes;
+    });
+
+    it('detects flat map { Headline: 48 } as legacy', () => {
+        expect(isLegacyFlatFontSizes({ Headline: 48, Sub: 16 })).toBe(true);
+    });
+
+    it('detects nested map { variantId: { Headline: 48 } } as NOT legacy', () => {
+        expect(isLegacyFlatFontSizes({ 'v-123': { Headline: 48 } })).toBe(false);
+    });
+
+    it('returns false for empty object', () => {
+        expect(isLegacyFlatFontSizes({})).toBe(false);
+    });
+});
+
+describe('migrateLegacyFontSizes', () => {
+    let migrateLegacyFontSizes: typeof import('./localeAutoShrink').migrateLegacyFontSizes;
+
+    beforeAll(async () => {
+        const mod = await import('./localeAutoShrink');
+        migrateLegacyFontSizes = mod.migrateLegacyFontSizes;
+    });
+
+    const variants = [
+        { id: 'master', preset: { width: 300, height: 250 } },
+        { id: 'big', preset: { width: 1080, height: 1080 } },
+        { id: 'tall', preset: { width: 300, height: 600 } },
+    ];
+
+    it('preserves master fontSize exactly', () => {
+        const result = migrateLegacyFontSizes({ Headline: 112 }, variants, 'master');
+        expect(result['master']!.Headline).toBe(112);
+    });
+
+    it('★ REGRESSION: scales non-master by uniformScale ratio', () => {
+        const result = migrateLegacyFontSizes({ Headline: 112 }, variants, 'master');
+        // big: min(1080/300, 1080/250) = min(3.6, 4.32) = 3.6
+        expect(result['big']!.Headline).toBe(Math.round(112 * 3.6)); // 403
+    });
+
+    it('handles tall variant (different aspect ratio)', () => {
+        const result = migrateLegacyFontSizes({ Headline: 112 }, variants, 'master');
+        // tall: min(300/300, 600/250) = min(1, 2.4) = 1
+        expect(result['tall']!.Headline).toBe(112); // same as master (1:1 width)
+    });
+
+    it('respects minimum fontSize of 8', () => {
+        const tinyVariants = [
+            { id: 'master', preset: { width: 300, height: 250 } },
+            { id: 'micro', preset: { width: 30, height: 25 } },
+        ];
+        const result = migrateLegacyFontSizes({ Sub: 12 }, tinyVariants, 'master');
+        // micro: min(30/300, 25/250) = 0.1 → 12*0.1=1.2 → clamped to 8
+        expect(result['micro']!.Sub).toBe(8);
+    });
+
+    it('handles multiple elements', () => {
+        const result = migrateLegacyFontSizes(
+            { Headline: 112, Sub: 32, CTA: 14 },
+            variants, 'master',
+        );
+        expect(Object.keys(result['master']!)).toHaveLength(3);
+        expect(Object.keys(result['big']!)).toHaveLength(3);
+        expect(result['big']!.Sub).toBe(Math.round(32 * 3.6)); // 115
+        expect(result['big']!.CTA).toBe(Math.round(14 * 3.6)); // 50
+    });
+});
