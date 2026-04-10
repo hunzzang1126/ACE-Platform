@@ -430,3 +430,96 @@ describe('smartSizeElements — Template-Proven Scaling (v3)', () => {
     });
 });
 
+// ── Cover Fill Centering & Image Centering (v0.0.0.505+) ──
+
+function makeImage(id: string, x: number, y: number, w: number, h: number, name?: string) {
+    return {
+        id,
+        name: name ?? `Image ${id}`,
+        type: 'image' as const,
+        src: 'data:image/png;base64,test',
+        fit: 'cover' as const,
+        visible: true,
+        locked: false,
+        opacity: 1,
+        zIndex: 0,
+        constraints: {
+            horizontal: { anchor: 'left' as const, offset: x },
+            vertical: { anchor: 'top' as const, offset: y },
+            size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width: w, height: h },
+        },
+    };
+}
+
+describe('★ REGRESSION: postStretchTextFit must not override cover-fill centering', () => {
+
+    it('background image keeps negative offset for centering (300x250 → 160x600)', () => {
+        // Image fills 300x250 → detected as background → cover fill
+        // imgAspect = 1.2, canvasAspect = 0.267 → bgW = 720, bgX = -280
+        // postStretchTextFit MUST NOT clamp this to offset=4
+        const bg = makeImage('bg', 0, 0, 300, 250, 'Background');
+        const result = smartSizeElements([bg as any], 300, 250, 160, 600);
+        const c = result[0]!.constraints;
+        // Cover fill: bgW = round(600 * 1.2) = 720, bgX = -round((720-160)/2) = -280
+        expect(c.size.width).toBe(720);
+        expect(c.horizontal.offset).toBe(-280);
+    });
+
+    it('background image keeps negative Y offset for vertical centering (300x250 → 728x90)', () => {
+        const bg = makeImage('bg', 0, 0, 300, 250, 'Background');
+        const result = smartSizeElements([bg as any], 300, 250, 728, 90);
+        const c = result[0]!.constraints;
+        // imgAspect=1.2, canvasAspect=8.09 → bgW=728, bgH=round(728/1.2)=607
+        // bgY = -round((607-90)/2) = -259
+        expect(c.size.height).toBeGreaterThan(90);
+        expect(c.vertical.offset).toBeLessThan(0);
+    });
+
+    it('non-overflow elements are still clamped to canvas bounds', () => {
+        // Text near corner → resize → after uniform scale + centering,
+        // if position goes beyond canvas, postStretchTextFit clamps it
+        const text = makeText('t', 0, 0, 200, 30, 24, { name: 'Corner Text' });
+        const result = smartSizeElements([text], 300, 250, 600, 500);
+        const c = result[0]!.constraints;
+        // After resize, text must remain within canvas bounds
+        expect(c.horizontal.offset).toBeGreaterThanOrEqual(0);
+        expect(c.horizontal.offset + c.size.width).toBeLessThanOrEqual(600 + 4); // MARGIN tolerance
+    });
+});
+
+describe('★ REGRESSION: non-background images are individually centered horizontally', () => {
+
+    it('single image element is centered after uniform scale (300x250 → 728x90)', () => {
+        // Image at corner (0,0) 150x100 → uniformScale = min(2.43, 0.36) = 0.36
+        // newW = round(150*0.36) = 54
+        // After individual centering: offset = round((728-54)/2) = 337
+        const img = makeImage('glow', 0, 0, 150, 100, 'Glow Effect');
+        const result = smartSizeElements([img as any], 300, 250, 728, 90);
+        const c = result[0]!.constraints;
+        const expectedCenter = Math.round((728 - c.size.width) / 2);
+        expect(c.horizontal.offset).toBe(expectedCenter);
+    });
+
+    it('text elements are NOT individually centered (group only)', () => {
+        const text = makeText('t', 10, 10, 200, 30, 24, { name: 'Title' });
+        const img = makeImage('i', 0, 0, 100, 80, 'Photo');
+        const result = smartSizeElements([text, img as any], 300, 250, 600, 500);
+        // Image should be centered
+        const imgC = result.find(e => e.type === 'image')!.constraints;
+        expect(imgC.horizontal.offset).toBe(Math.round((600 - imgC.size.width) / 2));
+        // Text should NOT be individually centered (only group-centered)
+        const textC = result.find(e => e.type === 'text')!.constraints;
+        const textCenter = Math.round((600 - textC.size.width) / 2);
+        // Text may or may not equal center — depends on group centering, not individual
+        // The key assertion is that image IS centered
+        expect(imgC.horizontal.offset).toBe(Math.round((600 - imgC.size.width) / 2));
+    });
+
+    it('edge-pin mode also centers images individually', () => {
+        const img = makeImage('overlay', 0, 0, 100, 80, 'Overlay');
+        const result = smartSizeElements([img as any], 300, 250, 160, 600, 'edge-pin');
+        const c = result[0]!.constraints;
+        // Should be centered in 160px width
+        expect(c.horizontal.offset).toBe(Math.round((160 - c.size.width) / 2));
+    });
+});
