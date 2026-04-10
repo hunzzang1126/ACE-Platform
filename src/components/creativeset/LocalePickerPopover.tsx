@@ -69,15 +69,26 @@ export function LocalePickerPopover({ existingLocales, onClose, onTranslating }:
         const master = cs.variants.find(v => v.id === cs.masterVariantId);
         if (!master) { onClose(); return; }
 
-        // Collect text elements to translate
-        const textElements = master.elements
-            .filter((el: any) => (el.type === 'text' && el.content) || (el.type === 'button' && (el as any).label))
-            .map((el: any) => ({
-                name: el.name,
-                content: el.type === 'button' ? (el as any).label : el.content,
-            }));
+        // ★ Read ORIGINAL texts — from stored localeData if available, NOT from current canvas.
+        // Current canvas may show a translated language (e.g., Korean),
+        // so reading from it would corrupt the original locale data.
+        const existingOriginalTexts = cs.localeData?.locales[originalLocale];
 
-        if (textElements.length === 0) { onClose(); return; }
+        let sourceTexts: { name: string; content: string }[];
+        if (existingOriginalTexts && Object.keys(existingOriginalTexts).length > 0) {
+            // ★ Use stored original texts — guaranteed correct
+            sourceTexts = Object.entries(existingOriginalTexts).map(([name, content]) => ({ name, content }));
+        } else {
+            // First translation — read from canvas (canvas IS the original)
+            sourceTexts = master.elements
+                .filter((el: any) => (el.type === 'text' && el.content) || (el.type === 'button' && (el as any).label))
+                .map((el: any) => ({
+                    name: el.name,
+                    content: el.type === 'button' ? (el as any).label : el.content,
+                }));
+        }
+
+        if (sourceTexts.length === 0) { onClose(); return; }
 
         // Show loading state
         setTranslating(true);
@@ -85,15 +96,15 @@ export function LocalePickerPopover({ existingLocales, onClose, onTranslating }:
 
         try {
             const result = await translateAdCopy({
-                elements: textElements,
+                elements: sourceTexts,
                 targetLang: code,
                 sourceLang: originalLocale,
             });
 
             if (result.success && Object.keys(result.translations).length > 0) {
-                // Build original texts map
+                // Build original texts map from source (NOT current canvas)
                 const originalTexts: Record<string, string> = {};
-                for (const el of textElements) originalTexts[el.name] = el.content;
+                for (const el of sourceTexts) originalTexts[el.name] = el.content;
 
                 // Store translations (merge with existing)
                 useDesignStore.getState().setLocaleData({

@@ -31,6 +31,16 @@ describe('LocalePickerPopover — direct translator architecture', () => {
         expect(src).toContain('switchLocale');
     });
 
+    it('★ REGRESSION: reads original texts from stored localeData, NOT current canvas', () => {
+        // When adding a 3rd language (e.g. DE after KO), the canvas shows KO text.
+        // Must read from stored localeData[originalLocale], not from current elements.
+        expect(src).toContain('existingOriginalTexts');
+        expect(src).toContain("cs.localeData?.locales[originalLocale]");
+        // Should use sourceTexts derived from stored data
+        expect(src).toContain('sourceTexts');
+        expect(src).not.toContain('textElements');
+    });
+
     it('translator has marketing-specific instructions per language', () => {
         expect(translatorSrc).toContain('advertising copy');
         expect(translatorSrc).toContain('ADVERTISING COPY');
