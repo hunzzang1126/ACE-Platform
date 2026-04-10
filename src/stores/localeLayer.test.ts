@@ -344,3 +344,70 @@ describe('Locale Layer — multi-language regression', () => {
         expect((useDesignStore.getState().creativeSet!.variants[0]!.elements[0] as any).content).toBe('안녕하세요');
     });
 });
+
+describe('Locale Layer — removeLocale', () => {
+    beforeEach(() => {
+        useDesignStore.setState({ allCreativeSets: {}, activeCreativeSetId: null, creativeSet: null });
+    });
+
+    it('removes a non-original locale', () => {
+        setupTestCS();
+        useDesignStore.getState().setLocaleData(makeLocaleData());
+        expect(useDesignStore.getState().creativeSet!.localeData!.locales['en']).toBeDefined();
+
+        useDesignStore.getState().removeLocale('en');
+        // After removing the only non-original, localeData should be cleaned up
+        expect(useDesignStore.getState().creativeSet!.localeData).toBeUndefined();
+    });
+
+    it('refuses to remove the original locale', () => {
+        setupTestCS();
+        useDesignStore.getState().setLocaleData(makeLocaleData());
+        useDesignStore.getState().removeLocale('ko'); // ko is original
+
+        // ko must still exist
+        expect(useDesignStore.getState().creativeSet!.localeData!.locales['ko']).toBeDefined();
+    });
+
+    it('switches to original when removing the active locale', () => {
+        setupTestCS();
+        const ld = makeLocaleData();
+        useDesignStore.getState().setLocaleData(ld);
+        useDesignStore.getState().switchLocale('en'); // activate English
+        expect(useDesignStore.getState().creativeSet!.localeData!.activeLocale).toBe('en');
+
+        useDesignStore.getState().removeLocale('en');
+
+        // Should have switched back to original (ko) content
+        const cs = useDesignStore.getState().creativeSet!;
+        const master = cs.variants.find(v => v.id === cs.masterVariantId)!;
+        const headline = master.elements.find(el => el.name === 'Headline') as any;
+        expect(headline.content).toBe('그냥 해'); // Korean original restored
+    });
+
+    it('removes one locale while keeping others', () => {
+        setupTestCS();
+        // Add 3 locales: KO (original) + EN + FR
+        useDesignStore.getState().setLocaleData({
+            locales: {
+                ko: { Headline: '그냥 해', Subline: '한계를 뛰어넘어', CTA: '지금 구매' },
+                en: { Headline: 'JUST DO IT', Subline: 'BREAK YOUR LIMITS.', CTA: 'SHOP NOW' },
+                fr: { Headline: 'FAITES-LE', Subline: 'DÉPASSEZ VOS LIMITES.', CTA: 'ACHETEZ' },
+            },
+            activeLocale: null,
+            originalLocale: 'ko',
+        });
+
+        useDesignStore.getState().removeLocale('en');
+
+        const ld = useDesignStore.getState().creativeSet!.localeData!;
+        expect(ld.locales['en']).toBeUndefined(); // removed
+        expect(ld.locales['ko']).toBeDefined(); // original kept
+        expect(ld.locales['fr']).toBeDefined(); // French kept
+    });
+
+    it('does nothing when no localeData exists', () => {
+        setupTestCS();
+        expect(() => useDesignStore.getState().removeLocale('en')).not.toThrow();
+    });
+});

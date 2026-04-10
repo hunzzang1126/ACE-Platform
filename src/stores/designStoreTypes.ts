@@ -45,6 +45,7 @@ export interface DesignState {
     // ── Locale Layer ──
     setLocaleData: (data: LocaleData) => void;
     switchLocale: (localeCode: string | null) => void;
+    removeLocale: (localeCode: string) => void;
 }
 
 // ── Helper: get the active creative set from state ──

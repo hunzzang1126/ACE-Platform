@@ -325,6 +325,36 @@ export const useDesignStore = create<DesignState>()(
                         state.creativeSet = cs;
                     });
                 },
+
+                removeLocale: (localeCode) => {
+                    const state = get();
+                    const cs = state.creativeSet;
+                    if (!cs?.localeData) return;
+
+                    // ★ SAFETY: Never delete the original locale
+                    if (localeCode === cs.localeData.originalLocale) return;
+
+                    // If the deleted locale is currently active, switch to original first
+                    if (cs.localeData.activeLocale === localeCode) {
+                        state.switchLocale(null);
+                    }
+
+                    // Remove from localeData
+                    set((s) => {
+                        const c = getActiveCS(s);
+                        if (!c?.localeData) return;
+                        delete c.localeData.locales[localeCode];
+
+                        // If only original remains, clean up localeData entirely
+                        const remaining = Object.keys(c.localeData.locales);
+                        if (remaining.length <= 1) {
+                            c.localeData = undefined as any;
+                        }
+
+                        c.updatedAt = new Date().toISOString();
+                        s.creativeSet = c;
+                    });
+                },
             })),
             {
                 name: 'glid-design-store',

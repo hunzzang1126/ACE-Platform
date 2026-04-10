@@ -41,13 +41,24 @@ function getDisplay(code: string) {
 export function LocaleBar() {
     const localeData = useDesignStore(s => s.creativeSet?.localeData);
     const switchLocale = useDesignStore(s => s.switchLocale);
+    const removeLocale = useDesignStore(s => s.removeLocale);
     const [pickerOpen, setPickerOpen] = useState(false);
+    const [translating, setTranslating] = useState(false);
 
     const handleSwitch = useCallback((code: string | null) => {
         switchLocale(code);
     }, [switchLocale]);
 
+    const handleRemove = useCallback((e: React.MouseEvent, code: string) => {
+        e.stopPropagation(); // prevent triggering the pill switch
+        const display = getDisplay(code);
+        if (window.confirm(`Remove ${display.label} (${display.code}) translation?`)) {
+            removeLocale(code);
+        }
+    }, [removeLocale]);
+
     const handlePickerClose = useCallback(() => setPickerOpen(false), []);
+    const handleTranslating = useCallback((v: boolean) => setTranslating(v), []);
 
     // Don't render if no locale data exists yet
     if (!localeData) {
@@ -63,7 +74,7 @@ export function LocaleBar() {
                     </svg>
                     Add Language
                 </button>
-                {pickerOpen && <LocalePickerPopover existingLocales={[]} onClose={handlePickerClose} />}
+                {pickerOpen && <LocalePickerPopover existingLocales={[]} onClose={handlePickerClose} onTranslating={handleTranslating} />}
             </div>
         );
     }
@@ -86,6 +97,15 @@ export function LocaleBar() {
                     >
                         <span className="locale-pill-code">{display.code}</span>
                         {isOriginal && <span className="locale-pill-tag">original</span>}
+                        {!isOriginal && (
+                            <span
+                                className="locale-pill-remove"
+                                onClick={(e) => handleRemove(e, code)}
+                                title={`Remove ${display.label}`}
+                            >
+                                ×
+                            </span>
+                        )}
                     </button>
                 );
             })}
@@ -94,13 +114,18 @@ export function LocaleBar() {
                 className="locale-add-btn"
                 onClick={() => setPickerOpen(true)}
                 title="Add a language translation"
+                disabled={translating}
             >
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                    <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
+                {translating ? (
+                    <span className="locale-spinner" />
+                ) : (
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                        <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                )}
             </button>
 
-            {pickerOpen && <LocalePickerPopover existingLocales={localeCodes} onClose={handlePickerClose} />}
+            {pickerOpen && <LocalePickerPopover existingLocales={localeCodes} onClose={handlePickerClose} onTranslating={handleTranslating} />}
         </div>
     );
 }
