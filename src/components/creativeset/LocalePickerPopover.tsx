@@ -5,11 +5,14 @@
 // Uses 2-letter codes + native names. No flags, no emojis.
 // ─────────────────────────────────────────────────
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useDesignStore } from '@/stores/designStore';
+import { translateAdCopy } from '@/services/localeTranslator';
 
 interface Props {
     existingLocales: string[];
     onClose: () => void;
+    onTranslating?: (translating: boolean) => void;
 }
 
 /** Available languages with their locale code and native name */
@@ -36,7 +39,7 @@ const LOCALE_OPTIONS: { code: string; english: string; native: string }[] = [
     { code: 'sv', english: 'Swedish', native: 'Svenska' },
 ];
 
-export function LocalePickerPopover({ existingLocales, onClose }: Props) {
+export function LocalePickerPopover({ existingLocales, onClose, onTranslating }: Props) {
     const ref = useRef<HTMLDivElement>(null);
 
     // Close on click outside
@@ -55,58 +58,64 @@ export function LocalePickerPopover({ existingLocales, onClose }: Props) {
         return () => document.removeEventListener('keydown', handler);
     }, [onClose]);
 
-    const handleSelect = useCallback((code: string) => {
+    const [translating, setTranslating] = useState(false);
+
+    const handleSelect = useCallback(async (code: string) => {
         const lang = LOCALE_OPTIONS.find(l => l.code === code);
+        const cs = useDesignStore.getState().creativeSet;
+        if (!cs) { onClose(); return; }
 
-        // ★ Read text elements directly from the store — avoids engine dependency
-        // Size Dashboard has no canvas engine, so analyze_scene fails there.
-        let textElements = '';
-        let originalLocale = 'en';
+        const originalLocale = cs.localeData?.originalLocale || 'en';
+        const master = cs.variants.find(v => v.id === cs.masterVariantId);
+        if (!master) { onClose(); return; }
+
+        // Collect text elements to translate
+        const textElements = master.elements
+            .filter((el: any) => (el.type === 'text' && el.content) || (el.type === 'button' && (el as any).label))
+            .map((el: any) => ({
+                name: el.name,
+                content: el.type === 'button' ? (el as any).label : el.content,
+            }));
+
+        if (textElements.length === 0) { onClose(); return; }
+
+        // Show loading state
+        setTranslating(true);
+        onTranslating?.(true);
+
         try {
-            const { useDesignStore } = require('@/stores/designStore');
-            const cs = useDesignStore.getState().creativeSet;
-            if (cs) {
-                originalLocale = cs.localeData?.originalLocale || 'en';
-                const master = cs.variants.find((v: any) => v.id === cs.masterVariantId);
-                if (master) {
-                    const texts = master.elements
-                        .filter((el: any) => el.type === 'text' && el.content)
-                        .map((el: any) => `  "${el.name}": "${el.content}"`);
-                    if (texts.length > 0) textElements = `\nCurrent text elements:\n${texts.join('\n')}`;
-                }
+            const result = await translateAdCopy({
+                elements: textElements,
+                targetLang: code,
+                sourceLang: originalLocale,
+            });
+
+            if (result.success && Object.keys(result.translations).length > 0) {
+                // Build original texts map
+                const originalTexts: Record<string, string> = {};
+                for (const el of textElements) originalTexts[el.name] = el.content;
+
+                // Store translations (merge with existing)
+                useDesignStore.getState().setLocaleData({
+                    locales: {
+                        [originalLocale]: originalTexts,
+                        [code]: result.translations,
+                    },
+                    activeLocale: code,
+                    originalLocale,
+                });
+                useDesignStore.getState().switchLocale(code);
+            } else {
+                console.error('[LocalePicker] Translation failed:', result.error);
             }
-        } catch { /* ok */ }
-
-        const prompt = `Translate all text content to ${lang?.english ?? code}. Use marketing-appropriate copy, not literal translation.${textElements}
-
-Execute this code:
-\`\`\`
-const cs = useDesignStore.getState().creativeSet;
-const master = cs.variants.find(v => v.id === cs.masterVariantId);
-const originalTexts = {};
-const translatedTexts = {};
-master.elements.filter(el => el.type === 'text' && el.content).forEach(el => {
-  originalTexts[el.name] = el.content;
-  translatedTexts[el.name] = /* YOUR ${lang?.english ?? code} TRANSLATION */;
-});
-useDesignStore.getState().setLocaleData({
-  locales: { "${originalLocale}": originalTexts, "${code}": translatedTexts },
-  activeLocale: "${code}",
-  originalLocale: "${originalLocale}"
-});
-useDesignStore.getState().switchLocale("${code}");
-return "Translated to ${lang?.english ?? code}";
-\`\`\``;
-
-        // @ts-expect-error — global bridge
-        const bridge = window.__aceGlobalAi;
-        if (bridge?.send) {
-            bridge.send(prompt);
-        } else {
-            console.warn('[LocalePicker] AI panel bridge not available');
+        } catch (err) {
+            console.error('[LocalePicker] Translation error:', err);
+        } finally {
+            setTranslating(false);
+            onTranslating?.(false);
         }
         onClose();
-    }, [onClose]);
+    }, [onClose, onTranslating]);
 
     const available = LOCALE_OPTIONS.filter(l => !existingLocales.includes(l.code));
 

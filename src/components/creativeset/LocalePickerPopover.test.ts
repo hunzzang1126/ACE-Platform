@@ -1,8 +1,8 @@
 // ─────────────────────────────────────────────────
-// LocalePickerPopover.test.ts — Locale selection + AI bridge
+// LocalePickerPopover.test.ts — Locale translation architecture
 // ─────────────────────────────────────────────────
-// Covers: global bridge usage, originalLocale enforcement,
-// no DOM manipulation, language options
+// Covers: direct translator usage, store integration,
+// no DOM manipulation, language options, marketing quality
 // ─────────────────────────────────────────────────
 
 import { describe, it, expect } from 'vitest';
@@ -10,11 +10,13 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
 const src = readFileSync(resolve(__dirname, './LocalePickerPopover.tsx'), 'utf-8');
+const translatorSrc = readFileSync(resolve(__dirname, '../../services/localeTranslator.ts'), 'utf-8');
 
-describe('LocalePickerPopover — AI bridge integration', () => {
-    it('★ REGRESSION: uses global bridge, not DOM querySelector', () => {
-        expect(src).toContain('__aceGlobalAi');
-        expect(src).toContain('bridge.send');
+describe('LocalePickerPopover — direct translator architecture', () => {
+    it('★ REGRESSION: uses dedicated translateAdCopy, NOT AI agent bridge', () => {
+        expect(src).toContain('translateAdCopy');
+        expect(src).not.toContain('__aceGlobalAi');
+        expect(src).not.toContain('bridge.send');
     });
 
     it('★ REGRESSION: does NOT use querySelector for AI input', () => {
@@ -22,15 +24,22 @@ describe('LocalePickerPopover — AI bridge integration', () => {
         expect(src).not.toContain('nativeInputValueSetter');
     });
 
-    it('★ REGRESSION: instructs AI to translate from ORIGINAL locale only', () => {
-        // Prompt now embeds original locale code and reads elements from store
+    it('★ REGRESSION: reads from ORIGINAL locale via designStore', () => {
         expect(src).toContain('originalLocale');
         expect(src).toContain('useDesignStore');
+        expect(src).toContain('setLocaleData');
+        expect(src).toContain('switchLocale');
     });
 
-    it('includes marketing-appropriate translation instruction', () => {
-        expect(src).toContain('marketing-appropriate');
-        expect(src).toContain('not literal translation');
+    it('translator has marketing-specific instructions per language', () => {
+        expect(translatorSrc).toContain('advertising copy');
+        expect(translatorSrc).toContain('ADVERTISING COPY');
+        expect(translatorSrc).toContain('emotional impact');
+        expect(translatorSrc).toContain('call-to-action');
+    });
+
+    it('translator uses low temperature for consistent quality', () => {
+        expect(translatorSrc).toContain('temperature: 0.3');
     });
 });
 
