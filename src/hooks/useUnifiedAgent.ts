@@ -106,8 +106,9 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         const model = getModelForRole(selectedRole);
         // ★ Max 3 rounds: analyze_scene → execute → done. Prevents runaway API costs.
         const base: AiConfig = { endpoint: 'https://openrouter.ai/api', model: model.id, maxToolRounds: 3 };
+        // ★ maxToolRounds is NEVER loaded from localStorage — prevents stale high values.
         const saved = localStorage.getItem('ace-ai-config');
-        if (saved) { try { const p = JSON.parse(saved) as Partial<AiConfig>; if (p.endpoint) base.endpoint = p.endpoint; if (p.maxToolRounds) base.maxToolRounds = p.maxToolRounds; } catch { /* */ } }
+        if (saved) { try { const p = JSON.parse(saved) as Partial<AiConfig>; if (p.endpoint) base.endpoint = p.endpoint; } catch { /* */ } }
         return base;
     }, [selectedRole]);
 
