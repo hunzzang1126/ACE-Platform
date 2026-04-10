@@ -389,7 +389,19 @@
     background: var(--border);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
-    overflow: hidden;
+}
+
+/* Round first/last row corners to match container radius */
+.project-list-row:first-child {
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+.project-list-row:last-child {
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+.project-list-row:only-child {
+    border-radius: var(--radius-lg);
 }
 
 .project-list-row {
