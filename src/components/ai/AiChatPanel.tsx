@@ -48,7 +48,7 @@ export default function AiChatPanel({ aiService, engine, trackedNodes, onSendMes
         if (!canUseAI()) {
             const limitMsg: AgentMessage = {
                 role: 'assistant',
-                content: `You've used all ${limits.aiTokensPerMonth} AI generations this month.\n\nUpgrade to Creator ($15/mo) for 200 generations, or Pro ($50/mo) for 500.\n\n→ Visit Settings or go to /pricing to upgrade.`,
+                content: `You've used all ${limits.aiTokensPerMonth} AI generations this month.\n\nUpgrade to Creator ($15/mo) for 50 generations, or Pro ($50/mo) for 300.\n\n→ Visit Settings or go to /pricing to upgrade.`,
                 timestamp: Date.now(),
             };
             setMessages(prev => [...prev, { role: 'user', content: msg, timestamp: Date.now() }, limitMsg]);

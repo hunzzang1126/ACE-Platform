@@ -53,7 +53,7 @@ export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
     },
     creator: {
         maxCreativeSets: 10,
-        aiTokensPerMonth: 200, // 200 AI generations/month
+        aiTokensPerMonth: 50, // 50 AI generations/month (Sonnet 4)
         allowedModels: ['anthropic/claude-3.5-haiku', 'anthropic/claude-sonnet-4'],
         defaultModel: 'anthropic/claude-sonnet-4',
         maxVariantsPerSet: 10,
@@ -63,7 +63,7 @@ export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
     },
     pro: {
         maxCreativeSets: -1,
-        aiTokensPerMonth: 500, // 500 AI generations/month
+        aiTokensPerMonth: 300, // 300 AI generations/month (Sonnet 4)
         allowedModels: ['anthropic/claude-3.5-haiku', 'anthropic/claude-sonnet-4'],
         defaultModel: 'anthropic/claude-sonnet-4',
         maxVariantsPerSet: -1,
