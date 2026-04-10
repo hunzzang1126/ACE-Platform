@@ -29,6 +29,13 @@ export function DashboardPage() {
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const [searchQuery, setSearchQuery] = useState('');
+    const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => {
+        return (localStorage.getItem('ace-dashboard-view') as 'grid' | 'list') || 'grid';
+    });
+    const handleViewChange = useCallback((mode: 'grid' | 'list') => {
+        setViewMode(mode);
+        localStorage.setItem('ace-dashboard-view', mode);
+    }, []);
     const [newlyCreatedId, setNewlyCreatedId] = useState<string | null>(null);
 
     // ★ Auto-refresh session after Stripe checkout success
@@ -278,6 +285,31 @@ export function DashboardPage() {
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
                     />
+                    <div className="dashboard-view-toggle">
+                        <button
+                            className={`dashboard-view-toggle__btn ${viewMode === 'grid' ? 'active' : ''}`}
+                            onClick={() => handleViewChange('grid')}
+                            title="Grid view"
+                        >
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                                <rect x="1" y="1" width="6" height="6" rx="1" />
+                                <rect x="9" y="1" width="6" height="6" rx="1" />
+                                <rect x="1" y="9" width="6" height="6" rx="1" />
+                                <rect x="9" y="9" width="6" height="6" rx="1" />
+                            </svg>
+                        </button>
+                        <button
+                            className={`dashboard-view-toggle__btn ${viewMode === 'list' ? 'active' : ''}`}
+                            onClick={() => handleViewChange('list')}
+                            title="List view"
+                        >
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                                <rect x="1" y="2" width="14" height="2" rx="0.5" />
+                                <rect x="1" y="7" width="14" height="2" rx="0.5" />
+                                <rect x="1" y="12" width="14" height="2" rx="0.5" />
+                            </svg>
+                        </button>
+                    </div>
                 </div>
 
                 {/* Content */}
@@ -314,7 +346,7 @@ export function DashboardPage() {
                                 </button>
                             </div>
                         ) : (
-                            <div className="project-grid">
+                            <div className={viewMode === 'list' ? 'project-list' : 'project-grid'}>
                                 {displaySets.map(set => (
                                     <ProjectCard
                                         key={set.id}
@@ -326,6 +358,7 @@ export function DashboardPage() {
                                         type="set"
                                         onOpen={handleOpenSet}
                                         initialRenaming={set.id === newlyCreatedId}
+                                        viewMode={viewMode}
                                     />
                                 ))}
                             </div>

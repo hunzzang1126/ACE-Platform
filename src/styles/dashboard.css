@@ -337,11 +337,135 @@
     margin-bottom: 14px;
 }
 
+/* ── View Toggle ── */
+.dashboard-view-toggle {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-left: 8px;
+    padding: 2px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+}
+
+.dashboard-view-toggle__btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 26px;
+    padding: 0;
+    background: none;
+    border: none;
+    border-radius: var(--radius-xs);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all var(--duration-fast) var(--ease);
+}
+
+.dashboard-view-toggle__btn:hover {
+    color: var(--text-secondary);
+    background: rgba(0, 0, 0, 0.04);
+}
+
+.dashboard-view-toggle__btn.active {
+    color: var(--accent);
+    background: rgba(99, 102, 241, 0.08);
+}
+
 /* ── Project Grid ── */
 .project-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
     gap: 16px;
+}
+
+/* ── Project List ── */
+.project-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+.project-list-row {
+    display: grid;
+    grid-template-columns: 32px 1fr 80px 120px 32px;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: var(--bg-surface);
+    cursor: pointer;
+    transition: background var(--duration-fast) var(--ease);
+}
+
+.project-list-row:hover {
+    background: var(--bg-elevated);
+}
+
+.project-list-row__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+}
+
+.project-list-row__name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.project-list-row__name span {
+    cursor: pointer;
+}
+
+.project-list-row__name span:hover {
+    color: var(--accent-hover);
+}
+
+.project-list-row__sizes {
+    font-size: 12px;
+    color: var(--text-muted);
+    text-align: right;
+}
+
+.project-list-row__date {
+    font-size: 12px;
+    color: var(--text-muted);
+    text-align: right;
+}
+
+.project-list-row__menu {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    background: none;
+    border: none;
+    border-radius: var(--radius-xs);
+    color: var(--text-muted);
+    cursor: pointer;
+    opacity: 0;
+    transition: all var(--duration-fast) var(--ease);
+}
+
+.project-list-row:hover .project-list-row__menu {
+    opacity: 1;
+}
+
+.project-list-row__menu:hover {
+    background: rgba(0, 0, 0, 0.06);
+    color: var(--text-primary);
 }
 
 /* ── Project Card ── */

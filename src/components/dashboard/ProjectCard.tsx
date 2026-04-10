@@ -14,6 +14,8 @@ interface ProjectCardProps {
     onOpen: (id: string) => void;
     /** Start in rename mode (for newly created cards) */
     initialRenaming?: boolean;
+    /** Grid (cards) or list (rows) display */
+    viewMode?: 'grid' | 'list';
 }
 
 function formatDate(iso: string): string {
@@ -21,7 +23,7 @@ function formatDate(iso: string): string {
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-export function ProjectCard({ id, name, variantCount, createdAt, createdBy, type, onOpen, initialRenaming }: ProjectCardProps) {
+export function ProjectCard({ id, name, variantCount, createdAt, createdBy, type, onOpen, initialRenaming, viewMode = 'grid' }: ProjectCardProps) {
     const [menuOpen, setMenuOpen] = useState(false);
     const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
     const [renaming, setRenaming] = useState(!!initialRenaming);
@@ -74,14 +76,88 @@ export function ProjectCard({ id, name, variantCount, createdAt, createdBy, type
         if (type === 'set') duplicateCreativeSet(id);
     }, [id, type, duplicateCreativeSet]);
 
-    // Generate preview grid rectangles
-    const previewSizes = Array.from({ length: Math.min(variantCount, 6) }, (_, i) => {
-        const layouts = [
-            { w: 45, h: 35 }, { w: 30, h: 45 }, { w: 55, h: 20 },
-            { w: 20, h: 50 }, { w: 40, h: 40 }, { w: 50, h: 25 },
-        ];
-        return layouts[i % layouts.length]!;
-    });
+    // Generate preview grid rectangles (grid mode only)
+    const previewSizes = viewMode === 'grid'
+        ? Array.from({ length: Math.min(variantCount, 6) }, (_, i) => {
+            const layouts = [
+                { w: 45, h: 35 }, { w: 30, h: 45 }, { w: 55, h: 20 },
+                { w: 20, h: 50 }, { w: 40, h: 40 }, { w: 50, h: 25 },
+            ];
+            return layouts[i % layouts.length]!;
+        })
+        : [];
+
+    // ── List View ──
+    if (viewMode === 'list') {
+        return (
+            <>
+                <div
+                    className="project-list-row"
+                    onDoubleClick={() => onOpen(id)}
+                    onContextMenu={handleContextMenu}
+                >
+                    {/* Icon */}
+                    <div className="project-list-row__icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2" />
+                            <line x1="3" y1="9" x2="21" y2="9" />
+                            <line x1="9" y1="3" x2="9" y2="21" />
+                        </svg>
+                    </div>
+
+                    {/* Name */}
+                    <div className="project-list-row__name">
+                        {renaming ? (
+                            <input
+                                ref={renameRef}
+                                className="project-card__rename"
+                                value={renameName}
+                                onChange={e => setRenameName(e.target.value)}
+                                onBlur={handleRenameSubmit}
+                                onKeyDown={e => { if (e.key === 'Enter') handleRenameSubmit(); if (e.key === 'Escape') setRenaming(false); }}
+                                autoFocus
+                            />
+                        ) : (
+                            <span onClick={() => onOpen(id)}>{name}</span>
+                        )}
+                    </div>
+
+                    {/* Sizes */}
+                    <div className="project-list-row__sizes">
+                        {variantCount} size{variantCount !== 1 ? 's' : ''}
+                    </div>
+
+                    {/* Date */}
+                    <div className="project-list-row__date">
+                        {formatDate(createdAt)}
+                    </div>
+
+                    {/* Kebab */}
+                    <button className="project-list-row__menu" onClick={e => { e.stopPropagation(); handleContextMenu(e); }}>
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                            <circle cx="4" cy="8" r="1.5" />
+                            <circle cx="8" cy="8" r="1.5" />
+                            <circle cx="12" cy="8" r="1.5" />
+                        </svg>
+                    </button>
+                </div>
+
+                {/* Context Menu (shared) */}
+                {menuOpen && (
+                    <>
+                        <div className="project-card__overlay" onClick={() => setMenuOpen(false)} />
+                        <div className="context-menu" style={{ left: menuPos.x, top: menuPos.y }}>
+                            <button className="context-item" onClick={() => { setMenuOpen(false); onOpen(id); }}>Open</button>
+                            <button className="context-item" onClick={handleRename}>Rename</button>
+                            {type === 'set' && <button className="context-item" onClick={handleDuplicate}>Duplicate</button>}
+                            <div className="context-divider" />
+                            <button className="context-item danger" onClick={handleDelete}>Delete</button>
+                        </div>
+                    </>
+                )}
+            </>
+        );
+    }
 
     return (
         <>
