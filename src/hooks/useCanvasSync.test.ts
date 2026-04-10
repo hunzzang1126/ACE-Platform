@@ -257,4 +257,39 @@ describe('canvasSyncSave — DATA INTEGRITY', () => {
             expect(shouldBlock).toBe(false);
         });
     });
+
+    // ─── ★ REGRESSION GUARD: Gallery image persistence (v475) ──
+    describe('★ REGRESSION: gallery images must use idb:// not blob:', () => {
+        it('blob: URL from gallery insert should be restored to idb://', () => {
+            // Simulates: user clicks image in gallery → blob URL on canvas → save
+            const elements: DesignElement[] = [
+                { id: 'el-1', name: 'Hero Image', type: 'image', src: 'blob:http://localhost:5173/gallery-temp', zIndex: 0, constraints: mockCreativeSet.variants[0].elements[0].constraints } as any,
+            ];
+            restoreIdbRefs(elements, 'v-master');
+            // Must restore to stored idb:// ref (from mock variant)
+            expect((elements[0] as ImageElement).src).toBe('idb://abc123');
+            expect((elements[0] as ImageElement).src).not.toContain('blob:');
+        });
+
+        it('new image without stored ref keeps blob: (first-time insert)', () => {
+            // First insert — no matching stored element yet
+            const elements: DesignElement[] = [
+                { id: 'new-img', name: 'New Gallery Image', type: 'image', src: 'blob:http://localhost:5173/new-upload', zIndex: 2, constraints: {} as any } as any,
+            ];
+            restoreIdbRefs(elements, 'v-master');
+            // No matching stored element → blob stays (will be caught by __glidPersistSrc)
+            expect((elements[0] as ImageElement).src).toBe('blob:http://localhost:5173/new-upload');
+        });
+
+        it('restoreIdbRefs handles mixed blob and idb elements', () => {
+            const elements: DesignElement[] = [
+                { id: 'el-1', name: 'Hero Image', type: 'image', src: 'blob:http://localhost/a', zIndex: 0, constraints: {} as any } as any,
+                { id: 'el-2', name: 'Headline', type: 'text', zIndex: 1, constraints: {} as any } as any,
+                { id: 'new-img', name: 'New Upload', type: 'image', src: 'blob:http://localhost/b', zIndex: 2, constraints: {} as any } as any,
+            ];
+            restoreIdbRefs(elements, 'v-master');
+            expect((elements[0] as ImageElement).src).toBe('idb://abc123'); // restored
+            expect((elements[2] as ImageElement).src).toContain('blob:'); // no match
+        });
+    });
 });
