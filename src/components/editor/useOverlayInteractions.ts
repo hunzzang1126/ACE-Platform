@@ -72,6 +72,13 @@ export function useOverlayInteractions(
         rotateElStartAngle.current = el.rotation ?? 0;
     }, []);
 
+    // ★ Use ref for callback to prevent listener re-registration during interactions.
+    // If onOverlayUpdate is in useEffect deps, every state update during drag/rotate
+    // triggers cleanup → removeEventListener → re-addEventListener.
+    // If mouseup fires in that gap, the rotation/resize state never resets → stuck rotation bug.
+    const onUpdateRef = useRef(onOverlayUpdate);
+    onUpdateRef.current = onOverlayUpdate;
+
     useEffect(() => {
         const handleMove = (e: MouseEvent) => {
             // ── Move ──
@@ -85,7 +92,7 @@ export function useOverlayInteractions(
                     if (dx > dy) newY = dragStart.current.elY;
                     else newX = dragStart.current.elX;
                 }
-                onOverlayUpdate?.(dragId.current, { x: newX, y: newY });
+                onUpdateRef.current?.(dragId.current, { x: newX, y: newY });
             }
 
             // ── Resize ──
@@ -116,7 +123,7 @@ export function useOverlayInteractions(
                     if (dir.includes('n')) { nh = Math.max(MIN_SIZE, s.h - dy); ny = s.y + (s.h - nh); }
                 }
 
-                onOverlayUpdate?.(resizeId.current, { x: nx, y: ny, w: nw, h: nh });
+                onUpdateRef.current?.(resizeId.current, { x: nx, y: ny, w: nw, h: nh });
                 setResizeTooltip({ w: nw, h: nh, x: nx, y: ny });
             }
 
@@ -130,7 +137,7 @@ export function useOverlayInteractions(
                 if (e.shiftKey) finalAngle = Math.round(finalAngle / 15) * 15;
                 // Normalize to 0-360
                 finalAngle = ((finalAngle % 360) + 360) % 360;
-                onOverlayUpdate?.(rotateId.current, { rotation: finalAngle });
+                onUpdateRef.current?.(rotateId.current, { rotation: finalAngle });
                 setRotationTooltip({ angle: finalAngle, x: cx, y: cy - 40 });
             }
         };
@@ -146,7 +153,7 @@ export function useOverlayInteractions(
         document.addEventListener('mousemove', handleMove);
         document.addEventListener('mouseup', handleUp);
         return () => { document.removeEventListener('mousemove', handleMove); document.removeEventListener('mouseup', handleUp); };
-    }, [onOverlayUpdate]);
+    }, []); // ★ Empty deps — listeners registered once, never re-registered
 
     return {
         handleOverlayMouseDown,
