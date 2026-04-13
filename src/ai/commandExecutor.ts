@@ -62,10 +62,26 @@ export async function executeToolCall(
                 if (!result.success) {
                     return { success: false, message: result.message };
                 }
+
+                // ★ Auto-place on canvas (fill to page as background)
+                let nodeId: number | undefined;
+                if (engine?.add_image) {
+                    try {
+                        nodeId = await engine.add_image(0, 0, result.imageUrl, canvasW, canvasH, 'ai_generated');
+                        if (engine.send_to_back) engine.send_to_back(nodeId);
+                    } catch { /* placement failed — still return URL */ }
+                }
+
+                // ★ Register in upload library
+                try {
+                    const { saveToUploadLibrary } = await import('@/stores/uploadStore');
+                    await saveToUploadLibrary(result.imageUrl, `AI Image`, canvasW, canvasH, 'ai');
+                } catch { /* upload library registration failed — non-critical */ }
+
                 return {
                     success: true,
-                    message: `Image generated (${canvasW}x${canvasH}) via ${result.model}`,
-                    data: { image_url: result.imageUrl },
+                    message: `Image generated and placed on canvas (${canvasW}x${canvasH}) via ${result.model}`,
+                    data: { image_url: result.imageUrl, nodeId },
                 };
             }
 

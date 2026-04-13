@@ -54,7 +54,7 @@ describe('commandExecutor', () => {
 
             expect(result.success).toBe(true);
             expect(result.message).toContain('Image generated');
-            expect(result.data).toEqual({ image_url: 'https://example.com/img.png' });
+            expect((result.data as any).image_url).toBe('https://example.com/img.png');
         });
 
         it('should return failure when image generation fails', async () => {
@@ -110,6 +110,23 @@ describe('commandExecutor', () => {
             expect(generateImage).toHaveBeenCalledWith(
                 expect.objectContaining({ width: 728, height: 90 }),
             );
+        });
+
+        it('should auto-place image on canvas via engine.add_image', async () => {
+            const engine = makeEngine();
+            vi.mocked(generateImage).mockResolvedValueOnce({
+                success: true, imageUrl: 'data:image/png;base64,X', model: 'flux', message: 'ok',
+            });
+
+            const result = await executeToolCall(
+                engine, 'generate_image',
+                { prompt: 'hero photo' }, [],
+            );
+
+            expect(result.success).toBe(true);
+            expect(engine.add_image).toHaveBeenCalledWith(0, 0, 'data:image/png;base64,X', 300, 250, 'ai_generated');
+            expect(engine.send_to_back).toHaveBeenCalled();
+            expect((result.data as any).nodeId).toBe(1);
         });
     });
 

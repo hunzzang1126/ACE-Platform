@@ -68,7 +68,7 @@ const replace_background_image: ToolDefinition = {
 
 const generate_image: ToolDefinition = {
     name: 'generate_image',
-    description: 'Generate an AI image. Returns a data URL. Use for backgrounds, product photos, or visual elements.',
+    description: 'Generate an AI image and place it on the canvas. Automatically adds the image as a canvas element and saves it to the upload library. Use for backgrounds, product photos, hero images, or any visual element.',
     parameters: {
         type: 'object',
         properties: {
