@@ -21,6 +21,7 @@ import { InlinePositionPanel } from './InlinePositionPanel';
 import { UpgradeModal } from '@/components/billing/UpgradeModal';
 import { usePlanLimits } from '@/hooks/usePlanLimits';
 import type { CanvasEngineActions, EngineNode } from '@/hooks/canvasTypes';
+import { useAppI18n } from '@/i18n';
 
 import type { ReactNode } from 'react';
 
@@ -115,6 +116,13 @@ export function EditorSidebar({ actions, nodes = [], selection = [], onTriggerIm
     const { limits } = usePlanLimits();
     const brandCloudEnabled = limits.brandCloudEnabled;
     const [showUpgrade, setShowUpgrade] = useState(false);
+    const { t } = useAppI18n();
+
+    const TAB_LABELS: Record<string, string> = {
+        templates: t('editor.sidebarTemplates'), elements: t('editor.sidebarElements'),
+        text: t('editor.sidebarText'), uploads: t('editor.sidebarUploads'),
+        brand: t('editor.sidebarBrand'), projects: t('editor.sidebarProjects'), ai: 'AI',
+    };
 
     const handleTabClick = useCallback((tabId: string) => {
         toggleTab(tabId);
@@ -127,8 +135,8 @@ export function EditorSidebar({ actions, nodes = [], selection = [], onTriggerIm
 
     // ── Determine panel title ──
     const panelTitle = activeInlinePanel
-        ? (activeInlinePanel === 'effects' ? 'Effects' : activeInlinePanel === 'animate' ? 'Animate' : 'Position')
-        : TABS.find(t => t.id === activeTab)?.label;
+        ? (activeInlinePanel === 'effects' ? t('editor.effects') : activeInlinePanel === 'animate' ? t('editor.animate') : t('editor.position'))
+        : TAB_LABELS[activeTab ?? ''] ?? activeTab;
 
     return (
         <div className="sidebar-root">
@@ -139,10 +147,10 @@ export function EditorSidebar({ actions, nodes = [], selection = [], onTriggerIm
                         key={tab.id}
                         className={`sidebar-icon-btn ${activeTab === tab.id ? 'active' : ''}`}
                         onClick={() => handleTabClick(tab.id)}
-                        title={tab.label}
+                        title={TAB_LABELS[tab.id] || tab.label}
                     >
                         <span className="sidebar-icon">{tab.icon}</span>
-                        <span className="sidebar-icon-label">{tab.label}</span>
+                        <span className="sidebar-icon-label">{TAB_LABELS[tab.id] || tab.label}</span>
                     </button>
                 ))}
             </nav>
@@ -215,7 +223,7 @@ export function EditorSidebar({ actions, nodes = [], selection = [], onTriggerIm
                         {!activeInlinePanel && activeTab === 'ai' && (
                             <div className="sidebar-placeholder">
                                 <p>ACE AI</p>
-                                <span>Auto-design, smart layout, brand check</span>
+                                <span>{t('editor.aiSidebarHint')}</span>
                             </div>
                         )}
                     </div>
@@ -227,6 +235,7 @@ export function EditorSidebar({ actions, nodes = [], selection = [], onTriggerIm
 
 // ── Brand Kit locked placeholder for non-enterprise users ──
 function BrandLockedPlaceholder({ onUpgrade }: { onUpgrade: () => void }) {
+    const { t } = useAppI18n();
     return (
         <div style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -237,10 +246,10 @@ function BrandLockedPlaceholder({ onUpgrade }: { onUpgrade: () => void }) {
                 <path d="M7 11V7a5 5 0 0110 0v4" />
             </svg>
             <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary, #e4e4e7)', margin: 0 }}>
-                Brand Kit
+                {t('editor.sidebarBrand')}
             </p>
             <p style={{ fontSize: 11, color: 'var(--text-muted, #71717a)', margin: 0, lineHeight: 1.5 }}>
-                Brand Kit is available on Enterprise plans. Upload logos, set brand colors, fonts, and guidelines for AI-powered design.
+                {t('editor.brandLockedHint')}
             </p>
             <button
                 onClick={onUpgrade}
@@ -254,7 +263,7 @@ function BrandLockedPlaceholder({ onUpgrade }: { onUpgrade: () => void }) {
                 onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
                 onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
             >
-                Upgrade to Enterprise
+                {t('editor.upgradeEnterprise')}
             </button>
         </div>
     );
