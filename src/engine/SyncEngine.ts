@@ -1,9 +1,9 @@
 // ─────────────────────────────────────────────────
 // SyncEngine – Plug-based Synchronization Core
 // ─────────────────────────────────────────────────
-// 오리진 요소 변경 → 플러그된 타겟에만 전파.
-// 제약 조건(constraints)을 기반으로 다른 크기의 배너에 맞게 좌표를 재계산.
-// role이 있는 요소는 Smart Layout 엔진으로 비율별 최적 위치 계산.
+// Origin element changes → propagate only to plugged targets.
+// Recalculates coordinates based on constraints for different size variants.
+// Elements with a role use the Smart Layout engine for aspect-ratio-optimal positioning.
 
 import type { BannerVariant, CreativeSet } from '@/schema/design.types';
 import type { DesignElement } from '@/schema/elements.types';
@@ -17,9 +17,9 @@ import { computeSmartConstraints, getSmartFontSize } from './smartLayout';
 export interface SyncDelta {
     variantId: string;
     elementId: string;
-    /** 변경된 속성들 */
+    /** Changed properties */
     changes: Partial<DesignElement>;
-    /** 재계산된 좌표 */
+    /** Recalculated coordinates */
     resolved: { x: number; y: number; width: number; height: number };
 }
 
@@ -32,7 +32,7 @@ export interface SyncResult {
 
 export class SyncEngine {
     /**
-     * 마스터 요소 변경 → 슬레이브 전파 좌표 계산
+     * Origin element change → compute propagation coordinates for targets
      *
      * ★ Plug-aware propagation:
      * Only propagates to variants that are plugged into the source variant.
@@ -66,23 +66,23 @@ export class SyncEngine {
                 continue;
             }
 
-            // 동기화 잠김
+            // Sync-locked variant
             if (variant.syncLocked) {
                 result.skipped.push({ variantId: variant.id, reason: 'syncLocked' });
                 continue;
             }
 
-            // 개별 오버라이드
+            // Element individually overridden
             if (variant.overriddenElementIds.includes(masterElement.id)) {
                 result.skipped.push({ variantId: variant.id, reason: 'overridden' });
                 continue;
             }
 
-            // 슬레이브의 해당 요소 찾기
+            // Find corresponding element in target variant
             const slaveElement = variant.elements.find((el) => el.id === masterElement.id);
             if (!slaveElement) continue;
 
-            // ── Smart Layout: role이 있으면 비율별 최적 재배치, 없으면 기존 방식 ──
+            // ── Smart Layout: use aspect-ratio-optimal placement when role is set, otherwise use constraints ──
             let smartConstraints: ElementConstraints | undefined;
             if (masterElement.role) {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -104,7 +104,7 @@ export class SyncEngine {
                 variant.preset.height,
             );
 
-            // 변경 사항 계산 (constraints + 비레이아웃 속성)
+            // Compute changes (constraints + non-layout properties)
             const changes = SyncEngine.computeChanges(masterElement, slaveElement);
 
             // If smart layout computed new constraints, use those instead of master's
@@ -134,8 +134,8 @@ export class SyncEngine {
     }
 
     /**
-     * 전체 크리에이티브 셋의 모든 요소를 동기화
-     * (초기 로드나 대량 변경 시 사용)
+     * Synchronize all elements in the entire creative set
+     * (Used on initial load or bulk changes)
      */
     static fullSync(creativeSet: CreativeSet): SyncResult {
         const master = creativeSet.variants.find(
@@ -156,8 +156,8 @@ export class SyncEngine {
     }
 
     /**
-     * 배치 업데이트: 여러 요소를 한 번에 동기화
-     * (requestAnimationFrame 내에서 호출하여 렌더 최적화)
+     * Batch update: synchronize multiple elements at once
+     * (Call within requestAnimationFrame for render optimization)
      */
     static batchPropagate(
         masterElements: DesignElement[],
@@ -176,7 +176,7 @@ export class SyncEngine {
     }
 
     /**
-     * 마스터 vs 슬레이브 요소의 비레이아웃 속성 차이 계산
+     * Compute non-layout property differences between origin and target elements
      */
     private static computeChanges(
         master: DesignElement,
@@ -184,16 +184,16 @@ export class SyncEngine {
     ): Partial<DesignElement> {
         const changes: Record<string, unknown> = {};
 
-        // constraints는 항상 마스터를 따름
+        // Constraints always follow the origin
         changes.constraints = { ...master.constraints };
 
-        // 공통 속성 동기화
+        // Sync common properties
         if (master.opacity !== slave.opacity) changes.opacity = master.opacity;
         if (master.visible !== slave.visible) changes.visible = master.visible;
         if (master.zIndex !== slave.zIndex) changes.zIndex = master.zIndex;
         if (master.blendMode !== slave.blendMode) changes.blendMode = master.blendMode;
 
-        // 타입별 속성 동기화
+        // Sync type-specific properties
         if (master.type === slave.type) {
             switch (master.type) {
                 case 'text': {

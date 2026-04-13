@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────
-// LayerPanel – 레이어 목록 패널
+// LayerPanel – Element layer list panel
 // ─────────────────────────────────────────────────
 import { useDesignStore } from '@/stores/designStore';
 import { useEditorStore } from '@/stores/editorStore';

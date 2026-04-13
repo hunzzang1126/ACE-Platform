@@ -1,8 +1,8 @@
 // ─────────────────────────────────────────────────
 // projectStore – Multi-Creative-Set + Folder Management
 // ─────────────────────────────────────────────────
-// 대시보드에서 여러 크리에이티브 셋과 폴더를 관리.
-// designStore는 "활성 편집 중인" 단일 셋만 보유.
+// Manages multiple creative sets and folders from the dashboard.
+// designStore holds only the single "actively editing" creative set.
 
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';

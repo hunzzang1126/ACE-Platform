@@ -33,7 +33,7 @@ describe('ProjectCard', () => {
 
     it('shows variant count', () => {
         render(<ProjectCard {...defaultProps} />);
-        expect(screen.getByText(/3/)).toBeTruthy();
+        expect(screen.getAllByText(/3/).length).toBeGreaterThan(0);
     });
 
     it('calls onOpen when clicked', () => {

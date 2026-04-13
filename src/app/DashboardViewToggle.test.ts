@@ -27,8 +27,8 @@ describe('DashboardPage — view mode toggle', () => {
 
     it('renders toggle buttons for grid and list', () => {
         expect(dashSrc).toContain('dashboard-view-toggle__btn');
-        expect(dashSrc).toContain("title=\"Grid view\"");
-        expect(dashSrc).toContain("title=\"List view\"");
+        expect(dashSrc).toContain("t('dash.gridView')");
+        expect(dashSrc).toContain("t('dash.listView')");
     });
 
     it('conditionally applies project-list or project-grid class', () => {
