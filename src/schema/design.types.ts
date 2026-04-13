@@ -3,8 +3,8 @@
 // ─────────────────────────────────────────────────
 import type { DesignElement } from './elements.types';
 
-/** 배너 규격 프리셋 정보 */
-export interface BannerPreset {
+/** Size preset definition (display dimensions + category) */
+export interface SizePreset {
     id: string;
     name: string;
     width: number;
@@ -12,19 +12,22 @@ export interface BannerPreset {
     category: 'display' | 'social' | 'video' | 'custom';
 }
 
-/** 개별 배너 변형 (특정 규격의 디자인) */
-export interface BannerVariant {
+/** @deprecated Use SizePreset. Kept for backward compatibility. */
+export type BannerPreset = SizePreset;
+
+/** Individual size variant (a specific design at a specific dimension) */
+export interface SizeVariant {
     id: string;
-    preset: BannerPreset;
-    /** 이 배너의 디자인 요소들 (derived view — computed from fabricJSON when present) */
+    preset: SizePreset;
+    /** Design elements for this variant (derived view — computed from fabricJSON when present) */
     elements: DesignElement[];
-    /** 배경색 */
+    /** Background color */
     backgroundColor: string;
-    /** 배경 이미지 URL */
+    /** Background image URL */
     backgroundImage?: string;
-    /** 마스터에서 동기화 제외된 요소 ID 목록 */
+    /** Element IDs excluded from master sync */
     overriddenElementIds: string[];
-    /** 개별 편집 잠금 상태 */
+    /** Individual editing lock state */
     syncLocked: boolean;
     /**
      * ★ SCREENSHOT PREVIEW — Fabric canvas toDataURL() captured at save time.
@@ -41,6 +44,9 @@ export interface BannerVariant {
      */
     fabricJSON?: string;
 }
+
+/** @deprecated Use SizeVariant. Kept for backward compatibility. */
+export type BannerVariant = SizeVariant;
 
 /** Per-locale translated content map: elementName → translated text */
 export type LocaleContent = Record<string, string>;
@@ -62,17 +68,17 @@ export interface LocaleData {
 /** Smart sizing mode: how elements are repositioned across variants */
 export type SizingMode = 'uniform' | 'edge-pin';
 
-/** 크리에이티브 셋 (오리진 + 플러그 연결된 변형들) */
+/** Creative set (origin + plug-connected variants) */
 export interface CreativeSet {
     id: string;
     name: string;
     description?: string;
-    /** 소속 폴더 ID */
+    /** Folder ID this set belongs to */
     folderId?: string;
     /** @deprecated Use plugConnections instead. Kept for backward compat (auto-derived). */
     masterVariantId: string;
-    /** 모든 배너 변형 (오리진 포함) */
-    variants: BannerVariant[];
+    /** All size variants (including origin) */
+    variants: SizeVariant[];
     /**
      * ★ Plug connections: maps targetVariantId → originVariantId.
      * A target "plugs into" its origin and inherits layout DNA.
@@ -80,12 +86,12 @@ export interface CreativeSet {
      * Example: { "v2": "v1", "v3": "v1" } means v2 and v3 are plugged into v1.
      */
     plugConnections: Record<string, string>;
-    /** 브랜드 설정 */
+    /** Brand configuration */
     brand: BrandConfig;
-    /** 생성 일시 */
+    /** Created at timestamp */
     createdAt: string;
     updatedAt: string;
-    /** 생성자 */
+    /** Created by user ID */
     createdBy?: string;
     /** Cosmetic label only — marks one variant as "Master" for organization. No functional difference. */
     masterLabel?: string;
@@ -98,7 +104,7 @@ export interface CreativeSet {
 }
 
 
-/** 대시보드용 크리에이티브 셋 요약 (가벼운 리스트 아이템) */
+/** Dashboard creative set summary (lightweight list item) */
 export interface CreativeSetSummary {
     id: string;
     name: string;
@@ -109,7 +115,7 @@ export interface CreativeSetSummary {
     createdBy: string;
 }
 
-/** 폴더 (크리에이티브 셋 정리용) */
+/** Folder (for organizing creative sets) */
 export interface Folder {
     id: string;
     name: string;
@@ -118,7 +124,7 @@ export interface Folder {
     updatedAt: string;
 }
 
-/** 브랜드 가이드라인 설정 */
+/** Brand guideline configuration */
 export interface BrandConfig {
     primaryColor: string;
     secondaryColor: string;
@@ -136,7 +142,7 @@ export interface BrandConfig {
     };
 }
 
-/** 프로젝트 (여러 크리에이티브 셋을 포함) */
+/** Project (contains multiple creative sets) */
 export interface Project {
     id: string;
     name: string;

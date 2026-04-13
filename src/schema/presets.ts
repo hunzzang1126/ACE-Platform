@@ -1,9 +1,9 @@
 // ─────────────────────────────────────────────────
-// Banner Preset Definitions (IAB + Social)
+// Size Preset Definitions (IAB + Social + Video)
 // ─────────────────────────────────────────────────
-import type { BannerPreset } from './design.types';
+import type { SizePreset } from './design.types';
 
-export const BANNER_PRESETS: BannerPreset[] = [
+export const SIZE_PRESETS: SizePreset[] = [
     // ── IAB Display ──
     { id: 'iab-300x250', name: 'Medium Rectangle', width: 300, height: 250, category: 'display' },
     { id: 'iab-728x90', name: 'Leaderboard', width: 728, height: 90, category: 'display' },
@@ -27,10 +27,13 @@ export const BANNER_PRESETS: BannerPreset[] = [
     { id: 'video-1080x1920', name: 'Vertical Video', width: 1080, height: 1920, category: 'video' },
 ];
 
-export function getPresetById(id: string): BannerPreset | undefined {
-    return BANNER_PRESETS.find((p) => p.id === id);
+/** @deprecated Use SIZE_PRESETS. Kept for backward compatibility. */
+export const BANNER_PRESETS = SIZE_PRESETS;
+
+export function getPresetById(id: string): SizePreset | undefined {
+    return SIZE_PRESETS.find((p) => p.id === id);
 }
 
-export function getPresetsByCategory(category: BannerPreset['category']): BannerPreset[] {
-    return BANNER_PRESETS.filter((p) => p.category === category);
+export function getPresetsByCategory(category: SizePreset['category']): SizePreset[] {
+    return SIZE_PRESETS.filter((p) => p.category === category);
 }
