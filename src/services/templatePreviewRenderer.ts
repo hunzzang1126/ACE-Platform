@@ -258,18 +258,11 @@ AVAILABLE TEMPLATES (shown in the grid image):
 ${list}
 
 Look at the grid image carefully. Each cell shows a rendered preview of that template layout.
-Based on the user's design request, pick the template whose VISUAL STRUCTURE best matches the mood and purpose.
+Based on the user's design request, pick the template whose VISUAL STRUCTURE best fits the content and mood.
 
-Rules:
-- Sports/energy/bold → pick dynamic layouts (Bold Headline, Full Bleed Hero)
-- Corporate/finance/trust → pick structured layouts (Left-Aligned Card, Minimal Clean)
-- Events/creative → pick flowing layouts (Top-Down Cascade, Diagonal Split)
-- Products/e-commerce → pick split layouts (Split Horizontal)
-- Luxury/editorial → pick elegant layouts (Right-Aligned, Minimal Clean)
-- Social/promo → pick attention-grabbing layouts (Badge Focus, Bold Headline)
-- If unsure, pick the one that LOOKS best for the content
+You can see the layouts — trust your visual judgment. Choose freely.
 
-Return ONLY a JSON object: { "templateId": "<id from list>", "reason": "<1 sentence why>" }`;
+Return ONLY a JSON object: { "templateId": "<id from list>", "reason": "<1 sentence explaining why this layout fits the request>" }`;
 }
 
 // ── Helpers ──────────────────────────────────────
