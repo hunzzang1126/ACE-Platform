@@ -22,6 +22,7 @@ import { SettingsBilling } from './settings/SettingsBilling';
 import { SettingsBrand } from './settings/SettingsBrand';
 import { SettingsConnections } from './settings/SettingsConnections';
 import { SettingsAppearance } from './settings/SettingsAppearance';
+import { useAppI18n } from '@/i18n';
 
 interface Props { isOpen: boolean; onClose: () => void; }
 
@@ -29,6 +30,7 @@ export function SettingsPanel({ isOpen, onClose }: Props) {
     const user = useAuthStore(s => s.user);
     const signOut = useAuthStore(s => s.signOut);
     const userId = user?.id;
+    const { t } = useAppI18n();
     const [prefs, setPrefs] = useState<UserPrefs>(() => loadUserPrefs(userId));
     const [activeTab, setActiveTab] = useState<SettingsTab>('general');
     const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([]);
@@ -87,7 +89,7 @@ export function SettingsPanel({ isOpen, onClose }: Props) {
                     padding: '24px 12px', display: 'flex', flexDirection: 'column', gap: 2,
                 }}>
                     <h2 style={{ fontSize: 16, fontWeight: 700, color: '#f5f5f7', margin: '0 8px 16px', letterSpacing: -0.3 }}>
-                        Settings
+                        {t('settings.title')}
                     </h2>
                     {SETTINGS_TABS.map(tab => (
                         <button
@@ -102,7 +104,7 @@ export function SettingsPanel({ isOpen, onClose }: Props) {
                                 cursor: 'pointer', transition: 'all 0.15s',
                             }}
                         >
-                            {tab.label}
+                            {t(tab.labelKey)}
                         </button>
                     ))}
                 </div>

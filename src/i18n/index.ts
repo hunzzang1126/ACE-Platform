@@ -9,3 +9,5 @@ export { ALL_LOCALES, LOCALE_LABELS, LANG_TO_LOCALE, LOCALE_TO_LANG } from './lo
 
 // Namespaces (side-effect imports register translations)
 import './dashboardI18n';
+import './navI18n';
+import './settingsI18n';

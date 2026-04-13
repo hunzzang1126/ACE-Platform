@@ -24,17 +24,17 @@ describe('settingsShared — SETTINGS_TABS', () => {
         expect(SETTINGS_TABS).toHaveLength(6);
     });
 
-    it('each tab has a non-empty label', () => {
+    it('each tab has a non-empty labelKey', () => {
         for (const tab of SETTINGS_TABS) {
-            expect(tab.label).toBeTruthy();
-            expect(tab.label.length).toBeGreaterThan(0);
+            expect(tab.labelKey).toBeTruthy();
+            expect(tab.labelKey.length).toBeGreaterThan(0);
         }
     });
 
-    it('appearance tab has label "Appearance"', () => {
+    it('appearance tab has i18n labelKey', () => {
         const tab = SETTINGS_TABS.find(t => t.key === 'appearance');
         expect(tab).toBeDefined();
-        expect(tab!.label).toBe('Appearance');
+        expect(tab!.labelKey).toBe('settings.appearance');
     });
 
     it('no duplicate tab keys', () => {

@@ -1,60 +1,13 @@
 // ─────────────────────────────────────────────────
 // AppSidebar — Wide sidebar with text labels (Figma-inspired)
 // ─────────────────────────────────────────────────
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useState, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { IcLayout, IcBolt } from '@/components/ui/Icons';
 import { useAuthStore } from '@/stores/authStore';
 import { SettingsPanel } from '@/components/panels/SettingsPanel';
 import { GlidLogo } from '@/components/brand/GlidLogo';
-
-const NAV_ITEMS: { icon: ReactNode; label: string; path: string }[] = [
-    {
-        icon: <IcLayout size={18} />,
-        label: 'Projects',
-        path: '/',
-    },
-    {
-        icon: <IcBolt size={18} />,
-        label: 'Activity',
-        path: '/activity',
-    },
-    {
-        icon: (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <line x1="3" y1="9" x2="21" y2="9" />
-                <line x1="3" y1="15" x2="21" y2="15" />
-                <line x1="9" y1="3" x2="9" y2="21" />
-                <line x1="15" y1="3" x2="15" y2="21" />
-            </svg>
-        ),
-        label: 'Brand Kit',
-        path: '/brand',
-    },
-    {
-        icon: (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="2" y="2" width="9" height="9" rx="1" />
-                <rect x="13" y="2" width="9" height="9" rx="1" />
-                <rect x="2" y="13" width="9" height="9" rx="1" />
-                <rect x="13" y="13" width="9" height="9" rx="1" />
-            </svg>
-        ),
-        label: 'Templates',
-        path: '/templates',
-    },
-    {
-        icon: (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="3 6 5 6 21 6" />
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-            </svg>
-        ),
-        label: 'Trash',
-        path: '/trash',
-    },
-];
+import { useAppI18n } from '@/i18n';
 
 export function AppSidebar() {
     const location = useLocation();
@@ -62,9 +15,43 @@ export function AppSidebar() {
     const user = useAuthStore(s => s.user);
     const role = useAuthStore(s => s.role);
     const [settingsOpen, setSettingsOpen] = useState(false);
+    const { t } = useAppI18n();
 
     const displayName = user?.displayName ?? 'User';
     const initials = displayName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+
+    const navItems: { icon: ReactNode; label: string; path: string }[] = useMemo(() => [
+        { icon: <IcLayout size={18} />, label: t('nav.projects'), path: '/' },
+        { icon: <IcBolt size={18} />, label: t('nav.activity'), path: '/activity' },
+        {
+            icon: (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" />
+                    <line x1="9" y1="3" x2="9" y2="21" /><line x1="15" y1="3" x2="15" y2="21" />
+                </svg>
+            ),
+            label: t('nav.brandKit'), path: '/brand',
+        },
+        {
+            icon: (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="2" width="9" height="9" rx="1" /><rect x="13" y="2" width="9" height="9" rx="1" />
+                    <rect x="2" y="13" width="9" height="9" rx="1" /><rect x="13" y="13" width="9" height="9" rx="1" />
+                </svg>
+            ),
+            label: t('nav.templates'), path: '/templates',
+        },
+        {
+            icon: (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                </svg>
+            ),
+            label: t('nav.trash'), path: '/trash',
+        },
+    ], [t]);
 
     return (
         <>
@@ -76,7 +63,7 @@ export function AppSidebar() {
 
                 {/* Navigation */}
                 <nav className="sidebar-nav">
-                    {NAV_ITEMS.map((item) => {
+                    {navItems.map((item) => {
                         const isActive = location.pathname === item.path ||
                             (item.path === '/' && location.pathname === '/');
                         return (
@@ -98,11 +85,11 @@ export function AppSidebar() {
                         <div className="sidebar-avatar">{initials}</div>
                         <div className="sidebar-user-info">
                             <span className="sidebar-user-name">{displayName}</span>
-                            <span className="sidebar-user-role">{role === 'admin' ? 'Admin' : 'User'}</span>
+                            <span className="sidebar-user-role">{role === 'admin' ? t('nav.admin') : t('nav.user')}</span>
                         </div>
                         <button
                             onClick={() => setSettingsOpen(true)}
-                            title="Settings"
+                            title={t('nav.settings')}
                             style={{
                                 background: 'none', border: 'none', color: '#86868b',
                                 cursor: 'pointer', padding: 4, marginLeft: 'auto',

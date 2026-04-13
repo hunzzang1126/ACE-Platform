@@ -6,13 +6,14 @@ import type React from 'react';
 
 export type SettingsTab = 'general' | 'appearance' | 'account' | 'billing' | 'brand' | 'connections';
 
-export const SETTINGS_TABS: { key: SettingsTab; label: string }[] = [
-    { key: 'general', label: 'General' },
-    { key: 'appearance', label: 'Appearance' },
-    { key: 'account', label: 'Account' },
-    { key: 'billing', label: 'Billing' },
-    { key: 'brand', label: 'Brand' },
-    { key: 'connections', label: 'Connections' },
+/** labelKey is a translation key resolved by SettingsPanel via t() */
+export const SETTINGS_TABS: { key: SettingsTab; labelKey: string }[] = [
+    { key: 'general', labelKey: 'settings.general' },
+    { key: 'appearance', labelKey: 'settings.appearance' },
+    { key: 'account', labelKey: 'settings.account' },
+    { key: 'billing', labelKey: 'settings.billing' },
+    { key: 'brand', labelKey: 'settings.brand' },
+    { key: 'connections', labelKey: 'settings.connections' },
 ];
 
 export function Section({ title, children }: { title: string; children: React.ReactNode }) {
