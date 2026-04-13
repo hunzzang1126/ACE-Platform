@@ -259,3 +259,72 @@ trigger: always_on
    - `import type {}` for all type-only imports (better tree-shaking)
    - Absolute imports via `@/` alias — no relative `../../` beyond 1 level
    - Group imports: React → External libs → Internal modules → Types → Styles
+
+---
+
+# MANDATORY TEST COVERAGE (ABSOLUTE RULE)
+
+> **Every code change MUST include corresponding test updates. Test count must NEVER decrease.**
+
+**When Adding a New Feature:**
+> - Write unit tests for ALL exported functions, hooks, and utilities
+> - Test file alongside source: `myModule.ts` → `myModule.test.ts`
+> - Cover: happy path, edge cases, error conditions, boundary values
+> - Minimum: 3+ test cases per exported function
+
+**When Fixing a Bug:**
+> - **FIRST** write a failing test that reproduces the exact bug
+> - Then fix the code so the test passes
+> - Name descriptively: `it('should not lose z-index after manual layer reorder')`
+
+**When Refactoring:**
+> - Run `npm run test:coverage` BEFORE and AFTER
+> - Coverage must NOT decrease
+> - If splitting files, split tests to match
+
+**Progressive Coverage Ratchet (never go backwards):**
+> | Module | Target |
+> |--------|--------|
+> | Stores | 90%+ |
+> | Engine/Converters | 85%+ |
+> | Services | 80%+ |
+> | Hooks | 80%+ |
+>
+> - Each commit message should note test delta: `(458 → 490 tests)`
+> - If a commit modifies logic and has 0 new tests → **STOP and add tests before pushing**
+> - Regression guards: `it('★ REGRESSION: should not [describe bug]')`
+
+---
+
+# VERSION INCREMENT ON GIT PUSH (MANDATORY)
+
+> - Before EVERY `git push`, increment build number in `src/version.ts`
+> - Format: `v{major}.{minor}.{patch}.{build}` (e.g., `v0.0.0.518`)
+> - Only build number auto-increments; major/minor/patch changed by user
+> - Commit sequence: code → tests → increment version → commit → push
+> **NEVER push without incrementing.**
+
+---
+
+# GIT BRANCHING & VERCEL DEPLOYMENT (MANDATORY)
+
+> **Branch Structure:**
+> - `feat/landing-auth` — dev branch → **Vercel preview**
+> - `main` — production branch → **main domain**
+>
+> **Rules:**
+> - All dev pushes → `feat/landing-auth` → auto-deploys to Vercel preview
+> - **NEVER merge to `main` unless user explicitly requests**
+> - After merge, switch back: `git checkout feat/landing-auth`
+
+---
+
+# HONEST FEEDBACK POLICY (No Yes-Man Behavior)
+
+> - **Good idea** → Say why it's good technically
+> - **Bad idea** → Say why with concrete technical reasons
+> - **Partially good** → Acknowledge good parts, push back on weak parts
+> - Never agree just to avoid conflict
+> - Never implement what you know will cause problems without warning
+> - Quantify risk: "This will take ~3 weeks and blocks Z"
+> - Reference precedent: "Figma does X instead because..."
