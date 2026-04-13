@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { getRecentPublishes } from '@/services/publish/publishService';
 import type { PublishRecord, PublishPlatform } from '@/services/publish/publishTypes';
+import { useAppI18n } from '@/i18n';
 
 // ── Platform label + color ──
 const PLATFORM_CONFIG: Record<PublishPlatform, { label: string; color: string; icon: string }> = {
@@ -26,6 +27,7 @@ export function ActivityPage() {
     const [records, setRecords] = useState<PublishRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'activity' | 'analytics'>('activity');
+    const { t } = useAppI18n();
 
     useEffect(() => {
         getRecentPublishes(50).then(data => {
@@ -51,10 +53,10 @@ export function ActivityPage() {
                         fontSize: 28, fontWeight: 700, color: '#f5f5f7',
                         margin: '0 0 8px',
                     }}>
-                        Activity
+                        {t('activity.title')}
                     </h1>
                     <p style={{ fontSize: 14, color: '#86868b', margin: '0 0 24px' }}>
-                        Track your published creatives and performance metrics
+                        {t('activity.subtitle')}
                     </p>
 
                     {/* Tab Switcher */}
@@ -75,7 +77,7 @@ export function ActivityPage() {
                                     transition: 'all 0.2s',
                                 }}
                             >
-                                {tab === 'activity' ? 'Publish History' : 'Analytics'}
+                                {tab === 'activity' ? t('activity.publishHistory') : t('activity.analytics')}
                             </button>
                         ))}
                     </div>
@@ -96,10 +98,11 @@ export function ActivityPage() {
 
 // ── Activity Tab ──
 function ActivityTab({ records, loading }: { records: PublishRecord[]; loading: boolean }) {
+    const { t } = useAppI18n();
     if (loading) {
         return (
             <div style={{ textAlign: 'center', padding: '60px 0', color: '#555' }}>
-                Loading publish history...
+                {t('activity.loading')}
             </div>
         );
     }
@@ -117,10 +120,10 @@ function ActivityTab({ records, loading }: { records: PublishRecord[]; loading: 
                     </svg>
                 </div>
                 <h3 style={{ color: '#86868b', fontSize: 16, fontWeight: 600, margin: '0 0 8px' }}>
-                    No published creatives yet
+                    {t('activity.noPublished')}
                 </h3>
                 <p style={{ color: '#555', fontSize: 13, margin: 0 }}>
-                    Open a creative set and click "Publish" to distribute your designs
+                    {t('activity.noPublishedHint')}
                 </p>
             </div>
         );
@@ -137,6 +140,7 @@ function ActivityTab({ records, loading }: { records: PublishRecord[]; loading: 
 
 // ── Single publish record row ──
 function PublishRow({ record }: { record: PublishRecord }) {
+    const { t } = useAppI18n();
     const platform = PLATFORM_CONFIG[record.platform];
     const status = STATUS_CONFIG[record.status] ?? STATUS_CONFIG.pending;
     const date = new Date(record.createdAt);
@@ -168,7 +172,7 @@ function PublishRow({ record }: { record: PublishRecord }) {
                     {record.variantLabel || `${record.platform} post`}
                 </div>
                 <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>
-                    {record.caption ? record.caption.slice(0, 60) + (record.caption.length > 60 ? '...' : '') : 'No caption'}
+                    {record.caption ? record.caption.slice(0, 60) + (record.caption.length > 60 ? '...' : '') : t('activity.noCaption')}
                 </div>
             </div>
 
@@ -191,6 +195,7 @@ function PublishRow({ record }: { record: PublishRecord }) {
 
 // ── Analytics Tab (placeholder with summary) ──
 function AnalyticsTab({ records }: { records: PublishRecord[] }) {
+    const { t } = useAppI18n();
     const published = records.filter(r => r.status === 'published');
     const byPlatform = new Map<PublishPlatform, number>();
     for (const r of published) {
@@ -205,10 +210,10 @@ function AnalyticsTab({ records }: { records: PublishRecord[] }) {
                 borderRadius: 16, border: '1px dashed rgba(255,255,255,0.06)',
             }}>
                 <h3 style={{ color: '#86868b', fontSize: 16, fontWeight: 600, margin: '0 0 8px' }}>
-                    No analytics data yet
+                    {t('activity.noAnalytics')}
                 </h3>
                 <p style={{ color: '#555', fontSize: 13, margin: 0 }}>
-                    Connect your ad accounts and publish creatives to see performance metrics
+                    {t('activity.noAnalyticsHint')}
                 </p>
             </div>
         );
@@ -218,9 +223,9 @@ function AnalyticsTab({ records }: { records: PublishRecord[] }) {
         <div>
             {/* Summary cards */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
-                <MetricCard label="Total Published" value={published.length.toString()} color="#0d99ff" />
-                <MetricCard label="Platforms Used" value={byPlatform.size.toString()} color="#34c759" />
-                <MetricCard label="This Week" value={
+                <MetricCard label={t('activity.totalPublished')} value={published.length.toString()} color="#0d99ff" />
+                <MetricCard label={t('activity.platformsUsed')} value={byPlatform.size.toString()} color="#34c759" />
+                <MetricCard label={t('activity.thisWeek')} value={
                     published.filter(r => {
                         const d = new Date(r.createdAt);
                         const now = new Date();
@@ -231,7 +236,7 @@ function AnalyticsTab({ records }: { records: PublishRecord[] }) {
 
             {/* Platform breakdown */}
             <h3 style={{ fontSize: 14, fontWeight: 600, color: '#c8c8cc', margin: '0 0 12px' }}>
-                Platform Breakdown
+                {t('activity.platformBreakdown')}
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {Array.from(byPlatform.entries()).map(([platform, count]) => {
@@ -247,7 +252,7 @@ function AnalyticsTab({ records }: { records: PublishRecord[] }) {
                                 <span style={{ fontSize: 13, fontWeight: 500, color: config.color }}>
                                     {config.label}
                                 </span>
-                                <span style={{ fontSize: 12, color: '#86868b' }}>{count} published</span>
+                                <span style={{ fontSize: 12, color: '#86868b' }}>{count} {t('activity.published')}</span>
                             </div>
                             <div style={{
                                 height: 4, borderRadius: 2,
@@ -273,7 +278,7 @@ function AnalyticsTab({ records }: { records: PublishRecord[] }) {
                 borderRadius: 12, border: '1px dashed rgba(255,255,255,0.06)',
             }}>
                 <p style={{ color: '#555', fontSize: 13, margin: 0 }}>
-                    Detailed performance charts (impressions, clicks, CTR) will appear here once platform APIs are connected
+                    {t('activity.chartHint')}
                 </p>
             </div>
         </div>

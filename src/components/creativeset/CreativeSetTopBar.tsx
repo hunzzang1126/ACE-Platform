@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthModal } from '@/components/editor/AuthModal';
+import { useAppI18n } from '@/i18n';
 
 interface Props {
     setName: string;
@@ -13,6 +14,7 @@ interface Props {
 export function CreativeSetTopBar({ setName, onPublish }: Props) {
     const navigate = useNavigate();
     const [showAccount, setShowAccount] = useState(false);
+    const { t } = useAppI18n();
 
     return (
         <>
@@ -51,7 +53,7 @@ export function CreativeSetTopBar({ setName, onPublish }: Props) {
                                 <line x1="12" y1="19" x2="12" y2="5" />
                                 <polyline points="5 12 12 5 19 12" />
                             </svg>
-                            PUBLISH
+                            {t('size.publish')}
                         </button>
                     )}
                     <button className="cs-topbar-btn icon" onClick={() => navigate('/dashboard')} title="Close">x</button>

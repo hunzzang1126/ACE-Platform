@@ -13,6 +13,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { TemplatePreview } from './TemplatePreviewCard';
 import type { BannerVariant, BannerPreset } from '@/schema/design.types';
+import { useAppI18n } from '@/i18n';
 
 const CATEGORIES = ['all', 'display', 'social', 'email', 'video'] as const;
 
@@ -27,6 +28,13 @@ export function TemplatesPage() {
 
     const [category, setCategory] = useState<string>('all');
     const [query, setQuery] = useState('');
+    const { t } = useAppI18n();
+
+    const CATEGORY_LABELS: Record<string, string> = {
+        all: t('templates.all'), display: t('templates.display'),
+        social: t('templates.social'), email: t('templates.email'),
+        video: t('templates.video'),
+    };
 
     const filtered = useMemo(() => {
         if (query.trim()) return search(query);
@@ -134,10 +142,10 @@ export function TemplatesPage() {
                 <div style={S.header}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 16, justifyContent: 'space-between' }}>
                         <div>
-                            <h1 style={S.title}>Templates</h1>
+                            <h1 style={S.title}>{t('templates.title')}</h1>
                             <p style={S.subtitle}>
-                                Browse and apply design templates to your projects.
-                                {adminMode && ' As an admin, you can edit templates directly.'}
+                                {t('templates.subtitle')}
+                                {adminMode && t('templates.subtitleAdmin')}
                             </p>
                         </div>
                         {adminMode && (
@@ -146,7 +154,7 @@ export function TemplatesPage() {
                                 style={S.addBtn}
                             >
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-                                Add Template
+                                {t('templates.addTemplate')}
                             </button>
                         )}
                     </div>
@@ -155,7 +163,7 @@ export function TemplatesPage() {
                         <div style={S.createForm}>
                             <input
                                 style={S.search}
-                                placeholder="Template name..."
+                                placeholder={t('templates.templateName')}
                                 value={newName}
                                 onChange={e => setNewName(e.target.value)}
                                 autoFocus
@@ -172,8 +180,8 @@ export function TemplatesPage() {
                                 <option value="video">Video</option>
                             </select>
                             <span style={{ fontSize: 11, color: '#86868b' }}>1080 x 1080</span>
-                            <button onClick={handleCreate} style={S.addBtn}>Create</button>
-                            <button onClick={() => setShowCreateForm(false)} style={{ ...S.pill, cursor: 'pointer' }}>Cancel</button>
+                            <button onClick={handleCreate} style={S.addBtn}>{t('templates.create')}</button>
+                            <button onClick={() => setShowCreateForm(false)} style={{ ...S.pill, cursor: 'pointer' }}>{t('templates.cancel')}</button>
                         </div>
                     )}
                 </div>
@@ -183,7 +191,7 @@ export function TemplatesPage() {
                     <input
                         style={S.search}
                         type="text"
-                        placeholder="Search templates..."
+                        placeholder={t('templates.searchPlaceholder')}
                         value={query}
                         onChange={e => setQuery(e.target.value)}
                     />
@@ -197,7 +205,7 @@ export function TemplatesPage() {
                                 }}
                                 onClick={() => { setCategory(cat); setQuery(''); }}
                             >
-                                {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                                {CATEGORY_LABELS[cat] || cat}
                             </button>
                         ))}
                     </div>
@@ -207,18 +215,18 @@ export function TemplatesPage() {
                 <div style={S.grid}>
                     {filtered.length === 0 && (
                         <div style={S.empty}>
-                            No templates found.
+                            {t('templates.noFound')}
                         </div>
                     )}
-                    {filtered.map(t => (
-                        <div key={t.id} style={S.card}>
+                    {filtered.map(tmpl => (
+                        <div key={tmpl.id} style={S.card}>
                             <div style={S.previewWrap}>
-                                <TemplatePreview template={t} />
+                                <TemplatePreview template={tmpl} />
                                 {/* Admin edit button */}
                                 {adminMode && (
                                     <button
-                                        onClick={() => handleEdit(t)}
-                                        title="Edit template (Admin)"
+                                        onClick={() => handleEdit(tmpl)}
+                                        title={t('templates.editTemplate')}
                                         style={S.editBtn}
                                         onMouseEnter={e => { e.currentTarget.style.opacity = '1'; }}
                                         onMouseLeave={e => { e.currentTarget.style.opacity = '0.7'; }}
@@ -231,8 +239,8 @@ export function TemplatesPage() {
                                 {/* Admin delete button */}
                                 {adminMode && (
                                     <button
-                                        onClick={() => handleDelete(t)}
-                                        title="Delete template"
+                                        onClick={() => handleDelete(tmpl)}
+                                        title={t('templates.deleteTemplate')}
                                         style={S.deleteBtn}
                                         onMouseEnter={e => { e.currentTarget.style.opacity = '1'; }}
                                         onMouseLeave={e => { e.currentTarget.style.opacity = '0.7'; }}
@@ -245,10 +253,10 @@ export function TemplatesPage() {
                                 )}
                             </div>
                             <div style={S.cardInfo}>
-                                <span style={S.cardName}>{t.name}</span>
+                                <span style={S.cardName}>{tmpl.name}</span>
                                 <span style={S.cardMeta}>
-                                    {t.width} x {t.height}
-                                    {!t.isBuiltIn && ' · Custom'}
+                                    {tmpl.width} x {tmpl.height}
+                                    {!tmpl.isBuiltIn && ` · ${t('templates.custom')}`}
                                 </span>
                             </div>
                         </div>

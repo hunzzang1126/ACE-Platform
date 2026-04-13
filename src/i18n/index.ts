@@ -14,3 +14,5 @@ import './settingsI18n';
 import './sizeI18n';
 import './aiI18n';
 import './editorI18n';
+import './templatesI18n';
+import './activityI18n';

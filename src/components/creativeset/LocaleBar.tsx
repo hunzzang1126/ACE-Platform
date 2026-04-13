@@ -9,6 +9,7 @@ import { useState, useCallback } from 'react';
 import { useDesignStore } from '@/stores/designStore';
 import type { LocaleData } from '@/schema/design.types';
 import { LocalePickerPopover } from './LocalePickerPopover';
+import { useAppI18n } from '@/i18n';
 
 /** 2-letter display codes for common languages */
 const LOCALE_DISPLAY: Record<string, { code: string; label: string }> = {
@@ -45,6 +46,7 @@ export function LocaleBar() {
     const [pickerOpen, setPickerOpen] = useState(false);
     const [translating, setTranslating] = useState(false);
     const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; code: string } | null>(null);
+    const { t } = useAppI18n();
 
     const handleSwitch = useCallback((code: string | null) => {
         switchLocale(code);
@@ -82,7 +84,7 @@ export function LocaleBar() {
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                         <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
                     </svg>
-                    Add Language
+                    {t('size.addLanguage')}
                 </button>
                 {pickerOpen && <LocalePickerPopover existingLocales={[]} onClose={handlePickerClose} onTranslating={handleTranslating} />}
             </div>

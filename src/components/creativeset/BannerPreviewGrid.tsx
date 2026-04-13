@@ -17,6 +17,7 @@ import { renderVariantWithFabric } from './fabricHeadlessRenderer';
 import { PreviewContextMenu } from './PreviewContextMenu';
 import { CanvasPreviewImage } from './CanvasPreviewImage';
 import { LinkedBadge } from './LinkedBadge';
+import { useAppI18n } from '@/i18n';
 
 interface ContextMenuState { x: number; y: number; variantId: string; }
 
@@ -42,6 +43,7 @@ function getPreviewScale(w: number, h: number) {
 
 export function BannerPreviewGrid({ variants, visibleIds, externalPlaying }: Props) {
     const navigate = useNavigate();
+    const { t } = useAppI18n();
     const [currentTime, setCurrentTime] = useState(0);
     const rafRef = useRef<number>(0);
     const startTimeRef = useRef<number>(0);
@@ -224,7 +226,7 @@ export function BannerPreviewGrid({ variants, visibleIds, externalPlaying }: Pro
         <div className="banner-grid-wrapper">
             <div className="banner-grid-toolbar">
                 {isPlaying && (<div className="banner-play-progress"><div className="banner-play-progress-bar" style={{ width: `${(currentTime / TIMELINE_DURATION) * 100}%` }} /></div>)}
-                {!hasAnyAnimation && (<span className="banner-no-anim-hint">Add animations in the editor to preview here</span>)}
+                {!hasAnyAnimation && (<span className="banner-no-anim-hint">{t('size.addAnimNote')}</span>)}
             </div>
 
             <div className="banner-grid" ref={gridContainerRef} style={{ position: 'relative', minHeight: Math.max(600, canvasHeight + 40), overflow: 'visible' }}>
@@ -269,17 +271,17 @@ export function BannerPreviewGrid({ variants, visibleIds, externalPlaying }: Pro
                             </div>
 
                             {!isPlaying && (<div className="banner-card-play-overlay"><div className="banner-card-play-btn" onMouseDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); handleDoubleClick(variant.id); }} title="Open in Editor">▶</div></div>)}
-                            <div className="banner-card-footer"><span className="banner-card-count">{variant.elements.length} elements</span><span className="banner-card-zoom">{Math.round(scale * 100)}%</span></div>
+                            <div className="banner-card-footer"><span className="banner-card-count">{variant.elements.length} {t('activity.elements')}</span><span className="banner-card-zoom">{Math.round(scale * 100)}%</span></div>
                         </div>
                     );
                 })}
-                {visibleVariants.length === 0 && (<div className="banner-grid-empty"><p>No sizes visible. Toggle sizes on in the sidebar or add new sizes.</p></div>)}
+                {visibleVariants.length === 0 && (<div className="banner-grid-empty"><p>{t('activity.noSizesVisible')}</p></div>)}
             </div>
 
             {selectedIds.size > 0 && (
                 <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: '#1e2231', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, padding: '8px 20px', display: 'flex', alignItems: 'center', gap: 16, boxShadow: '0 8px 32px rgba(0,0,0,0.5)', zIndex: 1000, fontSize: 12, color: '#e6edf3', backdropFilter: 'blur(12px)' }}>
-                    <span style={{ fontWeight: 600 }}>{selectedIds.size} selected</span>
-                    <button onClick={handleExportSelected} style={{ background: 'linear-gradient(135deg, #4a9eff, #6c63ff)', border: 'none', color: '#fff', padding: '6px 16px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Export Selected</button>
+                    <span style={{ fontWeight: 600 }}>{selectedIds.size} {t('activity.selected')}</span>
+                    <button onClick={handleExportSelected} style={{ background: 'linear-gradient(135deg, #4a9eff, #6c63ff)', border: 'none', color: '#fff', padding: '6px 16px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{t('activity.exportSelected')}</button>
                     <button onClick={clearSelection} style={{ background: 'none', border: 'none', color: '#8b949e', fontSize: 14, cursor: 'pointer', padding: '2px 6px' }} title="Clear selection">x</button>
                 </div>
             )}
