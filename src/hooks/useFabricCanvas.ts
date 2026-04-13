@@ -7,6 +7,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Canvas, Rect, Ellipse, Shadow, PencilBrush, Textbox, FabricImage, FabricObject } from 'fabric';
+import * as ff from './fabricFilters';
 
 // ★ Canva/Polotno-style: Global selection handle defaults
 FabricObject.ownDefaults.cornerColor = '#FFFFFF';
@@ -258,11 +259,11 @@ export function useFabricCanvas(width: number, height: number, _addDemoShapes = 
     // ── Effects ──
     const setShadow = useCallback((id: number, ox: number, oy: number, blur: number, r: number, g: number, b: number, a: number) => { const obj = findById(id); if (obj) { obj.set({ shadow: new Shadow({ color: `rgba(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)},${a})`, blur, offsetX: ox, offsetY: oy }) }); fabricRef.current?.renderAll(); } }, [findById]);
     const removeShadow = useCallback((id: number) => { const obj = findById(id); if (obj) { obj.set({ shadow: undefined }); fabricRef.current?.renderAll(); } }, [findById]);
-    const setBlendMode = useCallback((_id: number, _mode: string) => { }, []);
-    const setBrightness = useCallback((_id: number, _v: number) => { }, []);
-    const setContrast = useCallback((_id: number, _v: number) => { }, []);
-    const setSaturation = useCallback((_id: number, _v: number) => { }, []);
-    const setHueRotate = useCallback((_id: number, _deg: number) => { }, []);
+    const setBlendMode = useCallback((id: number, mode: string) => { const obj = findById(id); if (obj) { ff.applyBlendMode(obj, mode, fabricRef.current); syncState(); } }, [findById, syncState]);
+    const setBrightness = useCallback((id: number, v: number) => { const obj = findById(id); if (obj) { ff.setBrightness(obj, v, fabricRef.current); syncState(); } }, [findById, syncState]);
+    const setContrast = useCallback((id: number, v: number) => { const obj = findById(id); if (obj) { ff.setContrast(obj, v, fabricRef.current); syncState(); } }, [findById, syncState]);
+    const setSaturation = useCallback((id: number, v: number) => { const obj = findById(id); if (obj) { ff.setSaturation(obj, v, fabricRef.current); syncState(); } }, [findById, syncState]);
+    const setHueRotate = useCallback((id: number, deg: number) => { const obj = findById(id); if (obj) { ff.setHueRotate(obj, deg, fabricRef.current); syncState(); } }, [findById, syncState]);
     const addKeyframe = useCallback((_nodeId: number, _property: string, _time: number, _value: number, _easing: string) => { }, []);
 
     // ── Text Effects ──

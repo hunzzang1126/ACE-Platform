@@ -30,7 +30,7 @@ export interface ElementAnimation {
     outDuration?: number;
 }
 
-/** 기본 요소 공통 속성 */
+/** Base element common properties */
 export interface BaseElement {
     id: string;
     name: string;
@@ -39,9 +39,9 @@ export interface BaseElement {
     opacity: number;
     visible: boolean;
     locked: boolean;
-    /** 렌더링 순서 (z-index) */
+    /** Render order (z-index) */
     zIndex: number;
-    /** 블렌드 모드 */
+    /** Blend mode */
     blendMode?: string;
     /** Shadow / glow effect */
     shadow?: { offsetX: number; offsetY: number; blur: number; color: string };
@@ -65,9 +65,9 @@ export interface TextElement extends BaseElement {
     textAlign: 'left' | 'center' | 'right';
     lineHeight: number;
     letterSpacing: number;
-    /** 텍스트 오버플로우 시 자동 축소 */
+    /** Auto-shrink on text overflow */
     autoShrink: boolean;
-    /** 로컬라이징 키 (번역 연동) */
+    /** Localization key (translation integration) */
     localizationKey?: string;
 }
 
@@ -75,19 +75,19 @@ export interface TextElement extends BaseElement {
 export interface ImageElement extends BaseElement {
     type: 'image';
     src: string;
-    /** object-fit 스타일 */
+    /** object-fit style */
     fit: 'cover' | 'contain' | 'fill' | 'none';
     /** Original image natural dimensions — for aspect ratio preservation */
     naturalWidth?: number;
     naturalHeight?: number;
-    /** 크롭 영역 (0~1 비율) */
+    /** Crop region (0~1 ratio) */
     cropRect?: { x: number; y: number; w: number; h: number };
-    /** 이미지 필터 */
+    /** Image filters */
     filters?: ImageFilter[];
 }
 
 export interface ImageFilter {
-    type: 'brightness' | 'contrast' | 'saturate' | 'blur' | 'grayscale';
+    type: 'brightness' | 'contrast' | 'saturate' | 'hueRotate' | 'blur' | 'grayscale';
     value: number;
 }
 
@@ -119,7 +119,7 @@ export interface ShapeElement extends BaseElement {
     gradientStart?: string;
     gradientEnd?: string;
     gradientAngle?: number;
-    /** 폴리곤의 경우 좌표 배열 */
+    /** Coordinates array for polygons */
     points?: { x: number; y: number }[];
 }
 
@@ -139,7 +139,7 @@ export interface ButtonElement extends BaseElement {
     color: string;
     backgroundColor: string;
     borderRadius: number;
-    /** 클릭 시 이동 URL */
+    /** URL to navigate on click */
     clickUrl?: string;
 }
 

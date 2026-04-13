@@ -7,6 +7,7 @@
 
 import { Textbox, Shadow, type FabricObject } from 'fabric';
 import type { EngineNode } from './canvasTypes';
+import { getBlendMode, filterStateToSchema } from './fabricFilters';
 
 // ── Unique ID generator ──
 let _nextId = 1;
@@ -231,13 +232,23 @@ export function fabricToEngineNode(obj: FabricObject): EngineNode {
     node.visible = obj.visible !== false;
     node.locked = !!(obj as any).lockMovementX;
 
+    // Blend mode
+    const bm = getBlendMode(obj);
+    if (bm && bm !== 'normal') {
+        node.blendMode = bm;
+    }
 
+    // Image filters (brightness, contrast, saturation, hue)
+    const schemaFilters = filterStateToSchema(obj);
+    if (schemaFilters.length > 0) {
+        node.filters = schemaFilters;
+    }
 
     return node;
 }
 
 // ── Custom properties to include in serialization ──
-export const GLID_CUSTOM_PROPS = ['__glidId', '__glidZIndex', '__glidArtboard', '__glidName', '__glidGradientStart', '__glidGradientEnd', '__glidGradientAngle', '__glidCustomStyles', '__glidTextEffectType', '__glidTextEffectIntensity', '__glidTextEffectColor', '__glidOriginalFill', '__glidPersistSrc'];
+export const GLID_CUSTOM_PROPS = ['__glidId', '__glidZIndex', '__glidArtboard', '__glidName', '__glidGradientStart', '__glidGradientEnd', '__glidGradientAngle', '__glidCustomStyles', '__glidTextEffectType', '__glidTextEffectIntensity', '__glidTextEffectColor', '__glidOriginalFill', '__glidPersistSrc', '__glidBlendMode', '__glidFilters'];
 
 // Patch a Fabric object to include Glid custom props in toObject()
 export function patchAceProps(obj: FabricObject): void {
@@ -256,6 +267,8 @@ export function patchAceProps(obj: FabricObject): void {
         if ((this as any).__glidTextEffectIntensity != null) data.__glidTextEffectIntensity = (this as any).__glidTextEffectIntensity;
         if ((this as any).__glidTextEffectColor) data.__glidTextEffectColor = (this as any).__glidTextEffectColor;
         if ((this as any).__glidOriginalFill) data.__glidOriginalFill = (this as any).__glidOriginalFill;
+        if ((this as any).__glidBlendMode) data.__glidBlendMode = (this as any).__glidBlendMode;
+        if ((this as any).__glidFilters) data.__glidFilters = (this as any).__glidFilters;
         return data;
     };
 }

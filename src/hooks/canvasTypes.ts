@@ -61,6 +61,10 @@ export interface EngineNode {
     angle?: number;
     // Group children (when type === 'group')
     children?: EngineNode[];
+    // Blend mode (CSS globalCompositeOperation)
+    blendMode?: string;
+    // Image filters (brightness, contrast, saturation, hue)
+    filters?: { type: string; value: number }[];
 }
 
 export interface CanvasEngineState {
