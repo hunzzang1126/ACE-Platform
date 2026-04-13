@@ -95,6 +95,10 @@ export default defineConfig({
             '@': resolve(__dirname, 'src'),
         },
     },
+    // Strip console.log in production builds (keep warn/error for debugging)
+    esbuild: {
+        drop: process.env.NODE_ENV === 'production' ? ['console', 'debugger'] : [],
+    },
     optimizeDeps: {
         exclude: ['ace-engine'],
     },
