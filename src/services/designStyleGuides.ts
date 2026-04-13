@@ -114,7 +114,7 @@ const DEFAULT_PALETTE: DesignStyleGuide = {
 // ── AI Color Palette Generation ──────────────────
 
 const COLOR_SYSTEM_PROMPT = `You are a world-class brand color expert and creative director.
-Given a user's design prompt, determine the PERFECT color palette.
+Given a user's design prompt, determine the PERFECT color palette and typography.
 
 RULES:
 1. If the prompt mentions a KNOWN BRAND (Nike, Coca-Cola, Apple, Google, etc.), use that brand's signature colors.
@@ -128,7 +128,16 @@ RULES:
    - Fashion/beauty → elegant dark or warm neutral
 4. ALWAYS ensure 4.5:1+ contrast between text and background.
 5. Dark backgrounds (< #333) should have white/light text. Light backgrounds (> #ccc) should have dark text.
-6. Decide if a BACKGROUND IMAGE is needed. Be SELECTIVE — only use images when a real visual scene adds value:
+6. FONT SELECTION — choose fonts that match the design's mood. Use DIFFERENT fonts for headline vs body.
+   Available Google Fonts (pick from this list):
+   Sans-serif: Inter, DM Sans, Space Grotesk, Outfit, Sora, Montserrat, Poppins, Roboto, Oswald, Roboto Condensed, Raleway, Nunito
+   Serif: Playfair Display, DM Serif Display, Cormorant Garamond, Libre Baskerville, Fraunces, Lora
+   Display: Bebas Neue, Anton
+   RULES:
+   - fontPrimary (headlines) and fontSecondary (body) MUST be different fonts
+   - Choose fonts that feel right for the mood — trust your judgment
+   - NEVER return "Inter" for both — that's boring and generic
+7. Decide if a BACKGROUND IMAGE is needed. Be SELECTIVE — only use images when a real visual scene adds value:
    USE IMAGE (true):
    - User explicitly asks for background/image/photo → ALWAYS YES
    - Sports/athletics (stadiums, fields, athletes in action) → YES
@@ -157,7 +166,7 @@ RULES:
    BAD: "dental clinic interior" (too vague — user asked for a person, not just a place)
    BAD: "basketball court" (missing the person entirely)
    Always describe the person's appearance, pose, clothing, and the environment.
-7. Return ONLY the JSON object, nothing else.`;
+8. Return ONLY the JSON object, nothing else.`;
 
 interface AiColorResponse {
     name: string;
