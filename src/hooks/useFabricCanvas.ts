@@ -8,6 +8,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Canvas, Rect, Ellipse, Shadow, PencilBrush, Textbox, FabricImage, FabricObject } from 'fabric';
 import * as ff from './fabricFilters';
+import { computeAlignment } from '@/engines/alignElements';
+import type { AlignDirection } from '@/engines/alignElements';
 
 // ★ Canva/Polotno-style: Global selection handle defaults
 FabricObject.ownDefaults.cornerColor = '#FFFFFF';
@@ -314,6 +316,24 @@ export function useFabricCanvas(width: number, height: number, _addDemoShapes = 
         obj.setCoords(); fabricRef.current?.renderAll(); syncState();
     }, [width, height, findById, syncState]);
 
+    // ── Multi-element alignment ──
+    const alignElements = useCallback((ids: number[], direction: AlignDirection) => {
+        const fc = fabricRef.current; if (!fc || ids.length < 2) return;
+        const bounds = ids.map(id => {
+            const obj = findById(id); if (!obj) return null;
+            const w = (obj.width ?? 0) * (obj.scaleX ?? 1);
+            const h = (obj.height ?? 0) * (obj.scaleY ?? 1);
+            return { id, x: obj.left ?? 0, y: obj.top ?? 0, w, h };
+        }).filter(Boolean) as { id: number; x: number; y: number; w: number; h: number }[];
+        if (bounds.length < 2) return;
+        const results = computeAlignment(bounds, direction);
+        for (const r of results) {
+            const obj = findById(r.id);
+            if (obj) { obj.set({ left: r.x, top: r.y }); obj.setCoords(); }
+        }
+        fc.renderAll(); pushUndo(`Align ${direction}`); syncState();
+    }, [findById, syncState]);
+
     // ── Tool-aware canvas click ──
     useEffect(() => { const fc = fabricRef.current; if (!fc || status !== 'ready') return; const handler = (opt: any) => { const p = fc.getScenePoint(opt.e); if (activeTool === 'shape') { addRect(p.x - 60, p.y - 40); setTool('select'); } else if (activeTool === 'text') { addText(p.x, p.y); setTool('select'); } else if (activeTool === 'image') { const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*'; input.style.display = 'none'; input.onchange = () => { const file = input.files?.[0]; if (file) { const reader = new FileReader(); reader.onload = () => addImage(p.x, p.y, reader.result as string); reader.readAsDataURL(file); document.body.removeChild(input); } }; document.body.appendChild(input); input.click(); setTool('select'); } }; fc.on('mouse:down', handler); return () => { fc.off('mouse:down', handler); }; }, [activeTool, status, addRect, addText, addImage, setTool]);
 
@@ -346,7 +366,7 @@ export function useFabricCanvas(width: number, height: number, _addDemoShapes = 
         addText, updateText, getTextContent, addImage, deleteSelected, clearAll, selectNode, deselectAll,
         setNodePosition, setNodeSize, setNodeOpacity, setFillColor, bringToFront, sendToBack, bringForward, sendBackward,
         setShadow, removeShadow, setTextEffect, removeTextEffect, setBlendMode, setBrightness, setContrast, setSaturation, setHueRotate, addKeyframe, duplicateSelected,
-        undo, redo, alignToCanvas,
+        undo, redo, alignToCanvas, alignElements,
         replaceImageSrc: async (id: number, newSrc: string) => { await engineRef.current?.replace_image_src(id, newSrc); },
         fillToPage: (id: number) => {
             const obj = findById(id); if (!obj) return;

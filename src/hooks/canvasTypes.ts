@@ -2,6 +2,7 @@
 // Canvas Types — Shared type definitions for engine hooks
 // ─────────────────────────────────────────────────
 import type { TextEffectType } from '@/schema/elements.types';
+import type { AlignDirection } from '@/engines/alignElements';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Engine = any;
@@ -135,6 +136,8 @@ export interface CanvasEngineActions {
     redo: () => void;
     // Alignment to canvas
     alignToCanvas: (id: number, alignment: 'left' | 'center-h' | 'right' | 'top' | 'center-v' | 'bottom') => void;
+    // Multi-element alignment
+    alignElements: (ids: number[], direction: AlignDirection) => void;
     // Image manipulation
     replaceImageSrc: (id: number, newSrc: string) => Promise<void>;
     /** Scale image to fill the entire canvas (cover mode, centered) */

@@ -5,13 +5,14 @@
 // ─────────────────────────────────────────────────
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { IcAlignLeft, IcAlignCenterH, IcAlignRight } from '@/components/ui/Icons';
+import { IcAlignLeft, IcAlignCenterH, IcAlignRight, IcAlignTop, IcAlignCenterV, IcAlignBottom } from '@/components/ui/Icons';
 import { ColorPicker } from '@/components/ui/ColorPicker';
 import { useUIStore } from '@/stores/uiStore';
 import type { EngineNode, CanvasEngineActions } from '@/hooks/canvasTypes';
 import type { OverlayElement } from '@/hooks/useOverlayElements';
 import { removeBackgroundFromUrl, blobToDataUrl } from '@/services/backgroundRemovalService';
 import { FONT_FAMILIES } from './contextToolbarConstants';
+import type { AlignDirection } from '@/engines/alignElements';
 
 // ── ScrubInput: icon + number input with drag-to-scrub ──
 function ScrubInput({ icon, value, min, max, step = 1, title, onChange }: {
@@ -150,6 +151,26 @@ export function ContextToolbar({ nodes = [], selection = [], actions, selectedOv
     if (multiSelected && actions) return (
         <div className="ctx-toolbar" role="toolbar">
             <span style={{ fontSize: 11, color: 'var(--text-muted, #71717a)', padding: '0 4px' }}>{selection.length} selected</span>
+            <div className="ctx-divider" />
+            {/* Align to each other */}
+            {(['left', 'center-h', 'right', 'top', 'center-v', 'bottom'] as AlignDirection[]).map(dir => (
+                <button key={dir} className="ctx-btn" onClick={() => actions.alignElements(selection, dir)} title={`Align ${dir}`}>
+                    {dir === 'left' && <IcAlignLeft size={13} />}
+                    {dir === 'center-h' && <IcAlignCenterH size={13} />}
+                    {dir === 'right' && <IcAlignRight size={13} />}
+                    {dir === 'top' && <IcAlignTop size={13} />}
+                    {dir === 'center-v' && <IcAlignCenterV size={13} />}
+                    {dir === 'bottom' && <IcAlignBottom size={13} />}
+                </button>
+            ))}
+            <div className="ctx-divider" />
+            {/* Distribute */}
+            <button className="ctx-btn" onClick={() => actions.alignElements(selection, 'distribute-h')} title="Distribute horizontally">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="4" y1="4" x2="4" y2="20" /><line x1="20" y1="4" x2="20" y2="20" /><rect x="9" y="7" width="6" height="10" rx="1" /></svg>
+            </button>
+            <button className="ctx-btn" onClick={() => actions.alignElements(selection, 'distribute-v')} title="Distribute vertically">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="4" y1="4" x2="20" y2="4" /><line x1="4" y1="20" x2="20" y2="20" /><rect x="7" y="9" width="10" height="6" rx="1" /></svg>
+            </button>
             <div className="ctx-divider" />
             <button className="ctx-btn ctx-delete-btn" onClick={() => actions.deleteSelected()} title="Delete selected">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

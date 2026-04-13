@@ -4,6 +4,8 @@
 
 import { useCallback } from 'react';
 import type { EngineNode, Engine } from './canvasTypes';
+import { computeAlignment } from '@/engines/alignElements';
+import type { AlignDirection } from '@/engines/alignElements';
 
 // Color palette for new shapes
 const SHAPE_COLORS: [number, number, number][] = [
@@ -92,6 +94,21 @@ export function useCanvasEngineActions(
         syncState();
     }, [nodes, width, height, syncState]);
 
+    // Multi-element alignment
+    const alignElements = useCallback((ids: number[], direction: AlignDirection) => {
+        const e = engineRef.current; if (!e || ids.length < 2) return;
+        const bounds = ids.map(id => {
+            const n = nodes.find(nd => nd.id === id);
+            return n ? { id: n.id, x: n.x, y: n.y, w: n.w, h: n.h } : null;
+        }).filter(Boolean) as { id: number; x: number; y: number; w: number; h: number }[];
+        if (bounds.length < 2) return;
+        const results = computeAlignment(bounds, direction);
+        for (const r of results) {
+            try { e.set_position(r.id, r.x, r.y); } catch { /* */ }
+        }
+        syncState();
+    }, [nodes, syncState]);
+
     return {
         addRect, addRoundedRect, addEllipse,
         deleteSelected, selectNode, deselectAll,
@@ -99,7 +116,7 @@ export function useCanvasEngineActions(
         bringToFront, sendToBack, bringForward, sendBackward,
         setShadow, removeShadow, setBlendMode,
         setBrightness, setContrast, setSaturation, setHueRotate,
-        addKeyframe, duplicateSelected, alignToCanvas,
+        addKeyframe, duplicateSelected, alignToCanvas, alignElements,
 
     };
 }
