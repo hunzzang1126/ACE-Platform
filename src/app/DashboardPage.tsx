@@ -15,20 +15,22 @@ import { usePlanLimits } from '@/hooks/usePlanLimits';
 import { UpgradeModal, type UpgradeReason } from '@/components/billing/UpgradeModal';
 import { useCloudSync } from '@/hooks/useCloudSync';
 import { CloudSyncIndicator } from '@/components/dashboard/CloudSyncIndicator';
+import { useAppI18n } from '@/i18n';
 
 
 
 
 
-function getGreeting(): string {
+function getGreetingKey(): string {
     const h = new Date().getHours();
-    if (h < 12) return 'Good morning';
-    if (h < 18) return 'Good afternoon';
-    return 'Good evening';
+    if (h < 12) return 'dash.goodMorning';
+    if (h < 18) return 'dash.goodAfternoon';
+    return 'dash.goodEvening';
 }
 
 export function DashboardPage() {
     const navigate = useNavigate();
+    const { t } = useAppI18n();
     const [searchParams, setSearchParams] = useSearchParams();
     const [searchQuery, setSearchQuery] = useState('');
     const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => {
@@ -159,12 +161,12 @@ export function DashboardPage() {
             return;
         }
         const defaultPreset = BANNER_PRESETS[0]!;
-        const csId = createCreativeSet('Untitled Creative Set', defaultPreset);
+        const csId = createCreativeSet(t('dash.untitledCreativeSet'), defaultPreset);
         const now = new Date().toISOString();
         useProjectStore.setState((state) => {
             state.creativeSets.push({
                 id: csId,
-                name: 'Untitled Creative Set',
+                name: t('dash.untitledCreativeSet'),
                 folderId: state.currentFolderId ?? undefined,
                 variantCount: 1,
                 createdAt: now,
@@ -207,17 +209,17 @@ export function DashboardPage() {
                     <div className="dashboard-hero__glass">
                         <div className="dashboard-hero__content">
                             <h1 className="dashboard-hero__title">
-                                <span className="dashboard-hero__greeting">{getGreeting()}</span>, {firstName}
+                                <span className="dashboard-hero__greeting">{t(getGreetingKey())}</span>, {firstName}
                             </h1>
                             <p className="dashboard-hero__subtitle">
-                                {creativeSets.length} project{creativeSets.length !== 1 ? 's' : ''} · {totalSizes} size{totalSizes !== 1 ? 's' : ''}
+                                {creativeSets.length} {creativeSets.length !== 1 ? t('dash.projects') : t('dash.project')} · {totalSizes} {totalSizes !== 1 ? t('dash.sizes') : t('dash.size')}
                             </p>
                         </div>
                         <button className="dashboard-hero__cta" onClick={handleNewCreativeSet}>
                             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                                 <line x1="8" y1="2" x2="8" y2="14" /><line x1="2" y1="8" x2="14" y2="8" />
                             </svg>
-                            New Project
+                            {t('dash.newProject')}
                         </button>
                     </div>
                     <div className="dashboard-hero__orb dashboard-hero__orb--1" />
@@ -243,10 +245,10 @@ export function DashboardPage() {
                     </span>
 
                     {isAdmin ? (
-                        <span style={{ color: '#d97706', fontWeight: 600 }}>Unlimited Access</span>
+                        <span style={{ color: '#d97706', fontWeight: 600 }}>{t('dash.unlimitedAccess')}</span>
                     ) : (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
-                            <span style={{ color: '#64748b', fontSize: 12, whiteSpace: 'nowrap' as const }}>AI Tokens</span>
+                            <span style={{ color: '#64748b', fontSize: 12, whiteSpace: 'nowrap' as const }}>{t('dash.aiTokens')}</span>
                             <div style={{ width: 120, height: 6, borderRadius: 3, background: 'rgba(0,0,0,0.06)', overflow: 'hidden' }}>
                                 <div style={{
                                     width: `${Math.min(100, aiUsagePercent)}%`, height: '100%', borderRadius: 3,
@@ -255,7 +257,7 @@ export function DashboardPage() {
                                 }} />
                             </div>
                             <span style={{ color: aiUsagePercent > 80 ? 'var(--error)' : 'var(--text-primary)', fontWeight: 600, fontSize: 12 }}>
-                                {remainingTokens.toLocaleString()} left
+                                {remainingTokens.toLocaleString()} {t('dash.left')}
                             </span>
                         </div>
                     )}
@@ -271,7 +273,7 @@ export function DashboardPage() {
                         onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent-muted)'; }}
                         onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}
                     >
-                        {isStarter ? 'Upgrade' : 'Manage Plan'}
+                        {isStarter ? t('dash.upgrade') : t('dash.managePlan')}
                     </button>
                 </div>
 
@@ -284,7 +286,7 @@ export function DashboardPage() {
                     </svg>
                     <input
                         className="dashboard-search-bar__input"
-                        placeholder="Search projects..."
+                        placeholder={t('dash.searchProjects')}
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
                     />
@@ -292,7 +294,7 @@ export function DashboardPage() {
                         <button
                             className={`dashboard-view-toggle__btn ${viewMode === 'grid' ? 'active' : ''}`}
                             onClick={() => handleViewChange('grid')}
-                            title="Grid view"
+                            title={t('dash.gridView')}
                         >
                             <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
                                 <rect x="1" y="1" width="6" height="6" rx="1" />
@@ -304,7 +306,7 @@ export function DashboardPage() {
                         <button
                             className={`dashboard-view-toggle__btn ${viewMode === 'list' ? 'active' : ''}`}
                             onClick={() => handleViewChange('list')}
-                            title="List view"
+                            title={t('dash.listView')}
                         >
                             <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
                                 <rect x="1" y="2" width="14" height="2" rx="0.5" />
@@ -319,7 +321,7 @@ export function DashboardPage() {
                 <div className="dashboard-content">
                     {displayFolders.length > 0 && (
                         <div className="dashboard-section">
-                            <h2 className="dashboard-section__title">Folders</h2>
+                            <h2 className="dashboard-section__title">{t('dash.folders')}</h2>
                             <div className="project-grid">
                                 {displayFolders.map(folder => (
                                     <div key={folder.id} className="folder-card" onDoubleClick={() => handleOpenFolder(folder.id)}>
@@ -333,7 +335,7 @@ export function DashboardPage() {
 
                     <div className="dashboard-section">
                         <h2 className="dashboard-section__title">
-                            {currentFolderId ? 'Projects' : 'All Projects'}
+                            {currentFolderId ? t('dash.projectsInFolder') : t('dash.allProjects')}
                         </h2>
                         {isEmpty ? (
                             <div className="dashboard-empty">
@@ -343,9 +345,9 @@ export function DashboardPage() {
                                         <line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" />
                                     </svg>
                                 </div>
-                                <p>No projects yet</p>
+                                <p>{t('dash.noProjectsYet')}</p>
                                 <button className="dashboard-empty__btn" onClick={handleNewCreativeSet}>
-                                    Create your first project
+                                    {t('dash.createFirstProject')}
                                 </button>
                             </div>
                         ) : (

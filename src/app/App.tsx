@@ -2,6 +2,7 @@
 // App.tsx – Router + Global Components
 // ─────────────────────────────────────────────────
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { AppI18nProvider } from '@/i18n';
 
 // Cloud Sync
 import { useCloudSync } from '@/hooks/useCloudSync';
@@ -41,6 +42,7 @@ function CloudSyncProvider() {
 export default function App() {
     return (
         <ErrorBoundary>
+            <AppI18nProvider>
             <BrowserRouter>
                 <CloudSyncProvider />
                 <Routes>
@@ -119,6 +121,7 @@ export default function App() {
                 </Routes>
                 <ToastContainer />
             </BrowserRouter>
+            </AppI18nProvider>
         </ErrorBoundary>
     );
 }
