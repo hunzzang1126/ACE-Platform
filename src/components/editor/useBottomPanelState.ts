@@ -68,14 +68,25 @@ export function useBottomPanelState(
         setBarDrag({ elementId, mode, startX: e.clientX, origStart: config.startTime, origEnd: resolvedEnd });
     }, [animPresets, duration, overlayElements, nodes, DEFAULT_DURATION]);
 
+    // ★ Refs for values used inside mousemove/mouseup to avoid listener churn.
+    // Same pattern fix as useOverlayInteractions rotation stuck bug (v511).
+    const durationRef = useRef(duration);
+    durationRef.current = duration;
+    const animPresetsRef = useRef(animPresets);
+    animPresetsRef.current = animPresets;
+    const engineRef = useRef(engine);
+    engineRef.current = engine;
+    const recalcDurationRef = useRef(recalcDuration);
+    recalcDurationRef.current = recalcDuration;
+
     useEffect(() => {
         if (!barDrag) return;
         const container = timelineBarsRef.current;
         if (!container) return;
         const containerWidth = container.clientWidth;
-        const pxToTime = (px: number) => (px / containerWidth) * duration;
         const MIN_BAR = 0.1;
         const handleMove = (e: MouseEvent) => {
+            const pxToTime = (px: number) => (px / containerWidth) * durationRef.current;
             const dx = e.clientX - barDrag.startX;
             const dt = pxToTime(dx);
             let newStart = barDrag.origStart, newEnd = barDrag.origEnd;
@@ -92,10 +103,10 @@ export function useBottomPanelState(
                 // Allow extending past current duration up to MAX_DURATION
                 newEnd = Math.min(MAX_DURATION, Math.max(barDrag.origStart + MIN_BAR, barDrag.origEnd + dt));
             }
-            animPresets.setTiming(barDrag.elementId, newStart, newEnd);
+            animPresetsRef.current.setTiming(barDrag.elementId, newStart, newEnd);
             // ★ AE model: re-apply visibility after timing change so Fabric
             // hides/shows elements based on their new in/out points.
-            try { engine?.anim_seek(engine.anim_time?.()); } catch { /* ok */ }
+            try { engineRef.current?.anim_seek(engineRef.current.anim_time?.()); } catch { /* ok */ }
             // Auto-extend/shrink duration in real-time during drag
             const store = useAnimPresetStore.getState();
             const allBarIds = [...overlayElements.map(el => el.id), ...nodes.map(n => String(n.id))];
@@ -109,19 +120,19 @@ export function useBottomPanelState(
             // Use functional setState to avoid stale closure — always compare latest
             setDuration(prev => {
                 if (Math.abs(targetDur - prev) > 0.01) {
-                    try { engine?.set_duration(targetDur); } catch { /* ok */ }
+                    try { engineRef.current?.set_duration(targetDur); } catch { /* ok */ }
                     return targetDur;
                 }
                 return prev;
             });
         };
-        const handleUp = () => { setBarDrag(null); document.body.style.cursor = ''; document.body.style.userSelect = ''; recalcDuration(); };
+        const handleUp = () => { setBarDrag(null); document.body.style.cursor = ''; document.body.style.userSelect = ''; recalcDurationRef.current(); };
         document.body.style.cursor = barDrag.mode === 'move' ? 'grabbing' : 'ew-resize';
         document.body.style.userSelect = 'none';
         document.addEventListener('mousemove', handleMove);
         document.addEventListener('mouseup', handleUp);
         return () => { document.removeEventListener('mousemove', handleMove); document.removeEventListener('mouseup', handleUp); };
-    }, [barDrag, duration, animPresets, MAX_DURATION, engine, recalcDuration]);
+    }, [barDrag]); // ★ Only barDrag triggers re-registration (null→drag or drag→null)
 
     // ── Engine sync ──
     const syncTime = useCallback(() => {
