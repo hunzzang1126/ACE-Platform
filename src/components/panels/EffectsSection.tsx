@@ -4,6 +4,7 @@
 // ─────────────────────────────────────────────────
 import { useState, useCallback, useEffect } from 'react';
 import type { CanvasEngineActions } from '@/hooks/useCanvasEngine';
+import { useAppI18n } from '@/i18n';
 
 interface Props {
     nodeId: number;
@@ -16,6 +17,7 @@ const BLEND_MODES = [
 ];
 
 export function EffectsSection({ nodeId, actions }: Props) {
+    const { t } = useAppI18n();
     // Shadow state
     const [shadowEnabled, setShadowEnabled] = useState(false);
     const [shadowX, setShadowX] = useState(4);
@@ -59,7 +61,7 @@ export function EffectsSection({ nodeId, actions }: Props) {
         <>
             {/* Blend Mode */}
             <div className="ed-props-section">
-                <div className="ed-props-section-label">Blend Mode</div>
+                <div className="ed-props-section-label">{t('editor.blendMode')}</div>
                 <select
                     className="ed-props-select"
                     value={blendMode}
@@ -76,7 +78,7 @@ export function EffectsSection({ nodeId, actions }: Props) {
             {/* Drop Shadow */}
             <div className="ed-props-section">
                 <div className="ed-props-section-header-row">
-                    <span className="ed-props-section-label">Drop Shadow</span>
+                    <span className="ed-props-section-label">{t('editor.dropShadow')}</span>
                     <label className="ed-props-toggle">
                         <input
                             type="checkbox"
@@ -97,12 +99,12 @@ export function EffectsSection({ nodeId, actions }: Props) {
 
             {/* Filters */}
             <div className="ed-props-section">
-                <div className="ed-props-section-label">Adjustments</div>
+                <div className="ed-props-section-label">{t('editor.adjustments')}</div>
                 <div className="ed-props-effects-grid">
-                    <EffectSlider label="Brightness" value={brightness} min={0} max={200} suffix="%" onChange={(v) => { setBrightness(v); actions.setBrightness(nodeId, v / 100); }} />
-                    <EffectSlider label="Contrast" value={contrast} min={0} max={200} suffix="%" onChange={(v) => { setContrast(v); actions.setContrast(nodeId, v / 100); }} />
-                    <EffectSlider label="Saturation" value={saturation} min={0} max={200} suffix="%" onChange={(v) => { setSaturation(v); actions.setSaturation(nodeId, v / 100); }} />
-                    <EffectSlider label="Hue" value={hueRotate} min={0} max={360} suffix="°" onChange={(v) => { setHueRotate(v); actions.setHueRotate(nodeId, v); }} />
+                    <EffectSlider label={t('editor.brightness')} value={brightness} min={0} max={200} suffix="%" onChange={(v) => { setBrightness(v); actions.setBrightness(nodeId, v / 100); }} />
+                    <EffectSlider label={t('editor.contrast')} value={contrast} min={0} max={200} suffix="%" onChange={(v) => { setContrast(v); actions.setContrast(nodeId, v / 100); }} />
+                    <EffectSlider label={t('editor.saturation')} value={saturation} min={0} max={200} suffix="%" onChange={(v) => { setSaturation(v); actions.setSaturation(nodeId, v / 100); }} />
+                    <EffectSlider label={t('editor.hueRotate')} value={hueRotate} min={0} max={360} suffix="°" onChange={(v) => { setHueRotate(v); actions.setHueRotate(nodeId, v); }} />
                 </div>
             </div>
         </>

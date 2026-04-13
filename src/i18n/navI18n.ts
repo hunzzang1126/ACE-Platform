@@ -13,6 +13,9 @@ registerTranslations('nav', {
         settings: 'Settings',
         admin: 'Admin',
         user: 'User',
+        dashboard: 'Dashboard',
+        creativeSet: 'Creative Set',
+        canvasEditor: 'Canvas Editor',
     },
     ko: {
         projects: '프로젝트',
@@ -23,6 +26,9 @@ registerTranslations('nav', {
         settings: '설정',
         admin: '관리자',
         user: '사용자',
+        dashboard: '대시보드',
+        creativeSet: '크리에이티브 셋',
+        canvasEditor: '캔버스 에디터',
     },
     ja: {
         projects: 'プロジェクト',
@@ -33,6 +39,9 @@ registerTranslations('nav', {
         settings: '設定',
         admin: '管理者',
         user: 'ユーザー',
+        dashboard: 'ダッシュボード',
+        creativeSet: 'クリエイティブセット',
+        canvasEditor: 'キャンバスエディター',
     },
     zh: {
         projects: '项目',
@@ -43,6 +52,9 @@ registerTranslations('nav', {
         settings: '设置',
         admin: '管理员',
         user: '用户',
+        dashboard: '仪表板',
+        creativeSet: '创意集',
+        canvasEditor: '画布编辑器',
     },
     es: {
         projects: 'Proyectos',
@@ -53,6 +65,9 @@ registerTranslations('nav', {
         settings: 'Configuración',
         admin: 'Admin',
         user: 'Usuario',
+        dashboard: 'Panel',
+        creativeSet: 'Conjunto Creativo',
+        canvasEditor: 'Editor de Canvas',
     },
     fr: {
         projects: 'Projets',
@@ -63,6 +78,9 @@ registerTranslations('nav', {
         settings: 'Paramètres',
         admin: 'Admin',
         user: 'Utilisateur',
+        dashboard: 'Tableau de bord',
+        creativeSet: 'Ensemble Créatif',
+        canvasEditor: 'Éditeur de Canevas',
     },
     de: {
         projects: 'Projekte',
@@ -73,6 +91,9 @@ registerTranslations('nav', {
         settings: 'Einstellungen',
         admin: 'Admin',
         user: 'Benutzer',
+        dashboard: 'Dashboard',
+        creativeSet: 'Kreativ-Set',
+        canvasEditor: 'Canvas-Editor',
     },
     pt: {
         projects: 'Projetos',
@@ -83,6 +104,9 @@ registerTranslations('nav', {
         settings: 'Configurações',
         admin: 'Admin',
         user: 'Usuário',
+        dashboard: 'Painel',
+        creativeSet: 'Conjunto Criativo',
+        canvasEditor: 'Editor de Canvas',
     },
     it: {
         projects: 'Progetti',
@@ -93,6 +117,9 @@ registerTranslations('nav', {
         settings: 'Impostazioni',
         admin: 'Admin',
         user: 'Utente',
+        dashboard: 'Pannello',
+        creativeSet: 'Set Creativo',
+        canvasEditor: 'Editor Canvas',
     },
     th: {
         projects: 'โปรเจกต์',
@@ -103,5 +130,8 @@ registerTranslations('nav', {
         settings: 'ตั้งค่า',
         admin: 'ผู้ดูแล',
         user: 'ผู้ใช้',
+        dashboard: 'แดชบอร์ด',
+        creativeSet: 'ชุดครีเอทีฟ',
+        canvasEditor: 'ตัวแก้ไขแคนวาส',
     },
 });

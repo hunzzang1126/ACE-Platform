@@ -12,3 +12,5 @@ import './dashboardI18n';
 import './navI18n';
 import './settingsI18n';
 import './sizeI18n';
+import './aiI18n';
+import './editorI18n';

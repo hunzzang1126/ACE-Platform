@@ -10,6 +10,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useUnifiedAgent, type AgentIntent } from '@/hooks/useUnifiedAgent';
 import { getModelForRole, type AceModelRole } from '@/services/modelRouter';
 import { useAuthStore } from '@/stores/authStore';
+import { useAppI18n } from '@/i18n';
 import { IcSend, IcClose, IcChevronRight, IcError } from '@/components/ui/Icons';
 import { ActionCardInline, ThinkingCard, ImageGalleryCard, ModelDropdown } from './AiPanelCards';
 import {
@@ -26,12 +27,8 @@ const INTENT_LABELS: Record<AgentIntent, string> = {
     scan: 'Scanning design',
 };
 
-const QUICK_ACTIONS = [
-    { id: 'generate', label: 'Generate', hint: 'Create a new design from a prompt' },
-    { id: 'scan', label: 'Scan Design', hint: 'Drop a screenshot to recreate' },
-] as const;
-
 export function GlobalAiPanel() {
+    const { t } = useAppI18n();
     const [open, setOpen] = useState(false);
     const [showDropZone, setShowDropZone] = useState(false);
     const [selectedRole, setSelectedRole] = useState<AceModelRole>('design');
@@ -50,7 +47,7 @@ export function GlobalAiPanel() {
     const agent = useUnifiedAgent({ navigate, selectedRole });
 
     const currentPage = location.pathname.startsWith('/editor/detail') ? 'detail' : location.pathname === '/editor' ? 'editor' : 'dashboard';
-    const contextLabel = currentPage === 'dashboard' ? 'Dashboard' : currentPage === 'editor' ? 'Creative Set' : 'Canvas Editor';
+    const contextLabel = currentPage === 'dashboard' ? t('nav.dashboard') : currentPage === 'editor' ? t('nav.creativeSet') : t('nav.canvasEditor');
     const isBusy = agent.state.phase !== 'idle' && agent.state.phase !== 'done' && agent.state.phase !== 'error';
 
     // ── Cmd+K Toggle ──
@@ -97,9 +94,14 @@ export function GlobalAiPanel() {
 
     const handleSend = useCallback(() => { agent.send(); }, [agent]);
 
+    const quickActions = [
+        { id: 'generate', label: t('ai.generate'), hint: t('ai.generateHint') },
+        { id: 'scan', label: t('ai.scanDesign'), hint: t('ai.scanHint') },
+    ];
+
     return (
         <div style={{ ...wrapperStyle, width: open ? PANEL_WIDTH : 32 }}>
-            <button onClick={() => { setOpen(!open); setTimeout(() => inputRef.current?.focus(), 150); }} style={toggleBtnStyle} title={open ? 'Close AI (Cmd+K)' : 'Open AI (Cmd+K)'}>
+            <button onClick={() => { setOpen(!open); setTimeout(() => inputRef.current?.focus(), 150); }} style={toggleBtnStyle} title={open ? `${t('ai.closeAi')} (Cmd+K)` : `${t('ai.openAi')} (Cmd+K)`}>
                 {open ? <IcChevronRight size={14} color="#64748b" /> : <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: -0.5, background: 'linear-gradient(135deg, #ff6b6b, #ee5a9f, #8b5cf6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>G</span>}
             </button>
 
@@ -109,11 +111,11 @@ export function GlobalAiPanel() {
                     <div style={headerStyle}>
                         <span style={glidLogoStyle}>G</span>
                         <div style={{ flex: 1 }}>
-                            <div style={{ fontWeight: 600, fontSize: 13, color: '#1e293b', letterSpacing: -0.3 }}>GLID AI</div>
+                            <div style={{ fontWeight: 600, fontSize: 13, color: '#1e293b', letterSpacing: -0.3 }}>{t('ai.title')}</div>
                             <div style={{ fontSize: 10, color: '#64748b', marginTop: 1 }}>{contextLabel}</div>
                         </div>
-                        <button onClick={() => agent.clearChat()} style={headerBtnStyle} title="New conversation"><span style={{ fontSize: 12, color: '#64748b' }}>+</span></button>
-                        <button onClick={() => setOpen(false)} style={headerBtnStyle} title="Close (Esc)"><IcClose size={14} color="#64748b" /></button>
+                        <button onClick={() => agent.clearChat()} style={headerBtnStyle} title={t('ai.newConversation')}><span style={{ fontSize: 12, color: '#64748b' }}>+</span></button>
+                        <button onClick={() => setOpen(false)} style={headerBtnStyle} title={`${t('ai.close')} (Esc)`}><IcClose size={14} color="#64748b" /></button>
                     </div>
 
                     {/* Messages */}
@@ -121,15 +123,15 @@ export function GlobalAiPanel() {
                         {agent.messages.length === 0 && agent.state.phase === 'idle' && (
                             <div style={emptyStyle}>
                                 <span style={glidLogoLargeStyle}>GLID</span>
-                                <div style={{ marginTop: 16, fontSize: 14, fontWeight: 500, color: '#1e293b' }}>What would you like to create?</div>
-                                <div style={{ fontSize: 12, color: '#64748b', marginTop: 6, lineHeight: 1.5 }}>Design social creatives, ads, landing pages, or any visual format. Drop a screenshot to reverse-engineer an existing design.</div>
+                                <div style={{ marginTop: 16, fontSize: 14, fontWeight: 500, color: '#1e293b' }}>{t('ai.whatCreate')}</div>
+                                <div style={{ fontSize: 12, color: '#64748b', marginTop: 6, lineHeight: 1.5 }}>{t('ai.description')}</div>
                                 <div style={quickActionsStyle}>
-                                    {QUICK_ACTIONS.map(action => (<button key={action.id} onClick={() => handleQuickAction(action.id)} style={quickActionBtnStyle}><span style={{ fontSize: 12, fontWeight: 500, color: '#1e293b' }}>{action.label}</span><span style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>{action.hint}</span></button>))}
+                                    {quickActions.map(action => (<button key={action.id} onClick={() => handleQuickAction(action.id)} style={quickActionBtnStyle}><span style={{ fontSize: 12, fontWeight: 500, color: '#1e293b' }}>{action.label}</span><span style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>{action.hint}</span></button>))}
                                 </div>
                             </div>
                         )}
 
-                        {showDropZone && (<div style={dropOverlayStyle}><div style={{ fontSize: 14, fontWeight: 500, color: '#7c3aed' }}>Drop screenshot to scan</div><div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>AI will extract all elements as editable layers</div></div>)}
+                        {showDropZone && (<div style={dropOverlayStyle}><div style={{ fontSize: 14, fontWeight: 500, color: '#7c3aed' }}>{t('ai.dropToScan')}</div><div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>{t('ai.dropHint')}</div></div>)}
 
                         {agent.messages.map((m, i) => {
                             if (m.role === 'user') return <div key={i} style={userBubbleStyle}>{m.content}</div>;
@@ -150,12 +152,12 @@ export function GlobalAiPanel() {
                                 <span style={{ fontSize: 11, color: '#1e293b', fontWeight: 500 }}>{activeModel.name}</span>
                                 <IcChevronRight size={10} color="#94a3b8" />
                             </button>
-                            <button onClick={() => fileInputRef.current?.click()} style={{ ...headerBtnStyle, marginLeft: 'auto' }} title="Scan a screenshot"><span style={{ fontSize: 11, color: '#64748b' }}>Scan</span></button>
+                            <button onClick={() => fileInputRef.current?.click()} style={{ ...headerBtnStyle, marginLeft: 'auto' }} title={t('ai.scanScreenshot')}><span style={{ fontSize: 11, color: '#64748b' }}>{t('ai.scan')}</span></button>
                             <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFileInput} />
                         </div>
                         {showModelDropdown && <ModelDropdown selectedRole={selectedRole} onSelect={(role) => { setSelectedRole(role); setShowModelDropdown(false); }} />}
                         <div style={inputAreaStyle}>
-                            <input ref={inputRef} value={agent.input} onChange={e => agent.setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }} placeholder="Ask anything about your creative..." disabled={isBusy} style={inputFieldStyle} />
+                            <input ref={inputRef} value={agent.input} onChange={e => agent.setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }} placeholder={t('ai.askAnything')} disabled={isBusy} style={inputFieldStyle} />
                             <button onClick={handleSend} disabled={!agent.input.trim() || isBusy} style={{ ...sendBtnStyle, opacity: !agent.input.trim() || isBusy ? 0.4 : 1 }}><IcSend size={14} color="#fff" /></button>
                         </div>
                     </div>
