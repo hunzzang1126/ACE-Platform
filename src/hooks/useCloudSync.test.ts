@@ -1,8 +1,8 @@
 // ─────────────────────────────────────────────────
-// useCloudSync.test.ts — Cloud sync hook tests
+// useCloudSync.test.ts — Cloud-first sync hook tests
 // ─────────────────────────────────────────────────
-// Covers: login sync, IDB hydration wait, store subscriptions,
-// push debouncing, migration check, cloud-enabled guard
+// Covers: cloud-first read, IDB hydration wait, store subscriptions,
+// push debouncing, migration check, offline fallback
 // ─────────────────────────────────────────────────
 
 import { describe, it, expect } from 'vitest';
@@ -18,6 +18,14 @@ describe('useCloudSync — hook export', () => {
 
     it('returns isSyncing state', () => {
         expect(src).toContain('isSyncing');
+    });
+
+    it('returns syncStatus state', () => {
+        expect(src).toContain('syncStatus');
+    });
+
+    it('exports CloudSyncStatus type', () => {
+        expect(src).toContain('export type CloudSyncStatus');
     });
 });
 
@@ -42,17 +50,37 @@ describe('useCloudSync — IDB hydration', () => {
     });
 });
 
-describe('useCloudSync — migration', () => {
-    it('checks if migration is done', () => {
+describe('★ Cloud-first architecture (v514)', () => {
+    it('uses fullSync to read from cloud first', () => {
+        expect(src).toContain('fullSync(userId)');
+    });
+
+    it('cloud data is source of truth — iterated first', () => {
+        // Cloud data should be applied first, local-only added after
+        expect(src).toContain('Start with cloud data (source of truth)');
+    });
+
+    it('detects local-only creative sets and pushes them', () => {
+        expect(src).toContain('localOnlyCS');
+        expect(src).toContain('local-only creative sets');
+    });
+
+    it('falls back to local cache when offline', () => {
+        expect(src).toContain('Cloud pull failed — using local cache');
+        expect(src).toContain("setSyncStatus('offline')");
+    });
+
+    it('sets synced status on success', () => {
+        expect(src).toContain("setSyncStatus('synced')");
+    });
+
+    it('sets error status on failure', () => {
+        expect(src).toContain("setSyncStatus('error')");
+    });
+
+    it('still runs migration for first-time users', () => {
         expect(src).toContain('isMigrationDone');
-    });
-
-    it('runs migration when needed', () => {
         expect(src).toContain('runMigration');
-    });
-
-    it('calls syncOnLogin', () => {
-        expect(src).toContain('syncOnLogin');
     });
 });
 
@@ -79,6 +107,18 @@ describe('useCloudSync — store subscriptions', () => {
     });
 });
 
+describe('useCloudSync — anti-resurrection guard', () => {
+    it('filters trashed items before applying merged data', () => {
+        expect(src).toContain('ANTI-RESURRECTION GUARD');
+        expect(src).toContain('trashedIds');
+    });
+
+    it('uses applyMergedData helper', () => {
+        expect(src).toContain('function applyMergedData');
+        expect(src).toContain('applyMergedData(');
+    });
+});
+
 describe('useCloudSync — error handling', () => {
     it('catches sync errors without crashing', () => {
         expect(src).toContain('catch');
@@ -89,3 +129,4 @@ describe('useCloudSync — error handling', () => {
         expect(src).toContain('setIsSyncing(false)');
     });
 });
+

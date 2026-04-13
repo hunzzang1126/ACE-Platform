@@ -116,17 +116,28 @@ export const useProjectStore = create<ProjectState>()(
 
             createCreativeSet: (name) => {
                 const id = uuid();
+                const now = new Date().toISOString();
+                const summary: CreativeSetSummary = {
+                    id,
+                    name,
+                    folderId: useProjectStore.getState().currentFolderId ?? undefined,
+                    variantCount: 1,
+                    createdAt: now,
+                    updatedAt: now,
+                    createdBy: '',
+                };
                 set((state) => {
-                    state.creativeSets.push({
-                        id,
-                        name,
-                        folderId: state.currentFolderId ?? undefined,
-                        variantCount: 1,
-                        createdAt: new Date().toISOString(),
-                        updatedAt: new Date().toISOString(),
-                        createdBy: 'Young An',
-                    });
+                    state.creativeSets.push(summary);
                 });
+
+                // ★ Cloud-first: push immediately (not debounced) so other devices see it
+                import('@/services/cloudSync').then(({ pushProject }) => {
+                    import('@/stores/authStore').then(({ useAuthStore }) => {
+                        const userId = useAuthStore.getState().user?.id;
+                        if (userId) pushProject(userId, summary);
+                    });
+                }).catch(() => { /* offline — will sync later */ });
+
                 return id;
             },
 

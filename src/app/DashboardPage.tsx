@@ -13,6 +13,8 @@ import { IcFolder } from '@/components/ui/Icons';
 import { APP_VERSION } from '@/version';
 import { usePlanLimits } from '@/hooks/usePlanLimits';
 import { UpgradeModal, type UpgradeReason } from '@/components/billing/UpgradeModal';
+import { useCloudSync } from '@/hooks/useCloudSync';
+import { CloudSyncIndicator } from '@/components/dashboard/CloudSyncIndicator';
 
 
 
@@ -68,6 +70,7 @@ export function DashboardPage() {
 
     // ★ Plan enforcement
     const { canCreateSet, remainingSets, planName, remainingTokens, limits, isStarter, isAdmin, aiUsagePercent } = usePlanLimits();
+    const { syncStatus } = useCloudSync();
     const allSetsCount = useDesignStore(s => Object.keys(s.allCreativeSets).length);
     const [upgradeModal, setUpgradeModal] = useState<{ open: boolean; reason: UpgradeReason }>({
         open: false, reason: 'creative_set_limit',
@@ -367,8 +370,9 @@ export function DashboardPage() {
                 </div>
 
 
-                {/* Version Footer */}
+                {/* Version Footer + Sync Status */}
                 <footer className="dashboard-footer">
+                    <CloudSyncIndicator status={syncStatus} />
                     <span className="dashboard-footer__version">{APP_VERSION}</span>
                 </footer>
             </main>
