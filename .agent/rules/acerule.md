@@ -32,13 +32,21 @@ trigger: always_on
 
 # ACE PLATFORM IDENTITY — READ THIS FIRST
 
-> **ACE is a FULL CREATIVE PLATFORM — NOT a banner tool.**
-> Banners and banner resizing are ONE supplementary feature.
-> ACE enables creation of: social media creatives, video ads, static landing pages,
-> display banners, rich media, and ANY visual creative format.
+> **ACE is an AI AD CREATIVE PLATFORM.**
+> Year 1 focus: Display Ads, Social Ads, Video Ads.
+> Year 2 expansion: Social media creatives, broader formats.
+> The killer differentiator is: **AI designs it → Smart Sizing scales it to 50 sizes.**
+>
+> **Positioning hierarchy:**
+> - ❌ "Banner tool" — too narrow, 2010s feel
+> - ❌ "Full Creative Platform" — overpromises vs. current reality, competes with Canva/Figma
+> - ✅ **"AI Ad Creative Platform"** — clear niche, clear buyer (agencies, performance marketers)
+>
 > NEVER refer to ACE as a "banner editor" or "banner tool" in code, comments, or UI.
-> The AI agent, design engine, and all features must be built with this
-> platform-level ambition in mind. Think Figma + Pencil.dev, not BannerFlow.
+> In code: prefer `creative`, `size`, `variant` over `banner`. Example:
+> `BANNER_PRESETS` → `SIZE_PRESETS`, `BannerVariant` → `SizeVariant`
+>
+> Think Creatopy + AI superpowers, not Figma competitor.
 
 ---
 
@@ -105,6 +113,60 @@ trigger: always_on
 
 ---
 
+# EDITOR FEATURE STABILITY — 6-STEP VERIFICATION (ABSOLUTE RULE)
+
+> **Every editor feature (new or modified) MUST pass ALL 6 checks before merge.**
+> Skipping any step risks data loss, rendering desync, or export corruption.
+> **A broken feature is worse than no feature. Stability > Speed.**
+>
+> 1. **Canvas Editor**: Feature works correctly in the Fabric.js editor
+> 2. **Save → Restore**: Save → exit → re-enter → **pixel-identical restoration**
+> 3. **Size Preview Grid**: Element appears correctly in SizePreviewGrid (`constraintsToAbsolute()`)
+> 4. **Export (PNG/HTML5)**: Exported output matches canvas exactly
+> 5. **Admin Template Editor**: Feature works identically when editing a global template.
+>    Template save logic (`overrideTemplate`) must NOT corrupt data.
+> 6. **Single Resolver**: ALL views use `constraintsToAbsolute()` from `elementConverters.ts`.
+>    NEVER create a second resolver function. One function = zero drift.
+>
+> **If ANY check fails → do NOT merge. Fix first.**
+> **If a feature cannot satisfy all 6 checks → defer it. Do not ship broken.**
+
+---
+
+# API KEY SECURITY — NO CLIENT-SIDE SECRETS (ABSOLUTE RULE)
+
+> **NEVER expose API keys in client-side code.**
+> `VITE_*` environment variables are bundled into the browser build and visible to anyone.
+> All third-party API calls (OpenRouter, image generation, etc.) MUST go through:
+>   - Supabase Edge Functions, OR
+>   - A backend server proxy
+>
+> **Current violation**: `VITE_OPENROUTER_API_KEY` is in the client bundle.
+> **Remediation**: Task 6-1 (Server Proxy) — until completed, this is a known risk.
+> **After fix**: No `VITE_*` variable should contain an API secret. Only public keys (Supabase anon key, Stripe publishable key) are acceptable in `VITE_*`.
+
+---
+
+# TEMPLATE MARKETPLACE QUALITY GATE (RULE)
+
+> **User-submitted templates MUST pass a 2-stage curation:**
+>
+> **Gate 1 — AI Quality Score (Automated)**:
+> - Use `creativeScore.ts` / `designScoreEngine.ts` (already built)
+> - Minimum score: **70/100** to proceed
+> - Auto-reject triggers: text overlap, insufficient contrast, empty canvas, resolution below threshold
+> - On rejection: show actionable feedback ("Improve text contrast", "Elements are overlapping")
+>
+> **Gate 2 — Admin Approval (Manual)**:
+> - Only templates passing Gate 1 appear in the Admin review queue
+> - Admin can Approve / Reject with optional feedback
+> - Approved templates go live in the marketplace
+>
+> **Never allow unvetted user content into the public template library.**
+> Bad templates = users lose trust in the platform = churn.
+
+---
+
 # ACE Project Rules (North America Target)
 
 0. **Sync Consistency — HIGHEST PRIORITY**:
@@ -112,15 +174,16 @@ trigger: always_on
 
 1. **Role Separation**: Strictly follow the Single Responsibility Principle. A file can have 300-600 lines ONLY IF it serves a single, cohesive purpose. Mixing UI, API, and Canvas logic in one file is strictly prohibited.
 2. **Modular Hooks**: Extract all logic into Custom Hooks. Components must remain "thin" and focus on rendering.
-3. **Language**: The entire UI must be in English. No Korean text in the production code.
+3. **Language / i18n**: All UI text must use the global i18n system (`useAppI18n()` hook). **No hardcoded English strings in JSX.** The user's onboarding language selection determines the ENTIRE platform language — dashboard, editor, panels, AI agent responses, toast messages, everything. The AI agent must receive the current language and respond in that language.
 4. **No Emojis in UI — ABSOLUTE RULE**: **ZERO emoji characters** in any UI label, button, title, placeholder, status message, badge, or notification. This is a professional tool — emojis look cheap and instantly degrade product quality. Use clean typography, geometric SVG icons, or simple text characters (·, +, ×) instead. **No exceptions. Ever.** Reference: Apple, Figma, Linear — none use emojis in their product UI. ACE must meet the same standard.
-4. **Project Structure**:
+5. **Project Structure**:
    - `main.py` / `App.tsx`: Entry points only.
    - `/components`: Pure UI elements.
    - `/hooks`: Business logic and state orchestration.
-   - `/engines`: PixiJS & Canvas manipulation.
+   - `/engines`: Fabric.js & Canvas manipulation.
    - `/schemas`: Zod or Type definitions.
-5. **AI Integration**: Design interactions as JSON-based tools. Every AI-driven layout change must be verifiable via vision-check logic.
+   - `/i18n`: Translation files and i18n hooks.
+6. **AI Integration**: Design interactions as JSON-based tools. Keep the AI pipeline **simple but smart** — avoid over-engineering. Existing `designStyleGuides.ts` + `goldenExamples` are sufficient for design quality. No additional "Design Recipe DB" layers unless proven necessary by repeated failures.
 
 6. **Proactive QA Sweep (매 작업 후 필수)**:
    After implementing ANY significant change (bug fix, feature, refactor), run a **full exploratory QA sweep** via browser before considering the task complete. Test like a real user — not just the changed feature, but ALL connected flows.
