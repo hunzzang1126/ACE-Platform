@@ -30,6 +30,8 @@ export interface ExportOptions {
     loop?: boolean;
     /** Title for <title> tag */
     title?: string;
+    /** Show 'Powered by Glid' watermark (Creator plan) */
+    watermark?: boolean;
 }
 
 export interface ExportResult {
@@ -58,6 +60,7 @@ export function exportToHtml5(
         duration = 5,
         loop = false,
         title = 'Glid Banner',
+        watermark = false,
     } = options;
 
     // Get animation presets from store
@@ -88,7 +91,7 @@ export function exportToHtml5(
     // Assemble full HTML
     const html = buildHtmlDocument({
         width, height, backgroundColor, clickTagUrl,
-        title, keyframeBlocks, elementHtml, duration, loop,
+        title, keyframeBlocks, elementHtml, duration, loop, watermark,
     });
 
     const blob = new Blob([html], { type: 'text/html' });
@@ -272,6 +275,7 @@ interface BuildOptions {
     elementHtml: string[];
     duration: number;
     loop: boolean;
+    watermark: boolean;
 }
 
 function buildHtmlDocument(opts: BuildOptions): string {
@@ -322,6 +326,7 @@ ${opts.keyframeBlocks.join('\n')}
 <div id="ace-banner">
 ${opts.elementHtml.join('\n')}
   <div id="ace-clickarea"></div>
+${opts.watermark ? `  <div style="position:absolute;bottom:4px;right:6px;font-size:9px;color:rgba(0,0,0,0.25);font-family:system-ui,sans-serif;pointer-events:none;z-index:9998">Powered by Glid</div>` : ''}
 </div>
 ${clickTagScript}
 </body>

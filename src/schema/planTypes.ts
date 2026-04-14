@@ -43,7 +43,7 @@ export interface PlanInfo {
 export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
     starter: {
         maxCreativeSets: 3,
-        aiTokensPerMonth: 10, // 10 AI generations/month (Sonnet 4)
+        aiTokensPerMonth: 20, // 20 AI generations/month (Sonnet 4) — bumped from 10
         allowedModels: ['anthropic/claude-sonnet-4'],
         defaultModel: 'anthropic/claude-sonnet-4',
         maxVariantsPerSet: 3,
@@ -56,10 +56,10 @@ export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
         aiTokensPerMonth: 50, // 50 AI generations/month (Sonnet 4)
         allowedModels: ['anthropic/claude-3.5-haiku', 'anthropic/claude-sonnet-4'],
         defaultModel: 'anthropic/claude-sonnet-4',
-        maxVariantsPerSet: 10,
-        allowedExports: ['png', 'jpg'],
+        maxVariantsPerSet: 5,
+        allowedExports: ['png', 'jpg', 'html5'],
         maxTeamMembers: 1,
-        brandCloudEnabled: false,
+        brandCloudEnabled: true, // 1 brand kit allowed
     },
     pro: {
         maxCreativeSets: -1,

@@ -52,9 +52,9 @@ describe('planTypes', () => {
             expect(ent).toContain('mp4');
         });
 
-        it('should enable brand cloud only for enterprise+', () => {
+        it('should enable brand cloud for creator+ (1 kit for creator)', () => {
             expect(PLAN_LIMITS.starter.brandCloudEnabled).toBe(false);
-            expect(PLAN_LIMITS.creator.brandCloudEnabled).toBe(false);
+            expect(PLAN_LIMITS.creator.brandCloudEnabled).toBe(true);
             expect(PLAN_LIMITS.enterprise.brandCloudEnabled).toBe(true);
         });
 
@@ -77,8 +77,8 @@ describe('planTypes', () => {
             expect(PLAN_LIMITS.starter.allowedModels).not.toContain('anthropic/claude-3.5-haiku');
         });
 
-        it('starter AI budget is 10 (Sonnet 4 tier)', () => {
-            expect(PLAN_LIMITS.starter.aiTokensPerMonth).toBe(10);
+        it('starter AI budget is 20 (bumped from 10 for Sonnet 4)', () => {
+            expect(PLAN_LIMITS.starter.aiTokensPerMonth).toBe(20);
         });
 
         it('creator AI budget is 50', () => {
@@ -87,6 +87,18 @@ describe('planTypes', () => {
 
         it('pro AI budget is 300', () => {
             expect(PLAN_LIMITS.pro.aiTokensPerMonth).toBe(300);
+        });
+
+        it('creator gets HTML5 export (with watermark)', () => {
+            expect(PLAN_LIMITS.creator.allowedExports).toContain('html5');
+        });
+
+        it('creator has max 5 variants per set', () => {
+            expect(PLAN_LIMITS.creator.maxVariantsPerSet).toBe(5);
+        });
+
+        it('creator has brand kit enabled', () => {
+            expect(PLAN_LIMITS.creator.brandCloudEnabled).toBe(true);
         });
     });
 
