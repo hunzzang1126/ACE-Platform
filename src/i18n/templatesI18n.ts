@@ -22,6 +22,7 @@ registerTranslations('templates', {
         custom: 'Custom',
         editTemplate: 'Edit template (Admin)',
         deleteTemplate: 'Delete template',
+        featured: 'Featured',
     },
     ko: {
         title: '템플릿',
@@ -41,6 +42,7 @@ registerTranslations('templates', {
         custom: '커스텀',
         editTemplate: '템플릿 편집 (관리자)',
         deleteTemplate: '템플릿 삭제',
+        featured: '추천',
     },
     ja: {
         title: 'テンプレート',
@@ -60,6 +62,7 @@ registerTranslations('templates', {
         custom: 'カスタム',
         editTemplate: 'テンプレート編集 (管理者)',
         deleteTemplate: 'テンプレート削除',
+        featured: '注目',
     },
     zh: {
         title: '模板',
@@ -79,6 +82,7 @@ registerTranslations('templates', {
         custom: '自定义',
         editTemplate: '编辑模板 (管理员)',
         deleteTemplate: '删除模板',
+        featured: '推荐',
     },
     es: { title: 'Plantillas', subtitle: 'Explore y aplique plantillas de diseño a sus proyectos.', subtitleAdmin: ' Como admin, puede editar plantillas directamente.', addTemplate: 'Agregar plantilla', searchPlaceholder: 'Buscar plantillas...', templateName: 'Nombre de plantilla...', create: 'Crear', cancel: 'Cancelar', noFound: 'No se encontraron plantillas.', all: 'Todas', display: 'Display', social: 'Social', email: 'Email', video: 'Video', custom: 'Personalizado', editTemplate: 'Editar plantilla (Admin)', deleteTemplate: 'Eliminar plantilla' },
     fr: { title: 'Modèles', subtitle: 'Parcourez et appliquez des modèles de design à vos projets.', subtitleAdmin: " En tant qu'admin, vous pouvez éditer les modèles directement.", addTemplate: 'Ajouter modèle', searchPlaceholder: 'Rechercher...', templateName: 'Nom du modèle...', create: 'Créer', cancel: 'Annuler', noFound: 'Aucun modèle trouvé.', all: 'Tous', display: 'Display', social: 'Social', email: 'Email', video: 'Vidéo', custom: 'Personnalisé', editTemplate: 'Éditer modèle (Admin)', deleteTemplate: 'Supprimer modèle' },
