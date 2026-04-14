@@ -171,8 +171,10 @@ export function buildContextSystemPrompt(ctx: ContextInfo): string {
     const mem = ctx.memory ? `\nUser prefs: ${ctx.memory}` : '';
 
     // ★ Common header: 2 lines. Same for all pages.
-    // Add language instruction if not English
-    const langInstr = ctx.language && ctx.language !== 'en' ? ` Respond in ${LANG_NAMES[ctx.language] || ctx.language}.` : '';
+    // Language: UI pref takes priority, but also auto-detect input language
+    const langInstr = ctx.language && ctx.language !== 'en'
+        ? ` Respond in ${LANG_NAMES[ctx.language] || ctx.language}. If the user writes in a different language, respond in that language instead.`
+        : ' If the user writes in a non-English language, respond in that language.';
     const header = `You are Glid, ACE creative platform AI. Be concise. Explain before executing.${langInstr}`;
 
     switch (ctx.page) {

@@ -127,11 +127,12 @@ describe('buildContextSystemPrompt', () => {
         expect(prompt).toContain('Respond in Korean');
     });
 
-    it('no language instruction for English', () => {
+    it('English prompt includes auto-detect fallback', () => {
         const ctx = buildContext('/');
         ctx.language = 'en';
         const prompt = buildContextSystemPrompt(ctx);
-        expect(prompt).not.toContain('Respond in');
+        expect(prompt).not.toContain('Respond in Korean');
+        expect(prompt).toContain('non-English language');
     });
 
     it('includes language instruction for Japanese', () => {
