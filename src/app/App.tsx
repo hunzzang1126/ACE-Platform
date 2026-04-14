@@ -29,6 +29,7 @@ import { TermsPage } from './TermsPage';
 
 // Components
 import { GlobalAiPanel } from '../components/ai/GlobalAiPanel';
+import { AiOnboardingTooltip } from '../components/ai/AiOnboardingTooltip';
 import { ErrorBoundary } from '../components/ui/ErrorBoundary';
 import { ToastContainer } from '../components/ui/Toast';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
@@ -81,6 +82,7 @@ export default function App() {
                                     <GeneralEditorPage />
                                 </div>
                                 <GlobalAiPanel />
+                                <AiOnboardingTooltip />
                             </div>
                         </ProtectedRoute>
                     } />
@@ -91,6 +93,7 @@ export default function App() {
                                     <DetailEditorPage />
                                 </div>
                                 <GlobalAiPanel />
+                                <AiOnboardingTooltip />
                             </div>
                         </ProtectedRoute>
                     } />

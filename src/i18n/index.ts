@@ -18,3 +18,4 @@ import './templatesI18n';
 import './activityI18n';
 import './aiSuggestionsI18n';
 import './upgradeI18n';
+import './onboardingI18n';
