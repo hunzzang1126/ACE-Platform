@@ -17,6 +17,7 @@ import { useCloudSync } from '@/hooks/useCloudSync';
 import { CloudSyncIndicator } from '@/components/dashboard/CloudSyncIndicator';
 import { DashboardEmptyState } from '@/components/dashboard/DashboardEmptyState';
 import { PlanStatusBar } from '@/components/dashboard/PlanStatusBar';
+import { ReferralCard } from '@/components/dashboard/ReferralCard';
 import { useAppI18n } from '@/i18n';
 
 
@@ -230,6 +231,7 @@ export function DashboardPage() {
 
                 {/* ── Plan Status Bar ── */}
                 <PlanStatusBar />
+                <ReferralCard />
 
 
 
