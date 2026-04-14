@@ -62,8 +62,21 @@ export async function resolveAsset(ref: string): Promise<string> {
         return ref;
     }
 
-    // Already-signed or external URLs — pass through
-    if (isCloudUrl(ref) || ref.startsWith('https://') || ref.startsWith('http://') || ref.startsWith('blob:')) return ref;
+    // ★ CONSOLIDATED FIX (was duplicated in useCanvasSync.ts restoreImage):
+    // Recover expired signed Supabase URLs → re-sign via storage:// ref.
+    // Images saved before v0.0.0.488 may have leaked signed URLs as src.
+    if (isCloudUrl(ref)) {
+        const storageRef = signedUrlToStorageRef(ref);
+        if (storageRef) {
+            const signedUrl = await resolveCloudUrl(storageRef);
+            if (signedUrl) return signedUrl;
+        }
+        // If we can't recover, pass through as-is (may work if not expired)
+        return ref;
+    }
+
+    // Already-external or blob URLs — pass through
+    if (ref.startsWith('https://') || ref.startsWith('http://') || ref.startsWith('blob:')) return ref;
 
     // idb:// → IndexedDB
     if (!ref.startsWith(IDB_PREFIX)) return ref;

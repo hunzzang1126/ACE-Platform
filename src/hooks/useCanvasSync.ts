@@ -6,7 +6,7 @@
 
 import { useCallback } from 'react';
 import { isAssetRef, resolveAsset } from '@/services/assetService';
-import { isCloudUrl, resolveCloudUrl } from '@/services/cloudStorageService';
+import { isCloudUrl } from '@/services/cloudStorageService';
 import { useDesignStore } from '@/stores/designStore';
 import { loadVideoBlob } from '@/stores/videoStorage';
 import type { DesignElement, ShapeElement, TextElement, ImageElement, VideoElement, ElementAnimation } from '@/schema/elements.types';
@@ -230,23 +230,11 @@ function restoreImage(engine: Engine, img: ImageElement, canvasW: number, canvas
         let stableSrc = img.src;
         const cx = x, cy = y, cw = w, ch = h, ci = img;
         pendingLoads.push(async () => {
-            let srcToResolve = ci.src!;
-            // ★ REGRESSION FIX: Recover expired signed Supabase URLs.
-            // If the stored src is a signed URL (not storage://), extract the
-            // storage path and re-sign it. This fixes images saved before v0.0.0.488.
-            if (!isAssetRef(srcToResolve) && isCloudUrl(srcToResolve)) {
-                try {
-                    const url = new URL(srcToResolve);
-                    const match = url.pathname.match(/\/storage\/v1\/object\/sign\/ace-assets\/(.+)/);
-                    if (match?.[1]) {
-                        const recoveredRef = `storage://${match[1]}`;
-                        stableSrc = recoveredRef; // ★ Fix the persist ref too
-                        srcToResolve = recoveredRef;
-                        console.log(`[restoreImage] Recovered signed URL → ${recoveredRef}`);
-                    }
-                } catch { /* invalid URL */ }
-            }
-            const resolved = isAssetRef(srcToResolve) ? await resolveAsset(srcToResolve) : srcToResolve;
+            const srcToResolve = ci.src!;
+            // ★ Signed URL recovery is now consolidated in resolveAsset()
+            // resolveAsset handles: idb://, storage://, and expired signed URLs
+            const needsResolve = isAssetRef(srcToResolve) || isCloudUrl(srcToResolve);
+            const resolved = needsResolve ? await resolveAsset(srcToResolve) : srcToResolve;
             const nodeId = await engine.add_image(cx, cy, resolved, cw, ch, ci.name, ci.zIndex, ci.naturalWidth, ci.naturalHeight, ci.fit);
             // ★ Set persistent src on the Fabric object so save reads idb:// not blob:
             if (nodeId != null && engine._findById) {
