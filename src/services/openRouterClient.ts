@@ -16,21 +16,68 @@ import { getModelId, getMaxTokens, type AceModelRole } from '@/services/modelRou
 const OPENROUTER_BASE = 'https://openrouter.ai/api/v1';
 
 // ── URL ──
+// Production uses Supabase Edge Function proxy (API key stays server-side).
+// Local dev uses Vite proxy to avoid CORS + keeps direct key for speed.
+
+function getSupabaseUrl(): string {
+    return (import.meta.env.VITE_SUPABASE_URL as string) ?? '';
+}
 
 export function getOpenRouterUrl(): string {
     const isLocalDev =
         typeof window !== 'undefined' && window.location.hostname === 'localhost';
-    return isLocalDev
-        ? '/api/openrouter/v1/chat/completions'
-        : `${OPENROUTER_BASE}/chat/completions`;
+    if (isLocalDev) return '/api/openrouter/v1/chat/completions';
+
+    // Production → route through Supabase Edge Function proxy
+    const sbUrl = getSupabaseUrl();
+    if (sbUrl) return `${sbUrl}/functions/v1/ai-proxy`;
+
+    // Fallback: direct (only if no Supabase configured — NOT recommended)
+    return `${OPENROUTER_BASE}/chat/completions`;
 }
 
 // ── Headers ──
+// Production: sends user JWT (Supabase auth token) — edge function handles OpenRouter key.
+// Local dev / fallback: sends OpenRouter key directly.
+
+async function getSessionToken(): Promise<string | null> {
+    try {
+        const { getSupabase } = await import('@/services/supabaseClient');
+        const sb = getSupabase();
+        if (!sb) return null;
+        const { data } = await sb.auth.getSession();
+        return data.session?.access_token ?? null;
+    } catch { return null; }
+}
 
 export function getOpenRouterHeaders(): Record<string, string> {
+    // For sync callers — will be overridden by async version in callOpenRouterApi
     return {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${getOpenRouterKey()}`,
+        'HTTP-Referer': 'https://ace.design',
+        'X-Title': 'Glid Design Engine',
+    };
+}
+
+async function getProxyHeaders(): Promise<Record<string, string>> {
+    const isLocalDev = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+
+    if (isLocalDev) {
+        // Direct API key (local dev only, not exposed in production bundle)
+        return {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${getOpenRouterKey()}`,
+            'HTTP-Referer': 'https://ace.design',
+            'X-Title': 'Glid Design Engine',
+        };
+    }
+
+    // Production: use JWT token for edge function auth
+    const token = await getSessionToken();
+    return {
+        'Content-Type': 'application/json',
+        'Authorization': token ? `Bearer ${token}` : `Bearer ${getOpenRouterKey()}`,
         'HTTP-Referer': 'https://ace.design',
         'X-Title': 'Glid Design Engine',
     };
@@ -226,19 +273,21 @@ export async function callOpenRouterApi(
     body: Record<string, unknown>,
     signal?: AbortSignal,
 ): Promise<unknown> {
-    const key = getOpenRouterKey();
-    if (!key) {
+    const converted = convertAnthropicToOpenRouter(body);
+    const url = getOpenRouterUrl();
+    const headers = await getProxyHeaders();
+
+    // In proxy mode (production), key check is server-side
+    const isProxyMode = url.includes('/functions/v1/ai-proxy');
+    if (!isProxyMode && !getOpenRouterKey()) {
         throw new Error('OpenRouter API key is not configured. Set VITE_OPENROUTER_API_KEY in .env');
     }
 
-    const converted = convertAnthropicToOpenRouter(body);
-    const url = getOpenRouterUrl();
-
-    console.log(`[OpenRouter] → ${url} model=${converted.model}, tools=${(converted.tools as unknown[])?.length ?? 0}`);
+    console.log(`[OpenRouter] → ${url} model=${converted.model}, tools=${(converted.tools as unknown[])?.length ?? 0}${isProxyMode ? ' (proxy)' : ''}`);
 
     const res = await fetch(url, {
         method: 'POST',
-        headers: getOpenRouterHeaders(),
+        headers,
         body: JSON.stringify(converted),
         signal,
     });
@@ -246,7 +295,7 @@ export async function callOpenRouterApi(
     if (!res.ok) {
         const errText = await res.text();
         if (res.status === 401) {
-            throw new Error('OpenRouter API key invalid (401). Check VITE_OPENROUTER_API_KEY.');
+            throw new Error(isProxyMode ? 'Session expired. Please log in again.' : 'OpenRouter API key invalid (401). Check VITE_OPENROUTER_API_KEY.');
         }
         if (res.status === 402) {
             throw new Error('OpenRouter: Insufficient credits. Add credits at openrouter.ai.');
