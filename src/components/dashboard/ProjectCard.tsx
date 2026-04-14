@@ -4,6 +4,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useProjectStore } from '@/stores/projectStore';
 import { ProjectThumbnail } from './ProjectThumbnail';
+import { ShareModal } from './ShareModal';
 
 interface ProjectCardProps {
     id: string;
@@ -30,6 +31,7 @@ export function ProjectCard({ id, name, variantCount, createdAt, createdBy, type
     const [renaming, setRenaming] = useState(!!initialRenaming);
     const [renameName, setRenameName] = useState(name);
     const renameRef = useRef<HTMLInputElement>(null);
+    const [shareOpen, setShareOpen] = useState(false);
 
     // Auto-focus rename input when created in rename mode
     useEffect(() => {
@@ -145,6 +147,7 @@ export function ProjectCard({ id, name, variantCount, createdAt, createdBy, type
                         <div className="context-menu" style={{ left: menuPos.x, top: menuPos.y }}>
                             <button className="context-item" onClick={() => { setMenuOpen(false); onOpen(id); }}>Open</button>
                             <button className="context-item" onClick={handleRename}>Rename</button>
+                            {type === 'set' && <button className="context-item" onClick={() => { setMenuOpen(false); setShareOpen(true); }}>Share</button>}
                             {type === 'set' && <button className="context-item" onClick={handleDuplicate}>Duplicate</button>}
                             <div className="context-divider" />
                             <button className="context-item danger" onClick={handleDelete}>Delete</button>
@@ -212,12 +215,15 @@ export function ProjectCard({ id, name, variantCount, createdAt, createdBy, type
                     <div className="context-menu" style={{ left: menuPos.x, top: menuPos.y }}>
                         <button className="context-item" onClick={() => { setMenuOpen(false); onOpen(id); }}>Open</button>
                         <button className="context-item" onClick={handleRename}>Rename</button>
+                        {type === 'set' && <button className="context-item" onClick={() => { setMenuOpen(false); setShareOpen(true); }}>Share</button>}
                         {type === 'set' && <button className="context-item" onClick={handleDuplicate}>Duplicate</button>}
                         <div className="context-divider" />
                         <button className="context-item danger" onClick={handleDelete}>Delete</button>
                     </div>
                 </>
             )}
+            {/* Share Modal */}
+            <ShareModal isOpen={shareOpen} onClose={() => setShareOpen(false)} projectId={id} projectName={name} />
         </>
     );
 }

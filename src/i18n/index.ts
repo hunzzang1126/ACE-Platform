@@ -19,3 +19,4 @@ import './activityI18n';
 import './aiSuggestionsI18n';
 import './upgradeI18n';
 import './onboardingI18n';
+import './shareI18n';
