@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import { getModelForRole, type AceModelRole } from '@/services/modelRouter';
 import { IcLoader, IcCheck, IcError } from '@/components/ui/Icons';
 import { actionCardStyle, modelDropdownStyle, modelOptionStyle } from './aiPanelStyles';
+import { useAppI18n } from '@/i18n';
 
 // ── Types ────────────────────────────────────────
 
@@ -157,15 +158,17 @@ export function ImageGalleryCard({ images, onSelect }: { images: Array<{ id: str
         try { onSelect(img.url); } finally { setTimeout(() => setApplying(false), 1000); }
     };
 
+    const { t } = useAppI18n();
+
     return (
         <div style={{ margin: '6px 10px', padding: '8px', background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(139,92,246,0.12)', borderRadius: 10 }}>
-            <div style={{ fontSize: 11, color: '#7c3aed', fontWeight: 500, marginBottom: 6 }}>Choose a background</div>
+            <div style={{ fontSize: 11, color: '#7c3aed', fontWeight: 500, marginBottom: 6 }}>{t('ai.chooseBackground')}</div>
             <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4 }}>
                 {images.map(img => (
                     <div key={img.id} onClick={() => handleSelect(img)} style={{ position: 'relative', flexShrink: 0, width: 110, height: 80, borderRadius: 8, overflow: 'hidden', border: selectedId === img.id ? '2px solid #8b5cf6' : '2px solid transparent', cursor: applying ? 'wait' : 'pointer', transition: 'all 0.2s ease', opacity: applying && selectedId !== img.id ? 0.5 : 1 }}>
                         <img src={img.url} alt={img.prompt} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         <div style={{ position: 'absolute', inset: 0, background: selectedId === img.id ? 'rgba(139,92,246,0.3)' : 'rgba(0,0,0,0)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s ease' }}>
-                            {selectedId === img.id && (<span style={{ fontSize: 10, fontWeight: 600, color: '#fff', background: 'rgba(139,92,246,0.8)', padding: '2px 8px', borderRadius: 4 }}>{applying ? 'Applying...' : 'Applied'}</span>)}
+                            {selectedId === img.id && (<span style={{ fontSize: 10, fontWeight: 600, color: '#fff', background: 'rgba(139,92,246,0.8)', padding: '2px 8px', borderRadius: 4 }}>{applying ? t('ai.applying') : t('ai.applied')}</span>)}
                         </div>
                     </div>
                 ))}
@@ -185,6 +188,7 @@ const PLAN_RANK: Record<string, number> = { starter: 0, creator: 1, pro: 2, ente
 
 export function ModelDropdown({ selectedRole, onSelect }: { selectedRole: AceModelRole; onSelect: (role: AceModelRole) => void }) {
     const [userPlan, setUserPlan] = useState<string>('starter');
+    const { t } = useAppI18n();
     useEffect(() => { import('@/stores/authStore').then(({ useAuthStore }) => { setUserPlan(useAuthStore.getState().user?.plan ?? 'starter'); }); }, []);
     const navigate = useNavigate();
     const userRank = PLAN_RANK[userPlan] ?? 0;
@@ -204,7 +208,7 @@ export function ModelDropdown({ selectedRole, onSelect }: { selectedRole: AceMod
                                 {isLocked && (<span style={{ fontSize: 9, fontWeight: 700, color: '#818cf8', background: 'rgba(129,140,248,0.12)', padding: '1px 6px', borderRadius: 4, letterSpacing: '0.3px', textTransform: 'uppercase' }}>Pro</span>)}
                             </div>
                         </div>
-                        <div style={{ fontSize: 10, color: isLocked ? '#94a3b8' : '#64748b', marginTop: 2 }}>{isLocked ? 'Upgrade to Pro to use this model' : m.id}</div>
+                        <div style={{ fontSize: 10, color: isLocked ? '#94a3b8' : '#64748b', marginTop: 2 }}>{isLocked ? t('ai.upgradeModel') : m.id}</div>
                     </button>
                 );
             })}
