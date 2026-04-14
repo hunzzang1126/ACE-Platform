@@ -124,7 +124,7 @@ export function GlobalAiPanel() {
     return (
         <div style={{ ...wrapperStyle, width: open ? PANEL_WIDTH : 32 }}>
             <button onClick={() => { setOpen(!open); setTimeout(() => inputRef.current?.focus(), 150); }} style={toggleBtnStyle} title={open ? `${t('ai.closeAi')} (Cmd+K)` : `${t('ai.openAi')} (Cmd+K)`}>
-                {open ? <IcChevronRight size={14} color="#64748b" /> : <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: -0.5, background: 'linear-gradient(135deg, #ff6b6b, #ee5a9f, #8b5cf6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>G</span>}
+                {open ? <IcChevronRight size={14} color="#64748b" /> : <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: -0.5, background: 'linear-gradient(135deg, #2DD4BF, #818cf8, #c084fc)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>G</span>}
             </button>
 
             {open && (
@@ -153,7 +153,7 @@ export function GlobalAiPanel() {
                             </div>
                         )}
 
-                        {showDropZone && (<div style={dropOverlayStyle}><div style={{ fontSize: 14, fontWeight: 500, color: '#7c3aed' }}>{t('ai.dropToScan')}</div><div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>{t('ai.dropHint')}</div></div>)}
+                        {showDropZone && (<div style={dropOverlayStyle}><div style={{ fontSize: 14, fontWeight: 500, color: '#6366F1' }}>{t('ai.dropToScan')}</div><div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>{t('ai.dropHint')}</div></div>)}
 
                         {agent.messages.map((m, i) => {
                             if (m.role === 'user') return <div key={i} style={userBubbleStyle}>{m.content}</div>;

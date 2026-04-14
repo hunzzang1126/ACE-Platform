@@ -61,12 +61,12 @@ export const dropOverlayStyle: CSSProperties = {
     position: 'absolute', inset: 0, zIndex: 10,
     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
     background: 'rgba(255,255,255,0.92)',
-    border: '2px dashed #ee5a9f', borderRadius: 8, margin: 8,
+    border: '2px dashed #6366F1', borderRadius: 8, margin: 8,
 };
 
 export const userBubbleStyle: CSSProperties = {
     padding: '8px 14px', margin: '4px 14px', alignSelf: 'flex-end',
-    background: 'linear-gradient(135deg, #ff6b6b, #ee5a9f, #8b5cf6)', borderRadius: '12px 12px 4px 12px',
+    background: 'linear-gradient(135deg, #6366F1, #2DD4BF)', borderRadius: '12px 12px 4px 12px',
     maxWidth: '85%', fontSize: 13, lineHeight: '1.6', color: '#ffffff',
 };
 
@@ -124,19 +124,19 @@ export const inputFieldStyle: CSSProperties = {
 
 export const sendBtnStyle: CSSProperties = {
     width: 34, height: 34, borderRadius: 8,
-    background: 'linear-gradient(135deg, #ff6b6b, #ee5a9f, #8b5cf6)', border: 'none', cursor: 'pointer',
+    background: 'linear-gradient(135deg, #6366F1, #2DD4BF)', border: 'none', cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     transition: 'opacity 0.15s ease',
 };
 
 export const glidLogoStyle: CSSProperties = {
     fontSize: 16, fontWeight: 800, letterSpacing: -0.5,
-    background: 'linear-gradient(135deg, #ff6b6b, #ee5a9f, #8b5cf6)',
+    background: 'linear-gradient(135deg, #2DD4BF, #818cf8, #c084fc)',
     WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', lineHeight: 1,
 };
 
 export const glidLogoLargeStyle: CSSProperties = {
     fontSize: 36, fontWeight: 900, letterSpacing: -1.5,
-    background: 'linear-gradient(135deg, #ff6b6b, #ee5a9f, #8b5cf6)',
+    background: 'linear-gradient(135deg, #2DD4BF, #818cf8, #c084fc)',
     WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', lineHeight: 1,
 };

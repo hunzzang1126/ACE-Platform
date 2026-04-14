@@ -29,7 +29,7 @@ export function ActionCardInline({ card }: { card: ActionCardData }) {
     const [expanded, setExpanded] = useState(false);
     const hasExpandable = !!card.expandedDetail;
 
-    const icon = card.status === 'running' ? <IcLoader size={12} color="#ee5a9f" />
+    const icon = card.status === 'running' ? <IcLoader size={12} color="#6366F1" />
         : card.status === 'done' ? <IcCheck size={12} color="#16a34a" />
             : card.status === 'error' ? <IcError size={12} color="#dc2626" />
                 : <span style={{ width: 12, display: 'inline-block', textAlign: 'center', color: '#94a3b8' }}>·</span>;
