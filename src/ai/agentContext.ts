@@ -16,7 +16,7 @@ export {
 } from './agentSceneAnalysis';
 
 export interface AgentMessage {
-    role: 'user' | 'assistant' | 'system' | 'action' | 'thinking' | 'image_gallery' | 'narration';
+    role: 'user' | 'assistant' | 'system' | 'action' | 'thinking' | 'image_gallery' | 'narration' | 'design_complete';
     content: string;
     timestamp: number;
     phases?: AgentPhase[];

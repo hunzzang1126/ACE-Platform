@@ -49,6 +49,8 @@ registerTranslations('ai', {
         applied: 'Applied',
         thoughtFor: 'Thought for',
         upgradeModel: 'Upgrade to Pro to use this model',
+        designComplete: 'Design Complete',
+        elementsCreated: 'elements',
     },
     ko: {
         sugCreateAd: '광고 만들기',
@@ -88,6 +90,8 @@ registerTranslations('ai', {
         applied: '적용됨',
         thoughtFor: '생각 시간',
         upgradeModel: '이 모델을 사용하려면 Pro로 업그레이드하세요',
+        designComplete: '디자인 완료',
+        elementsCreated: '개 요소',
     },
     ja: {
         sugCreateAd: '広告作成', sugCreateAdHint: 'AIがデザインする広告', sugCreateSocial: 'ソーシャル投稿', sugCreateSocialHint: 'Instagram、Facebook、LinkedIn',
@@ -97,6 +101,7 @@ registerTranslations('ai', {
         sugChangeColor: '色変更', sugChangeColorHint: '新しい配色', sugAddAnim: 'アニメ追加', sugAddAnimHint: 'アニメーション適用', sugDuplicate: '配置', sugDuplicateHint: '複製して整列',
         sugAlignAll: '整列', sugAlignAllHint: '選択要素を整列', sugGroupStyle: 'スタイル統一', sugGroupStyleHint: '一貫したスタイル',
         chooseBackground: '背景を選択', applying: '適用中...', applied: '適用済み', thoughtFor: '思考時間', upgradeModel: 'Proにアップグレードしてこのモデルを使用',
+        designComplete: 'デザイン完了', elementsCreated: '要素',
     },
     zh: {
         sugCreateAd: '创建广告', sugCreateAdHint: 'AI设计广告', sugCreateSocial: '社交帖子', sugCreateSocialHint: 'Instagram、Facebook、LinkedIn',
@@ -106,5 +111,6 @@ registerTranslations('ai', {
         sugChangeColor: '更改颜色', sugChangeColorHint: '新配色方案', sugAddAnim: '添加动画', sugAddAnimHint: '为元素添加动画', sugDuplicate: '排列', sugDuplicateHint: '复制并排列',
         sugAlignAll: '对齐', sugAlignAllHint: '自动对齐', sugGroupStyle: '统一样式', sugGroupStyleHint: '一致的样式',
         chooseBackground: '选择背景', applying: '应用中...', applied: '已应用', thoughtFor: '思考时间', upgradeModel: '升级到Pro以使用此模型',
+        designComplete: '设计完成', elementsCreated: '个元素',
     },
 });

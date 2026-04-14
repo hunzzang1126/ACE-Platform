@@ -13,6 +13,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useAppI18n } from '@/i18n';
 import { IcSend, IcClose, IcChevronRight, IcError } from '@/components/ui/Icons';
 import { ActionCardInline, ThinkingCard, ImageGalleryCard, ModelDropdown, ProgressCard } from './AiPanelCards';
+import { ResultPreviewCard } from './ResultPreviewCard';
 import { getAiSuggestions } from '@/ai/aiSuggestions';
 import type { CanvasContext } from '@/ai/aiSuggestions';
 import {
@@ -160,6 +161,7 @@ export function GlobalAiPanel() {
                             if (m.role === 'thinking') return <ThinkingCard key={`thinking-${i}`} content={m.content} />;
                             if (m.role === 'image_gallery' && m.imageGallery) return <ImageGalleryCard key={`gallery-${i}`} images={m.imageGallery.images} onSelect={(url) => agent.applyGalleryImage(url, m.imageGallery!.canvasW, m.imageGallery!.canvasH)} />;
                             if (m.role === 'narration') return <div key={i} style={{ ...assistantStyle, fontSize: 11, color: '#6366F1', fontStyle: 'italic' }}>{m.content}</div>;
+                            if (m.role === 'design_complete') return <ResultPreviewCard key={`result-${i}`} summary={m.content} elementCount={m.actionCard?.id ? parseInt(m.actionCard.id, 10) : undefined} durationSec={m.phases?.[0] ? Math.round((Date.now() - m.phases[0].timestamp) / 1000) : undefined} />;
                             return <div key={i} style={assistantStyle}>{m.content}</div>;
                         })}
 

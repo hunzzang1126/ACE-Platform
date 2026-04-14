@@ -265,6 +265,22 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
                 reply = await runChatFlow(enrichedMsg, config);
             }
             setMessages(prev => [...prev, { role: 'assistant', content: reply, timestamp: Date.now() }]);
+
+            // ★ Emit inline result preview for design operations
+            const isEditorPage = location.pathname === '/editor';
+            const isDesignAction = reply.includes('Design generated') || reply.includes('layers') || reply.includes('created') || reply.includes('applied') || reply.includes('background');
+            if (isEditorPage && isDesignAction) {
+                const engine = engineRef.current?.current ?? engineRef.current;
+                let elCount = 0;
+                try { const nodes = JSON.parse(engine?.get_all_nodes?.() ?? '[]'); elCount = nodes.length; } catch { /* ok */ }
+                setMessages(prev => [...prev, {
+                    role: 'design_complete' as AgentMessage['role'],
+                    content: reply,
+                    timestamp: Date.now(),
+                    actionCard: { id: String(elCount), label: '', status: 'done' as const },
+                }]);
+            }
+
             setState(prev => ({ ...prev, phase: 'done' }));
 
             // ★ Record AI usage after successful completion
