@@ -8,6 +8,28 @@
 import { useDesignStore } from '@/stores/designStore';
 import type { DesignElement } from '@/schema/elements.types';
 
+// ── Language Helpers ─────────────────────────────
+
+const LANG_NAMES: Record<string, string> = {
+    ko: 'Korean', ja: 'Japanese', zh: 'Chinese', es: 'Spanish',
+    fr: 'French', de: 'German', pt: 'Portuguese', it: 'Italian', th: 'Thai',
+};
+
+function getUserLanguage(): string {
+    try {
+        const stored = localStorage.getItem('ace-user-prefs');
+        if (stored) {
+            const prefs = JSON.parse(stored);
+            // userPrefs store stores per-userId, find latest
+            const firstKey = Object.keys(prefs.state?.language ?? {})[0];
+            if (firstKey) return prefs.state.language[firstKey] || 'en';
+            // fallback: check flat language field
+            if (prefs.state?.language && typeof prefs.state.language === 'string') return prefs.state.language;
+        }
+    } catch { /* ok */ }
+    return 'en';
+}
+
 // ── Types ────────────────────────────────────────
 
 export type PageContext = 'dashboard' | 'size-dashboard' | 'canvas-editor';
@@ -24,6 +46,8 @@ export interface ContextInfo {
     snapshot: string;
     /** 1-line memory summary (from Supabase) */
     memory?: string;
+    /** User's selected UI language (e.g. 'ko', 'en', 'ja') */
+    language?: string;
 }
 
 // ── Page Detection ───────────────────────────────
@@ -147,7 +171,9 @@ export function buildContextSystemPrompt(ctx: ContextInfo): string {
     const mem = ctx.memory ? `\nUser prefs: ${ctx.memory}` : '';
 
     // ★ Common header: 2 lines. Same for all pages.
-    const header = `You are Glid, ACE creative platform AI. Be concise. Explain before executing.`;
+    // Add language instruction if not English
+    const langInstr = ctx.language && ctx.language !== 'en' ? ` Respond in ${LANG_NAMES[ctx.language] || ctx.language}.` : '';
+    const header = `You are Glid, ACE creative platform AI. Be concise. Explain before executing.${langInstr}`;
 
     switch (ctx.page) {
         case 'dashboard':
@@ -212,6 +238,7 @@ export function buildContext(pathname: string, memory?: string): ContextInfo {
         useDesignPipeline: page === 'canvas-editor',
         snapshot: '', // populated via buildWorkspaceSnapshot() during prompt build
         memory,
+        language: getUserLanguage(),
     };
 }
 

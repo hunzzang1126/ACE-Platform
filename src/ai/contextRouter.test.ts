@@ -119,6 +119,27 @@ describe('buildContextSystemPrompt', () => {
         const prompt = buildContextSystemPrompt(ctx);
         expect(prompt).toContain('Glid');
     });
+
+    it('includes language instruction for non-English locale', () => {
+        const ctx = buildContext('/');
+        ctx.language = 'ko';
+        const prompt = buildContextSystemPrompt(ctx);
+        expect(prompt).toContain('Respond in Korean');
+    });
+
+    it('no language instruction for English', () => {
+        const ctx = buildContext('/');
+        ctx.language = 'en';
+        const prompt = buildContextSystemPrompt(ctx);
+        expect(prompt).not.toContain('Respond in');
+    });
+
+    it('includes language instruction for Japanese', () => {
+        const ctx = buildContext('/editor/detail/123');
+        ctx.language = 'ja';
+        const prompt = buildContextSystemPrompt(ctx);
+        expect(prompt).toContain('Respond in Japanese');
+    });
 });
 
 describe('enrichMessageWithContext', () => {
