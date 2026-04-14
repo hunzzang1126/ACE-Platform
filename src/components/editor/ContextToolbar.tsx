@@ -13,6 +13,7 @@ import type { OverlayElement } from '@/hooks/useOverlayElements';
 import { removeBackgroundFromUrl, blobToDataUrl } from '@/services/backgroundRemovalService';
 import { FONT_FAMILIES } from './contextToolbarConstants';
 import type { AlignDirection } from '@/engines/alignElements';
+import { FontPicker } from './FontPicker';
 
 // ── ScrubInput: icon + number input with drag-to-scrub ──
 function ScrubInput({ icon, value, min, max, step = 1, title, onChange }: {
@@ -96,9 +97,7 @@ function TextControls({ fontFamily, fontSize, color, fontWeight, textAlign, line
     const isBold = fontWeight === '700' || fontWeight === 'bold';
     return (
         <>
-            <select className="ctx-select ctx-font-select" value={fontFamily} onChange={e => onUpdate({ fontFamily: e.target.value })}>
-                {FONT_FAMILIES.map(f => <option key={f} value={f}>{f.split(',')[0]}</option>)}
-            </select>
+            <FontPicker value={fontFamily} onChange={v => onUpdate({ fontFamily: v })} />
             <div className="ctx-divider" />
             <div className="ctx-font-size">
                 <button className="ctx-btn" onClick={() => onUpdate({ fontSize: Math.max(1, fontSize - 1) })}>-</button>
