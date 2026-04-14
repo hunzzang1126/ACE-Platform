@@ -22,6 +22,7 @@ import { useCanvasSync } from '@/hooks/useCanvasSync';
 import { exportToHtml5, exportToImage, downloadExport } from '@/engine/html5Exporter';
 import type { EngineNode } from '@/hooks/canvasTypes';
 import { useEditorPageSave, useEditorRestore, useEditorAutoSync, useEditorAutoSave } from './useEditorPageEffects';
+import { useEyedropper } from '@/hooks/useEyedropper';
 
 export function DetailEditorPage() {
     const { variantId } = useParams<{ variantId: string }>();
@@ -47,6 +48,7 @@ export function DetailEditorPage() {
 
     const { canvasRef, overlayRef, engineRef, state, actions, syncState, retryInit } = useFabricCanvas(width, height, false);
     const overlay = useOverlayElements(width, height);
+    useEyedropper({ canvasRef, nodes: state.nodes, selection: state.selection, actions });
     const { saveToStore, saveFromCachedNodes, restoreFromStore } = useCanvasSync(variantId, width, height);
 
     const isDirtyRef = useRef(false);

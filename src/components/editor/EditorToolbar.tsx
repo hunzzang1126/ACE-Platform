@@ -62,6 +62,13 @@ const PenIcon = () => (
     </svg>
 );
 
+const EyedropperIcon = () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <path d="M20.71 5.63l-2.34-2.34a1 1 0 00-1.41 0l-3.54 3.54 1.41 1.41-1.41 1.42-3.54-3.54-5.66 5.66a2 2 0 000 2.83l2.83 2.83a2 2 0 002.83 0l5.66-5.66-3.54-3.54 1.42-1.41 1.41 1.41 3.54-3.54a1 1 0 000-1.42z" />
+        <line x1="2" y1="22" x2="6" y2="18" />
+    </svg>
+);
+
 const TOOLS: ToolDef[] = [
     { id: 'select', icon: <IcCursor size={14} />, label: 'Select (V)' },
     { id: 'shape', icon: <ShapeIcon />, label: 'Shape — click canvas to add (S)' },
@@ -71,6 +78,7 @@ const TOOLS: ToolDef[] = [
     { id: 'video', icon: <VideoIcon />, label: 'Import Video' },
     { id: 'hand', icon: <HandIcon />, label: 'Hand / Pan (H)' },
     { id: 'zoom', icon: <IcSearch size={14} />, label: 'Zoom (Z)' },
+    { id: 'eyedropper', icon: <EyedropperIcon />, label: 'Eyedropper — pick color from canvas (D)' },
 ];
 
 export function EditorToolbar({ actions, onTriggerImageUpload, onTriggerVideoUpload }: Props) {
