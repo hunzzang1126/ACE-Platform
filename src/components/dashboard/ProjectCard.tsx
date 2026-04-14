@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────────
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useProjectStore } from '@/stores/projectStore';
+import { ProjectThumbnail } from './ProjectThumbnail';
 
 interface ProjectCardProps {
     id: string;
@@ -79,16 +80,8 @@ export function ProjectCard({ id, name, variantCount, createdAt, createdBy, type
         if (type === 'set') duplicateCreativeSet(id);
     }, [id, type, duplicateCreativeSet]);
 
-    // Generate preview grid rectangles (grid mode only)
-    const previewSizes = viewMode === 'grid'
-        ? Array.from({ length: Math.min(variantCount, 6) }, (_, i) => {
-            const layouts = [
-                { w: 45, h: 35 }, { w: 30, h: 45 }, { w: 55, h: 20 },
-                { w: 20, h: 50 }, { w: 40, h: 40 }, { w: 50, h: 25 },
-            ];
-            return layouts[i % layouts.length]!;
-        })
-        : [];
+    // Preview thumbnail uses actual design data
+    const showThumbnail = viewMode === 'grid';
 
     // ── List View ──
     if (viewMode === 'list') {
@@ -169,20 +162,11 @@ export function ProjectCard({ id, name, variantCount, createdAt, createdBy, type
                 onDoubleClick={() => onOpen(id)}
                 onContextMenu={handleContextMenu}
             >
-                {/* Preview Area */}
                 <div className="project-card__preview">
-                    <div className="project-card__preview-grid">
-                        {previewSizes.map((size, i) => (
-                            <div
-                                key={i}
-                                className="project-card__preview-rect"
-                                style={{ width: size.w, height: size.h }}
-                            />
-                        ))}
-                    </div>
-                    {variantCount > 6 && (
+                    <ProjectThumbnail setId={id} width={200} height={120} />
+                    {variantCount > 1 && (
                         <span className="project-card__preview-more">
-                            +{variantCount - 6} more
+                            {variantCount} sizes
                         </span>
                     )}
                 </div>

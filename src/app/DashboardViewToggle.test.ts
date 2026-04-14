@@ -69,10 +69,10 @@ describe('ProjectCard — list view rendering', () => {
         expect(cardSrc).toContain('project-card__rename');
     });
 
-    it('skips preview rectangles in list mode', () => {
+    it('uses ProjectThumbnail for grid preview', () => {
         expect(cardSrc).toContain("viewMode === 'grid'");
-        // previewSizes only generated when grid mode
-        expect(cardSrc).toContain("? Array.from");
+        // ProjectThumbnail renders real design data instead of generic rectangles
+        expect(cardSrc).toContain("ProjectThumbnail");
     });
 
     it('supports context menu in list mode', () => {
