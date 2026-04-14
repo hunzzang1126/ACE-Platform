@@ -8,6 +8,7 @@
 
 import { useMemo } from 'react';
 import { useDesignStore } from '@/stores/designStore';
+import { constraintsToAbsolute } from '@/engine/elementConverters';
 
 interface ProjectThumbnailProps {
     setId: string;
@@ -33,23 +34,19 @@ export function ProjectThumbnail({ setId, width = 160, height = 100 }: ProjectTh
         const scaleX = width / cw;
         const scaleY = height / ch;
 
+        // ★ SINGLE RESOLVER: Use constraintsToAbsolute() per rendering pipeline sync rule
         const miniElements: MiniElement[] = master.elements.slice(0, 8).map(el => {
-            const constraints = el.constraints;
-            // Use constraint data for position — simplified absolute fallback
-            const x = (constraints?.x?.value ?? 0) * scaleX;
-            const y = (constraints?.y?.value ?? 0) * scaleY;
-            const w = (constraints?.width?.value ?? 50) * scaleX;
-            const h = (constraints?.height?.value ?? 30) * scaleY;
+            const abs = constraintsToAbsolute(el.constraints, cw, ch);
 
             let color = '#a0a0a0';
             if (el.fill) color = el.fill;
             else if (el.backgroundColor) color = el.backgroundColor;
 
             return {
-                x: Math.max(0, x),
-                y: Math.max(0, y),
-                w: Math.max(4, Math.min(w, width)),
-                h: Math.max(2, Math.min(h, height)),
+                x: Math.max(0, abs.x * scaleX),
+                y: Math.max(0, abs.y * scaleY),
+                w: Math.max(4, Math.min(abs.w * scaleX, width)),
+                h: Math.max(2, Math.min(abs.h * scaleY, height)),
                 color,
                 borderRadius: el.type === 'rounded_rect' || el.type === 'ellipse' ? 2 : 0,
                 isText: el.type === 'text',
