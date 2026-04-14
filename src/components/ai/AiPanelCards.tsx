@@ -79,6 +79,72 @@ export function ThinkingCard({ content }: { content: string }) {
     );
 }
 
+// ── Progress Card (step-by-step AI phase indicator) ──
+
+type AgentPhase = 'idle' | 'scanning' | 'thinking' | 'planning' | 'executing' | 'reflecting' | 'done' | 'error';
+
+const PHASE_STEPS: { phase: AgentPhase; label: string; icon: string }[] = [
+    { phase: 'thinking', label: 'Analyzing', icon: '1' },
+    { phase: 'planning', label: 'Planning', icon: '2' },
+    { phase: 'executing', label: 'Executing', icon: '3' },
+    { phase: 'reflecting', label: 'Finishing', icon: '4' },
+];
+
+function getPhaseIndex(phase: AgentPhase): number {
+    const idx = PHASE_STEPS.findIndex(s => s.phase === phase);
+    return idx >= 0 ? idx : phase === 'scanning' ? 0 : phase === 'done' ? PHASE_STEPS.length : -1;
+}
+
+export function ProgressCard({ phase, narration }: { phase: AgentPhase; narration?: string }) {
+    const [elapsed, setElapsed] = useState(0);
+    const activeIdx = getPhaseIndex(phase);
+
+    useEffect(() => {
+        if (phase === 'idle' || phase === 'done' || phase === 'error') return;
+        const start = Date.now();
+        const iv = setInterval(() => setElapsed(Math.round((Date.now() - start) / 1000)), 1000);
+        return () => clearInterval(iv);
+    }, [phase]);
+
+    if (phase === 'idle' || phase === 'done') return null;
+
+    return (
+        <div style={{ margin: '6px 10px', padding: '10px 12px', background: 'rgba(99,102,241,0.04)', border: '1px solid rgba(99,102,241,0.12)', borderRadius: 10 }}>
+            {/* Step indicators */}
+            <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
+                {PHASE_STEPS.map((step, i) => {
+                    const isDone = i < activeIdx;
+                    const isActive = i === activeIdx;
+                    return (
+                        <div key={step.phase} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                            <div style={{
+                                width: 20, height: 20, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, transition: 'all 0.3s ease',
+                                background: isDone ? 'linear-gradient(135deg, #6366F1, #2DD4BF)' : isActive ? 'linear-gradient(135deg, #6366F1, #818cf8)' : 'rgba(0,0,0,0.06)',
+                                color: isDone || isActive ? '#fff' : '#94a3b8',
+                                boxShadow: isActive ? '0 0 8px rgba(99,102,241,0.3)' : 'none',
+                                animation: isActive ? 'pulse 2s ease-in-out infinite' : 'none',
+                            }}>
+                                {isDone ? '\u2713' : step.icon}
+                            </div>
+                            <span style={{ fontSize: 9, color: isDone ? '#16a34a' : isActive ? '#6366F1' : '#94a3b8', fontWeight: isActive ? 600 : 400 }}>{step.label}</span>
+                        </div>
+                    );
+                })}
+            </div>
+            {/* Progress bar */}
+            <div style={{ height: 2, background: 'rgba(0,0,0,0.06)', borderRadius: 1, overflow: 'hidden', marginBottom: 6 }}>
+                <div style={{ height: '100%', background: 'linear-gradient(90deg, #6366F1, #2DD4BF)', borderRadius: 1, transition: 'width 0.5s ease', width: `${Math.min(100, ((activeIdx + 0.5) / PHASE_STEPS.length) * 100)}%` }} />
+            </div>
+            {/* Narration + timer */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <IcLoader size={10} color="#6366F1" />
+                <span style={{ fontSize: 10, color: '#475569', flex: 1 }}>{narration || PHASE_STEPS[Math.min(activeIdx, PHASE_STEPS.length - 1)]?.label || 'Working'}...</span>
+                {elapsed > 0 && <span style={{ fontSize: 9, color: '#94a3b8' }}>{elapsed}s</span>}
+            </div>
+        </div>
+    );
+}
+
 // ── Image Gallery Card ───────────────────────────
 
 export function ImageGalleryCard({ images, onSelect }: { images: Array<{ id: string; url: string; prompt: string }>; onSelect: (url: string) => void }) {

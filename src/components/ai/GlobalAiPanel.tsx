@@ -12,7 +12,7 @@ import { getModelForRole, type AceModelRole } from '@/services/modelRouter';
 import { useAuthStore } from '@/stores/authStore';
 import { useAppI18n } from '@/i18n';
 import { IcSend, IcClose, IcChevronRight, IcError } from '@/components/ui/Icons';
-import { ActionCardInline, ThinkingCard, ImageGalleryCard, ModelDropdown } from './AiPanelCards';
+import { ActionCardInline, ThinkingCard, ImageGalleryCard, ModelDropdown, ProgressCard } from './AiPanelCards';
 import { getAiSuggestions } from '@/ai/aiSuggestions';
 import type { CanvasContext } from '@/ai/aiSuggestions';
 import {
@@ -159,9 +159,11 @@ export function GlobalAiPanel() {
                             if (m.role === 'action' && m.actionCard) return <ActionCardInline key={`action-${m.actionCard.id}-${i}`} card={m.actionCard} />;
                             if (m.role === 'thinking') return <ThinkingCard key={`thinking-${i}`} content={m.content} />;
                             if (m.role === 'image_gallery' && m.imageGallery) return <ImageGalleryCard key={`gallery-${i}`} images={m.imageGallery.images} onSelect={(url) => agent.applyGalleryImage(url, m.imageGallery!.canvasW, m.imageGallery!.canvasH)} />;
+                            if (m.role === 'narration') return <div key={i} style={{ ...assistantStyle, fontSize: 11, color: '#6366F1', fontStyle: 'italic' }}>{m.content}</div>;
                             return <div key={i} style={assistantStyle}>{m.content}</div>;
                         })}
 
+                        {isBusy && <ProgressCard phase={agent.state.phase as any} narration={agent.messages.filter(m => m.role === 'narration').pop()?.content} />}
                         {agent.state.phase === 'error' && agent.state.error && (<div style={errorStyle}><IcError size={12} color="#f85149" /><span>{agent.state.error}</span></div>)}
                         <div ref={bottomRef} />
                     </div>
