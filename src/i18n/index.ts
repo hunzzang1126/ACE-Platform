@@ -16,3 +16,4 @@ import './aiI18n';
 import './editorI18n';
 import './templatesI18n';
 import './activityI18n';
+import './aiSuggestionsI18n';

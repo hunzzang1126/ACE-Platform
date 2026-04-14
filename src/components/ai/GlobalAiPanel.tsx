@@ -13,6 +13,8 @@ import { useAuthStore } from '@/stores/authStore';
 import { useAppI18n } from '@/i18n';
 import { IcSend, IcClose, IcChevronRight, IcError } from '@/components/ui/Icons';
 import { ActionCardInline, ThinkingCard, ImageGalleryCard, ModelDropdown } from './AiPanelCards';
+import { getAiSuggestions } from '@/ai/aiSuggestions';
+import type { CanvasContext } from '@/ai/aiSuggestions';
 import {
     PANEL_WIDTH, wrapperStyle, toggleBtnStyle, panelInnerStyle,
     headerStyle, headerBtnStyle, msgAreaStyle, emptyStyle,
@@ -86,18 +88,37 @@ export function GlobalAiPanel() {
     const handleDrop = useCallback((e: React.DragEvent) => { e.preventDefault(); setShowDropZone(false); const f = e.dataTransfer.files[0]; if (f?.type.startsWith('image/')) handleImageDrop(f); }, [handleImageDrop]);
     const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; if (f) handleImageDrop(f); e.target.value = ''; }, [handleImageDrop]);
 
+    // ── Context-aware suggestions ──
+    const canvasCtx: CanvasContext = (() => {
+        const page = currentPage as CanvasContext['page'];
+        if (page !== 'detail') return { page, elementCount: 0, selectionCount: 0, selectedTypes: [], hasText: false, hasImages: false };
+        try {
+            const eng = agent.engineRef?.current;
+            const nodesJson = eng?.get_all_nodes?.();
+            const nodes: { type: string }[] = nodesJson ? JSON.parse(nodesJson) : [];
+            const sel = eng?.get_selection_ids?.() ?? [];
+            const selTypes = nodes.filter((n: any) => sel.includes(n.id)).map((n: any) => n.type);
+            return { page, elementCount: nodes.length, selectionCount: sel.length, selectedTypes: selTypes, hasText: nodes.some(n => n.type === 'text'), hasImages: nodes.some(n => n.type === 'image') };
+        } catch { return { page, elementCount: 0, selectionCount: 0, selectedTypes: [], hasText: false, hasImages: false }; }
+    })();
+    const suggestions = getAiSuggestions(canvasCtx);
+
+    const quickActions = suggestions.map(s => ({
+        id: s.id,
+        label: t(s.labelKey) || s.labelKey.split('.').pop() || s.id,
+        hint: t(s.hintKey) || s.hintKey.split('.').pop() || '',
+    }));
+
     const handleQuickAction = useCallback((actionId: string) => {
-        if (actionId === 'scan') fileInputRef.current?.click();
-        else if (actionId === 'generate') { inputRef.current?.focus(); agent.setInput('Create a '); }
-        else if (actionId === 'check') agent.send('Run a quality check on the current canvas');
-    }, [agent]);
+        const sug = suggestions.find(s => s.id === actionId);
+        if (!sug) return;
+        if (sug.action === 'scan') fileInputRef.current?.click();
+        else if (sug.action === 'send') agent.send(sug.prompt);
+        else if (sug.action === 'focus') { agent.setInput(sug.prompt); inputRef.current?.focus(); }
+        else if (sug.action === 'export') agent.send(sug.prompt);
+    }, [agent, suggestions]);
 
     const handleSend = useCallback(() => { agent.send(); }, [agent]);
-
-    const quickActions = [
-        { id: 'generate', label: t('ai.generate'), hint: t('ai.generateHint') },
-        { id: 'scan', label: t('ai.scanDesign'), hint: t('ai.scanHint') },
-    ];
 
     return (
         <div style={{ ...wrapperStyle, width: open ? PANEL_WIDTH : 32 }}>
