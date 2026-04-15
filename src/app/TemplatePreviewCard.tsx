@@ -72,21 +72,31 @@ export function TemplatePreview({ template }: { template: DesignTemplate }) {
                         // Combine element shadow + textEffect shadow
                         const finalTextShadow = [effectShadow, shadowCSS].filter(Boolean).join(', ') || undefined;
 
+                        // ★ FIX: Fabric.js positions text at exact top (no half-leading).
+                        // CSS line-height adds (lineHeight-1)/2*fontSize above the first line.
+                        // Compensate by shifting top position up by that amount.
+                        const lh = el.lineHeight || 1.2;
+                        const fs = el.fontSize || 16;
+                        const halfLeading = ((lh - 1) / 2) * fs;
+
                         return (
                             <div key={el.id} style={{
-                                ...baseStyle,
-                                color: el.color, fontSize: el.fontSize,
+                                position: 'absolute',
+                                left: pos.x,
+                                top: pos.y - halfLeading,
+                                width: pos.w,
+                                height: pos.h + halfLeading, // prevent clipping from shift
+                                opacity: el.opacity ?? 1,
+                                zIndex: el.zIndex ?? 0,
+                                overflow: 'visible',
+                                pointerEvents: 'none',
+                                color: el.color, fontSize: fs,
                                 fontWeight: el.fontWeight,
                                 fontFamily: el.fontFamily || 'Inter, sans-serif',
                                 textAlign: (el.textAlign as React.CSSProperties['textAlign']) || 'left',
-                                lineHeight: el.lineHeight || 1.2,
+                                lineHeight: lh,
                                 whiteSpace: 'pre-wrap', wordBreak: 'break-word',
                                 textShadow: finalTextShadow,
-                                // ★ FIX: Fabric.js places text at exact top without CSS half-leading.
-                                // CSS adds (lineHeight-1)/2*fontSize as top padding (half-leading).
-                                // Compensate with negative margin to match Fabric.js positioning.
-                                marginTop: -((el.lineHeight || 1.2) - 1) / 2 * (el.fontSize || 16),
-                                display: 'block',
                                 // ★ outline/splice effects use CSS stroke (webkit)
                                 ...(el.textEffect?.type === 'outline' || el.textEffect?.type === 'splice'
                                     ? { WebkitTextStroke: `${Math.max(1, 2 * (el.textEffect.intensity / 50))}px ${el.textEffect.color}` }
