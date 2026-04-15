@@ -46,7 +46,18 @@ async function getSessionToken(): Promise<string | null> {
         const sb = getSupabase();
         if (!sb) return null;
         const { data } = await sb.auth.getSession();
-        return data.session?.access_token ?? null;
+        const session = data.session;
+        if (!session?.access_token) return null;
+
+        // ★ Check if token expires within 60s — refresh proactively
+        const expiresAt = session.expires_at ?? 0;
+        const nowSec = Math.floor(Date.now() / 1000);
+        if (expiresAt - nowSec < 60) {
+            const { data: refreshed } = await sb.auth.refreshSession();
+            return refreshed.session?.access_token ?? session.access_token;
+        }
+
+        return session.access_token;
     } catch { return null; }
 }
 
