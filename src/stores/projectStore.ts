@@ -165,6 +165,13 @@ export const useProjectStore = create<ProjectState>()(
                     });
                     state.selectedIds.delete(id);
                 });
+
+                // ★ Cloud-first: immediately soft-delete on cloud (set deleted_at)
+                import('@/services/cloudSync').then(({ trashProject }) => {
+                    trashProject(id).catch(e =>
+                        console.warn('[projectStore] Cloud trash failed:', e)
+                    );
+                }).catch(() => { /* offline */ });
             },
 
             deleteFolder: (id) => {
