@@ -85,12 +85,30 @@ async function getProxyHeaders(): Promise<Record<string, string>> {
     }
 
     // Production: use JWT token for edge function auth
-    const token = await getSessionToken();
+    let token = await getSessionToken();
+
+    // ★ If no token, force a refresh attempt
+    if (!token) {
+        try {
+            const { getSupabase } = await import('@/services/supabaseClient');
+            const sb = getSupabase();
+            if (sb) {
+                const { data: refreshed } = await sb.auth.refreshSession();
+                token = refreshed.session?.access_token ?? null;
+            }
+        } catch { /* ignore */ }
+    }
+
+    if (!token) {
+        throw new Error('Not logged in. Please log in to use AI features.');
+    }
+
+    // ★ Include apikey header (Supabase Edge Function standard)
+    const anonKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY ?? '';
     return {
         'Content-Type': 'application/json',
-        'Authorization': token ? `Bearer ${token}` : `Bearer ${getOpenRouterKey()}`,
-        'HTTP-Referer': 'https://ace.design',
-        'X-Title': 'Glid Design Engine',
+        'Authorization': `Bearer ${token}`,
+        ...(anonKey ? { 'apikey': anonKey } : {}),
     };
 }
 
