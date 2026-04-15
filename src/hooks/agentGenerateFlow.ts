@@ -171,7 +171,7 @@ async function selectTemplate(prompt: string, canvasW: number, canvasH: number, 
     cb.narrate(`Analyzing layout templates for ${canvasW}x${canvasH}...`);
     cb.addCard('structure', 'AI selecting layout template', 'running');
 
-    let template: import('@/services/designTemplates').DesignTemplate | null = null;
+    let template: { id: string; name: string; description: string } | null = null;
     try {
         const { renderTemplateGrid, buildTemplateSelectionPrompt, getTemplateById } = await resilientImport(() => import('@/services/templatePreviewRenderer'));
         const { callWithRole } = await resilientImport(() => import('@/services/openRouterClient'));
@@ -198,11 +198,14 @@ async function selectTemplate(prompt: string, canvasW: number, canvasH: number, 
         }
     } catch (err) { console.warn('[UnifiedAgent] AI template selection failed, falling back:', err); }
 
+    // ★ Fallback: pick first available template from Supabase store
     if (!template) {
-        const { selectTemplate: selTpl } = await resilientImport(() => import('@/services/designTemplates'));
-        template = selTpl(canvasW, canvasH);
-        if (!template) throw new Error('No compatible template found');
-        cb.updateCard('structure', 'done', template.name, { reasoning: `Fallback: "${template.name}" — ${template.description}`, expandedDetail: `Template: ${template.name}\nDescription: ${template.description}\nAspect Ratios: ${template.aspectRatios.join(', ')}\nMethod: Rotation fallback` });
+        const { useTemplateStore } = await resilientImport(() => import('@/stores/templateStore'));
+        const allTemplates = useTemplateStore.getState().templates ?? [];
+        const fallback = allTemplates.find((t: any) => t.id.startsWith('ai-')) ?? allTemplates[0];
+        if (!fallback) throw new Error('No templates available in store');
+        template = { id: fallback.id, name: fallback.name, description: fallback.description ?? '' };
+        cb.updateCard('structure', 'done', template.name, { reasoning: `Fallback: "${template.name}"`, expandedDetail: `Template: ${template.name}\nMethod: First available from Supabase` });
     }
     return template;
 }

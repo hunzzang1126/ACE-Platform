@@ -10,6 +10,7 @@ import type { RenderElement } from '@/services/autoDesignTypes';
 import type { DesignElement, TextElement, ShapeElement, ButtonElement } from '@/schema/elements.types';
 import type { BannerVariant } from '@/schema/design.types';
 import { constraintsToAbsolute } from '@/engine/constraintUtils';
+import { useTemplateStore } from '@/stores/templateStore';
 
 /**
  * Resolve template elements from Supabase-stored data.
@@ -23,8 +24,6 @@ export function resolveTemplateElements(
     canvasW: number,
     canvasH: number,
 ): RenderElement[] {
-    // ★ Dynamic import avoided — templateStore is always loaded by this point
-    const { useTemplateStore } = require('@/stores/templateStore');
     const store = useTemplateStore.getState();
 
     // ★ ID Resolution: AI selects 'centered-stack' but templateStore
@@ -82,7 +81,6 @@ export function resolveTemplateElements(
  */
 export function getTemplateBackground(templateId: string): string | null {
     try {
-        const { useTemplateStore } = require('@/stores/templateStore');
         const store = useTemplateStore.getState();
         const tmpl = store.getById(templateId)
             ?? store.getById(`ai-${templateId}`)

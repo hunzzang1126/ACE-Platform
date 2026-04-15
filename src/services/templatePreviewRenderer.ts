@@ -1,79 +1,62 @@
 // ─────────────────────────────────────────────────
 // templatePreviewRenderer.ts — Render template previews for AI vision
 // ─────────────────────────────────────────────────
-// Renders each design template to a small Canvas2D thumbnail,
-// then composes a labeled grid collage that the AI can "see"
-// to pick the best layout for the user's request.
-//
-// Dynamic: reads from DESIGN_TEMPLATES at render time.
-// Adding/removing templates automatically updates the grid.
+// ★ CLOUD-FIRST: Reads from templateStore (Supabase-synced).
+// Only templates that exist in Supabase are shown to the AI.
+// No hardcoded template references.
 // ─────────────────────────────────────────────────
 
-import { DESIGN_TEMPLATES, type DesignTemplate, type GeneratedContent } from '@/services/designTemplates';
-import type { DesignStyleGuide } from '@/services/designStyleGuides';
+import type { RenderElement } from '@/services/autoDesignTypes';
+import { resolveTemplateElements } from '@/services/templateResolver';
+import { useTemplateStore } from '@/stores/templateStore';
 
-// ── Neutral style guide for preview rendering ────
+// ── Types (minimal — just what the grid needs) ───
 
-const PREVIEW_GUIDE: DesignStyleGuide = {
-    id: 'preview',
-    name: 'Preview',
-    description: '',
-    keywords: [],
-    colors: {
-        background: '#1a1a2e',
-        surface: '#16213e',
-        border: '#0f3460',
-        foreground: '#e2e8f0',
-        secondary: '#94a3b8',
-        tertiary: '#64748b',
-        muted: '#475569',
-        accent: '#e94560',
-        accentForeground: '#ffffff',
-        error: '#ff4444',
-        warning: '#ffaa00',
-        info: '#4488ff',
-        gradientStart: '#1a1a2e',
-        gradientEnd: '#16213e',
-        gradientAngle: 135,
-    },
-    typography: {
-        primaryFont: 'Inter',
-        secondaryFont: 'Inter',
-        scale: { hero: 0.18, headline: 0.11, title: 0.08, body: 0.055, caption: 0.04, micro: 0.03 },
-        weights: { bold: '800', semibold: '600', medium: '500', normal: '400' },
-        letterSpacing: { tight: -0.5, normal: 0, wide: 1.5 },
-    },
-    spacing: { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, safe: 16 },
-    radius: 6,
-};
-
-const PREVIEW_CONTENT: GeneratedContent = {
-    headline: 'Bold\nHeadline',
-    subheadline: 'Supporting text goes here with context',
-    cta: 'Get Started',
-    tag: 'FEATURED',
-};
+interface TemplateInfo {
+    id: string;
+    name: string;
+    description: string;
+}
 
 // ── Cache ────────────────────────────────────────
-// Keyed by template IDs + canvas aspect, invalidated when templates change.
 
 const previewCache = new Map<string, string>();
 
+function getTemplateList(): TemplateInfo[] {
+    const templates = useTemplateStore.getState().templates ?? [];
+    return templates
+        .filter((t: any) => t.id.startsWith('ai-') || t.id.startsWith('builtin-'))
+        .map((t: any) => ({ id: t.id, name: t.name, description: t.description }));
+}
+
 function getCacheKey(canvasW: number, canvasH: number): string {
-    const ids = DESIGN_TEMPLATES.map(t => t.id).join(',');
+    const ids = getTemplateList().map(t => t.id).join(',');
     return `${ids}|${canvasW}x${canvasH}`;
 }
 
 // ── Render single template to base64 ─────────────
 
 function renderSinglePreview(
-    template: DesignTemplate,
+    templateId: string,
     canvasW: number,
     canvasH: number,
     thumbW: number,
     thumbH: number,
 ): string {
-    const elements = template.build(canvasW, canvasH, PREVIEW_GUIDE, PREVIEW_CONTENT);
+    // ★ Get elements from Supabase-synced templateStore
+    let elements: RenderElement[];
+    try {
+        elements = resolveTemplateElements(templateId, canvasW, canvasH);
+    } catch {
+        // Template might have invalid data — return blank
+        const canvas = document.createElement('canvas');
+        canvas.width = thumbW;
+        canvas.height = thumbH;
+        const ctx = canvas.getContext('2d')!;
+        ctx.fillStyle = '#1a1a2e';
+        ctx.fillRect(0, 0, thumbW, thumbH);
+        return canvas.toDataURL('image/png');
+    }
 
     const canvas = document.createElement('canvas');
     canvas.width = thumbW;
@@ -96,7 +79,6 @@ function renderSinglePreview(
         const h = el.h ?? 50;
 
         if (el.type === 'text') {
-            // Render text
             const fontSize = Math.max(8, el.font_size ?? 14);
             ctx.font = `${el.font_weight ?? '400'} ${fontSize}px Inter, sans-serif`;
             ctx.fillStyle = el.color_hex ?? '#ffffff';
@@ -113,7 +95,6 @@ function renderSinglePreview(
                 ctx.fillText(line, textX, y + i * lineH, w);
             });
         } else if (el.gradient_start_hex && el.gradient_end_hex) {
-            // Gradient rect
             const angle = (el.gradient_angle ?? 135) * Math.PI / 180;
             const cx = x + w / 2;
             const cy = y + h / 2;
@@ -141,7 +122,6 @@ function renderSinglePreview(
             roundRect(ctx, x, y, w, h, el.radius ?? 6);
             ctx.fill();
         } else {
-            // Regular rect
             ctx.fillStyle = rgbaFromEl(el);
             ctx.fillRect(x, y, w, h);
         }
@@ -155,9 +135,8 @@ function renderSinglePreview(
 // ── Compose labeled grid collage ─────────────────
 
 /**
- * Renders all compatible templates into a single labeled grid image.
- * Each cell shows the template preview with its name below.
- * Returns base64 data URL.
+ * Renders all Supabase templates into a single labeled grid image.
+ * ★ Only templates in templateStore (synced from Supabase) are shown.
  */
 export function renderTemplateGrid(
     canvasW: number,
@@ -167,22 +146,20 @@ export function renderTemplateGrid(
     const cached = previewCache.get(cacheKey);
     if (cached) return cached;
 
-    const templates = DESIGN_TEMPLATES;
+    const templates = getTemplateList();
     const count = templates.length;
+    if (count === 0) return '';
 
-    // Grid layout: aim for ~4 columns
     const cols = Math.min(4, count);
     const rows = Math.ceil(count / cols);
 
-    // Each cell size
     const cellW = 200;
     const thumbAspect = canvasH / canvasW;
     const thumbH = Math.round(cellW * thumbAspect);
     const labelH = 22;
-    const cellH = thumbH + labelH + 8; // thumb + label + padding
+    const cellH = thumbH + labelH + 8;
     const padding = 8;
 
-    // Total grid size
     const gridW = cols * (cellW + padding) + padding;
     const gridH = rows * (cellH + padding) + padding;
 
@@ -191,7 +168,6 @@ export function renderTemplateGrid(
     grid.height = gridH;
     const gctx = grid.getContext('2d')!;
 
-    // Dark background
     gctx.fillStyle = '#0d0d0d';
     gctx.fillRect(0, 0, gridW, gridH);
 
@@ -201,21 +177,16 @@ export function renderTemplateGrid(
         const cx = padding + col * (cellW + padding);
         const cy = padding + row * (cellH + padding);
 
-        // Render thumbnail
-        const thumbDataUrl = renderSinglePreview(tmpl, canvasW, canvasH, cellW, thumbH);
+        const thumbDataUrl = renderSinglePreview(tmpl.id, canvasW, canvasH, cellW, thumbH);
 
-        // Draw thumbnail onto grid
         const img = new Image();
         img.src = thumbDataUrl;
-        // Synchronous because data URL loads immediately
         gctx.drawImage(img, cx, cy, cellW, thumbH);
 
-        // Draw border
         gctx.strokeStyle = '#333';
         gctx.lineWidth = 1;
         gctx.strokeRect(cx, cy, cellW, thumbH);
 
-        // Draw label
         gctx.fillStyle = '#ffffff';
         gctx.font = 'bold 11px Inter, sans-serif';
         gctx.textAlign = 'center';
@@ -229,25 +200,25 @@ export function renderTemplateGrid(
 }
 
 /**
- * Get template by ID.
+ * Get template by ID from templateStore (Supabase-synced).
  */
-export function getTemplateById(id: string): DesignTemplate | undefined {
-    return DESIGN_TEMPLATES.find(t => t.id === id);
+export function getTemplateById(id: string): TemplateInfo | undefined {
+    return getTemplateList().find(t => t.id === id);
 }
 
 /**
  * Get template by 1-based index (as shown in the grid labels).
  */
-export function getTemplateByIndex(idx: number): DesignTemplate | undefined {
-    return DESIGN_TEMPLATES[idx - 1];
+export function getTemplateByIndex(idx: number): TemplateInfo | undefined {
+    return getTemplateList()[idx - 1];
 }
 
 /**
  * Build the AI prompt for template selection.
- * Returns the system instruction + available template IDs.
+ * ★ Only lists templates from templateStore (Supabase).
  */
 export function buildTemplateSelectionPrompt(canvasW: number, canvasH: number): string {
-    const templates = DESIGN_TEMPLATES;
+    const templates = getTemplateList();
     const list = templates.map((t, i) =>
         `${i + 1}. "${t.id}" — ${t.name}: ${t.description}`
     ).join('\n');
@@ -267,7 +238,7 @@ Return ONLY a JSON object: { "templateId": "<id from list>", "reason": "<1 sente
 
 // ── Helpers ──────────────────────────────────────
 
-function rgbaFromEl(el: import('@/services/autoDesignService').RenderElement): string {
+function rgbaFromEl(el: RenderElement): string {
     const r = Math.round((el.r ?? 0.5) * 255);
     const g = Math.round((el.g ?? 0.5) * 255);
     const b = Math.round((el.b ?? 0.5) * 255);
