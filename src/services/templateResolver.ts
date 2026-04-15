@@ -34,11 +34,21 @@ export function resolveTemplateElements(
         ?? store.getById(`builtin-${templateId}`);
 
     if (!tmpl) {
-        throw new Error(
-            `[templateResolver] Template "${templateId}" not found in store. ` +
-            `Tried: "${templateId}", "ai-${templateId}", "builtin-${templateId}". ` +
-            `Ensure it exists in Supabase template_overrides table.`
+        // Template was deleted from Supabase (admin removed it).
+        // Gracefully pick the first available AI template instead of crashing.
+        const allTemplates = store.templates ?? [];
+        const fallback = allTemplates.find((t: any) => t.id.startsWith('ai-'))
+            ?? allTemplates[0];
+        if (!fallback) {
+            throw new Error(
+                `[templateResolver] No templates available in store. ` +
+                `Supabase template_overrides table may be empty.`
+            );
+        }
+        console.warn(
+            `[templateResolver] "${templateId}" not found — using "${fallback.id}" instead.`
         );
+        return resolveTemplateElements(fallback.id, canvasW, canvasH);
     }
 
     // Parse the stored variant snapshot

@@ -47,9 +47,9 @@ describe('templateResolver — structure', () => {
         expect(SRC).toContain('JSON.parse(tmpl.variantSnapshot)');
     });
 
-    it('throws on missing template (no silent fallback)', () => {
-        expect(SRC).toContain('throw new Error');
-        expect(SRC).toContain('not found in store');
+    it('gracefully falls back when template is missing (admin deleted it)', () => {
+        expect(SRC).toContain('not found — using');
+        expect(SRC).toContain('fallback');
     });
 
     it('handles text, shape, and button element types', () => {
