@@ -328,4 +328,30 @@ describe('templateStore — addCustomTemplate (v424)', () => {
         expect(tmpl!.width).toBe(1080);
         expect(tmpl!.height).toBe(1080);
     });
+
+    it('slugifies special characters in template name', () => {
+        const id = useTemplateStore.getState().addCustomTemplate({
+            name: 'Design Trends!!  2026', category: 'display', variant: mockVariant,
+        });
+        expect(id).toBe('design-trends-2026');
+    });
+
+    it('adds collision suffix when duplicate name exists', () => {
+        const id1 = useTemplateStore.getState().addCustomTemplate({
+            name: 'Duplicate Name', category: 'display', variant: mockVariant,
+        });
+        const id2 = useTemplateStore.getState().addCustomTemplate({
+            name: 'Duplicate Name', category: 'display', variant: mockVariant,
+        });
+        expect(id1).toBe('duplicate-name');
+        expect(id2).not.toBe(id1);
+        expect(id2).toContain('duplicate-name-');
+    });
+
+    it('falls back to "custom-template" for empty name', () => {
+        const id = useTemplateStore.getState().addCustomTemplate({
+            name: '', category: 'display', variant: mockVariant,
+        });
+        expect(id).toBe('custom-template');
+    });
 });

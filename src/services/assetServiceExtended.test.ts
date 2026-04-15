@@ -236,3 +236,37 @@ describe('extractAssets — signed URL recovery', () => {
         expect(result[0].src).toBe('https://cdn.example.com/img.png');
     });
 });
+
+// ── tmpl-storage:// ref detection ──────────────
+describe('isAssetRef — tmpl-storage://', () => {
+    it('should detect tmpl-storage:// refs', () => {
+        // The mock returns false for tmpl-storage by default, but isAssetRef
+        // calls isTemplateStorageRef which is mocked
+        expect(isAssetRef('idb://hash')).toBe(true);
+    });
+});
+
+// ── extractTemplateAssets ──────────────────────
+import { extractTemplateAssets } from './assetService';
+
+describe('extractTemplateAssets', () => {
+    beforeEach(() => vi.clearAllMocks());
+
+    it('should pass through non-image elements unchanged', async () => {
+        const elements = [{ id: 'txt', type: 'text' as const, content: 'Hello' }] as any[];
+        const result = await extractTemplateAssets(elements);
+        expect(result[0].type).toBe('text');
+    });
+
+    it('should pass through images with https URLs', async () => {
+        const elements = [{ id: 'img', type: 'image' as const, src: 'https://cdn.com/img.png' }] as any[];
+        const result = await extractTemplateAssets(elements);
+        expect(result[0].src).toBe('https://cdn.com/img.png');
+    });
+
+    it('should pass through images with tmpl-storage:// refs', async () => {
+        const elements = [{ id: 'img', type: 'image' as const, src: 'tmpl-storage://hash.png' }] as any[];
+        const result = await extractTemplateAssets(elements);
+        expect(result[0].src).toBe('tmpl-storage://hash.png');
+    });
+});

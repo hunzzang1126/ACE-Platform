@@ -82,6 +82,11 @@ export function TemplatePreview({ template }: { template: DesignTemplate }) {
                                 lineHeight: el.lineHeight || 1.2,
                                 whiteSpace: 'pre-wrap', wordBreak: 'break-word',
                                 textShadow: finalTextShadow,
+                                // ★ FIX: Fabric.js places text at exact top without CSS half-leading.
+                                // CSS adds (lineHeight-1)/2*fontSize as top padding (half-leading).
+                                // Compensate with negative margin to match Fabric.js positioning.
+                                marginTop: -((el.lineHeight || 1.2) - 1) / 2 * (el.fontSize || 16),
+                                display: 'block',
                                 // ★ outline/splice effects use CSS stroke (webkit)
                                 ...(el.textEffect?.type === 'outline' || el.textEffect?.type === 'splice'
                                     ? { WebkitTextStroke: `${Math.max(1, 2 * (el.textEffect.intensity / 50))}px ${el.textEffect.color}` }

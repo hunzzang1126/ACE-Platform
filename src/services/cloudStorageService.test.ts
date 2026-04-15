@@ -134,4 +134,52 @@ describe('cloudStorageService', () => {
             expect(result).toContain('storage://');
         });
     });
+
+    // ── Template Storage (PUBLIC bucket) ──────────
+    describe('isTemplateStorageRef', () => {
+        it('should detect tmpl-storage:// prefix', async () => {
+            const { isTemplateStorageRef } = await import('./cloudStorageService');
+            expect(isTemplateStorageRef('tmpl-storage://abc123.png')).toBe(true);
+        });
+
+        it('should reject non-template refs', async () => {
+            const { isTemplateStorageRef } = await import('./cloudStorageService');
+            expect(isTemplateStorageRef('storage://user/file.png')).toBe(false);
+            expect(isTemplateStorageRef('idb://hash')).toBe(false);
+            expect(isTemplateStorageRef('https://example.com')).toBe(false);
+        });
+    });
+
+    describe('uploadToTemplateStorage', () => {
+        it('should return null when no supabase', async () => {
+            const { getSupabase } = await import('@/services/supabaseClient');
+            vi.mocked(getSupabase).mockReturnValueOnce(null);
+            const { uploadToTemplateStorage } = await import('./cloudStorageService');
+            const result = await uploadToTemplateStorage(new Blob(['test']));
+            expect(result).toBeNull();
+        });
+
+        it('should upload blob and return tmpl-storage:// ref', async () => {
+            const { uploadToTemplateStorage } = await import('./cloudStorageService');
+            const result = await uploadToTemplateStorage(new Blob(['test'], { type: 'image/png' }));
+            expect(result).toContain('tmpl-storage://');
+        });
+    });
+
+    describe('resolveTemplateStorageUrl', () => {
+        it('should return null for non-template refs', async () => {
+            const { resolveTemplateStorageUrl } = await import('./cloudStorageService');
+            expect(resolveTemplateStorageUrl('storage://user/file.png')).toBeNull();
+        });
+
+        it('should return public URL for template ref', async () => {
+            mockSupabase.storage.from.mockReturnValueOnce({
+                ...mockSupabase.storage.from(),
+                getPublicUrl: vi.fn().mockReturnValue({ data: { publicUrl: 'https://public.url/img.png' } }),
+            });
+            const { resolveTemplateStorageUrl } = await import('./cloudStorageService');
+            const result = resolveTemplateStorageUrl('tmpl-storage://abc123.png');
+            expect(result).toBe('https://public.url/img.png');
+        });
+    });
 });
