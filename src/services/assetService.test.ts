@@ -21,6 +21,9 @@ vi.mock('./cloudStorageService', () => ({
     isCloudUrl: vi.fn((ref: string) => ref.includes('.supabase.co')),
     getCurrentUserId: vi.fn().mockResolvedValue(null),
     resolveCloudUrl: vi.fn().mockResolvedValue(null),
+    uploadToTemplateStorage: vi.fn().mockResolvedValue(null),
+    isTemplateStorageRef: vi.fn((ref: string) => ref.startsWith('tmpl-storage://')),
+    resolveTemplateStorageUrl: vi.fn().mockReturnValue(null),
 }));
 
 // Mock crypto.subtle

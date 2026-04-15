@@ -14,7 +14,7 @@
 
 import { aceDB } from '@/stores/aceDB';
 import type { DesignElement, ImageElement } from '@/schema/elements.types';
-import { uploadToCloud, isStorageRef, isCloudUrl, getCurrentUserId, resolveCloudUrl } from './cloudStorageService';
+import { uploadToCloud, isStorageRef, isCloudUrl, getCurrentUserId, resolveCloudUrl, uploadToTemplateStorage, isTemplateStorageRef, resolveTemplateStorageUrl } from './cloudStorageService';
 
 const IDB_PREFIX = 'idb://';
 
@@ -62,6 +62,14 @@ export async function resolveAsset(ref: string): Promise<string> {
         return ref;
     }
 
+    // ★ Template storage refs → public URL (no signed URL needed)
+    if (isTemplateStorageRef(ref)) {
+        const publicUrl = resolveTemplateStorageUrl(ref);
+        if (publicUrl) return publicUrl;
+        console.warn(`[assetService] Template asset unreachable: ${ref}`);
+        return ref;
+    }
+
     // ★ CONSOLIDATED FIX (was duplicated in useCanvasSync.ts restoreImage):
     // Recover expired signed Supabase URLs → re-sign via storage:// ref.
     // Images saved before v0.0.0.488 may have leaked signed URLs as src.
@@ -97,7 +105,7 @@ export async function resolveAsset(ref: string): Promise<string> {
  * Recognizes both idb:// (IndexedDB) and storage:// (Supabase) refs.
  */
 export function isAssetRef(src: string): boolean {
-    return src.startsWith(IDB_PREFIX) || isStorageRef(src);
+    return src.startsWith(IDB_PREFIX) || isStorageRef(src) || isTemplateStorageRef(src);
 }
 
 /**
@@ -142,6 +150,64 @@ export async function extractAssets(
             } else {
                 // Can't extract storage path — keep as-is (will break after expiry)
                 console.warn('[extractAssets] Could not convert signed URL to storage ref:', src.slice(0, 80));
+                results.push(el);
+            }
+        } else {
+            results.push(el);
+        }
+    }
+
+    return results;
+}
+
+/**
+ * Extract assets for TEMPLATE storage — uses the PUBLIC ace-templates bucket.
+ * ★ Template images must be globally visible to all users.
+ * Converts data: URLs → tmpl-storage:// refs.
+ * Also migrates any storage:// (private) refs to tmpl-storage:// (public).
+ */
+export async function extractTemplateAssets(
+    elements: DesignElement[],
+): Promise<DesignElement[]> {
+    const results: DesignElement[] = [];
+
+    for (const el of elements) {
+        if (el.type !== 'image') { results.push(el); continue; }
+
+        const src = el.src;
+        if (isDataUrl(src)) {
+            // data: → upload to PUBLIC template bucket
+            const ref = await uploadToTemplateStorage(src);
+            results.push({ ...el, src: ref ?? src } as ImageElement);
+        } else if (isStorageRef(src)) {
+            // ★ Private ref → re-upload to public template bucket
+            // Resolve the private ref to a URL, download, re-upload to public
+            const resolved = await resolveAsset(src);
+            if (resolved && resolved !== src) {
+                try {
+                    const resp = await fetch(resolved);
+                    const blob = await resp.blob();
+                    const ref = await uploadToTemplateStorage(blob);
+                    results.push({ ...el, src: ref ?? src } as ImageElement);
+                } catch {
+                    results.push(el);
+                }
+            } else {
+                results.push(el);
+            }
+        } else if (src.startsWith('idb://')) {
+            // idb:// → resolve from IndexedDB, upload to public
+            const resolved = await resolveAsset(src);
+            if (resolved && resolved !== src) {
+                try {
+                    const resp = await fetch(resolved);
+                    const blob = await resp.blob();
+                    const ref = await uploadToTemplateStorage(blob);
+                    results.push({ ...el, src: ref ?? src } as ImageElement);
+                } catch {
+                    results.push(el);
+                }
+            } else {
                 results.push(el);
             }
         } else {

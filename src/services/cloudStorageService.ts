@@ -163,3 +163,61 @@ function mimeToExt(mime: string): string {
     };
     return map[mime] ?? 'png';
 }
+
+// ── Template Storage (PUBLIC bucket) ────────────
+
+const TEMPLATE_BUCKET = 'ace-templates';
+const TEMPLATE_PREFIX = 'tmpl-storage://';
+
+/**
+ * Upload image to the PUBLIC template bucket.
+ * Returns tmpl-storage://{hash}.{ext} ref.
+ * Unlike ace-assets, this bucket is PUBLIC — no signed URLs needed.
+ */
+export async function uploadToTemplateStorage(
+    input: string | Blob,
+): Promise<string | null> {
+    const sb = getSupabase();
+    if (!sb) return null;
+
+    const blob = typeof input === 'string' ? dataUrlToBlob(input) : input;
+    const hash = await computeHash(blob);
+    const ext = mimeToExt(blob.type);
+    const path = `${hash}.${ext}`;
+
+    const { error } = await sb.storage.from(TEMPLATE_BUCKET).upload(path, blob, {
+        contentType: blob.type,
+        upsert: true,
+    });
+
+    if (error && !error.message?.includes('already exists') && !error.message?.includes('Duplicate')) {
+        console.error('[templateStorage] Upload failed:', error.message);
+        return null;
+    }
+
+    const ref = `${TEMPLATE_PREFIX}${path}`;
+    console.log(`[templateStorage] Stored: ${ref}`);
+    return ref;
+}
+
+/**
+ * Resolve a tmpl-storage:// ref to a public URL.
+ * No signed URL needed — bucket is PUBLIC.
+ */
+export function resolveTemplateStorageUrl(ref: string): string | null {
+    if (!isTemplateStorageRef(ref)) return null;
+    const sb = getSupabase();
+    if (!sb) return null;
+
+    const path = ref.slice(TEMPLATE_PREFIX.length);
+    const { data } = sb.storage.from(TEMPLATE_BUCKET).getPublicUrl(path);
+    return data?.publicUrl ?? null;
+}
+
+/**
+ * Check if a ref is a template storage reference.
+ */
+export function isTemplateStorageRef(ref: string): boolean {
+    return ref.startsWith(TEMPLATE_PREFIX);
+}
+

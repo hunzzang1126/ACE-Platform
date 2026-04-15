@@ -12,6 +12,7 @@ import {
     deleteTemplateOverride,
 } from '@/services/supabaseClient';
 import { cleanupOrphanedTemplateCS } from './templateStoreCleanup';
+import { extractTemplateAssets } from '@/services/assetService';
 
 // ── Types ──
 
@@ -228,11 +229,21 @@ export const useTemplateStore = create<TemplateState>()(
                 // Push to Supabase (fire-and-forget)
                 (async () => {
                     try {
+                        // ★ Extract images to PUBLIC template bucket before saving
+                        const publicElements = await extractTemplateAssets(cleanVariant.elements);
+                        const publicVariant = { ...cleanVariant, elements: publicElements };
+                        const publicSnapshot = JSON.stringify(publicVariant);
+                        // Update local state with public refs
+                        set(state => {
+                            state.templateOverrides[id] = publicSnapshot;
+                            const t = state.templates.find(t => t.id === id);
+                            if (t) t.variantSnapshot = publicSnapshot;
+                        });
                         const { useAuthStore } = await import('@/stores/authStore');
                         const userId = useAuthStore.getState().user?.id;
                         if (userId) {
                             const tmpl = get().templates.find(t => t.id === id);
-                            await upsertTemplateOverride(id, snapshot, userId, tmpl?.width, tmpl?.height, tmpl?.name);
+                            await upsertTemplateOverride(id, publicSnapshot, userId, tmpl?.width, tmpl?.height, tmpl?.name);
                         }
                     } catch (e) {
                         console.warn('[templateStore] Failed to push override to cloud:', e);
@@ -291,10 +302,20 @@ export const useTemplateStore = create<TemplateState>()(
                 // Push to Supabase so all users see it
                 (async () => {
                     try {
+                        // ★ Extract images to PUBLIC template bucket
+                        const publicElements = await extractTemplateAssets(opts.variant.elements);
+                        const publicVariant = { ...variantWithMeta, elements: publicElements };
+                        const publicSnapshot = JSON.stringify(publicVariant);
+                        // Update local state with public refs
+                        set(state => {
+                            const t = state.templates.find(t => t.id === id);
+                            if (t) t.variantSnapshot = publicSnapshot;
+                            state.templateOverrides[id] = publicSnapshot;
+                        });
                         const { useAuthStore } = await import('@/stores/authStore');
                         const userId = useAuthStore.getState().user?.id;
                         if (userId) {
-                            await upsertTemplateOverride(id, snapshot, userId, 1080, 1080, opts.name);
+                            await upsertTemplateOverride(id, publicSnapshot, userId, 1080, 1080, opts.name);
                             console.log('[templateStore] Custom template pushed to cloud:', id);
                         }
                     } catch (e) {

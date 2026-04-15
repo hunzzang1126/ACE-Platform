@@ -21,6 +21,9 @@ vi.mock('./cloudStorageService', () => ({
     isCloudUrl: mockIsCloudUrl,
     getCurrentUserId: mockGetCurrentUserId,
     resolveCloudUrl: mockResolveCloudUrl,
+    uploadToTemplateStorage: vi.fn().mockResolvedValue(null),
+    isTemplateStorageRef: vi.fn().mockReturnValue(false),
+    resolveTemplateStorageUrl: vi.fn().mockReturnValue(null),
 }));
 
 import { isAssetRef, isDataUrl, extractAssets, resolveAssets, revokeAssetCache } from './assetService';
