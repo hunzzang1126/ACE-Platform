@@ -1,19 +1,80 @@
+// ─────────────────────────────────────────────────
 // TemplatePreviewCard — Fabric.js headless rendered template preview
+// ─────────────────────────────────────────────────
 // ★ Uses SAME Fabric.js engine as Canvas Editor for pixel-perfect rendering.
-// Previous CSS-based approach had unfixable text positioning drift.
+// ★ Performance: dataURL cache + render queue (max 3 concurrent) to prevent
+//   GPU lock-up when 30+ templates render simultaneously.
+// ─────────────────────────────────────────────────
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { renderVariantWithFabric } from '@/components/creativeset/fabricHeadlessRenderer';
 import type { DesignTemplate } from '@/stores/templateStore';
 import type { BannerVariant } from '@/schema/design.types';
 
 const PREVIEW_W = 220;
 
+// ═══════════════════════════════════════════════════
+// RENDER CACHE — prevents redundant Fabric renders
+// ═══════════════════════════════════════════════════
+
+const previewCache = new Map<string, string>();  // templateId → dataURL
+const MAX_CACHE = 200;
+
+/** Get cached dataURL, null if not cached */
+export function getCachedPreview(templateId: string): string | null {
+    return previewCache.get(templateId) ?? null;
+}
+
+/** Store a rendered dataURL in cache */
+function setCachedPreview(templateId: string, dataUrl: string): void {
+    if (previewCache.size >= MAX_CACHE) {
+        // Evict oldest entry
+        const firstKey = previewCache.keys().next().value;
+        if (firstKey) previewCache.delete(firstKey);
+    }
+    previewCache.set(templateId, dataUrl);
+}
+
+/** Invalidate a specific template's cache (call after save/edit) */
+export function invalidatePreviewCache(templateId: string): void {
+    previewCache.delete(templateId);
+}
+
+// ═══════════════════════════════════════════════════
+// RENDER QUEUE — max 3 concurrent Fabric renders
+// ═══════════════════════════════════════════════════
+
+const MAX_CONCURRENT = 3;
+let activeRenders = 0;
+const pendingQueue: Array<{ resolve: () => void }> = [];
+
+async function acquireRenderSlot(): Promise<void> {
+    if (activeRenders < MAX_CONCURRENT) {
+        activeRenders++;
+        return;
+    }
+    return new Promise(resolve => pendingQueue.push({ resolve }));
+}
+
+function releaseRenderSlot(): void {
+    activeRenders--;
+    if (pendingQueue.length > 0 && activeRenders < MAX_CONCURRENT) {
+        activeRenders++;
+        pendingQueue.shift()!.resolve();
+    }
+}
+
+// ═══════════════════════════════════════════════════
+// COMPONENT
+// ═══════════════════════════════════════════════════
+
 export function TemplatePreview({ template }: { template: DesignTemplate }) {
-    let variant: BannerVariant | null = null;
-    try {
-        variant = JSON.parse(template.variantSnapshot);
-    } catch { /* noop */ }
+    // ★ useMemo prevents JSON.parse on every render — key perf fix.
+    // Only re-parse if variantSnapshot string actually changes.
+    const variant = useMemo<BannerVariant | null>(() => {
+        try { return JSON.parse(template.variantSnapshot); }
+        catch { return null; }
+    }, [template.variantSnapshot]);
 
     if (!variant) {
         return (
@@ -28,13 +89,15 @@ export function TemplatePreview({ template }: { template: DesignTemplate }) {
         );
     }
 
-    return <FabricPreview variant={variant} width={template.width} height={template.height} />;
+    return <FabricPreview templateId={template.id} variant={variant} width={template.width} height={template.height} />;
 }
 
 // ── Fabric.js headless renderer component ──
 
-function FabricPreview({ variant, width, height }: { variant: BannerVariant; width: number; height: number }) {
-    const [dataUrl, setDataUrl] = useState<string | null>(null);
+function FabricPreview({ templateId, variant, width, height }: {
+    templateId: string; variant: BannerVariant; width: number; height: number;
+}) {
+    const [dataUrl, setDataUrl] = useState<string | null>(() => getCachedPreview(templateId));
     const [error, setError] = useState(false);
     const renderIdRef = useRef(0);
 
@@ -42,20 +105,38 @@ function FabricPreview({ variant, width, height }: { variant: BannerVariant; wid
     const previewH = height * scale;
 
     useEffect(() => {
-        const renderId = ++renderIdRef.current;
+        // ★ Cache hit — skip Fabric render entirely
+        const cached = getCachedPreview(templateId);
+        if (cached) { setDataUrl(cached); return; }
 
-        // Ensure variant has correct preset dimensions
+        const renderId = ++renderIdRef.current;
+        let cancelled = false;
+
         const fullVariant: BannerVariant = {
             ...variant,
             preset: variant.preset ?? { id: 'preview', name: 'Preview', width, height, category: 'display' as const },
         };
 
-        renderVariantWithFabric(fullVariant)
-            .then(url => { if (renderId === renderIdRef.current) setDataUrl(url); })
-            .catch(() => { if (renderId === renderIdRef.current) setError(true); });
+        // ★ Queue-limited render — max 3 concurrent Fabric canvases
+        (async () => {
+            await acquireRenderSlot();
+            if (cancelled) { releaseRenderSlot(); return; }
 
-        return () => { renderIdRef.current++; };
-    }, [variant, width, height]);
+            try {
+                const url = await renderVariantWithFabric(fullVariant);
+                if (!cancelled && renderId === renderIdRef.current) {
+                    setCachedPreview(templateId, url);
+                    setDataUrl(url);
+                }
+            } catch {
+                if (!cancelled && renderId === renderIdRef.current) setError(true);
+            } finally {
+                releaseRenderSlot();
+            }
+        })();
+
+        return () => { cancelled = true; renderIdRef.current++; };
+    }, [templateId, variant, width, height]);
 
     if (error) {
         return (

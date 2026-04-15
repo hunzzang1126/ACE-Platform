@@ -9,6 +9,7 @@ import { useTemplateStore } from '@/stores/templateStore';
 import type { OverlayElement } from '@/hooks/useOverlayElements';
 import type { EngineNode } from '@/hooks/canvasTypes';
 import { readNodesFromEngine, addOverlaysAndSort } from '@/hooks/canvasSyncSave';
+import { invalidatePreviewCache } from '@/app/TemplatePreviewCard';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Engine = any;
@@ -69,6 +70,8 @@ export function useEditorPageSave(
 
                     console.log('[handleSave] Template direct save: elements:', elements.length, 'from engine (bypassing broken store path)');
                     overrideTemplate(tmplId, directVariant, width, height);
+                    // ★ Invalidate preview cache so the card re-renders with new content
+                    invalidatePreviewCache(tmplId);
                     setEditingTemplateId(null);
                     useTemplateStore.getState().setEditingTempCsId(null);
                     isDirtyRef.current = false;
