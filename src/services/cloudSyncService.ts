@@ -10,6 +10,7 @@
 import { getSupabase, isCloudEnabled } from './supabaseClient';
 import { useProjectStore } from '@/stores/projectStore';
 import { useDesignStore } from '@/stores/designStore';
+import { useUploadStore } from '@/stores/uploadStore';
 import type { CreativeSet } from '@/schema/design.types';
 
 export type CloudSyncStatus = 'idle' | 'pushing' | 'pulling' | 'error' | 'offline';
@@ -171,6 +172,9 @@ export async function pullFromCloud(userId: string): Promise<boolean> {
             console.log(`[cloudSync] Found ${cloudSets.length} creative sets in cloud`);
         }
 
+        // ★ Pull uploads from Storage — list files in user's folder
+        await syncUploadsFromStorage(sb, userId);
+
         _state = { status: 'idle', lastSyncAt: Date.now(), error: null };
         notify();
         return true;
@@ -217,4 +221,75 @@ export function startAutoSync(userId: string, intervalMs = 30_000): () => void {
         window.removeEventListener('online', onOnline);
         window.removeEventListener('beforeunload', onBeforeUnload);
     };
+}
+
+// ── Sync uploads from Storage (list files in user folder) ──
+
+const ASSET_BUCKET = 'ace-assets';
+
+async function syncUploadsFromStorage(
+    sb: ReturnType<typeof getSupabase>,
+    userId: string,
+): Promise<void> {
+    if (!sb) return;
+
+    try {
+        const folder = `${userId}/designs`;
+        const { data: files, error } = await sb.storage
+            .from(ASSET_BUCKET)
+            .list(folder, { limit: 100, sortBy: { column: 'created_at', order: 'desc' } });
+
+        if (error || !files || files.length === 0) {
+            if (error) console.warn('[cloudSync] Storage list error:', error.message);
+            return;
+        }
+
+        // Filter to image files only
+        const imageFiles = files.filter(f =>
+            f.name && /\.(png|jpg|jpeg|webp|gif|avif|svg)$/i.test(f.name)
+        );
+        if (imageFiles.length === 0) return;
+
+        // Build signed URLs in batch
+        const paths = imageFiles.map(f => `${folder}/${f.name}`);
+        const { data: signedData, error: signErr } = await sb.storage
+            .from(ASSET_BUCKET)
+            .createSignedUrls(paths, 3600);
+
+        if (signErr || !signedData) {
+            console.warn('[cloudSync] Signed URL batch error:', signErr?.message);
+            return;
+        }
+
+        const { addUpload } = useUploadStore.getState();
+        let added = 0;
+
+        for (let i = 0; i < imageFiles.length; i++) {
+            const file = imageFiles[i]!;
+            const signed = signedData[i];
+            if (!signed?.signedUrl) continue;
+
+            // Use storage:// ref so resolveAsset can re-sign later
+            const storageRef = `storage://${folder}/${file.name}`;
+            const id = file.name.replace(/\.[^.]+$/, ''); // hash without extension
+
+            addUpload({
+                id,
+                name: file.name,
+                idbRef: storageRef,
+                width: 0,  // dimensions unknown from storage listing
+                height: 0,
+                source: 'user',
+                createdAt: file.created_at ?? new Date().toISOString(),
+                mimeType: file.metadata?.mimetype ?? 'image/png',
+            });
+            added++;
+        }
+
+        if (added > 0) {
+            console.log(`[cloudSync] Synced ${added} uploads from Storage`);
+        }
+    } catch (err) {
+        console.warn('[cloudSync] syncUploadsFromStorage error:', err);
+    }
 }
