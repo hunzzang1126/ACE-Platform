@@ -8,6 +8,8 @@ import { removeBackgroundFromUrl, blobToDataUrl } from '@/services/backgroundRem
 import { useSizingOverrideStore } from '@/stores/sizingOverrideStore';
 import { useEditorStore } from '@/stores/editorStore';
 import { useDesignStore } from '@/stores/designStore';
+import { ROLE_LABELS } from '@/schema/layoutRoles';
+import type { LayoutRole } from '@/schema/layoutRoles';
 
 // ── Constants ──
 
@@ -181,6 +183,7 @@ export function SmartSizingSection({ elementId }: { elementId: string }) {
                 <div style={{ fontSize: 11, color: '#8b949e', padding: '2px 0' }}>
                     This is the master variant. Edits here propagate to all sizes.
                 </div>
+                <RoleSelector elementId={elementId} />
                 {overrideCount > 0 && (
                     <div style={{ fontSize: 11, color: '#fbbf24', marginTop: 4 }}>
                         {overrideCount} element{overrideCount !== 1 ? 's' : ''} overridden in other variants
@@ -236,5 +239,49 @@ export function SmartSizingSection({ elementId }: { elementId: string }) {
                 </button>
             )}
         </Section>
+    );
+}
+
+// ── Layout Role Selector ──
+
+const ROLE_OPTIONS: LayoutRole[] = [
+    'background', 'hero', 'logo', 'headline', 'subline',
+    'cta', 'tnc', 'accent', 'detail', 'badge',
+];
+
+function RoleSelector({ elementId }: { elementId: string }) {
+    const updateElement = useDesignStore(s => s.updateMasterElement);
+    const currentRole = useDesignStore(s => {
+        const cs = s.creativeSet;
+        if (!cs) return undefined;
+        const master = cs.variants.find(v => v.id === cs.masterVariantId);
+        return master?.elements.find(el => el.id === elementId)?.role;
+    });
+
+    const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const val = e.target.value;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        updateElement(elementId, { role: (val || undefined) } as any);
+    };
+
+    return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+            <span style={{ fontSize: 10, color: '#8b949e', whiteSpace: 'nowrap' }}>Role:</span>
+            <select
+                value={currentRole ?? ''}
+                onChange={handleChange}
+                style={{
+                    flex: 1, background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.1)', borderRadius: 4,
+                    color: '#e6edf3', fontSize: 11, padding: '3px 6px',
+                    cursor: 'pointer',
+                }}
+            >
+                <option value="">Auto-detect</option>
+                {ROLE_OPTIONS.map(r => (
+                    <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                ))}
+            </select>
+        </div>
     );
 }

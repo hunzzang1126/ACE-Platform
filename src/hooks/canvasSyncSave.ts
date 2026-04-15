@@ -11,6 +11,7 @@ import {
     engineNodeToShapeElement, engineNodeToTextElement,
     engineNodeToImageElement, overlayToDesignElement,
 } from '@/engine/elementConverters';
+import { heuristicFallback, applyRolesToElements } from '@/services/visionRoleClassifier';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Engine = any;
@@ -89,12 +90,15 @@ export function convertNodesToElements(nodes: EngineNode[], canvasW: number, can
 
 /**
  * Read nodes from live engine and convert them to DesignElements.
+ * ★ Auto-tags elements with LayoutRole if not already set (heuristic-based).
  */
 export function readNodesFromEngine(engine: Engine, canvasW: number, canvasH: number): DesignElement[] {
     if (typeof engine.syncZIndexFromStack === 'function') engine.syncZIndexFromStack();
     const raw = engine.get_all_nodes();
     const nodes: EngineNode[] = JSON.parse(raw);
-    return convertNodesToElements(nodes, canvasW, canvasH);
+    const elements = convertNodesToElements(nodes, canvasW, canvasH);
+    autoTagRoles(elements, canvasW, canvasH);
+    return elements;
 }
 
 /**
@@ -116,4 +120,20 @@ export function asyncExtractAssets(elements: DesignElement[], variantId: string,
             console.log('[useCanvasSync] Asset extraction complete — base64 → idb:// refs');
         }
     }).catch(err => { console.warn('[useCanvasSync] Asset extraction failed:', err); });
+}
+
+/**
+ * ★ Auto-tag elements with LayoutRole if they don't have one yet.
+ * Uses heuristic fallback (name + coverage + text-size) — no API call.
+ * Only tags elements without an existing role to avoid overwriting
+ * Vision AI or user-set roles.
+ */
+function autoTagRoles(elements: DesignElement[], canvasW: number, canvasH: number): void {
+    const untagged = elements.filter(el => !el.role);
+    if (untagged.length === 0) return;
+    const classifications = heuristicFallback(untagged, canvasW, canvasH);
+    const applied = applyRolesToElements(untagged, classifications);
+    if (applied > 0) {
+        console.log(`[canvasSyncSave] Auto-tagged ${applied} element(s) with LayoutRole`);
+    }
 }
