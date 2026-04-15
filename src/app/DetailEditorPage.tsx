@@ -23,6 +23,13 @@ import { exportToHtml5, exportToImage, downloadExport } from '@/engine/html5Expo
 import type { EngineNode } from '@/hooks/canvasTypes';
 import { useEditorPageSave, useEditorRestore, useEditorAutoSync, useEditorAutoSave } from './useEditorPageEffects';
 import { useEyedropper } from '@/hooks/useEyedropper';
+import { OnboardingGuide } from '@/components/onboarding/OnboardingGuide';
+import type { GuideStep } from '@/components/onboarding/OnboardingGuide';
+
+const EDITOR_GUIDE_STEPS: GuideStep[] = [
+    { titleKey: 'guide.editor.step1Title', descKey: 'guide.editor.step1Desc', targetSelector: '.ed-sidebar', position: 'right' },
+    { titleKey: 'guide.editor.step2Title', descKey: 'guide.editor.step2Desc' },
+];
 
 export function DetailEditorPage() {
     const { variantId } = useParams<{ variantId: string }>();
@@ -111,6 +118,9 @@ export function DetailEditorPage() {
             </div>
             <BottomPanel variant={variant} engine={engineRef.current} nodes={state.nodes} selection={state.selection} actions={actions} overlayElements={overlay.overlayElements} selectedOverlayId={overlay.selectedOverlayId} onOverlaySelect={handleOverlaySelect} onOverlayMoveUp={overlay.moveUp} onOverlayMoveDown={overlay.moveDown} onOverlayReorderTo={overlay.reorderTo} onOverlaySetZIndex={overlay.setZIndex} onOverlayToggleLock={overlay.toggleLock} onOverlayToggleVisibility={overlay.toggleVisibility} onOverlayDuplicate={overlay.duplicateOverlay} onOverlayRename={overlay.renameOverlay} onOverlayDelete={overlay.deleteElement} />
             {authModalOpen && (<AuthModal onClose={toggleAuthModal} onSuccess={toggleAuthModal} />)}
+
+            {/* ★ Onboarding Guide */}
+            <OnboardingGuide page="editor" steps={EDITOR_GUIDE_STEPS} />
         </div>
     );
 }

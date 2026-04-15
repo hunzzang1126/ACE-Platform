@@ -21,3 +21,4 @@ import './upgradeI18n';
 import './onboardingI18n';
 import './shareI18n';
 import './referralI18n';
+import './guideI18n';

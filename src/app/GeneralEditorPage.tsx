@@ -14,6 +14,8 @@ import { v4 as uuid } from 'uuid';
 import type { DesignElement } from '@/schema/elements.types';
 import { PublishModal } from '@/components/publish/PublishModal';
 import { LocaleBar } from '@/components/creativeset/LocaleBar';
+import { OnboardingGuide } from '@/components/onboarding/OnboardingGuide';
+import type { GuideStep } from '@/components/onboarding/OnboardingGuide';
 import '@/styles/visionqa.css';
 
 export function GeneralEditorPage() {
@@ -117,6 +119,11 @@ export function GeneralEditorPage() {
     const masterHasElements = creativeSet.variants.find(
         (v) => v.id === creativeSet.masterVariantId,
     )?.elements.length ?? 0;
+
+    const sizeGuideSteps: GuideStep[] = [
+        { titleKey: 'guide.sizes.step1Title', descKey: 'guide.sizes.step1Desc', targetSelector: '.cs-sidebar-add-btn', position: 'right' },
+        { titleKey: 'guide.sizes.step2Title', descKey: 'guide.sizes.step2Desc', targetSelector: '.banner-grid', position: 'top' },
+    ];
 
     return (
         <div className="cs-layout">
@@ -227,6 +234,9 @@ export function GeneralEditorPage() {
                     <div className="vqa-loading-progress">Click to dismiss</div>
                 </div>
             )}
+
+            {/* ★ Onboarding Guide */}
+            <OnboardingGuide page="sizes" steps={sizeGuideSteps} />
         </div>
     );
 }

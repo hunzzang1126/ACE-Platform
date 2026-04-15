@@ -19,6 +19,8 @@ import { DashboardEmptyState } from '@/components/dashboard/DashboardEmptyState'
 import { PlanStatusBar } from '@/components/dashboard/PlanStatusBar';
 import { ReferralCard } from '@/components/dashboard/ReferralCard';
 import { useAppI18n } from '@/i18n';
+import { OnboardingGuide } from '@/components/onboarding/OnboardingGuide';
+import type { GuideStep } from '@/components/onboarding/OnboardingGuide';
 
 
 
@@ -203,6 +205,11 @@ export function DashboardPage() {
 
     const isEmpty = displaySets.length === 0 && displayFolders.length === 0;
 
+    const dashboardGuideSteps: GuideStep[] = [
+        { titleKey: 'guide.dashboard.step1Title', descKey: 'guide.dashboard.step1Desc', targetSelector: '.dashboard-hero__cta', position: 'bottom' },
+        { titleKey: 'guide.dashboard.step2Title', descKey: 'guide.dashboard.step2Desc' },
+    ];
+
     return (
         <div className="dashboard-layout">
             <AppSidebar />
@@ -291,7 +298,7 @@ export function DashboardPage() {
                             {currentFolderId ? t('dash.projectsInFolder') : t('dash.allProjects')}
                         </h2>
                         {isEmpty ? (
-                            <DashboardEmptyState onNewProject={handleNewCreativeSet} onGoTemplates={() => navigate('/templates')} />
+                            <DashboardEmptyState onNewProject={handleNewCreativeSet} />
                         ) : (
                             <div className={viewMode === 'list' ? 'project-list' : 'project-grid'}>
                                 {displaySets.map(set => (
@@ -332,6 +339,9 @@ export function DashboardPage() {
                 currentUsage={upgradeModal.reason === 'creative_set_limit' ? creativeSets.length : undefined}
                 limit={upgradeModal.reason === 'creative_set_limit' ? limits.maxCreativeSets : undefined}
             />
+
+            {/* ★ Onboarding Guide */}
+            <OnboardingGuide page="dashboard" steps={dashboardGuideSteps} />
         </div>
     );
 }
