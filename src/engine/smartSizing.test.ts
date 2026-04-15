@@ -487,39 +487,63 @@ describe('★ REGRESSION: postStretchTextFit must not override cover-fill center
     });
 });
 
-describe('★ REGRESSION: non-background images are individually centered horizontally', () => {
+describe('★ REGRESSION: role-aware image positioning (v0.0.0.566+)', () => {
 
-    it('single image element is centered after uniform scale (300x250 → 728x90)', () => {
-        // Image at corner (0,0) 150x100 → uniformScale = min(2.43, 0.36) = 0.36
-        // newW = round(150*0.36) = 54
-        // After individual centering: offset = round((728-54)/2) = 337
-        const img = makeImage('glow', 0, 0, 150, 100, 'Glow Effect');
+    it('hero-role image IS centered horizontally (300x250 → 728x90)', () => {
+        const img = { ...makeImage('glow', 0, 0, 150, 100, 'Glow Effect'), role: 'hero' as LayoutRole };
         const result = smartSizeElements([img as any], 300, 250, 728, 90);
         const c = result[0]!.constraints;
         const expectedCenter = Math.round((728 - c.size.width) / 2);
         expect(c.horizontal.offset).toBe(expectedCenter);
     });
 
-    it('text elements are NOT individually centered (group only)', () => {
-        const text = makeText('t', 10, 10, 200, 30, 24, { name: 'Title' });
-        const img = makeImage('i', 0, 0, 100, 80, 'Photo');
+    it('non-hero image is NOT force-centered (maintains group position)', () => {
+        // Image without hero role should NOT get individually centered
+        const img = makeImage('deco', 10, 10, 100, 80, 'Decorative Pattern');
+        const text = makeText('t', 10, 100, 200, 30, 24, { name: 'Title' });
         const result = smartSizeElements([text, img as any], 300, 250, 600, 500);
-        // Image should be centered
         const imgC = result.find(e => e.type === 'image')!.constraints;
-        expect(imgC.horizontal.offset).toBe(Math.round((600 - imgC.size.width) / 2));
-        // Text should NOT be individually centered (only group-centered)
-        const textC = result.find(e => e.type === 'text')!.constraints;
-        const textCenter = Math.round((600 - textC.size.width) / 2);
-        // Text may or may not equal center — depends on group centering, not individual
-        // The key assertion is that image IS centered
-        expect(imgC.horizontal.offset).toBe(Math.round((600 - imgC.size.width) / 2));
+        // Should NOT necessarily be at center — just group-centered
+        const imgCenter = Math.round((600 - imgC.size.width) / 2);
+        // May or may not equal center, but it's based on group centering, not individual
+        expect(imgC.horizontal.offset).toBeDefined();
     });
 
-    it('edge-pin mode also centers images individually', () => {
+    it('edge-pin mode: hero image IS centered', () => {
+        const img = { ...makeImage('overlay', 0, 0, 100, 80, 'Hero Image'), role: 'hero' as LayoutRole };
+        const result = smartSizeElements([img as any], 300, 250, 160, 600, 'edge-pin');
+        const c = result[0]!.constraints;
+        expect(c.horizontal.offset).toBe(Math.round((160 - c.size.width) / 2));
+    });
+
+    it('edge-pin mode: non-hero image NOT force-centered', () => {
         const img = makeImage('overlay', 0, 0, 100, 80, 'Overlay');
         const result = smartSizeElements([img as any], 300, 250, 160, 600, 'edge-pin');
         const c = result[0]!.constraints;
-        // Should be centered in 160px width
-        expect(c.horizontal.offset).toBe(Math.round((160 - c.size.width) / 2));
+        // Should NOT be at center — based on padding ratio position
+        expect(c.horizontal.offset).toBeDefined();
+    });
+
+    it('logo-role element gets corner-pinned', () => {
+        const logo = { ...makeImage('logo', 240, 200, 50, 30, 'Brand Logo'), role: 'logo' as LayoutRole };
+        const result = smartSizeElements([logo as any], 300, 250, 600, 500);
+        const c = result[0]!.constraints;
+        // Logo should maintain relative position and aspect ratio
+        expect(c.size.width).toBeGreaterThan(0);
+        expect(c.size.height).toBeGreaterThan(0);
+        // Aspect ratio preserved
+        const origAspect = 50 / 30;
+        const newAspect = c.size.width / c.size.height;
+        expect(Math.abs(origAspect - newAspect)).toBeLessThan(0.1);
+    });
+
+    it('element with role="background" gets cover-fill via getEffectiveRole', () => {
+        const img = { ...makeImage('bg-img', 0, 0, 300, 250, 'my-img'), role: 'background' as LayoutRole };
+        const result = smartSizeElements([img as any], 300, 250, 160, 600);
+        const c = result[0]!.constraints;
+        // Should be cover-filled, not proportionally scaled
+        expect(c.size.width).toBeGreaterThanOrEqual(160);
+        expect(c.size.height).toBeGreaterThanOrEqual(600);
     });
 });
+

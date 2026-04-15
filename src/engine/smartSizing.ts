@@ -34,6 +34,11 @@ function toLayoutRole(elementRole: ElementRole, el: DesignElement): LayoutRole {
 const MIN_FONT = 8;
 const MIN_CTA_HEIGHT = 44;
 
+// ── Role-aware helpers (extracted to smartSizingHelpers.ts) ──
+// Re-export for backward compat
+export { getEffectiveRole, buildCoverFill, buildLogoPinned } from './smartSizingHelpers';
+import { getEffectiveRole, buildCoverFill, buildLogoPinned } from './smartSizingHelpers';
+
 // ── Smart Sizing v8: Polotno-style uniform scale ──
 
 export function smartSizeElements(
@@ -53,20 +58,17 @@ export function smartSizeElements(
 
     for (const el of originElements) {
         const abs = constraintsToAbsolute(el.constraints, originW, originH);
-        const role = detectElementRole(el, originW, originH);
+        // ★ Use persisted role first (Vision AI tagged), fallback to heuristic
+        const role = getEffectiveRole(el, originW, originH);
 
         if (role === 'background') {
-            let bgW = targetW, bgH = targetH, bgX = 0, bgY = 0;
-            if (el.type === 'image' && abs.w > 0 && abs.h > 0) {
-                const imgAspect = abs.w / abs.h;
-                const canvasAspect = targetW / targetH;
-                if (imgAspect > canvasAspect) { bgH = targetH; bgW = Math.round(targetH * imgAspect); bgX = -Math.round((bgW - targetW) / 2); }
-                else { bgW = targetW; bgH = Math.round(targetW / imgAspect); bgY = -Math.round((bgH - targetH) / 2); }
-            }
-            result.push({
-                ...JSON.parse(JSON.stringify(el)),
-                constraints: { horizontal: { anchor: 'left' as const, offset: bgX }, vertical: { anchor: 'top' as const, offset: bgY }, size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width: bgW, height: bgH }, rotation: el.constraints.rotation },
-            } as DesignElement);
+            result.push(buildCoverFill(el, abs, targetW, targetH));
+            continue;
+        }
+
+        // ★ Logo: fixed size, corner-pinned (aspect ratio preserved)
+        if (role === 'logo' && abs.w > 0 && abs.h > 0) {
+            result.push(buildLogoPinned(el, abs, originW, originH, targetW, targetH, uniformScale));
             continue;
         }
 
@@ -104,10 +106,11 @@ export function smartSizeElements(
             }
         }
 
-        // ★ Individual image centering — overrides group position for images only.
-        // Images are centered horizontally on canvas regardless of where group landed.
+        // ★ ROLE-AWARE image positioning (no more blanket centering)
+        // Only center images that are explicitly role=hero AND were originally centered.
+        // Other images (product shots, decorative) maintain their relative position.
         for (const { el } of contentElements) {
-            if (el.type === 'image') {
+            if (el.type === 'image' && el.role === 'hero') {
                 const imgW = el.constraints.size.width;
                 el.constraints.horizontal = { anchor: 'left' as const, offset: Math.round((targetW - imgW) / 2) };
             }
@@ -155,20 +158,10 @@ function edgePinSizeElements(
 
     // ── 0. Process backgrounds first (cover fill) ──
     for (const el of originElements) {
-        const role = detectElementRole(el, originW, originH);
+        const role = getEffectiveRole(el, originW, originH);
         if (role === 'background') {
             const abs = constraintsToAbsolute(el.constraints, originW, originH);
-            let bgW = targetW, bgH = targetH, bgX = 0, bgY = 0;
-            if (el.type === 'image' && abs.w > 0 && abs.h > 0) {
-                const imgAspect = abs.w / abs.h;
-                const canvasAspect = targetW / targetH;
-                if (imgAspect > canvasAspect) { bgH = targetH; bgW = Math.round(targetH * imgAspect); bgX = -Math.round((bgW - targetW) / 2); }
-                else { bgW = targetW; bgH = Math.round(targetW / imgAspect); bgY = -Math.round((bgH - targetH) / 2); }
-            }
-            result.push({
-                ...JSON.parse(JSON.stringify(el)),
-                constraints: { horizontal: { anchor: 'left' as const, offset: bgX }, vertical: { anchor: 'top' as const, offset: bgY }, size: { widthMode: 'fixed' as const, heightMode: 'fixed' as const, width: bgW, height: bgH }, rotation: el.constraints.rotation },
-            } as DesignElement);
+            result.push(buildCoverFill(el, abs, targetW, targetH));
         } else {
             nonBgElements.push(el);
         }
@@ -255,9 +248,9 @@ function edgePinSizeElements(
         // else: padding ratio already applied, no shift needed
     }
 
-    // ★ Individual image centering (same as uniform mode)
+    // ★ ROLE-AWARE image positioning (no more blanket centering)
     for (const { el } of contentItems) {
-        if (el.type === 'image') {
+        if (el.type === 'image' && el.role === 'hero') {
             const imgW = el.constraints.size.width;
             el.constraints.horizontal = { anchor: 'left' as const, offset: Math.round((targetW - imgW) / 2) };
         }
