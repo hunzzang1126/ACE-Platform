@@ -145,15 +145,6 @@ export function GeneralEditorPage() {
                 <main className="cs-main">
                     {/* ★ Locale Bar — language switcher pills */}
                     <LocaleBar />
-                    {/* Quick action bar */}
-                    {masterHasElements === 0 && (
-                        <div className="cs-empty-banner">
-                            <p>No elements yet. Add demo elements to preview across sizes.</p>
-                            <button className="cs-demo-btn" onClick={handleAddDemoElements}>
-                                + Add Demo Elements
-                            </button>
-                        </div>
-                    )}
                     <BannerPreviewGrid
                         variants={creativeSet.variants}
                         visibleIds={visibleIds}

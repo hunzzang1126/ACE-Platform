@@ -27,8 +27,8 @@ import { OnboardingGuide } from '@/components/onboarding/OnboardingGuide';
 import type { GuideStep } from '@/components/onboarding/OnboardingGuide';
 
 const EDITOR_GUIDE_STEPS: GuideStep[] = [
-    { titleKey: 'guide.editor.step1Title', descKey: 'guide.editor.step1Desc', targetSelector: '.ed-sidebar', position: 'right' },
-    { titleKey: 'guide.editor.step2Title', descKey: 'guide.editor.step2Desc' },
+    { titleKey: 'guide.editor.step1Title', descKey: 'guide.editor.step1Desc', targetSelector: '.sidebar-icons', position: 'right' },
+    { titleKey: 'guide.editor.step2Title', descKey: 'guide.editor.step2Desc', targetSelector: '.sidebar-icons', position: 'right' },
 ];
 
 export function DetailEditorPage() {

@@ -179,7 +179,6 @@ function getCardPosition(step: GuideStep): React.CSSProperties {
         return { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' };
     }
 
-    // Try to find target element and position near it
     const el = document.querySelector(step.targetSelector);
     if (!el) {
         return { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' };
@@ -187,28 +186,36 @@ function getCardPosition(step: GuideStep): React.CSSProperties {
 
     const rect = el.getBoundingClientRect();
     const pos = step.position ?? 'bottom';
-    const pad = 12;
+    const pad = 16;
+    const cardW = 320;
+    const cardH = 200; // approximate
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    // Clamp helpers
+    const clampX = (x: number) => Math.max(16, Math.min(x, vw - cardW - 16));
+    const clampY = (y: number) => Math.max(16, Math.min(y, vh - cardH - 16));
 
     switch (pos) {
         case 'bottom':
             return {
-                top: Math.min(rect.bottom + pad, window.innerHeight - 220),
-                left: Math.max(16, Math.min(rect.left, window.innerWidth - 340)),
+                top: clampY(rect.bottom + pad),
+                left: clampX(rect.left + rect.width / 2 - cardW / 2),
             };
         case 'top':
             return {
-                top: Math.max(16, rect.top - 200 - pad),
-                left: Math.max(16, Math.min(rect.left, window.innerWidth - 340)),
+                top: clampY(rect.top - cardH - pad),
+                left: clampX(rect.left + rect.width / 2 - cardW / 2),
             };
         case 'right':
             return {
-                top: Math.max(16, rect.top),
-                left: Math.min(rect.right + pad, window.innerWidth - 340),
+                top: clampY(rect.top + rect.height / 2 - cardH / 2),
+                left: clampX(rect.right + pad),
             };
         case 'left':
             return {
-                top: Math.max(16, rect.top),
-                left: Math.max(16, rect.left - 340 - pad),
+                top: clampY(rect.top + rect.height / 2 - cardH / 2),
+                left: clampX(rect.left - cardW - pad),
             };
     }
 }

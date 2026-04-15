@@ -10,6 +10,7 @@ import { textEffectToCSS, parseShadowColorForEngine } from './templateEffectHelp
 import type { CanvasEngineActions } from '@/hooks/canvasTypes';
 import { ensureGoogleFont } from './contextToolbarConstants';
 import type { BannerVariant } from '@/schema/design.types';
+import { useAppI18n } from '@/i18n';
 
 const CATEGORIES = ['all', 'display', 'social', 'email', 'video'] as const;
 
@@ -19,6 +20,7 @@ interface Props {
 
 export function SidebarTemplateTab({ actions }: Props) {
     const { templates, search, getByCategory, instantiate } = useTemplateStore();
+    const { t } = useAppI18n();
 
     const [category, setCategory] = useState<string>('all');
     const [query, setQuery] = useState('');
@@ -43,7 +45,7 @@ export function SidebarTemplateTab({ actions }: Props) {
             <input
                 className="sidebar-search"
                 type="text"
-                placeholder="Search templates..."
+                placeholder={t('editor.searchTemplates')}
                 value={query}
                 onChange={e => { setQuery(e.target.value); }}
             />
@@ -56,7 +58,7 @@ export function SidebarTemplateTab({ actions }: Props) {
                         className={`sidebar-pill ${category === cat ? 'active' : ''}`}
                         onClick={() => { setCategory(cat); setQuery(''); }}
                     >
-                        {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                        {t(`editor.cat${cat.charAt(0).toUpperCase() + cat.slice(1)}`)}
                     </button>
                 ))}
             </div>
@@ -65,16 +67,16 @@ export function SidebarTemplateTab({ actions }: Props) {
             <div className="sidebar-template-grid">
                 {filtered.length === 0 && (
                     <div className="sidebar-empty">
-                        No templates found. Create a design and save it as a template.
+                        {t('editor.noTemplatesFound')}
                     </div>
                 )}
-                {filtered.map(t => (
-                    <div key={t.id} className="sidebar-template-card" onClick={() => handleApply(t.id)} style={{ position: 'relative' }}>
-                        <TemplatePreview template={t} />
+                {filtered.map(tpl => (
+                    <div key={tpl.id} className="sidebar-template-card" onClick={() => handleApply(tpl.id)} style={{ position: 'relative' }}>
+                        <TemplatePreview template={tpl} />
                         <div className="sidebar-template-info">
-                            <span className="sidebar-template-name">{t.name}</span>
+                            <span className="sidebar-template-name">{tpl.name}</span>
                             <span className="sidebar-template-meta">
-                                {t.width}x{t.height}
+                                {tpl.width}x{tpl.height}
                             </span>
                         </div>
                     </div>
