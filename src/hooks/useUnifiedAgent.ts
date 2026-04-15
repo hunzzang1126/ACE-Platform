@@ -113,7 +113,10 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
     }, [selectedRole]);
 
     // ── Flow callbacks object (shared) ──
-    const flowCallbacks: AgentFlowCallbacks = { narrate, addCard, updateCard, moveCursor, hideCursor };
+    const setPhase = useCallback((phase: 'thinking' | 'planning' | 'executing' | 'reflecting') => {
+        setState(prev => ({ ...prev, phase }));
+    }, []);
+    const flowCallbacks: AgentFlowCallbacks = { narrate, addCard, updateCard, moveCursor, hideCursor, setPhase };
 
     // ── Generate Design ──
     const runGenerateFlow = useCallback(async (prompt: string) => {

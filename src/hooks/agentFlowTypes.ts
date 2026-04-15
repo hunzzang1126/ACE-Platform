@@ -11,6 +11,8 @@ export interface AgentFlowCallbacks {
     updateCard: (id: string, status: ProgressCard['status'], detail?: string, opts?: { reasoning?: string; expandedDetail?: string }) => void;
     moveCursor: (x: number, y: number, label?: string) => void;
     hideCursor: () => void;
+    /** Drive the stepper UI through phases: thinking → planning → executing → reflecting */
+    setPhase?: (phase: 'thinking' | 'planning' | 'executing' | 'reflecting') => void;
 }
 
 /** Minimal engine interface used by flow functions */

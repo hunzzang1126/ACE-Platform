@@ -264,3 +264,77 @@ describe('agentGenerateFlow — pipeline completeness', () => {
         expect(src).toContain('reorder_by_z_index');
     });
 });
+
+// ══════════════════════════════════════════════════
+// ★ REGRESSION: Stepper phase sync
+// ══════════════════════════════════════════════════
+describe('★ REGRESSION: stepper phases sync with pipeline', () => {
+    it('calls setPhase thinking at Phase 1 (Canvas scan)', () => {
+        expect(src).toContain("cb.setPhase?.('thinking')");
+    });
+
+    it('calls setPhase planning at Phase 2 (Copywriting)', () => {
+        expect(src).toContain("cb.setPhase?.('planning')");
+    });
+
+    it('calls setPhase executing at Phase 5 (Template Build)', () => {
+        expect(src).toContain("cb.setPhase?.('executing')");
+    });
+
+    it('calls setPhase reflecting at Phase 6 (Vision QA)', () => {
+        expect(src).toContain("cb.setPhase?.('reflecting')");
+    });
+
+    it('all 4 stepper phases are called exactly once each', () => {
+        const phases = ['thinking', 'planning', 'executing', 'reflecting'];
+        for (const phase of phases) {
+            const needle = `setPhase?.('${phase}')`;
+            const count = src.split(needle).length - 1;
+            expect(count).toBe(1);
+        }
+    });
+
+    it('phases appear in correct order in source', () => {
+        const thinkingIdx = src.indexOf("setPhase?.('thinking')");
+        const planningIdx = src.indexOf("setPhase?.('planning')");
+        const executingIdx = src.indexOf("setPhase?.('executing')");
+        const reflectingIdx = src.indexOf("setPhase?.('reflecting')");
+        expect(thinkingIdx).toBeLessThan(planningIdx);
+        expect(planningIdx).toBeLessThan(executingIdx);
+        expect(executingIdx).toBeLessThan(reflectingIdx);
+    });
+});
+
+// ── useUnifiedAgent wires setPhase ──
+describe('useUnifiedAgent — setPhase wiring', () => {
+    const agentSrc = require('fs').readFileSync(
+        require('path').resolve(__dirname, './useUnifiedAgent.ts'), 'utf-8'
+    );
+
+    it('defines setPhase callback', () => {
+        expect(agentSrc).toContain('const setPhase');
+    });
+
+    it('passes setPhase into flowCallbacks', () => {
+        expect(agentSrc).toContain('setPhase }');
+    });
+
+    it('setPhase updates state.phase', () => {
+        expect(agentSrc).toContain('prev, phase');
+    });
+});
+
+// ── agentFlowTypes has setPhase ──
+describe('agentFlowTypes — setPhase interface', () => {
+    const typesSrc = require('fs').readFileSync(
+        require('path').resolve(__dirname, './agentFlowTypes.ts'), 'utf-8'
+    );
+
+    it('AgentFlowCallbacks has optional setPhase', () => {
+        expect(typesSrc).toContain('setPhase?:');
+    });
+
+    it('setPhase accepts stepper phases', () => {
+        expect(typesSrc).toContain("'thinking' | 'planning' | 'executing' | 'reflecting'");
+    });
+});

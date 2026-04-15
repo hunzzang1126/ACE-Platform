@@ -15,7 +15,8 @@ export async function executeGenerateFlow(
     engine: FlowEngine,
     cb: AgentFlowCallbacks,
 ): Promise<string> {
-    // ── Phase 1: Canvas scan ──
+    // ── Phase 1: Canvas scan (stepper: Analyzing) ──
+    cb.setPhase?.('thinking');
     cb.narrate('Starting design generation. Reading current canvas state...');
     cb.addCard('context', 'Reading canvas context', 'running');
     let elementCount = 0;
@@ -30,7 +31,8 @@ export async function executeGenerateFlow(
     const brand = await scanBrandCloud(prompt, cb);
     await pause(300);
 
-    // ── Phase 2: AI Copywriting ──
+    // ── Phase 2: AI Copywriting (stepper: Planning) ──
+    cb.setPhase?.('planning');
     cb.narrate("I'll generate the ad copy tailored for your prompt.");
     cb.addCard('content', 'Generating creative copy', 'running');
     await pause(400);
@@ -71,10 +73,12 @@ export async function executeGenerateFlow(
     const bgResult = await generateBgImage(needsBackgroundImage, backgroundImagePrompt, prompt, canvasW, canvasH, guide, abort, cb);
     await pause(300);
 
-    // ── Phase 5: Template Build ──
+    // ── Phase 5: Template Build (stepper: Executing) ──
+    cb.setPhase?.('executing');
     const rendered = await buildAndRender(template, guide, content, canvasW, canvasH, bgResult, brand.logoUrl, brand.logoW, brand.logoH, engine, abort, cb);
 
-    // ── Phase 6: Vision QA ──
+    // ── Phase 6: Vision QA (stepper: Finishing) ──
+    cb.setPhase?.('reflecting');
     await runVisionQA(engine, canvasW, canvasH, guide, template, rendered, abort, cb);
 
     // ── Phase 7: Save to AI Memory ──
