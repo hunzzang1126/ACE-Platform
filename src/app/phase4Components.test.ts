@@ -158,7 +158,7 @@ describe('AiOnboardingTooltip — structure + persistence', () => {
 // ══════════════════════════════════════════════════
 // ProjectThumbnail
 // ══════════════════════════════════════════════════
-describe('ProjectThumbnail — element rendering', () => {
+describe('ProjectThumbnail — screenshot or placeholder', () => {
     it('reads from designStore allCreativeSets', () => {
         expect(thumbnailSrc).toContain('useDesignStore.getState().allCreativeSets');
     });
@@ -167,39 +167,23 @@ describe('ProjectThumbnail — element rendering', () => {
         expect(thumbnailSrc).toContain('cs.masterVariantId');
     });
 
-    it('limits to 12 elements max', () => {
-        expect(thumbnailSrc).toContain('.slice(0, 12)');
-    });
-
-    it('★ SINGLE RESOLVER: uses constraintsToAbsolute for positioning', () => {
-        expect(thumbnailSrc).toContain('constraintsToAbsolute');
-        expect(thumbnailSrc).toContain('abs.x * scaleX');
-        expect(thumbnailSrc).toContain('abs.y * scaleY');
-    });
-
-    it('renders text elements differently (border-bottom)', () => {
-        expect(thumbnailSrc).toContain("el.type === 'text'");
-        expect(thumbnailSrc).toContain('borderBottom');
-    });
-
-    it('shows fallback icon when no data', () => {
-        expect(thumbnailSrc).toContain('if (!data)');
-        expect(thumbnailSrc).toContain('<svg');
-    });
-
     it('supports screenshot preview when available', () => {
         expect(thumbnailSrc).toContain('screenshotUrl');
         expect(thumbnailSrc).toContain('objectFit');
     });
 
-    it('uses preset.width/height for scale calculation', () => {
+    it('uses preset.width/height for size label', () => {
         expect(thumbnailSrc).toContain('master.preset.width');
         expect(thumbnailSrc).toContain('master.preset.height');
     });
 
-    it('supports gradient backgrounds', () => {
-        expect(thumbnailSrc).toContain('gradientStart');
-        expect(thumbnailSrc).toContain('gradientEnd');
+    it('shows clean PlaceholderBox when no screenshot', () => {
+        expect(thumbnailSrc).toContain('PlaceholderBox');
+        expect(thumbnailSrc).toContain('<svg');
+    });
+
+    it('shows canvas dimensions in placeholder', () => {
+        expect(thumbnailSrc).toContain('sizeLabel');
     });
 });
 
