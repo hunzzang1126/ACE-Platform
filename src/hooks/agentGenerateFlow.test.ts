@@ -83,3 +83,39 @@ describe('agentGenerateFlow — user preferences', () => {
         expect(src).toContain('loadUserPrefs');
     });
 });
+
+// ══════════════════════════════════════════════════
+// ★ REGRESSION: Template reference-size scaling
+// ══════════════════════════════════════════════════
+describe('★ REGRESSION: template builds at reference size', () => {
+    it('defines REF_SIZE = 1080 for consistent template builds', () => {
+        expect(src).toContain('REF_SIZE = 1080');
+    });
+
+    it('builds template at reference dimensions, not raw canvas size', () => {
+        expect(src).toContain('template.build(refW, refH, guide, content)');
+    });
+
+    it('scales x, y, w, h from reference to actual canvas', () => {
+        expect(src).toContain('scaleX = canvasW / refW');
+        expect(src).toContain('scaleY = canvasH / refH');
+    });
+
+    it('scales font_size proportionally with min cap of 8px', () => {
+        expect(src).toContain('Math.max(8,');
+        expect(src).toContain('Math.min(scaleX, scaleY)');
+    });
+
+    it('preserves aspect ratio for reference dimensions', () => {
+        expect(src).toContain('refAspect = canvasW / canvasH');
+    });
+
+    it('★ REGRESSION: never calls template.build with raw canvasW, canvasH', () => {
+        // The old bug: template.build(canvasW, canvasH, ...) produced tiny text at 300x250
+        // New code: template.build(refW, refH, ...) always builds at ~1080 scale
+        const buildCalls = src.match(/template\.build\([^)]+\)/g) ?? [];
+        for (const call of buildCalls) {
+            expect(call).not.toContain('canvasW, canvasH');
+        }
+    });
+});

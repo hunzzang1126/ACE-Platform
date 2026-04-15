@@ -243,7 +243,30 @@ async function buildAndRender(
     cb.addCard('build', 'Combining layout', 'running');
 
     const { validateLayout } = await resilientImport(() => import('@/engine/layoutValidator'));
-    let allElements = template.build(canvasW, canvasH, guide, content);
+
+    // ★ Build at reference size (matches template preview thumbnails),
+    // then proportionally scale to actual canvas. This ensures the AI output
+    // looks identical to the template preview regardless of canvas size.
+    // The constraint system handles future smart-sizing.
+    const REF_SIZE = 1080;
+    const refAspect = canvasW / canvasH;
+    const refW = refAspect >= 1 ? REF_SIZE : Math.round(REF_SIZE * refAspect);
+    const refH = refAspect >= 1 ? Math.round(REF_SIZE / refAspect) : REF_SIZE;
+
+    let allElements = template.build(refW, refH, guide, content);
+
+    // Scale from reference → actual canvas
+    const scaleX = canvasW / refW;
+    const scaleY = canvasH / refH;
+    allElements = allElements.map(el => ({
+        ...el,
+        x: el.x != null ? Math.round(el.x * scaleX) : undefined,
+        y: el.y != null ? Math.round(el.y * scaleY) : undefined,
+        w: el.w != null ? Math.round(el.w * scaleX) : undefined,
+        h: el.h != null ? Math.round(el.h * scaleY) : undefined,
+        font_size: el.font_size != null ? Math.max(8, Math.round(el.font_size * Math.min(scaleX, scaleY))) : undefined,
+    }));
+
     if (bgResult.hasImage && bgResult.url) allElements = allElements.filter(el => el.name !== 'background');
     allElements = allElements.filter(el => { if (el.type === 'text' && (!el.content || el.content.trim() === '')) { console.log(`[Pipeline] Removing empty text: ${el.name}`); return false; } return true; });
 
