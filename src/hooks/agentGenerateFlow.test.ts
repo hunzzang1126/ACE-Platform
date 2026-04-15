@@ -85,38 +85,32 @@ describe('agentGenerateFlow — user preferences', () => {
 });
 
 // ══════════════════════════════════════════════════
-// ★ REGRESSION: Template reference-size scaling
+// ★ REGRESSION: Template source is Supabase-only (cloud-first)
 // ══════════════════════════════════════════════════
-describe('★ REGRESSION: template builds at reference size', () => {
-    it('defines REF_SIZE = 1080 for consistent template builds', () => {
-        expect(src).toContain('REF_SIZE = 1080');
+describe('★ REGRESSION: template uses Supabase resolver (not hardcoded build)', () => {
+    it('uses resolveTemplateElements from templateResolver', () => {
+        expect(src).toContain('resolveTemplateElements');
+        expect(src).toContain('templateResolver');
     });
 
-    it('builds template at reference dimensions, not raw canvas size', () => {
-        expect(src).toContain('template.build(refW, refH, guide, content)');
+    it('does NOT call template.build() — removed in v0.0.0.555', () => {
+        expect(src).not.toContain('template.build(');
     });
 
-    it('scales x, y, w, h from reference to actual canvas', () => {
-        expect(src).toContain('scaleX = canvasW / refW');
-        expect(src).toContain('scaleY = canvasH / refH');
+    it('does NOT reference REF_SIZE or refAspect — scaling handled by resolver', () => {
+        expect(src).not.toContain('REF_SIZE');
+        expect(src).not.toContain('refAspect');
     });
 
-    it('scales font_size proportionally with min cap of 8px', () => {
-        expect(src).toContain('Math.max(8,');
-        expect(src).toContain('Math.min(scaleX, scaleY)');
+    it('does NOT manually scale x/y/w/h — resolver handles via constraintsToAbsolute', () => {
+        expect(src).not.toContain('scaleX = canvasW / refW');
+        expect(src).not.toContain('scaleY = canvasH / refH');
     });
 
-    it('preserves aspect ratio for reference dimensions', () => {
-        expect(src).toContain('refAspect = canvasW / canvasH');
-    });
-
-    it('★ REGRESSION: never calls template.build with raw canvasW, canvasH', () => {
-        // The old bug: template.build(canvasW, canvasH, ...) produced tiny text at 300x250
-        // New code: template.build(refW, refH, ...) always builds at ~1080 scale
-        const buildCalls = src.match(/template\.build\([^)]+\)/g) ?? [];
-        for (const call of buildCalls) {
-            expect(call).not.toContain('canvasW, canvasH');
-        }
+    it('★ REGRESSION: resolver reads from templateStore (Supabase-synced)', () => {
+        // The old flow used DESIGN_TEMPLATES (hardcoded array)
+        // New flow uses templateStore which syncs from Supabase template_overrides
+        expect(src).toContain('resolveTemplateElements(template.id');
     });
 });
 
