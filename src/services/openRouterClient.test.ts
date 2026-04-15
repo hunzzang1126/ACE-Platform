@@ -178,4 +178,75 @@ describe('openRouterClient', () => {
             }
         });
     });
+
+    // ── Proxy headers (source-level) ──
+    describe('proxy auth — source-level checks', () => {
+        const src = require('fs').readFileSync(require('path').resolve(__dirname, './openRouterClient.ts'), 'utf-8');
+
+        it('★ REGRESSION: production path never sends OpenRouter key as Bearer', () => {
+            // The old bug: fallback sent getOpenRouterKey() when JWT was null
+            // New code should throw error instead
+            expect(src).not.toContain("token ? `Bearer ${token}` : `Bearer ${getOpenRouterKey()}`");
+        });
+
+        it('throws clear error when no JWT in production', () => {
+            expect(src).toContain("'Not logged in. Please log in to use AI features.'");
+        });
+
+        it('retries with refreshSession when token is null', () => {
+            expect(src).toContain('sb.auth.refreshSession()');
+        });
+
+        it('includes apikey header for Supabase Edge Function', () => {
+            expect(src).toContain("'apikey'");
+            expect(src).toContain('VITE_SUPABASE_ANON_KEY');
+        });
+
+        it('checks token expiry and refreshes proactively', () => {
+            expect(src).toContain('expires_at');
+            expect(src).toContain('refreshSession');
+        });
+    });
 });
+
+// ══════════════════════════════════════════════════
+// Edge Function — source-level structure tests
+// ══════════════════════════════════════════════════
+describe('ai-proxy edge function — structure', () => {
+    const edgeSrc = require('fs').readFileSync(
+        require('path').resolve(__dirname, '../../supabase/functions/ai-proxy/index.ts'), 'utf-8'
+    );
+
+    it('handles CORS preflight', () => {
+        expect(edgeSrc).toContain("req.method === 'OPTIONS'");
+        expect(edgeSrc).toContain('Access-Control-Allow-Origin');
+    });
+
+    it('allows x-title and http-referer in CORS', () => {
+        expect(edgeSrc).toContain('x-title');
+        expect(edgeSrc).toContain('http-referer');
+    });
+
+    it('requires Bearer token (light auth)', () => {
+        expect(edgeSrc).toContain("startsWith('Bearer ')");
+    });
+
+    it('reads OPENROUTER_API_KEY from server env', () => {
+        expect(edgeSrc).toContain("Deno.env.get('OPENROUTER_API_KEY')");
+    });
+
+    it('returns 503 if OPENROUTER_API_KEY missing', () => {
+        expect(edgeSrc).toContain('AI service not configured');
+        expect(edgeSrc).toContain('503');
+    });
+
+    it('proxies to OpenRouter with server-side key', () => {
+        expect(edgeSrc).toContain('openrouter.ai/api/v1/chat/completions');
+        expect(edgeSrc).toContain('`Bearer ${openRouterKey}`');
+    });
+
+    it('★ does NOT expose API key to client (no VITE_ prefix)', () => {
+        expect(edgeSrc).not.toContain('VITE_OPENROUTER');
+    });
+});
+
