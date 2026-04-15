@@ -48,10 +48,11 @@ export function DetailEditorPage() {
 
     useEffect(() => { setLayer('detail'); setActiveVariant(variantId ?? null); return () => setActiveVariant(null); }, [variantId, setLayer, setActiveVariant]);
 
-    if (!creativeSet) return <Navigate to="/" replace />;
-    const variant = creativeSet.variants.find((v) => v.id === variantId);
-    if (!variant) return <Navigate to="/editor" replace />;
-    const { width, height } = variant.preset;
+    // ★ HOOKS MUST BE CALLED UNCONDITIONALLY (React Rules of Hooks)
+    // Derive variant early but use fallback dimensions so hooks always run.
+    const variant = creativeSet?.variants.find((v) => v.id === variantId) ?? null;
+    const width = variant?.preset.width ?? 300;
+    const height = variant?.preset.height ?? 250;
 
     const { canvasRef, overlayRef, engineRef, state, actions, syncState, retryInit } = useFabricCanvas(width, height, false);
     const overlay = useOverlayElements(width, height);
@@ -95,6 +96,10 @@ export function DetailEditorPage() {
     }, []);
 
     const handleOverlaySelect = useCallback((id: string | null) => { if (id != null) { try { engineRef.current?.deselect_all(); } catch { /* */ } } overlay.selectOverlay(id); }, [overlay, engineRef]);
+
+    // ★ EARLY RETURNS — AFTER all hooks have been called
+    if (!creativeSet) return <Navigate to="/" replace />;
+    if (!variant) return <Navigate to="/editor" replace />;
 
     return (
         <div className="ed-layout">
