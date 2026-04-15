@@ -248,5 +248,79 @@ describe('ai-proxy edge function — structure', () => {
     it('★ does NOT expose API key to client (no VITE_ prefix)', () => {
         expect(edgeSrc).not.toContain('VITE_OPENROUTER');
     });
+
+    it('★ REGRESSION: does NOT use supabase.auth.getUser() — gateway handles auth', () => {
+        // getUser() caused 401 because Supabase gateway already validates JWT
+        // before edge function code runs. Double-validation = always fail.
+        expect(edgeSrc).not.toContain('auth.getUser');
+    });
+
+    it('★ REGRESSION: does NOT import supabase client (unnecessary overhead)', () => {
+        expect(edgeSrc).not.toContain("from 'https://esm.sh/@supabase/supabase-js");
+    });
+
+    it('catches errors and returns 500 with message', () => {
+        expect(edgeSrc).toContain('catch (err)');
+        expect(edgeSrc).toContain('status: 500');
+    });
+
+    it('sets Content-Type on all responses', () => {
+        expect(edgeSrc).toContain("'Content-Type': 'application/json'");
+    });
+
+    it('uses glid.studio as HTTP-Referer', () => {
+        expect(edgeSrc).toContain('https://glid.studio');
+    });
 });
 
+// ══════════════════════════════════════════════════
+// ★ REGRESSION GUARDS — Never break AI proxy again
+// ══════════════════════════════════════════════════
+describe('★ REGRESSION: AI proxy pipeline integrity', () => {
+    const clientSrc = require('fs').readFileSync(
+        require('path').resolve(__dirname, './openRouterClient.ts'), 'utf-8'
+    );
+    const edgeSrc = require('fs').readFileSync(
+        require('path').resolve(__dirname, '../../supabase/functions/ai-proxy/index.ts'), 'utf-8'
+    );
+
+    it('client production path routes through Supabase edge function', () => {
+        expect(clientSrc).toContain('/functions/v1/ai-proxy');
+    });
+
+    it('client and edge function CORS headers match for x-title', () => {
+        // Client sends X-Title, edge function must allow it
+        const clientSendsXTitle = clientSrc.includes("'X-Title'");
+        const edgeAllowsXTitle = edgeSrc.includes('x-title');
+        expect(clientSendsXTitle).toBe(true);
+        expect(edgeAllowsXTitle).toBe(true);
+    });
+
+    it('edge function allows POST and OPTIONS methods', () => {
+        expect(edgeSrc).toContain('POST');
+        expect(edgeSrc).toContain('OPTIONS');
+    });
+
+    it('★ REGRESSION: getSessionToken uses getSession not getUser', () => {
+        // getSession returns cached token (fast). getUser hits server (slow + can fail).
+        expect(clientSrc).toContain('sb.auth.getSession()');
+    });
+
+    it('★ REGRESSION: production path sends JWT as Authorization Bearer', () => {
+        expect(clientSrc).toContain('`Bearer ${token}`');
+    });
+
+    it('★ REGRESSION: edge function proxies OpenRouter response status', () => {
+        expect(edgeSrc).toContain('status: openRouterRes.status');
+    });
+
+    it('★ REGRESSION: CORS allows wildcard origin', () => {
+        // Production uses glid.studio, edge function must accept any origin
+        expect(edgeSrc).toContain("'Access-Control-Allow-Origin': '*'");
+    });
+
+    it('local dev bypasses proxy and calls OpenRouter directly', () => {
+        expect(clientSrc).toContain("window.location.hostname === 'localhost'");
+        expect(clientSrc).toContain('/api/openrouter');
+    });
+});
