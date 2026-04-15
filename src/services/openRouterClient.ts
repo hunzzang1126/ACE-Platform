@@ -323,8 +323,9 @@ export async function callOpenRouterApi(
 
     if (!res.ok) {
         const errText = await res.text();
+        console.error(`[OpenRouter] ${res.status} error:`, errText);
         if (res.status === 401) {
-            throw new Error(isProxyMode ? 'Session expired. Please log in again.' : 'OpenRouter API key invalid (401). Check VITE_OPENROUTER_API_KEY.');
+            throw new Error(isProxyMode ? `Auth failed (401): ${errText}` : 'OpenRouter API key invalid (401). Check VITE_OPENROUTER_API_KEY.');
         }
         if (res.status === 402) {
             throw new Error('OpenRouter: Insufficient credits. Add credits at openrouter.ai.');
