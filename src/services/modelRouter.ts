@@ -1,6 +1,8 @@
 // ─────────────────────────────────────────────────
 // modelRouter.ts — Model Selection & Routing
 // ─────────────────────────────────────────────────
+// ★ Image gen: Flux removed from OpenRouter (Apr 2026).
+//   Now using Gemini "Nano Banana" image models.
 // Maps Glid use cases to optimal OpenRouter models.
 // Single config point for all model decisions.
 //
@@ -11,7 +13,7 @@
 //
 // Internal (not in selector):
 //   Vision:   uses the selected model (all Claude models have vision built-in)
-//   Image:    Flux Schnell / Imagen 3
+//   Image:    Nano Banana 2 (fast) / Nano Banana Pro (quality)
 // ─────────────────────────────────────────────────
 
 export type AceModelRole =
@@ -85,24 +87,24 @@ const MODEL_CONFIGS: Record<AceModelRole, ModelConfig> = {
         costPer1MOutput: 15.00,
     },
     image_fast: {
-        // FLUX.2 Pro — native width/height support, fast, reliable
-        id: 'black-forest-labs/flux.2-pro',
-        name: 'FLUX.2 Pro',
+        // Nano Banana 2 (Gemini 3.1 Flash Image) — fast, cheap
+        id: 'google/gemini-3.1-flash-image-preview',
+        name: 'Nano Banana 2',
         maxTokens: 0,
         supportsVision: false,
         supportsTools: false,
-        costPer1MInput: 0.000003,
-        costPer1MOutput: 0,
+        costPer1MInput: 0.0000005,
+        costPer1MOutput: 0.000003,
     },
     image_quality: {
-        // Gemini 3 Pro Image Preview — higher quality
+        // Nano Banana Pro (Gemini 3 Pro Image) — higher quality
         id: 'google/gemini-3-pro-image-preview',
-        name: 'Gemini 3 Pro Image',
+        name: 'Nano Banana Pro',
         maxTokens: 0,
         supportsVision: false,
         supportsTools: false,
         costPer1MInput: 0.000002,
-        costPer1MOutput: 0,
+        costPer1MOutput: 0.000012,
     },
 };
 

@@ -36,8 +36,9 @@ describe('modelRouter', () => {
         const fast = getModelId('image_fast');
         const quality = getModelId('image_quality');
         expect(fast).not.toBe(quality);
-        expect(fast).toContain('flux'); // FLUX.2 Pro — native width/height
-        expect(quality).toContain('gemini'); // Gemini 3 Pro Image
+        // ★ Flux removed from OpenRouter Apr 2026 → Nano Banana models
+        expect(fast).toContain('gemini'); // Nano Banana 2 (fast)
+        expect(quality).toContain('gemini'); // Nano Banana Pro (quality)
     });
 
     it('getMaxTokens returns correct value', () => {
