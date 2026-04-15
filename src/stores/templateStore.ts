@@ -280,7 +280,19 @@ export const useTemplateStore = create<TemplateState>()(
 
             // ── Admin: add custom template ──
             addCustomTemplate: (opts) => {
-                const id = `tmpl-custom-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+                // ★ Use user-set name as ID (slugified for URL safety)
+                const slug = opts.name
+                    .toLowerCase()
+                    .replace(/[^a-z0-9\s-]/g, '')
+                    .trim()
+                    .replace(/\s+/g, '-')
+                    .slice(0, 60) || 'custom-template';
+                // Avoid collision with existing templates
+                const existing = get().templates.map(t => t.id);
+                let id = slug;
+                if (existing.includes(id)) {
+                    id = `${slug}-${Date.now().toString(36).slice(-4)}`;
+                }
                 const now = new Date().toISOString();
                 // Embed metadata in variant for cloud sync
                 const variantWithMeta = {
@@ -357,8 +369,8 @@ export const useTemplateStore = create<TemplateState>()(
                                 if (override.height) tmpl.height = override.height;
                                 if (override.name) tmpl.name = override.name;
                                 tmpl.updatedAt = new Date().toISOString();
-                            } else if (id.startsWith('tmpl-custom-')) {
-                                // ★ Custom admin template from cloud — use name column first
+                            } else {
+                                // ★ Unknown template from cloud — create locally (custom or renamed)
                                 let metaName = override.name ?? 'Custom Template';
                                 let metaCategory: TemplateCategory = 'social';
                                 if (!override.name) {

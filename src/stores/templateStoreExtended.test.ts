@@ -288,11 +288,11 @@ describe('templateStore — ★ REGRESSION: deleteCustomTemplate (v424)', () => 
 // ★ REGRESSION: addCustomTemplate (v424)
 // ─────────────────────────────────────────────────
 describe('templateStore — addCustomTemplate (v424)', () => {
-    it('creates a custom template with tmpl-custom- prefix', () => {
+    it('creates a custom template with slugified name as ID', () => {
         const id = useTemplateStore.getState().addCustomTemplate({
             name: 'Test Custom', category: 'display', variant: mockVariant,
         });
-        expect(id).toMatch(/^tmpl-custom-/);
+        expect(id).toBe('test-custom');
     });
 
     it('sets isBuiltIn to false', () => {
