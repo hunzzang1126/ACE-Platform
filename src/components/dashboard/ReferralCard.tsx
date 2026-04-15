@@ -1,8 +1,8 @@
 // ─────────────────────────────────────────────────
-// ReferralCard — Invite friends + earn credits
+// ReferralCard — Compact inline referral section
 // ─────────────────────────────────────────────────
-// Displays referral code, copy link, and referral stats.
-// Brand palette: Indigo→Mint gradient accent.
+// Single-row design: icon + text + code + copy button.
+// Much smaller footprint than the previous card layout.
 // ─────────────────────────────────────────────────
 
 import { useState, useMemo, useCallback } from 'react';
@@ -38,100 +38,56 @@ export function ReferralCard() {
         setTimeout(() => setCopied(false), 2000);
     }, [referralUrl]);
 
-    // Referral stats (placeholder — will connect to Supabase)
-    const stats = { invited: 0, active: 0, creditsEarned: 0 };
-
     return (
         <div style={{
-            background: 'var(--bg-surface)', borderRadius: 12,
-            border: '1px solid var(--border)', overflow: 'hidden',
+            display: 'flex', alignItems: 'center', gap: 14,
+            padding: '14px 20px', borderRadius: 10,
+            background: 'linear-gradient(145deg, rgba(99,102,241,0.05), rgba(45,212,191,0.03))',
+            border: '1px solid var(--border)',
+            marginTop: 8,
         }}>
-            {/* Header */}
+            {/* Icon */}
             <div style={{
-                padding: '18px 22px 14px',
-                background: 'linear-gradient(145deg, rgba(99,102,241,0.06), rgba(45,212,191,0.03))',
-                borderBottom: '1px solid var(--border)',
+                width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                background: 'linear-gradient(135deg, #6366F1, #2DD4BF)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{
-                        width: 32, height: 32, borderRadius: 8,
-                        background: 'linear-gradient(135deg, #6366F1, #2DD4BF)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round">
-                            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                            <circle cx="9" cy="7" r="4" />
-                            <line x1="19" y1="8" x2="19" y2="14" />
-                            <line x1="22" y1="11" x2="16" y2="11" />
-                        </svg>
-                    </div>
-                    <div>
-                        <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-                            {t('referral.title')}
-                        </h3>
-                        <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '2px 0 0' }}>
-                            {t('referral.desc')}
-                        </p>
-                    </div>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <line x1="19" y1="8" x2="19" y2="14" />
+                    <line x1="22" y1="11" x2="16" y2="11" />
+                </svg>
+            </div>
+
+            {/* Text */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {t('referral.title')}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
+                    {t('referral.desc')}
                 </div>
             </div>
 
-            <div style={{ padding: '16px 22px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-                {/* Referral Code */}
-                <div>
-                    <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.05em', marginBottom: 4, display: 'block' }}>
-                        {t('referral.codeLabel')}
-                    </label>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                        <div style={{
-                            flex: 1, padding: '8px 12px', borderRadius: 8,
-                            background: 'var(--bg-hover)', border: '1px solid var(--border)',
-                            fontSize: 14, fontWeight: 700, color: 'var(--text-primary)',
-                            fontFamily: 'monospace', letterSpacing: '0.1em',
-                        }}>
-                            {referralCode}
-                        </div>
-                        <button onClick={copyLink} style={{
-                            padding: '8px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600,
-                            border: 'none', cursor: 'pointer', transition: 'all 0.2s',
-                            background: copied ? '#16a34a' : 'linear-gradient(135deg, #6366F1, #2DD4BF)',
-                            color: '#fff', whiteSpace: 'nowrap' as const,
-                        }}>
-                            {copied ? t('referral.copied') : t('referral.copyLink')}
-                        </button>
-                    </div>
-                </div>
-
-                {/* Stats */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-                    {[
-                        { label: t('referral.invited'), value: stats.invited },
-                        { label: t('referral.active'), value: stats.active },
-                        { label: t('referral.credits'), value: stats.creditsEarned },
-                    ].map(stat => (
-                        <div key={stat.label} style={{
-                            padding: '10px 12px', borderRadius: 8,
-                            background: 'var(--bg-hover)', textAlign: 'center' as const,
-                        }}>
-                            <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--accent)' }}>
-                                {stat.value}
-                            </div>
-                            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
-                                {stat.label}
-                            </div>
-                        </div>
-                    ))}
-                </div>
-
-                {/* Reward info */}
-                <div style={{
-                    padding: '10px 14px', borderRadius: 8,
-                    background: 'rgba(45,212,191,0.04)',
-                    border: '1px solid rgba(45,212,191,0.08)',
-                    fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5,
+            {/* Code + Copy */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                <span style={{
+                    padding: '6px 10px', borderRadius: 6,
+                    background: 'var(--bg-hover)', border: '1px solid var(--border)',
+                    fontSize: 12, fontWeight: 700, color: 'var(--text-primary)',
+                    fontFamily: 'monospace', letterSpacing: '0.08em',
                 }}>
-                    {t('referral.rewardInfo')}
-                </div>
+                    {referralCode}
+                </span>
+                <button onClick={copyLink} style={{
+                    padding: '6px 12px', borderRadius: 6, fontSize: 11, fontWeight: 600,
+                    border: 'none', cursor: 'pointer', transition: 'all 0.2s',
+                    background: copied ? '#16a34a' : 'linear-gradient(135deg, #6366F1, #2DD4BF)',
+                    color: '#fff', whiteSpace: 'nowrap' as const,
+                }}>
+                    {copied ? t('referral.copied') : t('referral.copyLink')}
+                </button>
             </div>
         </div>
     );

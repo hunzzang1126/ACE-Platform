@@ -231,9 +231,6 @@ export function DashboardPage() {
 
                 {/* ── Plan Status Bar ── */}
                 <PlanStatusBar />
-                <ReferralCard />
-
-
 
                 {/* Search */}
                 <div className="dashboard-search-bar">
@@ -315,6 +312,9 @@ export function DashboardPage() {
                         )}
                     </div>
                 </div>
+
+                {/* Referral — below projects, compact */}
+                <ReferralCard />
 
 
                 {/* Version Footer + Sync Status */}

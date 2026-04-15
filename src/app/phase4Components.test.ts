@@ -82,10 +82,9 @@ describe('ReferralCard — structure + brand', () => {
         expect(referralCardSrc).toContain('/signup?ref=${referralCode}');
     });
 
-    it('displays 3 stat columns', () => {
-        expect(referralCardSrc).toContain("t('referral.invited')");
-        expect(referralCardSrc).toContain("t('referral.active')");
-        expect(referralCardSrc).toContain("t('referral.credits')");
+    it('compact inline layout with title and description', () => {
+        expect(referralCardSrc).toContain("t('referral.title')");
+        expect(referralCardSrc).toContain("t('referral.desc')");
     });
 
     it('uses clipboard API with fallback', () => {
@@ -99,13 +98,14 @@ describe('ReferralCard — structure + brand', () => {
     });
 
     it('uses CSS custom properties for theme', () => {
-        expect(referralCardSrc).toContain('var(--bg-surface)');
         expect(referralCardSrc).toContain('var(--text-primary)');
         expect(referralCardSrc).toContain('var(--text-muted)');
+        expect(referralCardSrc).toContain('var(--border)');
     });
 
-    it('shows reward info section', () => {
-        expect(referralCardSrc).toContain("t('referral.rewardInfo')");
+    it('shows referral code and copy button', () => {
+        expect(referralCardSrc).toContain('referralCode');
+        expect(referralCardSrc).toContain("t('referral.copyLink')");
     });
 });
 
@@ -167,8 +167,8 @@ describe('ProjectThumbnail — element rendering', () => {
         expect(thumbnailSrc).toContain('cs.masterVariantId');
     });
 
-    it('limits to 8 elements max', () => {
-        expect(thumbnailSrc).toContain('.slice(0, 8)');
+    it('limits to 12 elements max', () => {
+        expect(thumbnailSrc).toContain('.slice(0, 12)');
     });
 
     it('★ SINGLE RESOLVER: uses constraintsToAbsolute for positioning', () => {
@@ -183,13 +183,23 @@ describe('ProjectThumbnail — element rendering', () => {
     });
 
     it('shows fallback icon when no data', () => {
-        expect(thumbnailSrc).toContain('if (!elements)');
+        expect(thumbnailSrc).toContain('if (!data)');
         expect(thumbnailSrc).toContain('<svg');
     });
 
-    it('clamps element sizes', () => {
-        expect(thumbnailSrc).toContain('Math.max(4');
-        expect(thumbnailSrc).toContain('Math.max(2');
+    it('supports screenshot preview when available', () => {
+        expect(thumbnailSrc).toContain('screenshotUrl');
+        expect(thumbnailSrc).toContain('objectFit');
+    });
+
+    it('uses preset.width/height for scale calculation', () => {
+        expect(thumbnailSrc).toContain('master.preset.width');
+        expect(thumbnailSrc).toContain('master.preset.height');
+    });
+
+    it('supports gradient backgrounds', () => {
+        expect(thumbnailSrc).toContain('gradientStart');
+        expect(thumbnailSrc).toContain('gradientEnd');
     });
 });
 
