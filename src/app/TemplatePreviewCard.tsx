@@ -1,10 +1,13 @@
-// TemplatePreviewCard — CSS-based template preview renderer
-// Used by TemplatesPage for visual template cards
+// TemplatePreviewCard — Fabric.js headless rendered template preview
+// ★ Uses SAME Fabric.js engine as Canvas Editor for pixel-perfect rendering.
+// Previous CSS-based approach had unfixable text positioning drift.
 
-import { constraintsToAbsolute } from '@/engine/elementConverters';
-import { textEffectToCSS } from '@/components/editor/templateEffectHelpers';
+import { useEffect, useRef, useState } from 'react';
+import { renderVariantWithFabric } from '@/components/creativeset/fabricHeadlessRenderer';
 import type { DesignTemplate } from '@/stores/templateStore';
 import type { BannerVariant } from '@/schema/design.types';
+
+const PREVIEW_W = 220;
 
 export function TemplatePreview({ template }: { template: DesignTemplate }) {
     let variant: BannerVariant | null = null;
@@ -15,7 +18,7 @@ export function TemplatePreview({ template }: { template: DesignTemplate }) {
     if (!variant) {
         return (
             <div style={{
-                width: 220, height: 160,
+                width: PREVIEW_W, height: 160,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 color: '#555', fontSize: 16, fontWeight: 600,
                 background: 'rgba(255,255,255,0.02)', borderRadius: 8,
@@ -25,105 +28,73 @@ export function TemplatePreview({ template }: { template: DesignTemplate }) {
         );
     }
 
-    const tw = template.width;
-    const th = template.height;
-    const previewW = 220;
-    const scale = previewW / tw;
-    const previewH = th * scale;
+    return <FabricPreview variant={variant} width={template.width} height={template.height} />;
+}
+
+// ── Fabric.js headless renderer component ──
+
+function FabricPreview({ variant, width, height }: { variant: BannerVariant; width: number; height: number }) {
+    const [dataUrl, setDataUrl] = useState<string | null>(null);
+    const [error, setError] = useState(false);
+    const renderIdRef = useRef(0);
+
+    const scale = PREVIEW_W / width;
+    const previewH = height * scale;
+
+    useEffect(() => {
+        const renderId = ++renderIdRef.current;
+
+        // Ensure variant has correct preset dimensions
+        const fullVariant: BannerVariant = {
+            ...variant,
+            preset: variant.preset ?? { id: 'preview', name: 'Preview', width, height, category: 'display' as const },
+        };
+
+        renderVariantWithFabric(fullVariant)
+            .then(url => { if (renderId === renderIdRef.current) setDataUrl(url); })
+            .catch(() => { if (renderId === renderIdRef.current) setError(true); });
+
+        return () => { renderIdRef.current++; };
+    }, [variant, width, height]);
+
+    if (error) {
+        return (
+            <div style={{
+                width: PREVIEW_W, height: previewH,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#555', fontSize: 12, background: '#1a1a2e', borderRadius: 8,
+            }}>
+                {width} x {height}
+            </div>
+        );
+    }
+
+    if (!dataUrl) {
+        return (
+            <div style={{
+                width: PREVIEW_W, height: previewH,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: '#0d1117', borderRadius: 8,
+            }}>
+                <div style={{
+                    width: 16, height: 16,
+                    border: '2px solid rgba(99,102,241,0.3)',
+                    borderTopColor: '#818cf8',
+                    borderRadius: '50%',
+                    animation: 'spin 0.8s linear infinite',
+                }} />
+            </div>
+        );
+    }
 
     return (
-        <div style={{ width: previewW, height: previewH, position: 'relative', overflow: 'hidden', borderRadius: 8 }}>
-            <div style={{
-                width: tw, height: th,
-                position: 'absolute', left: 0, top: 0,
-                transform: `scale(${scale})`,
-                transformOrigin: 'top left',
-                backgroundColor: variant.backgroundColor || '#f0f0f0',
-            }}>
-                {variant.elements.map((el) => {
-                    const pos = el.constraints
-                        ? constraintsToAbsolute(el.constraints, tw, th)
-                        : { x: 0, y: 0, w: 0, h: 0 };
-
-                    const shadow = el.shadow;
-                    const shadowCSS = shadow
-                        ? `${shadow.offsetX}px ${shadow.offsetY}px ${shadow.blur}px ${shadow.color}`
-                        : undefined;
-
-                    const baseStyle: React.CSSProperties = {
-                        position: 'absolute', left: pos.x, top: pos.y, width: pos.w, height: pos.h,
-                        opacity: el.opacity ?? 1, zIndex: el.zIndex ?? 0,
-                        overflow: 'visible', pointerEvents: 'none',
-                        boxShadow: el.type !== 'text' ? shadowCSS : undefined,
-                    };
-
-                    if (el.type === 'shape') {
-                        const bg = el.gradientStart && el.gradientEnd
-                            ? `linear-gradient(${el.gradientAngle ?? 0}deg, ${el.gradientStart}, ${el.gradientEnd})`
-                            : el.fill;
-                        return <div key={el.id} style={{ ...baseStyle, background: bg, borderRadius: el.borderRadius ?? 0 }} />;
-                    }
-
-                    if (el.type === 'text') {
-                        // ★ FIX: Convert textEffect to CSS text-shadow for preview (glow, neon, etc.)
-                        const effectShadow = el.textEffect && el.textEffect.type !== 'none'
-                            ? textEffectToCSS(el.textEffect.type, el.textEffect.intensity ?? 50, el.textEffect.color ?? '#ffffff')
-                            : undefined;
-                        // Combine element shadow + textEffect shadow
-                        const finalTextShadow = [effectShadow, shadowCSS].filter(Boolean).join(', ') || undefined;
-
-                        // ★ FIX: Fabric.js positions text at exact top (no half-leading).
-                        // CSS line-height adds (lineHeight-1)/2*fontSize above the first line.
-                        // Compensate by shifting top position up by that amount.
-                        const lh = el.lineHeight || 1.2;
-                        const fs = el.fontSize || 16;
-                        const halfLeading = ((lh - 1) / 2) * fs;
-
-                        return (
-                            <div key={el.id} style={{
-                                position: 'absolute',
-                                left: pos.x,
-                                top: pos.y - halfLeading,
-                                width: pos.w,
-                                height: pos.h + halfLeading, // prevent clipping from shift
-                                opacity: el.opacity ?? 1,
-                                zIndex: el.zIndex ?? 0,
-                                overflow: 'visible',
-                                pointerEvents: 'none',
-                                color: el.color, fontSize: fs,
-                                fontWeight: el.fontWeight,
-                                fontFamily: el.fontFamily || 'Inter, sans-serif',
-                                textAlign: (el.textAlign as React.CSSProperties['textAlign']) || 'left',
-                                lineHeight: lh,
-                                whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                                textShadow: finalTextShadow,
-                                // ★ outline/splice effects use CSS stroke (webkit)
-                                ...(el.textEffect?.type === 'outline' || el.textEffect?.type === 'splice'
-                                    ? { WebkitTextStroke: `${Math.max(1, 2 * (el.textEffect.intensity / 50))}px ${el.textEffect.color}` }
-                                    : {}),
-                            }}>
-                                {el.content}
-                            </div>
-                        );
-                    }
-
-                    if (el.type === 'button') {
-                        return (
-                            <div key={el.id} style={{
-                                ...baseStyle,
-                                backgroundColor: el.backgroundColor, color: el.color,
-                                fontSize: el.fontSize, fontWeight: 700,
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                borderRadius: el.borderRadius ?? 6,
-                            }}>
-                                {el.label}
-                            </div>
-                        );
-                    }
-
-                    return null;
-                })}
-            </div>
-        </div>
+        <img
+            src={dataUrl}
+            alt={`${width}x${height}`}
+            width={PREVIEW_W}
+            height={previewH}
+            style={{ display: 'block', borderRadius: 8 }}
+            draggable={false}
+        />
     );
 }
