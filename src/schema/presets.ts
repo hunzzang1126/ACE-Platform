@@ -4,6 +4,14 @@
 import type { SizePreset } from './design.types';
 
 export const SIZE_PRESETS: SizePreset[] = [
+    // ── Social Media (default — most common ad format) ──
+    { id: 'social-1080x1080', name: 'Instagram Post', width: 1080, height: 1080, category: 'social' },
+    { id: 'social-1080x1920', name: 'Instagram Story', width: 1080, height: 1920, category: 'social' },
+    { id: 'social-1200x628', name: 'Facebook Ad', width: 1200, height: 628, category: 'social' },
+    { id: 'social-1200x1200', name: 'Facebook Square', width: 1200, height: 1200, category: 'social' },
+    { id: 'social-1600x900', name: 'Twitter/X Header', width: 1600, height: 900, category: 'social' },
+    { id: 'social-1200x675', name: 'LinkedIn Sponsored', width: 1200, height: 675, category: 'social' },
+
     // ── IAB Display ──
     { id: 'iab-300x250', name: 'Medium Rectangle', width: 300, height: 250, category: 'display' },
     { id: 'iab-728x90', name: 'Leaderboard', width: 728, height: 90, category: 'display' },
@@ -13,14 +21,6 @@ export const SIZE_PRESETS: SizePreset[] = [
     { id: 'iab-300x600', name: 'Half Page', width: 300, height: 600, category: 'display' },
     { id: 'iab-320x480', name: 'Mobile Interstitial', width: 320, height: 480, category: 'display' },
     { id: 'iab-468x60', name: 'Full Banner', width: 468, height: 60, category: 'display' },
-
-    // ── Social Media ──
-    { id: 'social-1080x1080', name: 'Instagram Post', width: 1080, height: 1080, category: 'social' },
-    { id: 'social-1080x1920', name: 'Instagram Story', width: 1080, height: 1920, category: 'social' },
-    { id: 'social-1200x628', name: 'Facebook Ad', width: 1200, height: 628, category: 'social' },
-    { id: 'social-1200x1200', name: 'Facebook Square', width: 1200, height: 1200, category: 'social' },
-    { id: 'social-1600x900', name: 'Twitter/X Header', width: 1600, height: 900, category: 'social' },
-    { id: 'social-1200x675', name: 'LinkedIn Sponsored', width: 1200, height: 675, category: 'social' },
 
     // ── Video ──
     { id: 'video-1920x1080', name: 'Full HD (16:9)', width: 1920, height: 1080, category: 'video' },
