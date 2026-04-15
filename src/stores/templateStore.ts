@@ -232,7 +232,7 @@ export const useTemplateStore = create<TemplateState>()(
                         const userId = useAuthStore.getState().user?.id;
                         if (userId) {
                             const tmpl = get().templates.find(t => t.id === id);
-                            await upsertTemplateOverride(id, snapshot, userId, tmpl?.width, tmpl?.height);
+                            await upsertTemplateOverride(id, snapshot, userId, tmpl?.width, tmpl?.height, tmpl?.name);
                         }
                     } catch (e) {
                         console.warn('[templateStore] Failed to push override to cloud:', e);
@@ -294,7 +294,7 @@ export const useTemplateStore = create<TemplateState>()(
                         const { useAuthStore } = await import('@/stores/authStore');
                         const userId = useAuthStore.getState().user?.id;
                         if (userId) {
-                            await upsertTemplateOverride(id, snapshot, userId, 1080, 1080);
+                            await upsertTemplateOverride(id, snapshot, userId, 1080, 1080, opts.name);
                             console.log('[templateStore] Custom template pushed to cloud:', id);
                         }
                     } catch (e) {
@@ -330,21 +330,27 @@ export const useTemplateStore = create<TemplateState>()(
                             state.templateOverrides[id] = override.snapshot;
                             const tmpl = state.templates.find(t => t.id === id);
                             if (tmpl) {
-                                // Existing template — update snapshot
+                                // Existing template — update snapshot + name
                                 tmpl.variantSnapshot = override.snapshot;
                                 if (override.width) tmpl.width = override.width;
                                 if (override.height) tmpl.height = override.height;
+                                if (override.name) tmpl.name = override.name;
                                 tmpl.updatedAt = new Date().toISOString();
                             } else if (id.startsWith('tmpl-custom-')) {
-                                // ★ Custom admin template from cloud — create locally
-                                let meta = { name: 'Custom Template', category: 'social' as TemplateCategory };
-                                try {
-                                    const parsed = JSON.parse(override.snapshot);
-                                    if (parsed.__customMeta) meta = parsed.__customMeta;
-                                } catch { /* use defaults */ }
+                                // ★ Custom admin template from cloud — use name column first
+                                let metaName = override.name ?? 'Custom Template';
+                                let metaCategory: TemplateCategory = 'social';
+                                if (!override.name) {
+                                    // Fallback: read from __customMeta embedded in snapshot
+                                    try {
+                                        const parsed = JSON.parse(override.snapshot);
+                                        if (parsed.__customMeta?.name) metaName = parsed.__customMeta.name;
+                                        if (parsed.__customMeta?.category) metaCategory = parsed.__customMeta.category;
+                                    } catch { /* use defaults */ }
+                                }
                                 state.templates.push({
-                                    id, name: meta.name, description: '',
-                                    category: meta.category, tags: ['custom'],
+                                    id, name: metaName, description: '',
+                                    category: metaCategory, tags: ['custom'],
                                     thumbnailSrc: '', width: override.width ?? 1080, height: override.height ?? 1080,
                                     variantSnapshot: override.snapshot,
                                     usageCount: 0, isBuiltIn: false, isFavorite: false,

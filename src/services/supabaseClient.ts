@@ -233,7 +233,7 @@ export interface TemplateOverrideRow {
  * Called on app load by ALL users so they see admin-edited templates.
  */
 export async function fetchTemplateOverrides(): Promise<
-    Record<string, { snapshot: string; width?: number; height?: number }>
+    Record<string, { snapshot: string; width?: number; height?: number; name?: string }>
 > {
     const sb = getSupabase();
     if (!sb) return {};
@@ -241,14 +241,14 @@ export async function fetchTemplateOverrides(): Promise<
     try {
         const { data, error } = await sb
             .from('template_overrides')
-            .select('template_id, variant_snapshot, width, height');
+            .select('template_id, variant_snapshot, width, height, name');
 
         if (error || !data) {
             console.warn('[fetchTemplateOverrides] Error:', error?.message);
             return {};
         }
 
-        const result: Record<string, { snapshot: string; width?: number; height?: number }> = {};
+        const result: Record<string, { snapshot: string; width?: number; height?: number; name?: string }> = {};
         for (const row of data) {
             result[row.template_id] = {
                 snapshot: typeof row.variant_snapshot === 'string'
@@ -256,6 +256,7 @@ export async function fetchTemplateOverrides(): Promise<
                     : JSON.stringify(row.variant_snapshot),
                 width: row.width ?? undefined,
                 height: row.height ?? undefined,
+                name: row.name ?? undefined,
             };
         }
         console.log('[fetchTemplateOverrides] Loaded', Object.keys(result).length, 'global overrides');
@@ -276,21 +277,26 @@ export async function upsertTemplateOverride(
     userId: string,
     width?: number,
     height?: number,
+    name?: string,
 ): Promise<{ error: string | null }> {
     const sb = getSupabase();
     if (!sb) return { error: 'Supabase not configured' };
 
     try {
+        const payload: Record<string, unknown> = {
+            template_id: templateId,
+            variant_snapshot: JSON.parse(variantSnapshot), // store as JSONB
+            width: width ?? null,
+            height: height ?? null,
+            updated_by: userId,
+            updated_at: new Date().toISOString(),
+        };
+        // ★ Include user-facing name if provided
+        if (name !== undefined) payload.name = name;
+
         const { data, error } = await sb
             .from('template_overrides')
-            .upsert({
-                template_id: templateId,
-                variant_snapshot: JSON.parse(variantSnapshot), // store as JSONB
-                width: width ?? null,
-                height: height ?? null,
-                updated_by: userId,
-                updated_at: new Date().toISOString(),
-            }, { onConflict: 'template_id' })
+            .upsert(payload, { onConflict: 'template_id' })
             .select('template_id')
             .single();
 

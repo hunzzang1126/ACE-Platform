@@ -174,7 +174,7 @@ export function useFabricCanvas(width: number, height: number, _addDemoShapes = 
     const addRect = useCallback((x?: number, y?: number) => {
         const fc = fabricRef.current; if (!fc) return null;
         const id = nextId();
-        const rect = new Rect({ left: x ?? (width / 2 - 60), top: y ?? (height / 2 - 40), width: 120, height: 80, fill: nextColor(), opacity: 0.9 });
+        const rect = new Rect({ left: x ?? (width / 2 - 60), top: y ?? (height / 2 - 40), width: 120, height: 80, fill: nextColor(), opacity: 1.0 });
         (rect as any).__glidId = id; (rect as any).__glidZIndex = getUserObjects().length; patchAceProps(rect);
         fc.add(rect); fc.setActiveObject(rect); fc.renderAll(); syncState();
         return id;
@@ -183,7 +183,7 @@ export function useFabricCanvas(width: number, height: number, _addDemoShapes = 
     const addRoundedRect = useCallback((x?: number, y?: number) => {
         const fc = fabricRef.current; if (!fc) return null;
         const id = nextId();
-        const rect = new Rect({ left: x ?? (width / 2 - 60), top: y ?? (height / 2 - 40), width: 120, height: 80, fill: nextColor(), opacity: 0.9, rx: 12, ry: 12 });
+        const rect = new Rect({ left: x ?? (width / 2 - 60), top: y ?? (height / 2 - 40), width: 120, height: 80, fill: nextColor(), opacity: 1.0, rx: 12, ry: 12 });
         (rect as any).__glidId = id; (rect as any).__glidZIndex = getUserObjects().length; patchAceProps(rect);
         fc.add(rect); fc.setActiveObject(rect); fc.renderAll(); syncState();
         return id;
@@ -192,7 +192,7 @@ export function useFabricCanvas(width: number, height: number, _addDemoShapes = 
     const addEllipse = useCallback((x?: number, y?: number) => {
         const fc = fabricRef.current; if (!fc) return null;
         const id = nextId();
-        const el = new Ellipse({ left: x ?? (width / 2 - 60), top: y ?? (height / 2 - 40), rx: 60, ry: 50, fill: nextColor(), opacity: 0.9 });
+        const el = new Ellipse({ left: x ?? (width / 2 - 60), top: y ?? (height / 2 - 40), rx: 60, ry: 50, fill: nextColor(), opacity: 1.0 });
         (el as any).__glidId = id; (el as any).__glidZIndex = getUserObjects().length; patchAceProps(el);
         fc.add(el); fc.setActiveObject(el); fc.renderAll(); syncState();
         return id;
