@@ -48,7 +48,7 @@ vi.mock('@/hooks/useAnimationPresets', () => ({
     },
 }));
 
-import { handleAddText, handleAddShape, handleAddButton, handleSetAnimation } from './designElementCreators';
+import { handleAddText, handleAddShape, handleAddButton, handleSetAnimation, enforceSemanticZOrder } from './designElementCreators';
 
 describe('designElementCreators', () => {
     beforeEach(() => {
@@ -190,3 +190,77 @@ describe('designElementCreators', () => {
         });
     });
 });
+
+// ── enforceSemanticZOrder ──
+describe('enforceSemanticZOrder', () => {
+    it('should place background at the bottom (z=0)', () => {
+        const els = [
+            { name: 'headline', type: 'text', zIndex: 0 },
+            { name: 'background', type: 'shape', zIndex: 1 },
+        ];
+        enforceSemanticZOrder(els);
+        expect(els.find(e => e.name === 'background')!.zIndex).toBe(0);
+        expect(els.find(e => e.name === 'headline')!.zIndex).toBe(1);
+    });
+
+    it('★ REGRESSION: CTA text must be above CTA button bg', () => {
+        const els = [
+            { name: 'background', type: 'shape', zIndex: 0 },
+            { name: 'headline', type: 'text', zIndex: 1 },
+            { name: 'cta_button', type: 'shape', zIndex: 3 },  // BUG: was above text
+            { name: 'cta_label', type: 'text', zIndex: 2 },    // BUG: was below shape
+        ];
+        enforceSemanticZOrder(els);
+        const ctaBg = els.find(e => e.name === 'cta_button')!;
+        const ctaLabel = els.find(e => e.name === 'cta_label')!;
+        expect(ctaLabel.zIndex).toBeGreaterThan(ctaBg.zIndex);
+    });
+
+    it('should place badges/tags at the top', () => {
+        const els = [
+            { name: 'background', type: 'shape', zIndex: 0 },
+            { name: 'tag_text', type: 'text', zIndex: 1, role: 'tag' },
+            { name: 'headline', type: 'text', zIndex: 2 },
+        ];
+        enforceSemanticZOrder(els);
+        const tag = els.find(e => e.name === 'tag_text')!;
+        const headline = els.find(e => e.name === 'headline')!;
+        expect(tag.zIndex).toBeGreaterThan(headline.zIndex);
+    });
+
+    it('should handle full design layer stack correctly', () => {
+        const els = [
+            { name: 'cta_label', type: 'text', zIndex: 0 },
+            { name: 'accent_bar', type: 'shape', zIndex: 1 },
+            { name: 'cta_button', type: 'shape', zIndex: 2 },
+            { name: 'headline', type: 'text', zIndex: 3 },
+            { name: 'background', type: 'shape', zIndex: 4 },
+            { name: 'tag_badge', type: 'text', zIndex: 5 },
+        ];
+        enforceSemanticZOrder(els);
+        // Expected order: background(0) → accent(1) → headline(2) → cta_button(3) → cta_label(4) → tag(5)
+        expect(els.find(e => e.name === 'background')!.zIndex).toBe(0);
+        expect(els.find(e => e.name === 'accent_bar')!.zIndex).toBe(1);
+        expect(els.find(e => e.name === 'headline')!.zIndex).toBe(2);
+        expect(els.find(e => e.name === 'cta_button')!.zIndex).toBe(3);
+        expect(els.find(e => e.name === 'cta_label')!.zIndex).toBe(4);
+        expect(els.find(e => e.name === 'tag_badge')!.zIndex).toBe(5);
+    });
+
+    it('should handle empty array without error', () => {
+        const els: { name: string; type: string; zIndex: number }[] = [];
+        enforceSemanticZOrder(els);
+        expect(els).toHaveLength(0);
+    });
+
+    it('should detect role-based background elements', () => {
+        const els = [
+            { name: 'Rectangle #1', type: 'shape', zIndex: 1, role: 'background' },
+            { name: 'Title', type: 'text', zIndex: 0 },
+        ];
+        enforceSemanticZOrder(els);
+        expect(els.find(e => e.name === 'Rectangle #1')!.zIndex).toBe(0);
+        expect(els.find(e => e.name === 'Title')!.zIndex).toBe(1);
+    });
+});
+

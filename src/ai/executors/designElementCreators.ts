@@ -7,6 +7,9 @@ import { v4 as uuid } from 'uuid';
 import { useAnimPresetStore } from '@/hooks/useAnimationPresets';
 import type { DashboardExecResult } from '../dashboardExecutor';
 
+// ── Semantic Z-order type (matches designStore element shape) ──
+interface ZOrderElement { name: string; type: string; zIndex: number; role?: string }
+
 // ── Helpers ──
 
 function autoCollision(firstVariant: { elements: any[]; preset?: { height?: number } }, y: number, height: number, skipShapes = true): number {
@@ -229,3 +232,46 @@ export function handleSetAnimation(params: Record<string, unknown>): DashboardEx
 
     return { success: true, message: `Animation "${preset}" (${duration}s, start ${startTime}s) applied to ${updated} element(s) matching "${elementName}"` };
 }
+
+// ── Semantic Z-order Enforcement ──
+// ★ Fixes CTA text hidden behind CTA button bg, etc.
+// Called ONLY after AI design pipeline, never on user manual edits.
+
+function getSemanticLayer(el: ZOrderElement): number {
+    const name = (el.name || '').toLowerCase();
+    const role = (el.role || '').toLowerCase();
+    // 0: full-canvas background
+    if (name.includes('background') || name.includes('ai_background') || role === 'background') return 0;
+    // 1: decorative shapes (accent, divider, bar)
+    if (el.type === 'shape' && (name.includes('accent') || name.includes('divider') || name.includes('bar') || name.includes('overlay'))) return 1;
+    // 2: images
+    if (el.type === 'image') return 2;
+    // 5: CTA button bg (shape with cta/button in name)
+    if (el.type === 'shape' && (name.includes('cta') || name.includes('button') || role === 'cta')) return 5;
+    // 3: shapes (generic, not bg/cta)
+    if (el.type === 'shape') return 3;
+    // 6: CTA label text
+    if (el.type === 'text' && (name.includes('cta') || role === 'cta' || name.includes('label'))) return 6;
+    // 7: badges/tags (topmost)
+    if (name.includes('tag') || name.includes('badge') || name.includes('new') || role === 'tag') return 7;
+    // 4: headline & body text
+    if (el.type === 'text' && name.includes('headline') && !name.includes('sub')) return 4;
+    if (el.type === 'text') return 4;
+    // default
+    return 3;
+}
+
+/**
+ * Enforce correct semantic z-ordering on all elements.
+ * Guarantees: bg(0) → accents(1) → images(2) → shapes(3) → text(4) → CTA bg(5) → CTA text(6) → badges(7)
+ * ★ ONLY call from AI design pipeline, not on user manual layer reorder.
+ */
+export function enforceSemanticZOrder<T extends ZOrderElement>(elements: T[]): void {
+    // Assign semantic layer
+    const layered = elements.map((el, idx) => ({ el, semantic: getSemanticLayer(el), original: idx }));
+    // Stable sort: semantic layer first, then original order within same layer
+    layered.sort((a, b) => a.semantic - b.semantic || a.original - b.original);
+    // Reassign z-index
+    layered.forEach((item, i) => { item.el.zIndex = i; });
+}
+

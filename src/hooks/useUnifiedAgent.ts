@@ -139,8 +139,33 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         const abort = new AbortController();
         const result = await scanDesignScreenshot(imageData, canvasW, canvasH, abort.signal);
         updateCard('scan', 'done', `Found ${result.elements.length} elements`);
-        narrate(`Found ${result.elements.length} elements. Now rendering as editable layers.`);
 
+        // ★ Scan V2: Generate AI images for image_placeholder elements
+        const imgPlaceholders = result.elements.filter(el => el.type === 'image_placeholder' && el.image_description);
+        if (imgPlaceholders.length > 0) {
+            narrate(`Found ${imgPlaceholders.length} image element(s). Generating with AI...`);
+            addCard('imagegen', `Generating ${imgPlaceholders.length} image(s)`, 'running');
+            const { generateScanImage } = await resilientImport(() => import('@/services/scanImageGenerator'));
+            const generatedUrls = new Map<string, string>();
+            for (let i = 0; i < imgPlaceholders.length; i++) {
+                const el = imgPlaceholders[i]!;
+                updateCard('imagegen', 'running', `Image ${i + 1}/${imgPlaceholders.length}: ${el.name ?? 'generating'}...`);
+                try {
+                    const imgResult = await generateScanImage({
+                        description: el.image_description!, style: el.image_style ?? 'photo',
+                        width: el.w ?? 200, height: el.h ?? 200, crop: el.image_crop,
+                    }, abort.signal);
+                    if (imgResult.success && imgResult.imageUrl) generatedUrls.set(el.name ?? `img-${i}`, imgResult.imageUrl);
+                } catch (err) { console.warn(`[Scan] Image gen failed for ${el.name}:`, err); }
+            }
+            updateCard('imagegen', 'done', `${generatedUrls.size}/${imgPlaceholders.length} generated`);
+            // Attach generated URLs to elements for rendering
+            for (const el of result.elements) {
+                if (el.type === 'image_placeholder') (el as any).__generatedUrl = generatedUrls.get(el.name ?? '') ?? null;
+            }
+        }
+
+        narrate(`Rendering ${result.elements.length} elements as editable layers.`);
         addCard('render', 'Rendering layers on canvas', 'running');
         try { engine.clear_scene?.(); } catch { /* ok */ }
 
@@ -149,7 +174,11 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
             moveCursor(el.x ?? 0, el.y ?? 0, el.name);
             await new Promise(r => setTimeout(r, 120));
             try {
-                if (el.is_complex_bg) {
+                const genUrl = (el as any).__generatedUrl as string | null | undefined;
+                if (el.type === 'image_placeholder' && genUrl) {
+                    // ★ Scan V2: Place AI-generated image
+                    await engine.add_image(el.x ?? 0, el.y ?? 0, genUrl, el.w ?? 200, el.h ?? 200, el.name ?? 'ai_image');
+                } else if (el.is_complex_bg || (el.type === 'image_placeholder' && !genUrl)) {
                     engine.add_rect(el.x ?? 0, el.y ?? 0, el.w ?? canvasW, el.h ?? canvasH, el.r ?? 0.08, el.g ?? 0.08, el.b ?? 0.1, 1, `${el.name ?? 'background'} (replace with image)`);
                 } else if (el.gradient_start_hex && el.gradient_end_hex) {
                     engine.add_gradient_rect(el.x, el.y, el.w, el.h, el.gradient_start_hex, el.gradient_end_hex, el.gradient_angle ?? 135, el.radius ?? 0, el.name);
@@ -167,8 +196,9 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         }
         hideCursor();
         updateCard('render', 'done', `${rendered} layers created`);
-        narrate(`Done — ${rendered} layers extracted. Each is fully editable.`);
-        return `Scanned design: ${rendered} layers extracted.`;
+        const imgNote = imgPlaceholders.length > 0 ? ` (including ${imgPlaceholders.length} AI-generated image(s))` : '';
+        narrate(`Done — ${rendered} layers extracted${imgNote}. Each is fully editable.`);
+        return `Scanned design: ${rendered} layers extracted${imgNote}.`;
     }, [addCard, updateCard, moveCursor, hideCursor, narrate]);
 
     // ── Chat (regular AI agent) ──

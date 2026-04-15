@@ -257,6 +257,11 @@ async function buildAndRender(
     const { resolveTemplateElements } = await resilientImport(() => import('@/services/templateResolver'));
     let allElements = resolveTemplateElements(template.id, canvasW, canvasH);
 
+    // ★ RECOLOR: Replace template's original colors with AI-generated palette.
+    // Background is decided FIRST (Phase 4) — now all elements harmonize with it.
+    const { recolorTemplateElements } = await resilientImport(() => import('./agentColorRecolor'));
+    allElements = recolorTemplateElements(allElements, guide);
+
     if (bgResult.hasImage && bgResult.url) allElements = allElements.filter(el => el.name !== 'background');
     allElements = allElements.filter(el => { if (el.type === 'text' && (!el.content || el.content.trim() === '')) { console.log(`[Pipeline] Removing empty text: ${el.name}`); return false; } return true; });
 

@@ -7,6 +7,8 @@
 
 import { executeProjectTool } from './executors/projectExecutor';
 import { executeDesignTool } from './executors/designExecutor';
+import { enforceSemanticZOrder } from './executors/designElementCreators';
+import { useDesignStore } from '@/stores/designStore';
 
 export interface DashboardExecResult {
     success: boolean;
@@ -33,7 +35,19 @@ export function executeDashboardTool(
 
         // Try design tools (elements, animation, styling)
         const designResult = executeDesignTool(toolName, params);
-        if (designResult) return designResult;
+        if (designResult) {
+            // ★ After element creation, enforce correct z-order
+            // Fixes: CTA text hidden behind CTA button bg, etc.
+            const ELEMENT_TOOLS = new Set(['add_text', 'add_shape', 'add_button']);
+            if (ELEMENT_TOOLS.has(toolName) && designResult.success) {
+                const cs = useDesignStore.getState().creativeSet;
+                if (cs) {
+                    for (const v of cs.variants) enforceSemanticZOrder(v.elements);
+                    useDesignStore.setState({ creativeSet: cs });
+                }
+            }
+            return designResult;
+        }
 
         // Unknown tool
         return { success: false, message: `Unknown dashboard tool: ${toolName}` };

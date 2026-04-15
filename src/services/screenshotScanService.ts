@@ -40,6 +40,10 @@ export interface ScannedElement extends RenderElement {
     role: 'background' | 'headline' | 'subheadline' | 'body' | 'cta_button' | 'cta_label' | 'image' | 'shape' | 'other';
     font_style?: string; // 'sans', 'serif', 'display', 'mono'
     is_complex_bg?: boolean; // true if background needs AI image generation
+    // ★ Scan V2: Rich image description fields for AI image generation
+    image_description?: string; // Detailed prompt for AI image gen
+    image_style?: 'photo' | 'illustration' | 'texture' | 'gradient_complex' | 'pattern';
+    image_crop?: string; // Framing hint ('headshot', 'full body', 'product closeup')
 }
 
 export interface ScanResult {
@@ -47,16 +51,17 @@ export interface ScanResult {
     canvasW: number;
     canvasH: number;
     hasComplexBackground: boolean;
+    hasImagePlaceholders: boolean;
     backgroundHint?: string; // description for image gen prompt
 }
 
 // ── Vision Scan System Prompt ──────────────────────
-const SCAN_SYSTEM_PROMPT = `You are a precision design reverse-engineer. 
+const SCAN_SYSTEM_PROMPT = `You are a precision design reverse-engineer.
 Your job: analyze a banner/ad screenshot and extract ALL visual elements as structured JSON.
 
 For each element you identify, return:
 - type: "rect" | "rounded_rect" | "text" | "image_placeholder"
-- role: "background" | "headline" | "subheadline" | "body" | "cta_button" | "cta_label" | "shape" | "other"
+- role: "background" | "headline" | "subheadline" | "body" | "cta_button" | "cta_label" | "image" | "shape" | "other"
 - name: descriptive name matching the role
 - x, y: top-left position IN PIXELS (relative to full image dimensions)
 - w, h: width and height IN PIXELS
@@ -64,14 +69,24 @@ For each element you identify, return:
 - For text: content (exact text), color_hex (#rrggbb), font_size (px), font_weight ("400"/"700"/"800"/"900"), text_align, font_style ("sans"/"serif"/"display"/"mono")
 - radius: corner radius for rounded shapes (0 if sharp)
 - z_index: visual stacking order (0=bottom, higher=front)
-- is_complex_bg: true ONLY for complex photo/texture backgrounds that cannot be reproduced with solid/gradient
+
+IMAGE ELEMENT RULES:
+- If an element is a PHOTO (person, product, food, car, building, landscape) → type="image_placeholder"
+- If background is a PHOTO or COMPLEX TEXTURE → is_complex_bg=true + type="image_placeholder"
+- For EVERY image_placeholder, YOU MUST provide:
+  - image_description: detailed AI image generation prompt. Write it as if briefing an artist.
+    GOOD: "Professional woman in navy business suit, waist-up portrait, soft studio lighting, clean white background, corporate headshot style"
+    BAD: "a photo of a person"
+  - image_style: "photo" | "illustration" | "texture" | "gradient_complex" | "pattern"
+  - image_crop: framing hint ("headshot", "full body", "product closeup", "landscape wide", "aerial view", "overhead flat lay")
 
 CRITICAL RULES:
 1. Measure coordinates PRECISELY from image top-left (0,0)
 2. Cover EVERY visible element — do not skip any
-3. For background: if it's a solid color → use r/g/b. If gradient → gradient_start_hex + gradient_end_hex + gradient_angle. If photo/texture → is_complex_bg:true + description in name
+3. For background: solid color → r/g/b. Gradient → gradient_start_hex + gradient_end_hex. Photo/texture → image_placeholder + is_complex_bg:true
 4. Return elements sorted by z_index (background first, topmost last)
-5. font_size must be in real pixels matching the screenshot scale`;
+5. font_size must be in real pixels matching the screenshot scale
+6. image_description must be detailed enough to recreate the visual with AI. Include: subject, style, lighting, color, framing.`;
 
 const SCAN_TOOL = {
     name: 'scan_design',
@@ -106,6 +121,9 @@ const SCAN_TOOL = {
                         radius: { type: 'number' },
                         z_index: { type: 'number' },
                         is_complex_bg: { type: 'boolean' },
+                        image_description: { type: 'string', description: 'Detailed AI image generation prompt for image_placeholder elements' },
+                        image_style: { type: 'string', enum: ['photo', 'illustration', 'texture', 'gradient_complex', 'pattern'] },
+                        image_crop: { type: 'string', description: 'Framing hint: headshot, full body, product closeup, landscape wide' },
                     },
                 },
             },
@@ -184,12 +202,14 @@ export async function scanDesignScreenshot(
     }));
 
     const hasComplexBg = scaled.some(el => el.is_complex_bg);
+    const hasImagePlaceholders = scaled.some(el => el.type === 'image_placeholder');
 
     return {
         elements: scaled,
         canvasW: targetW,
         canvasH: targetH,
         hasComplexBackground: hasComplexBg,
+        hasImagePlaceholders,
         backgroundHint: input.background_description,
     };
 }
