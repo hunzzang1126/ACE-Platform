@@ -115,7 +115,7 @@ export function PreviewContextMenu({
                             const hasAnim = v.elements.some(el => el.animation && el.animation.preset !== 'none');
                             if (!hasAnim) { alert('No animations on this size. Add animations in the editor first.'); continue; }
                             try {
-                                const buffer = await exportVariantToMp4(v, duration, { fps: 30 }, (p) => {
+                                const buffer = await exportVariantToMp4(v, duration, { fps: 60 }, (p) => {
                                     if (p.phase === 'error') { alert('MP4 export failed: ' + p.error); }
                                 });
                                 downloadBlob(buffer, `banner_${v.preset.width}x${v.preset.height}.mp4`);
