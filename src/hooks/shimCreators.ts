@@ -212,9 +212,21 @@ export function createCreatorMethods(ctx: ShimContext) {
                 const newImg = await FabricImage.fromURL(newSrc, imgOptions);
                 (obj as any)._element = (newImg as any)._element;
                 (obj as any)._originalElement = (newImg as any)._originalElement;
-                // ★ CRITICAL: Update stable ref so save persists the NEW image,
-                // not the original. Without this, Remove BG results are lost on save.
-                (obj as any).__glidPersistSrc = newSrc;
+
+                // ★ CRITICAL FIX: Upload to Supabase Storage IMMEDIATELY rather than
+                // deferring to extractAssets (which may fail for external URLs due to CORS).
+                // storeAsset handles: data: → cloud, https:// → fetch → cloud, idb:// → passthrough.
+                let stableRef = newSrc;
+                try {
+                    const { storeAsset } = await import('@/services/assetService');
+                    stableRef = await storeAsset(newSrc);
+                    console.log(`[EngineShim] replace_image_src: uploaded → ${stableRef.slice(0, 60)}`);
+                } catch (uploadErr) {
+                    console.warn('[EngineShim] replace_image_src: upload failed, using raw src:', uploadErr);
+                }
+
+                // ★ Save stable ref (storage:// or idb://) so save persists correctly
+                (obj as any).__glidPersistSrc = stableRef;
                 obj.dirty = true;
                 fc.renderAll(); syncState();
             } catch (err) {

@@ -127,10 +127,17 @@ describe('shimCreators — data integrity', () => {
         expect(src).toContain("src.startsWith('data:') || src.startsWith('idb://')");
     });
 
-    it('★ REGRESSION: replace_image_src updates __glidPersistSrc', () => {
-        // Critical: Remove BG results are lost without this
+    it('★ REGRESSION: replace_image_src updates __glidPersistSrc with stable ref', () => {
+        // Critical: Remove BG / Reimagine results are lost without this
         const replaceSection = src.slice(src.indexOf('replace_image_src'));
-        expect(replaceSection).toContain('__glidPersistSrc = newSrc');
+        expect(replaceSection).toContain('__glidPersistSrc = stableRef');
+    });
+
+    it('★ REGRESSION: replace_image_src uploads to Supabase via storeAsset', () => {
+        // Reimagine images must persist in cloud storage, not just canvas
+        const replaceSection = src.slice(src.indexOf('replace_image_src'));
+        expect(replaceSection).toContain("import('@/services/assetService')");
+        expect(replaceSection).toContain('storeAsset(newSrc)');
     });
 
     it('stores gradient metadata on gradient rects', () => {
