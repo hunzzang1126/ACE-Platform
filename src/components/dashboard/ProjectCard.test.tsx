@@ -50,4 +50,27 @@ describe('ProjectCard', () => {
         );
         expect(container.innerHTML.length).toBeGreaterThan(0);
     });
+
+    it('enters rename mode on double-click of project name', () => {
+        render(<ProjectCard {...defaultProps} />);
+        const nameEl = screen.getByText('Test Campaign');
+        fireEvent.doubleClick(nameEl);
+        // After double-click, an input should appear
+        const input = document.querySelector('.project-card__rename');
+        expect(input).toBeTruthy();
+    });
+
+    it('shows kebab menu button (always visible)', () => {
+        const { container } = render(<ProjectCard {...defaultProps} />);
+        const menuBtn = container.querySelector('.project-card__menu-btn');
+        expect(menuBtn).toBeTruthy();
+    });
+
+    it('opens context menu on kebab click', () => {
+        const { container } = render(<ProjectCard {...defaultProps} />);
+        const menuBtn = container.querySelector('.project-card__menu-btn');
+        if (menuBtn) fireEvent.click(menuBtn);
+        // Context menu should now be visible
+        expect(document.querySelector('.context-menu')).toBeTruthy();
+    });
 });

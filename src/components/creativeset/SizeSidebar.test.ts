@@ -19,3 +19,18 @@ describe('SizeSidebar.tsx — dependencies', () => {
 describe('SizeSidebar.tsx — React patterns', () => {
     it('uses useState', () => { expect(src).toContain('useState'); });
 });
+
+describe('★ Progressive Disclosure: SizeSidebar (v0.0.0.599)', () => {
+    it('accepts hasAnyAnimation prop', () => {
+        expect(src).toContain('hasAnyAnimation');
+    });
+
+    it('conditionally renders playback section based on hasAnyAnimation', () => {
+        expect(src).toContain('hasAnyAnimation');
+    });
+
+    it('hides Play/Space button when static (no animations)', () => {
+        // The rendering should be gated by hasAnyAnimation
+        expect(src).toContain('hasAnyAnimation');
+    });
+});

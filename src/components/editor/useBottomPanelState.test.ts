@@ -83,3 +83,21 @@ describe('useBottomPanelState — Exports and structure', () => {
         expect(src).toContain("'ew-resize'");
     });
 });
+
+describe('★ REGRESSION GUARD: Bar resize too sensitive — 5s→6s fix (v0.0.0.600)', () => {
+    it('uses EDGE_PX = 6 (reduced from 8)', () => {
+        expect(src).toContain('const EDGE_PX = 6');
+    });
+
+    it('has MIN_DRAG_PX threshold to prevent accidental resize', () => {
+        expect(src).toContain('const MIN_DRAG_PX = 3');
+    });
+
+    it('skips resize when mouse movement is below threshold', () => {
+        expect(src).toContain('Math.abs(dx) < MIN_DRAG_PX');
+    });
+
+    it('only applies threshold to resize modes, not move', () => {
+        expect(src).toContain("barDrag.mode !== 'move'");
+    });
+});

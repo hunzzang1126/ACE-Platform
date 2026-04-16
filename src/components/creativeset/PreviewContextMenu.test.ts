@@ -24,3 +24,13 @@ describe('PreviewContextMenu.tsx — React patterns', () => {
     it('uses useEffect', () => { expect(src).toContain('useEffect'); });
     it('uses useCallback', () => { expect(src).toContain('useCallback'); });
 });
+
+describe('★ Video Export FPS (v0.0.0.601)', () => {
+    it('exports MP4 at 60fps for smooth motion', () => {
+        expect(src).toContain('fps: 60');
+    });
+
+    it('does NOT use 30fps for video export', () => {
+        expect(src).not.toContain('fps: 30');
+    });
+});

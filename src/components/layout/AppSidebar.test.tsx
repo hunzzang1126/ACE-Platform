@@ -42,4 +42,29 @@ describe('AppSidebar', () => {
         );
         expect(screen.getByText('Projects')).toBeTruthy();
     });
+
+    it('highlights Projects tab when on /dashboard route', () => {
+        const { container } = render(
+            <MemoryRouter initialEntries={['/dashboard']}>
+                <AppI18nProvider>
+                    <AppSidebar />
+                </AppI18nProvider>
+            </MemoryRouter>
+        );
+        // The active class should be applied
+        const activeItems = container.querySelectorAll('.sidebar-nav-item.active');
+        expect(activeItems.length).toBeGreaterThan(0);
+    });
+
+    it('highlights Projects tab when on / route', () => {
+        const { container } = render(
+            <MemoryRouter initialEntries={['/']}>
+                <AppI18nProvider>
+                    <AppSidebar />
+                </AppI18nProvider>
+            </MemoryRouter>
+        );
+        const activeItems = container.querySelectorAll('.sidebar-nav-item.active');
+        expect(activeItems.length).toBeGreaterThan(0);
+    });
 });
