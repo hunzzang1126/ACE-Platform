@@ -114,4 +114,51 @@ describe('★ REGRESSION GUARD: AI images saved to upload library', () => {
         const mod = await import('@/stores/uploadStore');
         expect(typeof mod.saveToUploadLibrary).toBe('function');
     });
+
+    it('fetchCloudUploads function exists and is exported', async () => {
+        const mod = await import('@/stores/uploadStore');
+        expect(typeof mod.fetchCloudUploads).toBe('function');
+    });
+});
+
+// ═══════════════════════════════════════════════════
+// ★ REGRESSION GUARD: Cloud-first Image Panel
+// ═══════════════════════════════════════════════════
+
+describe('★ REGRESSION GUARD: Cloud-first sync', () => {
+    it('SidebarUploadsTab imports fetchCloudUploads', () => {
+        const src = readFileSync(resolve(__dirname, '../components/editor/SidebarUploadsTab.tsx'), 'utf-8');
+        expect(src).toContain('fetchCloudUploads');
+    });
+
+    it('SidebarUploadsTab calls fetchCloudUploads on mount', () => {
+        const src = readFileSync(resolve(__dirname, '../components/editor/SidebarUploadsTab.tsx'), 'utf-8');
+        expect(src).toContain('fetchCloudUploads(userId)');
+    });
+
+    it('deduplicates storage:// refs correctly', () => {
+        useUploadStore.setState({ uploads: [] });
+        const entry = makeEntry({ idbRef: 'storage://user1/designs/abc.png' });
+        useUploadStore.getState().addUpload(entry);
+        useUploadStore.getState().addUpload({ ...entry, id: 'different-id' });
+        expect(useUploadStore.getState().uploads).toHaveLength(1);
+    });
+
+    it('accepts storage:// refs as idbRef field', () => {
+        useUploadStore.setState({ uploads: [] });
+        const entry = makeEntry({ idbRef: 'storage://user1/designs/hash123.png' });
+        useUploadStore.getState().addUpload(entry);
+        expect(useUploadStore.getState().uploads[0]!.idbRef).toBe('storage://user1/designs/hash123.png');
+    });
+
+    it('extractAssets migrates idb:// to storage:// (source file check)', () => {
+        const src = readFileSync(resolve(__dirname, '../services/assetService.ts'), 'utf-8');
+        expect(src).toContain('migrateIdbRefToCloud');
+        expect(src).toContain('IDB_PREFIX');
+    });
+
+    it('useUnifiedAgent saves scan images to upload library', () => {
+        const src = readFileSync(resolve(__dirname, '../hooks/useUnifiedAgent.ts'), 'utf-8');
+        expect(src).toContain('saveToUploadLibrary');
+    });
 });
