@@ -25,6 +25,10 @@ const SHIMMER_CSS = `
   0%, 100% { box-shadow: 0 0 6px rgba(99,102,241,0.3); }
   50% { box-shadow: 0 0 14px rgba(45,212,191,0.5); }
 }
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
 `;
 let _shimmerInjected = false;
 function injectShimmer() {
