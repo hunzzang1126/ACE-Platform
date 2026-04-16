@@ -15,6 +15,53 @@ import { FONT_FAMILIES } from './contextToolbarConstants';
 import type { AlignDirection } from '@/engines/alignElements';
 import { FontPicker } from './FontPicker';
 
+// ── Inline AI Replace (compact prompt in toolbar) ──
+function AiReplaceInline({ onReplace, w, h }: { onReplace: (url: string) => void; w: number; h: number }) {
+    const [open, setOpen] = useState(false);
+    const [prompt, setPrompt] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    const handleGo = async () => {
+        const trimmed = prompt.trim();
+        if (!trimmed || loading) return;
+        setLoading(true);
+        try {
+            const { generateBackgroundImage } = await import('@/services/imageGenClient');
+            const result = await generateBackgroundImage(trimmed, Math.max(w, 256), Math.max(h, 256), [], new AbortController().signal);
+            if (result.success && result.imageUrl) {
+                onReplace(result.imageUrl);
+                setPrompt(''); setOpen(false);
+            }
+        } catch (err) { console.error('[AiReplace]', err); }
+        finally { setLoading(false); }
+    };
+
+    if (!open) return (
+        <button className="ctx-btn ctx-label-btn" onClick={() => setOpen(true)} title="AI Replace Image" style={{ color: '#2dd4bf', fontWeight: 600 }}>AI Replace</button>
+    );
+
+    return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <input
+                autoFocus type="text" value={prompt}
+                onChange={e => setPrompt(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleGo(); if (e.key === 'Escape') { setOpen(false); setPrompt(''); } e.stopPropagation(); }}
+                placeholder="Describe..."
+                disabled={loading}
+                style={{
+                    width: 140, padding: '3px 8px',
+                    background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(45,212,191,0.4)',
+                    borderRadius: 4, color: '#e2e8f0', fontSize: 11, outline: 'none', fontFamily: 'inherit',
+                }}
+            />
+            <button className="ctx-btn" onClick={handleGo} disabled={loading || !prompt.trim()} style={{ color: '#2dd4bf', fontWeight: 600, fontSize: 11 }}>
+                {loading ? '...' : 'Go'}
+            </button>
+            <button className="ctx-btn" onClick={() => { setOpen(false); setPrompt(''); }} style={{ fontSize: 11, color: '#71717a' }}>x</button>
+        </div>
+    );
+}
+
 // ── ScrubInput: icon + number input with drag-to-scrub ──
 function ScrubInput({ icon, value, min, max, step = 1, title, onChange }: {
     icon: React.ReactNode; value: number; min: number; max: number;
@@ -191,6 +238,9 @@ export function ContextToolbar({ nodes = [], selection = [], actions, selectedOv
     if (hasOverlay && (selectedOverlay.type === 'image' || selectedOverlay.type === 'video')) return (
         <div className="ctx-toolbar" role="toolbar">
             <select className="ctx-select" value={selectedOverlay.objectFit || 'cover'} onChange={e => onOverlayUpdate?.(selectedOverlay.id, { objectFit: e.target.value as 'cover' | 'contain' | 'fill' })}><option value="cover">Cover</option><option value="contain">Contain</option><option value="fill">Fill</option></select>
+            {selectedOverlay.type === 'image' && (
+                <AiReplaceInline w={selectedOverlay.w} h={selectedOverlay.h} onReplace={(url) => onOverlayUpdate?.(selectedOverlay.id, { src: url })} />
+            )}
             <InlineButtons />
         </div>
     );
@@ -212,6 +262,12 @@ export function ContextToolbar({ nodes = [], selection = [], actions, selectedOv
                 {selectedNode.type !== 'image' && <ColorPicker label="" color={fillHex} onChange={handleColorChange} />}
                 {selectedNode.type === 'image' && selectedNode.src && <RemoveBgToolbarBtn nodeId={selectedNode.id} imageSrc={selectedNode.src} actions={actions} />}
                 {selectedNode.type === 'image' && <FillToPageToolbarBtn nodeId={selectedNode.id} actions={actions} />}
+                {selectedNode.type === 'image' && (
+                    <AiReplaceInline w={selectedNode.w} h={selectedNode.h} onReplace={async (url) => {
+                        actions.deleteNode(selectedNode.id);
+                        await actions.addImage(selectedNode.x, selectedNode.y, url, selectedNode.w, selectedNode.h);
+                    }} />
+                )}
                 <InlineButtons />
             </div>
         );
