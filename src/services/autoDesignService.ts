@@ -95,9 +95,11 @@ function sanitizeContent(c: GeneratedContent): GeneratedContent {
     if (JUNK.test(headline)) headline = 'Get Started Today';
     if (headline === headline.toLowerCase() && headline.length > 0) headline = toTitleCase(headline);
 
-    let cta = c.cta?.trim() || 'Learn More';
-    if (FONT_NAMES.test(cta) || JUNK.test(cta)) cta = 'Learn More';
-    if (cta === cta.toLowerCase() && cta.length > 0) cta = toTitleCase(cta);
+    // ★ CTA is OPTIONAL — AI decides if it's needed.
+    // Only sanitize junk; do NOT force a fallback.
+    let cta = c.cta?.trim() || '';
+    if (FONT_NAMES.test(cta) || JUNK.test(cta)) cta = '';
+    if (cta && cta === cta.toLowerCase() && cta.length > 0) cta = toTitleCase(cta);
 
     let subheadline = c.subheadline?.trim() || '';
     if (JUNK.test(subheadline)) subheadline = '';
@@ -143,8 +145,8 @@ export async function callTemplateContent(
 
     try {
         const parsed = JSON.parse(raw) as GeneratedContent;
-        return sanitizeContent({ headline: userProvided.headline || parsed.headline || 'Get Started Today', subheadline: userProvided.subheadline ?? parsed.subheadline ?? '', cta: userProvided.cta || parsed.cta || 'Learn More', tag: userProvided.tag || parsed.tag || '' });
+        return sanitizeContent({ headline: userProvided.headline || parsed.headline || 'Get Started Today', subheadline: userProvided.subheadline ?? parsed.subheadline ?? '', cta: userProvided.cta || parsed.cta || '', tag: userProvided.tag || parsed.tag || '' });
     } catch {
-        return sanitizeContent({ headline: userProvided.headline || 'Get Started Today', subheadline: userProvided.subheadline || '', cta: userProvided.cta || 'Learn More', tag: userProvided.tag || '' });
+        return sanitizeContent({ headline: userProvided.headline || 'Get Started Today', subheadline: userProvided.subheadline || '', cta: userProvided.cta || '', tag: userProvided.tag || '' });
     }
 }

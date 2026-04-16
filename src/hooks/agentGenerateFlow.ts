@@ -173,46 +173,54 @@ async function scanBrandCloud(prompt: string, cb: AgentFlowCallbacks): Promise<B
     return result;
 }
 
-async function selectTemplate(prompt: string, canvasW: number, canvasH: number, brandVisionBlocks: any[], abort: AbortController, cb: AgentFlowCallbacks) {
-    cb.narrate(`Analyzing layout templates for ${canvasW}x${canvasH}...`);
-    cb.addCard('structure', 'AI selecting layout template', 'running');
+async function selectTemplate(prompt: string, canvasW: number, canvasH: number, _brandVisionBlocks: any[], _abort: AbortController, cb: AgentFlowCallbacks) {
+    cb.narrate(`Selecting layout template for ${canvasW}×${canvasH}...`);
+    cb.addCard('structure', 'Selecting layout template', 'running');
 
-    let template: { id: string; name: string; description: string } | null = null;
-    try {
-        const { renderTemplateGrid, buildTemplateSelectionPrompt, getTemplateById } = await resilientImport(() => import('@/services/templatePreviewRenderer'));
-        const { callWithRole } = await resilientImport(() => import('@/services/openRouterClient'));
+    // ★ KEYWORD-BASED MATCHING: Match prompt keywords against template names.
+    // Admin controls matching by naming templates descriptively in the admin editor.
+    // Examples: "Event Clean", "Sale Bold", "Minimal Photo", "Corporate Stack"
+    // Saves ~200 tokens vs. Vision AI template selection.
+    const { useTemplateStore } = await resilientImport(() => import('@/stores/templateStore'));
+    const allTemplates = useTemplateStore.getState().templates ?? [];
 
-        const gridBase64 = renderTemplateGrid(canvasW, canvasH).split(',')[1] ?? '';
-        const aiResponse = await callWithRole('planner', {
-            messages: [{ role: 'user', content: [{ type: 'text', text: `${buildTemplateSelectionPrompt(canvasW, canvasH)}\n\nUser's design request: "${prompt}"` }, { type: 'image', source: { type: 'base64', media_type: 'image/png', data: gridBase64 } }, ...brandVisionBlocks] }],
-            max_tokens: 200,
-        }, abort.signal) as { content?: Array<{ type: string; text?: string }> };
+    if (allTemplates.length === 0) throw new Error('No templates available in store');
 
-        const aiText = aiResponse?.content?.find(b => b.type === 'text')?.text ?? '';
-        const jsonMatch = aiText.match(/\{[^}]+\}/);
-        if (jsonMatch) {
-            const parsed = JSON.parse(jsonMatch[0]);
-            const selectedId = parsed.templateId || parsed.template_id;
-            const reason = parsed.reason || '';
-            if (selectedId) {
-                template = getTemplateById(selectedId) ?? null;
-                if (template) {
-                    cb.updateCard('structure', 'done', `${template.name} (AI selected)`, { reasoning: reason || `AI selected "${template.name}" based on visual analysis`, expandedDetail: `Template: ${template.name}\nID: ${template.id}\nReason: ${reason}\nMethod: AI Vision-based selection` });
-                    cb.narrate(`AI chose "${template.name}" — ${reason}`);
-                }
-            }
+    const promptLower = prompt.toLowerCase();
+    const promptWords = promptLower.split(/\s+/);
+
+    // Score each template by how many of its name words match the prompt
+    let bestTemplate = allTemplates[0]!;
+    let bestScore = 0;
+
+    for (const tmpl of allTemplates) {
+        const nameWords = (tmpl.name || '').toLowerCase().split(/[\s\-_]+/);
+        const descWords = (tmpl.description || '').toLowerCase().split(/[\s\-_]+/);
+        const allWords = [...nameWords, ...descWords];
+        let score = 0;
+        for (const word of allWords) {
+            if (word.length < 3) continue; // skip short words
+            if (promptLower.includes(word)) score += 2;
+            if (promptWords.some(pw => pw.includes(word) || word.includes(pw))) score += 1;
         }
-    } catch (err) { console.warn('[UnifiedAgent] AI template selection failed, falling back:', err); }
-
-    // ★ Fallback: pick first available template from Supabase store
-    if (!template) {
-        const { useTemplateStore } = await resilientImport(() => import('@/stores/templateStore'));
-        const allTemplates = useTemplateStore.getState().templates ?? [];
-        const fallback = allTemplates.find((t: any) => t.id.startsWith('ai-')) ?? allTemplates[0];
-        if (!fallback) throw new Error('No templates available in store');
-        template = { id: fallback.id, name: fallback.name, description: fallback.description ?? '' };
-        cb.updateCard('structure', 'done', template.name, { reasoning: `Fallback: "${template.name}"`, expandedDetail: `Template: ${template.name}\nMethod: First available from Supabase` });
+        // Bonus for matching keywords
+        const tags = (tmpl as any).tags ?? [];
+        for (const tag of tags) {
+            if (promptLower.includes(tag.toLowerCase())) score += 3;
+        }
+        if (score > bestScore) {
+            bestScore = score;
+            bestTemplate = tmpl;
+        }
     }
+
+    const template = { id: bestTemplate.id, name: bestTemplate.name, description: bestTemplate.description ?? '' };
+    const method = bestScore > 0 ? `Matched by keywords (score: ${bestScore})` : 'Default template (no keyword match)';
+    cb.updateCard('structure', 'done', template.name, {
+        reasoning: method,
+        expandedDetail: `Template: ${template.name}\nID: ${template.id}\n${method}`,
+    });
+    cb.narrate(`Selected "${template.name}" — ${method}`);
     return template;
 }
 
@@ -299,6 +307,20 @@ async function buildAndRender(
         // Remove template background shape (photo replaces it)
         allElements = allElements.filter(el => el.name !== 'background');
     }
+
+    // ★ SKIP CTA: If AI decided no CTA is needed, remove CTA elements entirely.
+    // This prevents orphan CTA buttons/labels on non-commercial designs.
+    if (!content.cta) {
+        allElements = allElements.filter(el => {
+            const name = (el.name ?? '').toLowerCase();
+            if (name.includes('cta') || (name.includes('button') && el.type !== 'text')) {
+                console.log(`[Pipeline] Skipping CTA element (not needed): ${el.name}`);
+                return false;
+            }
+            return true;
+        });
+    }
+
     allElements = allElements.filter(el => { if (el.type === 'text' && (!el.content || el.content.trim() === '')) { console.log(`[Pipeline] Removing empty text: ${el.name}`); return false; } return true; });
 
     const validation = validateLayout(allElements, canvasW, canvasH);

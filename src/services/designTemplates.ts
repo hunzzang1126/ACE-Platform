@@ -74,42 +74,41 @@ export function buildContentPrompt(userPrompt: string, canvasW: number, canvasH:
     const headlineLimit = isWide ? '3-5 words, single line' : isTall ? '2-4 words per line, 2-3 lines' : '2-5 words per line, 1-2 lines';
     const subLimit = isSmall ? 'empty string (canvas too small)' : '1-2 sentences, max 15 words total';
 
-    return `You are a world-class ad copywriter. Generate copy for a ${canvasW}x${canvasH}px creative.
+    return `You are a world-class creative director. Generate copy for a ${canvasW}x${canvasH}px design.
 
 Brief: "${userPrompt}"
 Template: ${templateName}
 Language: ${language} (if prompt is in a different language, use THAT language)
 
-Return EXACTLY this JSON structure with your generated copy as the values:
+Return EXACTLY this JSON. Set any field to "" if it does NOT fit the design intent:
 {
-  "headline": "YOUR HEADLINE HERE",
-  "subheadline": "YOUR SUBHEADLINE HERE",
-  "cta": "YOUR CTA HERE",
-  "tag": "YOUR TAG HERE"
+  "headline": "...",
+  "subheadline": "...",
+  "cta": "...",
+  "tag": "..."
 }
 
-FIELD RULES:
-- headline: ${headlineLimit}. MUST be Title Case (capitalize first letter of each word). Bold, punchy, memorable. No period at end.
-  GOOD: "Discover Premium Wellness", "Transform Your Health Today", "Pure Natural Ingredients"
-  BAD: "about health products" (too generic, lowercase), "text" (not real copy)
-- subheadline: ${subLimit}. Sentence case. Supports the headline with descriptive marketing copy. Set to "" if headline is self-explanatory or canvas is small.
-  GOOD: "Clinically proven formulas for your daily routine", "Free shipping on orders over $50"
-  BAD: "text" (placeholder), "subheadline" (field name), "" when there's room for good copy
-- cta: 1-3 word call-to-action verb phrase. Title Case.
-  GOOD: "Shop Now", "Learn More", "Get Started", "Try Free", "Explore", "Book Now", "Discover"
-  BAD: "Inter" (font name!), "Click Here" (generic), "Button" (not copy)
-- tag: 1-2 word label, usually uppercase. Examples: "NEW", "SALE", "LIMITED", "PREMIUM", "2026". Set to "" if no natural category fits.
-  GOOD: "NEW ARRIVAL", "BEST SELLER", "LIMITED EDITION"
-  BAD: "text" (placeholder), "tag" (field name)
+DECISION RULES — YOU DECIDE what fields are needed:
+- headline: ALWAYS required. ${headlineLimit}. Title Case. Bold, punchy, memorable.
+- subheadline: Include ONLY if there's supporting info (date, location, description).
+  If the prompt mentions a date/time → put it here (e.g. "5월 15일 오후 3시").
+  If the prompt mentions a location → include it.
+  If headline is self-explanatory or canvas is small → set to "".
+- cta: Include ONLY for commercial/advertising designs (shop, buy, sign up, book, register).
+  Events, announcements, informational posters → NO CTA (set to "").
+  Educational, community, internal notices → NO CTA.
+  If unsure → NO CTA. CTA is the exception, not the rule.
+- tag: Short label ONLY if a natural category fits ("NEW", "SALE", "D-DAY"). Otherwise "".
 
-ABSOLUTE PROHIBITIONS:
-- NEVER output font names (Inter, Roboto, etc.) as copy text
-- NEVER output field names (headline, subheadline, cta, tag) as copy text
-- NEVER output CSS properties, layout terms, or technical terms as copy text
-- NEVER output placeholder text like "text", "lorem ipsum", "your text here"
-- ALL output must be real, human-readable advertising copy that relates to the brief
+EXTRACT FROM PROMPT:
+- Dates (5월 15일, May 15, 2026-05-15) → subheadline
+- Locations → subheadline  
+- Times (오후 3시, 3:00 PM) → subheadline
+- Prices/Discounts → tag or subheadline
 
-CRITICAL:
-- Write REAL ad copy relevant to the brief. The consumer will read this text.
-- Return ONLY the JSON object. No explanation, no markdown fences.`;
+PROHIBITIONS:
+- NEVER output font names, field names, CSS, placeholder text
+- NEVER add CTA for non-commercial designs
+- ALL text must be real, human-readable copy in the prompt's language
+- Return ONLY JSON. No explanation.`;
 }
