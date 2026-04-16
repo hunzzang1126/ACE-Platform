@@ -69,7 +69,7 @@ export function BottomPanel({ variant, engine, nodes, selection, actions, overla
     const getBarCursor = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
         const rect = e.currentTarget.getBoundingClientRect();
         const localX = e.clientX - rect.left;
-        return (localX <= 8 || localX >= rect.width - 8) ? 'ew-resize' : 'grab';
+        return (localX <= 6 || localX >= rect.width - 6) ? 'ew-resize' : 'grab';
     }, []);
 
     // ── Build unified layer list ──

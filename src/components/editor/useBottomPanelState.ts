@@ -53,7 +53,7 @@ export function useBottomPanelState(
         e.stopPropagation(); e.preventDefault();
         const rect = barEl.getBoundingClientRect();
         const localX = e.clientX - rect.left;
-        const EDGE_PX = 8;
+        const EDGE_PX = 6; // ★ Reduced from 8 — less sensitive edge detection
         let mode: 'move' | 'resize-left' | 'resize-right' = 'move';
         if (localX <= EDGE_PX) mode = 'resize-left';
         else if (localX >= rect.width - EDGE_PX) mode = 'resize-right';
@@ -85,9 +85,12 @@ export function useBottomPanelState(
         if (!container) return;
         const containerWidth = container.clientWidth;
         const MIN_BAR = 0.1;
+        const MIN_DRAG_PX = 3; // ★ Minimum pixels before resize takes effect
         const handleMove = (e: MouseEvent) => {
             const pxToTime = (px: number) => (px / containerWidth) * durationRef.current;
             const dx = e.clientX - barDrag.startX;
+            // ★ Skip resize if mouse hasn't moved enough (prevents accidental 5→6s bug)
+            if (barDrag.mode !== 'move' && Math.abs(dx) < MIN_DRAG_PX) return;
             const dt = pxToTime(dx);
             let newStart = barDrag.origStart, newEnd = barDrag.origEnd;
             if (barDrag.mode === 'move') {
