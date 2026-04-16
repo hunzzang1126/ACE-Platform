@@ -38,9 +38,14 @@ export async function exportVariantToMp4(
     options: VideoExportOptions,
     onProgress?: (p: VideoExportProgress) => void,
 ): Promise<ArrayBuffer> {
-    const { fps, bitrate = 5_000_000 } = options;
+    const { fps, bitrate } = options;
     const { width: w, height: h } = variant.preset;
     const totalFrames = Math.ceil(duration * fps);
+
+    // ★ Adaptive bitrate: scale with pixel area for consistent quality
+    // 1080x1080 = ~15Mbps, 300x250 = ~3Mbps, 1920x1080 = ~20Mbps
+    const pixels = w * h;
+    const effectiveBitrate = bitrate ?? Math.max(3_000_000, Math.round(pixels * 12));
 
     if (typeof VideoEncoder === 'undefined') {
         throw new Error('WebCodecs API not available. Use Chrome 94+.');
@@ -97,7 +102,7 @@ export async function exportVariantToMp4(
     encoder.configure({
         codec: 'avc1.640028',
         width: w, height: h,
-        bitrate,
+        bitrate: effectiveBitrate,
         framerate: fps,
     });
 
@@ -119,7 +124,7 @@ export async function exportVariantToMp4(
             duration: Math.round((1 / fps) * 1_000_000),
         });
 
-        encoder.encode(frame, { keyFrame: i % (fps * 2) === 0 });
+        encoder.encode(frame, { keyFrame: i % fps === 0 }); // Key frame every second
         frame.close();
         bitmap.close();
 

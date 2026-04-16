@@ -54,6 +54,10 @@ export async function exportToMp4(
         codec = 'avc1.640028',
     } = options;
 
+    // ★ Adaptive bitrate: scale with pixel area for consistent quality
+    const pixels = width * height;
+    const effectiveBitrate = bitrate ?? Math.max(3_000_000, Math.round(pixels * 12));
+
     const totalFrames = Math.ceil(duration * fps);
 
     // Check WebCodecs support
@@ -96,7 +100,7 @@ export async function exportToMp4(
         codec,
         width,
         height,
-        bitrate,
+        bitrate: effectiveBitrate,
         framerate: fps,
     });
 
@@ -117,7 +121,7 @@ export async function exportToMp4(
             duration: Math.round((1 / fps) * 1_000_000),
         });
 
-        const keyFrame = i % (fps * 2) === 0; // Key frame every 2 seconds
+        const keyFrame = i % fps === 0; // Key frame every second
         encoder.encode(frame, { keyFrame });
         frame.close();
         bitmap.close();
