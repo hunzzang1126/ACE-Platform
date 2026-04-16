@@ -11,7 +11,7 @@ import { EffectsSection } from '@/components/panels/EffectsSection';
 import { Section, ScrubField, PropField, OpacitySlider } from '@/components/panels/PropertyFields';
 import type { EngineNode, CanvasEngineActions } from '@/hooks/useCanvasEngine';
 import type { OverlayElement } from '@/hooks/useOverlayElements';
-import { FONT_FAMILIES, FONT_WEIGHTS, RemoveBgButton, FillToPageButton, SmartSizingSection, AiImageReplaceSection } from './PropertyPanelSections';
+import { FONT_FAMILIES, FONT_WEIGHTS, RemoveBgButton, FillToPageButton, SmartSizingSection, AiImageReplaceSection, AiOverlayReplaceSection } from './PropertyPanelSections';
 import { useAppI18n } from '@/i18n';
 
 interface Props {
@@ -90,6 +90,11 @@ export function PropertyPanel({ nodes = [], selection = [], actions, selectedOve
                     </select>
                 </Section>
                 <RemoveBgButton imageSrc={selectedOverlay.src} onResult={(dataUrl) => onOverlayUpdate?.(selectedOverlay.id, { src: dataUrl })} />
+                <AiOverlayReplaceSection
+                    overlayW={selectedOverlay.w}
+                    overlayH={selectedOverlay.h}
+                    onReplace={(newSrc) => onOverlayUpdate?.(selectedOverlay.id, { src: newSrc })}
+                />
                 <AlignmentSection onAlign={alignOverlay} />
                 <Section label={t('editor.opacity')}><OpacitySlider value={selectedOverlay.opacity} onChange={(v) => onOverlayUpdate?.(selectedOverlay.id, { opacity: v })} /></Section>
             </aside>
