@@ -77,12 +77,28 @@ export function SidebarUploadsTab({ onTriggerImageUpload, onTriggerVideoUpload, 
 
     const handleDelete = useCallback((e: React.MouseEvent, id: string) => {
         e.stopPropagation();
-        // ★ Also delete from Supabase Storage if cloud ref
+        // ★ Delete from Supabase Storage — handles both storage:// and idb:// refs
         const entry = uploads.find(u => u.id === id);
-        if (entry?.idbRef.startsWith('storage://')) {
-            import('@/services/cloudStorageService').then(({ deleteFromCloud }) => {
-                deleteFromCloud(entry.idbRef).catch(console.warn);
-            }).catch(() => { /* offline */ });
+        if (entry) {
+            if (entry.idbRef.startsWith('storage://')) {
+                // Direct cloud ref — delete by ref
+                import('@/services/cloudStorageService').then(({ deleteFromCloud }) => {
+                    deleteFromCloud(entry.idbRef).catch(console.warn);
+                });
+            } else if (entry.idbRef.startsWith('idb://')) {
+                // Legacy idb:// ref — try to delete matching cloud file by hash
+                import('@/stores/authStore').then(({ useAuthStore }) => {
+                    const uid = useAuthStore.getState().user?.id;
+                    if (!uid) return;
+                    const hash = entry.idbRef.slice(6); // strip "idb://"
+                    // Try common extensions — we don't know which was used
+                    import('@/services/cloudStorageService').then(({ deleteFromCloud }) => {
+                        deleteFromCloud(`storage://${uid}/designs/${hash}.png`).catch(console.warn);
+                        deleteFromCloud(`storage://${uid}/designs/${hash}.jpg`).catch(console.warn);
+                        deleteFromCloud(`storage://${uid}/designs/${hash}.webp`).catch(console.warn);
+                    });
+                });
+            }
         }
         removeUpload(id);
     }, [removeUpload, uploads]);
