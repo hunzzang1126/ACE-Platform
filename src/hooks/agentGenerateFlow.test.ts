@@ -212,7 +212,7 @@ describe('reference-size scaling — math verification', () => {
 describe('agentGenerateFlow — pipeline completeness', () => {
     it('Phase 3: selects template via AI or fallback', () => {
         expect(src).toContain('selectTemplate');
-        expect(src).toContain('getTemplateById');
+        expect(src).toContain('Template Selection');
     });
 
     it('Phase 4: generates color palette via AI', () => {

@@ -173,17 +173,16 @@ describe('ProjectThumbnail — screenshot or placeholder', () => {
     });
 
     it('uses preset.width/height for size label', () => {
-        expect(thumbnailSrc).toContain('master.preset.width');
-        expect(thumbnailSrc).toContain('master.preset.height');
+        expect(thumbnailSrc).toContain('v.preset.width');
+        expect(thumbnailSrc).toContain('v.preset.height');
     });
 
-    it('shows clean PlaceholderBox when no screenshot', () => {
-        expect(thumbnailSrc).toContain('PlaceholderBox');
-        expect(thumbnailSrc).toContain('<svg');
+    it('shows EmptyPlaceholder when no data', () => {
+        expect(thumbnailSrc).toContain('EmptyPlaceholder');
     });
 
-    it('shows canvas dimensions in placeholder', () => {
-        expect(thumbnailSrc).toContain('sizeLabel');
+    it('shows SizeRectangles for variant display', () => {
+        expect(thumbnailSrc).toContain('SizeRectangles');
     });
 });
 

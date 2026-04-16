@@ -218,16 +218,16 @@ describe('useTemplateStore — Template Overrides', () => {
         expect(useTemplateStore.getState().editingTemplateId).toBeNull();
     });
 
-    it('clearOverride reverts template to built-in default', () => {
+    it('clearOverride removes template entirely (cloud-only architecture)', () => {
         const templateId = BUILT_IN_TEMPLATES[0].id;
-        const originalSnapshot = BUILT_IN_TEMPLATES[0].variantSnapshot;
 
         // Override then clear
         useTemplateStore.getState().overrideTemplate(templateId, overrideVariant);
         useTemplateStore.getState().clearOverride(templateId);
 
+        // Cloud-only: template is removed, not reverted
         const tmpl = useTemplateStore.getState().templates.find(t => t.id === templateId);
-        expect(tmpl!.variantSnapshot).toBe(originalSnapshot);
+        expect(tmpl).toBeUndefined();
         expect(useTemplateStore.getState().templateOverrides[templateId]).toBeUndefined();
     });
 

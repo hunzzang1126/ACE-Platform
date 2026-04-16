@@ -60,9 +60,10 @@ describe('★ Cloud-first architecture (v514)', () => {
         expect(src).toContain('Start with cloud data (source of truth)');
     });
 
-    it('detects local-only creative sets and pushes them', () => {
-        expect(src).toContain('localOnlyCS');
-        expect(src).toContain('local-only creative sets');
+    it('cloud is sole source of truth — no local-only re-add', () => {
+        // v514+ architecture: cloud data is source of truth
+        // Local-only items are NOT re-added to prevent resurrection
+        expect(src).toContain('Cloud is source of truth');
     });
 
     it('falls back to local cache when offline', () => {
