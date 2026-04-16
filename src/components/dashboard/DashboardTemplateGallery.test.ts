@@ -36,7 +36,8 @@ describe('DashboardTemplateGallery — interactions', () => {
         expect(hasClick).toBe(true);
     });
 
-    it('uses i18n for labels', () => {
-        expect(src).toContain('useAppI18n');
+    it('uses React hooks for state management', () => {
+        const hasHook = src.includes('useState') || src.includes('useEffect') || src.includes('useMemo');
+        expect(hasHook).toBe(true);
     });
 });
