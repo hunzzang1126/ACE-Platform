@@ -5,7 +5,7 @@
 // Admin only: edit pencil icon → opens canvas editor for template
 // ─────────────────────────────────────────────────
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTemplateStore, type TemplateCategory, type DesignTemplate } from '@/stores/templateStore';
 import { useDesignStore } from '@/stores/designStore';
@@ -24,12 +24,40 @@ export function TemplatesPage() {
     const setEditingTemplateId = useTemplateStore(s => s.setEditingTemplateId);
     const addCustomTemplate = useTemplateStore(s => s.addCustomTemplate);
     const deleteCustomTemplate = useTemplateStore(s => s.deleteCustomTemplate);
+    const updateTemplate = useTemplateStore(s => s.updateTemplate);
     const isAdmin = useAuthStore(s => s.isAdmin);
     const createCreativeSet = useDesignStore(s => s.createCreativeSet);
 
     const [category, setCategory] = useState<string>('all');
     const [query, setQuery] = useState('');
     const { t } = useAppI18n();
+
+    // ★ Inline name editing
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [editName, setEditName] = useState('');
+    const nameInputRef = useRef<HTMLInputElement>(null);
+
+    const handleNameEdit = useCallback((tmpl: DesignTemplate) => {
+        setEditingId(tmpl.id);
+        setEditName(tmpl.name);
+    }, []);
+
+    const handleNameSave = useCallback(() => {
+        if (editingId && editName.trim()) {
+            const current = templates.find(t => t.id === editingId);
+            if (current && editName.trim() !== current.name) {
+                updateTemplate(editingId, { name: editName.trim() });
+            }
+        }
+        setEditingId(null);
+    }, [editingId, editName, templates, updateTemplate]);
+
+    useEffect(() => {
+        if (editingId && nameInputRef.current) {
+            nameInputRef.current.focus();
+            nameInputRef.current.select();
+        }
+    }, [editingId]);
 
     const CATEGORY_LABELS: Record<string, string> = {
         all: t('templates.all'), display: t('templates.display'),
@@ -140,6 +168,41 @@ export function TemplatesPage() {
 
     const adminMode = isAdmin();
 
+    // ★ Renders editable name or static name
+    const renderName = (tmpl: DesignTemplate) => {
+        if (adminMode && editingId === tmpl.id) {
+            return (
+                <input
+                    ref={nameInputRef}
+                    value={editName}
+                    onChange={e => setEditName(e.target.value)}
+                    onBlur={handleNameSave}
+                    onKeyDown={e => { if (e.key === 'Enter') handleNameSave(); if (e.key === 'Escape') setEditingId(null); }}
+                    style={{
+                        ...(S.cardName as any),
+                        background: 'rgba(99, 102, 241, 0.15)',
+                        border: '1px solid rgba(99, 102, 241, 0.5)',
+                        borderRadius: 4,
+                        padding: '2px 6px',
+                        outline: 'none',
+                        width: '100%',
+                        fontFamily: 'inherit',
+                        color: '#e2e8f0',
+                    }}
+                />
+            );
+        }
+        return (
+            <span
+                style={{ ...(S.cardName as any), cursor: adminMode ? 'text' : 'default' }}
+                onDoubleClick={adminMode ? () => handleNameEdit(tmpl) : undefined}
+                title={adminMode ? 'Double-click to rename' : undefined}
+            >
+                {tmpl.name}
+            </span>
+        );
+    };
+
     return (
         <div style={S.layout}>
             <AppSidebar />
@@ -234,7 +297,7 @@ export function TemplatesPage() {
                                     </div>
                                     <div style={S.cardInfo}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                            <span style={S.cardName}>{tmpl.name}</span>
+                                            {renderName(tmpl)}
                                             <span style={S.featuredBadge}>{t('templates.featured')}</span>
                                         </div>
                                         <span style={S.cardMeta}>{tmpl.width} x {tmpl.height}</span>
@@ -287,7 +350,7 @@ export function TemplatesPage() {
                                 )}
                             </div>
                             <div style={S.cardInfo}>
-                                <span style={S.cardName}>{tmpl.name}</span>
+                                {renderName(tmpl)}
                                 <span style={S.cardMeta}>
                                     {tmpl.width} x {tmpl.height}
                                     {!tmpl.isBuiltIn && ` · ${t('templates.custom')}`}
