@@ -325,8 +325,7 @@ export function ContextToolbar({ nodes = [], selection = [], actions, selectedOv
             <div className="ctx-toolbar" role="toolbar">
                 {selectedNode.type === 'image' && (
                     <AiReplaceInline w={selectedNode.w} h={selectedNode.h} onReplace={async (url) => {
-                        actions.deleteNode(selectedNode.id);
-                        await actions.addImage(selectedNode.x, selectedNode.y, url, selectedNode.w, selectedNode.h);
+                        await actions.replaceImageSrc(selectedNode.id, url);
                     }} />
                 )}
                 {selectedNode.type === 'image' && <div className="ctx-divider" />}
