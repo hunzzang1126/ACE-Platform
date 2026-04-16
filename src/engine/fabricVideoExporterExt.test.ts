@@ -82,3 +82,23 @@ describe('fabricVideoExporter — z-index ordering', () => {
         expect(src).toContain('.sort((a, b) => a.zIndex - b.zIndex)');
     });
 });
+
+describe('fabricVideoExporter — quality settings', () => {
+    it('uses adaptive bitrate based on pixel area', () => {
+        expect(src).toContain('pixels * 12');
+        expect(src).toContain('Math.max(3_000_000');
+    });
+
+    it('uses key frame every 1 second', () => {
+        expect(src).toContain('i % fps === 0');
+    });
+
+    it('resolves idb:// image URLs before rendering', () => {
+        expect(src).toContain("startsWith('idb://')");
+        expect(src).toContain('resolveAsset');
+    });
+
+    it('pre-loads images with crossOrigin anonymous', () => {
+        expect(src).toContain("img.crossOrigin = 'anonymous'");
+    });
+});

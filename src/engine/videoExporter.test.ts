@@ -75,4 +75,13 @@ describe('videoExporter — encoding pipeline', () => {
         expect(src).toContain('avc1.640028');
         expect(src).not.toContain('avc1.42001f');
     });
+
+    it('uses adaptive bitrate based on pixel area', () => {
+        expect(src).toContain('pixels * 12');
+        expect(src).toContain('Math.max(3_000_000');
+    });
+
+    it('uses key frame every 1 second', () => {
+        expect(src).toContain('i % fps === 0');
+    });
 });
