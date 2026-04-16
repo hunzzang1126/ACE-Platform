@@ -29,6 +29,7 @@ interface SpriteData {
     elId: string;
     dataUrl: string;
     x: number; y: number; w: number; h: number;
+    zIndex: number;
     preset: string;
     duration: number;
     startTime: number;
@@ -121,6 +122,7 @@ export const CanvasPreviewImage = memo(function CanvasPreviewImage({ variant, re
                     newSprites.push({
                         elId: el.id, dataUrl: sUrl,
                         x: abs.x, y: abs.y, w: abs.w, h: abs.h,
+                        zIndex: el.zIndex ?? 0,
                         preset: el.animation?.preset ?? 'none',
                         duration: el.animation?.duration ?? 0.6,
                         startTime: el.animation?.startTime ?? 0,
@@ -164,7 +166,7 @@ export const CanvasPreviewImage = memo(function CanvasPreviewImage({ variant, re
     return (
         <div style={{ position: 'relative', width: width * scale, height: height * scale, overflow: 'hidden' }}>
             <img src={baseUrl || staticUrl} alt="base" width={width * scale} height={height * scale} style={{ display: 'block' }} draggable={false} />
-            {sprites.map(sprite => {
+            {[...sprites].sort((a, b) => a.zIndex - b.zIndex).map((sprite, i) => {
                 const animStyle = computeAnimStyle(
                     sprite.preset as AnimPresetType, currentTime, sprite.duration, sprite.startTime,
                     sprite.endTime && sprite.endTime > 0 ? sprite.endTime : undefined,
@@ -183,6 +185,7 @@ export const CanvasPreviewImage = memo(function CanvasPreviewImage({ variant, re
                         style={{
                             position: 'absolute', left: 0, top: 0,
                             width: width * scale, height: height * scale,
+                            zIndex: i + 1,
                             ...scaledStyle,
                             pointerEvents: 'none',
                             willChange: 'transform, opacity',

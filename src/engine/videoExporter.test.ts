@@ -68,4 +68,11 @@ describe('videoExporter — encoding pipeline', () => {
         expect(src).toContain('Muxer');
         expect(src).toContain('ArrayBufferTarget');
     });
+
+    it('★ REGRESSION: uses H.264 High Profile Level 4.0 for 1080x1080 support', () => {
+        // avc1.42001f (Level 3.1) only supports max 921,600 px (960x960)
+        // avc1.640028 (Level 4.0) supports up to 2,097,152 px (1920x1080)
+        expect(src).toContain('avc1.640028');
+        expect(src).not.toContain('avc1.42001f');
+    });
 });

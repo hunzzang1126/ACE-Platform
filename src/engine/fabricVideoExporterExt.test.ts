@@ -70,4 +70,15 @@ describe('fabricVideoExporter — variant input', () => {
     it('imports BannerVariant type', () => {
         expect(src).toContain("BannerVariant");
     });
+
+    it('★ REGRESSION: uses H.264 Level 4.0 codec for 1080x1080+ support', () => {
+        expect(src).toContain('avc1.640028');
+        expect(src).not.toContain('avc1.42001f');
+    });
+});
+
+describe('fabricVideoExporter — z-index ordering', () => {
+    it('sorts elements by zIndex before rendering', () => {
+        expect(src).toContain('.sort((a, b) => a.zIndex - b.zIndex)');
+    });
 });

@@ -15,7 +15,7 @@ export interface ExportOptions {
     fps: number;
     /** H.264 bitrate in bps (default: 5Mbps) */
     bitrate?: number;
-    /** Codec (default: 'avc1.42001f' — H.264 Baseline) */
+    /** Codec (default: 'avc1.640028' — H.264 High Profile Level 4.0) */
     codec?: string;
 }
 
@@ -51,7 +51,7 @@ export async function exportToMp4(
         height,
         fps,
         bitrate = 5_000_000,
-        codec = 'avc1.42001f',
+        codec = 'avc1.640028',
     } = options;
 
     const totalFrames = Math.ceil(duration * fps);

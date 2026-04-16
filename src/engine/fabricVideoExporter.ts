@@ -95,7 +95,7 @@ export async function exportVariantToMp4(
     });
 
     encoder.configure({
-        codec: 'avc1.42001f',
+        codec: 'avc1.640028',
         width: w, height: h,
         bitrate,
         framerate: fps,
