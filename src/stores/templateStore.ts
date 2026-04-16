@@ -403,10 +403,10 @@ export const useTemplateStore = create<TemplateState>()(
                 // ★ Clean up orphaned template creative sets (deferred)
                 setTimeout(() => cleanupOrphanedTemplateCS(), 1000);
 
-                // ★ Cloud-only: no built-in injection. Keep persisted templates as-is.
-                // Hidden built-in IDs still used to filter out templates that admin deleted.
+                // ★ Cloud-only: purge ALL hardcoded built-in templates from cache.
+                // Only cloud-sourced templates (from syncOverridesFromCloud) survive.
                 const hiddenSet = new Set(state.hiddenBuiltInIds ?? []);
-                state.templates = state.templates.filter(t => !hiddenSet.has(t.id));
+                state.templates = state.templates.filter(t => !t.isBuiltIn && !hiddenSet.has(t.id));
 
                 // Re-apply LOCAL persisted overrides
                 if (state.templateOverrides && Object.keys(state.templateOverrides).length > 0) {
