@@ -5,7 +5,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import type { BannerVariant } from '@/schema/design.types';
-import { BUILT_IN_TEMPLATES } from './builtInTemplates';
+// ★ BUILT_IN_TEMPLATES removed — templates are now cloud-only (Supabase)
 import {
     fetchTemplateOverrides,
     upsertTemplateOverride,
@@ -254,15 +254,8 @@ export const useTemplateStore = create<TemplateState>()(
             clearOverride: (id) => {
                 set(state => {
                     delete state.templateOverrides[id];
-                    // Revert to built-in version
-                    const builtIn = BUILT_IN_TEMPLATES.find(t => t.id === id);
-                    const tmpl = state.templates.find(t => t.id === id);
-                    if (builtIn && tmpl) {
-                        tmpl.variantSnapshot = builtIn.variantSnapshot;
-                        tmpl.width = builtIn.width;
-                        tmpl.height = builtIn.height;
-                        tmpl.updatedAt = new Date().toISOString();
-                    }
+                    // ★ Cloud-only: just remove the template (re-fetch from cloud if needed)
+                    state.templates = state.templates.filter(t => t.id !== id);
                 });
                 // ★ Delete from Supabase (fire-and-forget)
                 deleteTemplateOverride(id).catch(e => {
@@ -410,14 +403,10 @@ export const useTemplateStore = create<TemplateState>()(
                 // ★ Clean up orphaned template creative sets (deferred)
                 setTimeout(() => cleanupOrphanedTemplateCS(), 1000);
 
-                // Refresh built-in templates (exclude hidden)
+                // ★ Cloud-only: no built-in injection. Keep persisted templates as-is.
+                // Hidden built-in IDs still used to filter out templates that admin deleted.
                 const hiddenSet = new Set(state.hiddenBuiltInIds ?? []);
-                const userTemplates = state.templates.filter(t => !t.isBuiltIn);
-                const builtInIds = new Set(BUILT_IN_TEMPLATES.map(t => t.id));
-                state.templates = [
-                    ...BUILT_IN_TEMPLATES.filter(t => !hiddenSet.has(t.id)),
-                    ...userTemplates.filter(t => !builtInIds.has(t.id)),
-                ];
+                state.templates = state.templates.filter(t => !hiddenSet.has(t.id));
 
                 // Re-apply LOCAL persisted overrides
                 if (state.templateOverrides && Object.keys(state.templateOverrides).length > 0) {
