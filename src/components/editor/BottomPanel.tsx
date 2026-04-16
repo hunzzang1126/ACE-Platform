@@ -8,7 +8,7 @@ import type { BannerVariant } from '@/schema/design.types';
 import type { CanvasEngineActions, EngineNode } from '@/hooks/useCanvasEngine';
 import type { OverlayElement } from '@/hooks/useOverlayElements';
 import { IcStop, IcPlay, IcPause, IcLoop } from '@/components/ui/Icons';
-import { presetLabel, outPresetLabel } from '@/hooks/useAnimationPresets';
+import { presetLabel, outPresetLabel, useAnimPresetStore } from '@/hooks/useAnimationPresets';
 import { useLayerDrag } from '@/hooks/useLayerDrag';
 import { type Engine, type UnifiedLayer, BAR_COLORS, nodeLabel } from './bottomPanelHelpers';
 import { OverlayLayerRow, EngineLayerRow } from './LayerRow';
@@ -36,11 +36,16 @@ interface Props {
 }
 
 export function BottomPanel({ variant, engine, nodes, selection, actions, overlayElements = [], selectedOverlayId, onOverlaySelect, onOverlayMoveUp, onOverlayMoveDown, onOverlayReorderTo, onOverlaySetZIndex, onOverlayToggleLock, onOverlayToggleVisibility, onOverlayDuplicate, onOverlayRename, onOverlayDelete }: Props) {
-    // ── Progressive disclosure: hide timeline when no animations exist ──
-    const hasAnyAnimation = useMemo(() =>
-        variant.elements.some(el => el.animation && el.animation.preset !== 'none'),
-        [variant.elements]
-    );
+    // ── Progressive disclosure: check BOTH saved state AND live preset store ──
+    // This way timeline appears instantly when user applies animation (no save needed)
+    const livePresets = useAnimPresetStore(s => s.presets);
+    const hasAnyAnimation = useMemo(() => {
+        // Check saved element data
+        const savedHas = variant.elements.some(el => el.animation && el.animation.preset !== 'none');
+        if (savedHas) return true;
+        // Check live preset store (before save)
+        return Object.values(livePresets).some(p => p.anim !== 'none');
+    }, [variant.elements, livePresets]);
     const [renamingId, setRenamingId] = useState<string | null>(null);
     const [renameValue, setRenameValue] = useState('');
     const [collapsed, setCollapsed] = useState(false);
