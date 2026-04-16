@@ -6,9 +6,10 @@
 // ─────────────────────────────────────────────────
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useUploadStore, type UploadEntry, saveToUploadLibrary } from '@/stores/uploadStore';
+import { useUploadStore, type UploadEntry, saveToUploadLibrary, fetchCloudUploads } from '@/stores/uploadStore';
 import { resolveAsset, isAssetRef } from '@/services/assetService';
 import { saveToBrandKit } from '@/stores/brandKitHelpers';
+import { useAuthStore } from '@/stores/authStore';
 
 interface Props {
     onTriggerImageUpload?: () => void;
@@ -19,8 +20,17 @@ interface Props {
 export function SidebarUploadsTab({ onTriggerImageUpload, onTriggerVideoUpload, onImageSelect }: Props) {
     const uploads = useUploadStore(s => s.uploads);
     const removeUpload = useUploadStore(s => s.removeUpload);
+    const userId = useAuthStore(s => s.user?.id);
     const [hoveredId, setHoveredId] = useState<string | null>(null);
     const [resolvedUrls, setResolvedUrls] = useState<Record<string, string>>({});
+    const cloudFetchedRef = useRef(false);
+
+    // ★ Cloud-first: fetch images from Supabase Storage on mount
+    useEffect(() => {
+        if (!userId || cloudFetchedRef.current) return;
+        cloudFetchedRef.current = true;
+        fetchCloudUploads(userId).catch(console.warn);
+    }, [userId]);
 
     // Resolve idb:// refs to blob URLs for display + clean up ghost entries
     useEffect(() => {

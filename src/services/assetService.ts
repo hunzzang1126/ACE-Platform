@@ -21,22 +21,51 @@ const IDB_PREFIX = 'idb://';
 // ── Core API ────────────────────────────────────
 
 /**
- * Store a data URL — tries Supabase Storage first, falls back to IndexedDB.
+ * Store any image URL — tries Supabase Storage first, falls back to IndexedDB.
+ * Handles: data: URLs, blob: URLs, and remote https:// URLs.
  * Returns storage:// ref (cloud) or idb://{hash} (local fallback).
  */
-export async function storeAsset(dataUrl: string): Promise<string> {
-    // Skip if already a cloud ref, idb:// ref, or non-data URL
-    if (!dataUrl.startsWith('data:')) return dataUrl;
+export async function storeAsset(inputUrl: string): Promise<string> {
+    // Already a stable ref — nothing to do
+    if (inputUrl.startsWith('idb://') || isStorageRef(inputUrl) || isTemplateStorageRef(inputUrl)) return inputUrl;
+
+    let blob: Blob;
+
+    if (inputUrl.startsWith('data:')) {
+        blob = dataUrlToBlob(inputUrl);
+    } else if (inputUrl.startsWith('blob:') || inputUrl.startsWith('https://') || inputUrl.startsWith('http://')) {
+        // ★ Remote/blob URLs: fetch → blob → upload to Supabase
+        // This catches AI-generated image URLs from Flux/DALL-E that would otherwise expire
+        try {
+            const resp = await fetch(inputUrl);
+            if (!resp.ok) {
+                console.warn(`[storeAsset] Failed to fetch remote URL (${resp.status}):`, inputUrl.slice(0, 80));
+                return inputUrl;
+            }
+            blob = await resp.blob();
+            if (!blob.type.startsWith('image/')) {
+                console.warn('[storeAsset] Fetched content is not an image:', blob.type);
+                return inputUrl;
+            }
+        } catch (err) {
+            console.warn('[storeAsset] Cannot fetch remote URL (CORS?):', inputUrl.slice(0, 80), err);
+            return inputUrl;
+        }
+    } else {
+        // Unknown scheme — pass through
+        return inputUrl;
+    }
 
     // ★ Try Supabase Storage first
     const userId = await getCurrentUserId();
     if (userId) {
-        const cloudRef = await uploadToCloud(dataUrl, 'designs', userId);
+        const hash = await computeSha256(blob);
+        const ext = blob.type === 'image/jpeg' ? 'jpg' : blob.type === 'image/webp' ? 'webp' : 'png';
+        const cloudRef = await uploadToCloud(blob, 'designs', userId, `${hash}.${ext}`);
         if (cloudRef) return cloudRef;
     }
 
     // Fallback: IndexedDB
-    const blob = dataUrlToBlob(dataUrl);
     const hash = await computeSha256(blob);
     const ref = `${IDB_PREFIX}${hash}`;
     const existing = await aceDB.assets.get(hash);
@@ -140,6 +169,13 @@ export async function extractAssets(
             // data: → upload to cloud or store in IDB
             const ref = await storeAsset(src);
             results.push({ ...el, src: ref } as ImageElement);
+        } else if (src.startsWith(IDB_PREFIX)) {
+            // ★ idb:// → try to migrate to storage:// (cloud) for cross-device sync
+            const migrated = await migrateIdbRefToCloud(src);
+            if (migrated && migrated !== src) {
+                console.log(`[extractAssets] Migrated ${src.slice(0, 30)} → ${migrated}`);
+            }
+            results.push({ ...el, src: migrated } as ImageElement);
         } else if (isCloudUrl(src)) {
             // ★ REGRESSION FIX: Signed Supabase URL leaked into element src.
             // These expire after 1 hour. Convert back to storage:// ref.
@@ -158,6 +194,29 @@ export async function extractAssets(
     }
 
     return results;
+}
+
+/**
+ * ★ Migrate a single idb:// ref to storage:// by resolving from IndexedDB,
+ * then re-uploading to Supabase Storage. Returns storage:// on success, original on failure.
+ */
+async function migrateIdbRefToCloud(idbRef: string): Promise<string> {
+    try {
+        const userId = await getCurrentUserId();
+        if (!userId) return idbRef; // Not logged in — can't migrate
+
+        const hash = idbRef.slice(IDB_PREFIX.length);
+        const entry = await aceDB.assets.get(hash);
+        if (!entry) return idbRef; // Asset not in local IDB
+
+        const blob = new Blob([entry.buffer], { type: entry.mimeType });
+        const ext = entry.mimeType === 'image/jpeg' ? 'jpg' : entry.mimeType === 'image/webp' ? 'webp' : 'png';
+        const cloudRef = await uploadToCloud(blob, 'designs', userId, `${hash}.${ext}`);
+        return cloudRef ?? idbRef;
+    } catch (err) {
+        console.warn('[assetService] idb→cloud migration failed:', err);
+        return idbRef;
+    }
 }
 
 /**

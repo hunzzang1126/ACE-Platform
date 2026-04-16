@@ -88,14 +88,14 @@ export async function saveToUploadLibrary(
     // Generate a stable ID from the URL
     const id = assetUrl.startsWith('idb://')
         ? assetUrl.slice(6)
-        : assetUrl.startsWith('https://')
+        : assetUrl.startsWith('storage://')
             ? assetUrl.split('/').pop()?.replace(/\.[^.]+$/, '') ?? crypto.randomUUID()
             : crypto.randomUUID();
 
     useUploadStore.getState().addUpload({
         id,
         name,
-        idbRef: assetUrl, // backwards compat field name — holds idb:// OR https://
+        idbRef: assetUrl, // backwards compat field name — holds idb://, storage://, or https://
         width,
         height,
         source,
@@ -104,3 +104,60 @@ export async function saveToUploadLibrary(
 
     return assetUrl;
 }
+
+/**
+ * ★ Cloud-first: Fetch ALL images from Supabase Storage bucket for this user.
+ * Merges with local entries so Image Panel shows everything across devices.
+ * Called on SidebarUploadsTab mount.
+ */
+export async function fetchCloudUploads(userId: string): Promise<number> {
+    try {
+        const { getSupabase } = await import('@/services/supabaseClient');
+        const sb = getSupabase();
+        if (!sb) return 0;
+
+        const { data, error } = await sb.storage
+            .from('ace-assets')
+            .list(`${userId}/designs`, { limit: MAX_UPLOADS, sortBy: { column: 'created_at', order: 'desc' } });
+
+        if (error || !data) {
+            console.warn('[uploadStore] Failed to list cloud assets:', error?.message);
+            return 0;
+        }
+
+        const existing = useUploadStore.getState().uploads;
+        const existingRefs = new Set(existing.map(u => u.idbRef));
+        let added = 0;
+
+        for (const file of data) {
+            if (!file.name || file.name.startsWith('.')) continue;
+            const ref = `storage://${userId}/designs/${file.name}`;
+
+            // Skip if already in local store
+            if (existingRefs.has(ref)) continue;
+
+            const id = file.name.replace(/\.[^.]+$/, '');
+            const ext = file.name.split('.').pop()?.toLowerCase() ?? 'png';
+            const mimeType = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'webp' ? 'image/webp' : 'image/png';
+
+            useUploadStore.getState().addUpload({
+                id,
+                name: `AI Image`,
+                idbRef: ref,
+                width: 0,  // Unknown until loaded — UI can lazy-detect
+                height: 0,
+                source: 'ai',
+                createdAt: file.created_at ?? new Date().toISOString(),
+                mimeType,
+            });
+            added++;
+        }
+
+        if (added > 0) console.log(`[uploadStore] Merged ${added} cloud image(s) into Image Panel`);
+        return added;
+    } catch (err) {
+        console.warn('[uploadStore] fetchCloudUploads failed:', err);
+        return 0;
+    }
+}
+
