@@ -77,8 +77,15 @@ export function SidebarUploadsTab({ onTriggerImageUpload, onTriggerVideoUpload, 
 
     const handleDelete = useCallback((e: React.MouseEvent, id: string) => {
         e.stopPropagation();
+        // ★ Also delete from Supabase Storage if cloud ref
+        const entry = uploads.find(u => u.id === id);
+        if (entry?.idbRef.startsWith('storage://')) {
+            import('@/services/cloudStorageService').then(({ deleteFromCloud }) => {
+                deleteFromCloud(entry.idbRef).catch(console.warn);
+            }).catch(() => { /* offline */ });
+        }
         removeUpload(id);
-    }, [removeUpload]);
+    }, [removeUpload, uploads]);
 
     // ── Drop zone ──
     const dropRef = useRef<HTMLDivElement>(null);
