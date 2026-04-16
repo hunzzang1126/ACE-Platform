@@ -155,7 +155,14 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
                         description: el.image_description!, style: el.image_style ?? 'photo',
                         width: el.w ?? 200, height: el.h ?? 200, crop: el.image_crop,
                     }, abort.signal);
-                    if (imgResult.success && imgResult.imageUrl) generatedUrls.set(el.name ?? `img-${i}`, imgResult.imageUrl);
+                    if (imgResult.success && imgResult.imageUrl) {
+                        generatedUrls.set(el.name ?? `img-${i}`, imgResult.imageUrl);
+                        // ★ Persist AI-generated scan images to Upload Library + Supabase
+                        try {
+                            const { saveToUploadLibrary } = await resilientImport(() => import('@/stores/uploadStore'));
+                            await saveToUploadLibrary(imgResult.imageUrl, `Scan: ${el.name ?? 'AI Image'}`, el.w ?? 200, el.h ?? 200, 'ai');
+                        } catch (libErr) { console.warn('[Scan] Upload library save failed:', libErr); }
+                    }
                 } catch (err) { console.warn(`[Scan] Image gen failed for ${el.name}:`, err); }
             }
             updateCard('imagegen', 'done', `${generatedUrls.size}/${imgPlaceholders.length} generated`);
