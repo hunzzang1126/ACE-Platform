@@ -117,3 +117,104 @@ describe('SidebarUploadsTab Save to Brand Kit integration', () => {
         expect(css).toContain('.uploads-brand-btn');
     });
 });
+
+// ═══════════════════════════════════════════════════
+// ★ REGRESSION GUARD: Cloud-first sync pipeline
+// ═══════════════════════════════════════════════════
+
+describe('★ REGRESSION GUARD: Cloud delete from Image Panel', () => {
+    it('deleteFromCloud is exported from cloudStorageService', async () => {
+        const mod = await import('@/services/cloudStorageService');
+        expect(typeof mod.deleteFromCloud).toBe('function');
+    });
+
+    it('deleteFromCloud rejects non-storage refs', async () => {
+        const { deleteFromCloud } = await import('@/services/cloudStorageService');
+        const result = await deleteFromCloud('idb://abc123');
+        expect(result).toBe(false);
+    });
+
+    it('deleteFromCloud rejects https refs', async () => {
+        const { deleteFromCloud } = await import('@/services/cloudStorageService');
+        const result = await deleteFromCloud('https://example.com/img.png');
+        expect(result).toBe(false);
+    });
+
+    it('SidebarUploadsTab handles storage:// cloud delete', async () => {
+        const src = (await import('fs')).readFileSync(
+            'src/components/editor/SidebarUploadsTab.tsx', 'utf-8'
+        );
+        expect(src).toContain("entry.idbRef.startsWith('storage://')");
+        expect(src).toContain('deleteFromCloud');
+    });
+
+    it('SidebarUploadsTab handles idb:// cloud delete with hash', async () => {
+        const src = (await import('fs')).readFileSync(
+            'src/components/editor/SidebarUploadsTab.tsx', 'utf-8'
+        );
+        expect(src).toContain("entry.idbRef.startsWith('idb://')");
+        expect(src).toContain('entry.idbRef.slice(6)');
+    });
+
+    it('SidebarUploadsTab tries all 3 extensions for idb:// delete', async () => {
+        const src = (await import('fs')).readFileSync(
+            'src/components/editor/SidebarUploadsTab.tsx', 'utf-8'
+        );
+        expect(src).toContain('${hash}.png');
+        expect(src).toContain('${hash}.jpg');
+        expect(src).toContain('${hash}.webp');
+    });
+});
+
+describe('★ REGRESSION GUARD: extractAssets idb→storage migration', () => {
+    it('extractAssets source contains migrateIdbRefToCloud', async () => {
+        const src = (await import('fs')).readFileSync(
+            'src/services/assetService.ts', 'utf-8'
+        );
+        expect(src).toContain('migrateIdbRefToCloud');
+    });
+
+    it('extractAssets handles idb:// src in image elements', async () => {
+        const src = (await import('fs')).readFileSync(
+            'src/services/assetService.ts', 'utf-8'
+        );
+        expect(src).toContain("src.startsWith(IDB_PREFIX)");
+    });
+
+    it('storeAsset handles remote https:// URLs', async () => {
+        const src = (await import('fs')).readFileSync(
+            'src/services/assetService.ts', 'utf-8'
+        );
+        expect(src).toContain("inputUrl.startsWith('https://')");
+        expect(src).toContain("inputUrl.startsWith('blob:')");
+    });
+
+    it('signedUrlToStorageRef is defined in assetService', async () => {
+        const src = (await import('fs')).readFileSync(
+            'src/services/assetService.ts', 'utf-8'
+        );
+        expect(src).toContain('function signedUrlToStorageRef');
+    });
+});
+
+describe('★ REGRESSION GUARD: Cloud-first Image Panel loading', () => {
+    it('fetchCloudUploads is exported', async () => {
+        const { fetchCloudUploads } = await import('@/stores/uploadStore');
+        expect(typeof fetchCloudUploads).toBe('function');
+    });
+
+    it('SidebarUploadsTab calls fetchCloudUploads on mount', async () => {
+        const src = (await import('fs')).readFileSync(
+            'src/components/editor/SidebarUploadsTab.tsx', 'utf-8'
+        );
+        expect(src).toContain('fetchCloudUploads(userId)');
+        expect(src).toContain('cloudFetchedRef');
+    });
+
+    it('SidebarUploadsTab imports useAuthStore for userId', async () => {
+        const src = (await import('fs')).readFileSync(
+            'src/components/editor/SidebarUploadsTab.tsx', 'utf-8'
+        );
+        expect(src).toContain("import { useAuthStore } from '@/stores/authStore'");
+    });
+});
