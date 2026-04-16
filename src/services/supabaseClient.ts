@@ -339,3 +339,49 @@ export async function deleteTemplateOverride(
         return { error: e.message ?? 'Unknown error' };
     }
 }
+
+// ── Brand Kit Cloud CRUD ────────────────────────
+
+/**
+ * Push a full BrandKit to Supabase (upsert by id).
+ * Stores the entire kit as JSONB for simplicity.
+ */
+export async function pushBrandKitCloud(
+    userId: string,
+    kitId: string,
+    data: unknown,
+): Promise<void> {
+    const sb = getSupabase();
+    if (!sb) return;
+    const { error } = await sb.from('brand_kits').upsert(
+        { id: kitId, user_id: userId, data, updated_at: new Date().toISOString() },
+        { onConflict: 'id' },
+    );
+    if (error) console.warn('[pushBrandKitCloud] Error:', error.message);
+}
+
+/**
+ * Pull all BrandKits for a user from Supabase.
+ */
+export async function pullBrandKitsCloud(
+    userId: string,
+): Promise<Array<{ id: string; data: unknown; updated_at: string }>> {
+    const sb = getSupabase();
+    if (!sb) return [];
+    const { data, error } = await sb
+        .from('brand_kits')
+        .select('id, data, updated_at')
+        .eq('user_id', userId);
+    if (error || !data) return [];
+    return data;
+}
+
+/**
+ * Delete a BrandKit from Supabase.
+ */
+export async function deleteBrandKitCloud(kitId: string): Promise<void> {
+    const sb = getSupabase();
+    if (!sb) return;
+    const { error } = await sb.from('brand_kits').delete().eq('id', kitId);
+    if (error) console.warn('[deleteBrandKitCloud] Error:', error.message);
+}

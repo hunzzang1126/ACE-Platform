@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import { useProjectStore } from '@/stores/projectStore';
 import { useDesignStore } from '@/stores/designStore';
+import { useBrandKitStore } from '@/stores/brandKitStore';
 import { isMigrationDone, runMigration } from '@/services/cloudMigration';
 import {
     pushProjectDebounced,
@@ -25,7 +26,7 @@ import {
     mergeByTimestamp,
     pushAllToCloud,
 } from '@/services/cloudSync';
-import { isCloudEnabled } from '@/services/supabaseClient';
+import { isCloudEnabled, pullBrandKitsCloud, pushBrandKitCloud, deleteBrandKitCloud } from '@/services/supabaseClient';
 import type { CreativeSetSummary, Folder, CreativeSet } from '@/schema/design.types';
 
 export type CloudSyncStatus = 'idle' | 'syncing' | 'synced' | 'offline' | 'error';
@@ -139,6 +140,36 @@ export function useCloudSync() {
                     );
 
                     console.log('[useCloudSync] Cloud-first sync complete — stores updated');
+
+                    // ── Brand Kit: pull from cloud ──
+                    try {
+                        const cloudKits = await pullBrandKitsCloud(userId);
+                        if (cloudKits.length > 0) {
+                            const brandStore = useBrandKitStore.getState();
+                            const localKitIds = new Set(brandStore.kits.map(k => k.id));
+                            for (const row of cloudKits) {
+                                const kit = row.data as any;
+                                if (kit && kit.id) {
+                                    if (!localKitIds.has(kit.id)) {
+                                        // Cloud kit not in local → add
+                                        useBrandKitStore.setState(s => ({ kits: [...s.kits, kit] }));
+                                    } else {
+                                        // Cloud kit exists locally → cloud wins if newer
+                                        const localKit = brandStore.kits.find(k => k.id === kit.id);
+                                        if (localKit && new Date(row.updated_at) > new Date(localKit.updatedAt)) {
+                                            useBrandKitStore.setState(s => ({
+                                                kits: s.kits.map(k => k.id === kit.id ? kit : k),
+                                            }));
+                                        }
+                                    }
+                                }
+                            }
+                            console.log(`[useCloudSync] Synced ${cloudKits.length} brand kits from cloud`);
+                        }
+                    } catch (e) {
+                        console.warn('[useCloudSync] Brand kit cloud pull failed:', e);
+                    }
+
                     setSyncStatus('synced');
                 } else {
                     // ★ Cloud pull failed — use local cache (offline fallback)
@@ -224,6 +255,32 @@ export function useCloudSync() {
             unsubProject();
             unsubDesign();
         };
+    }, [userId]);
+
+    // ── Subscribe to brandKitStore changes → push to cloud ──
+    useEffect(() => {
+        if (!userId || !isCloudEnabled()) return;
+        let prevKits = useBrandKitStore.getState().kits;
+
+        const unsubBrand = useBrandKitStore.subscribe((state) => {
+            const curr = state.kits;
+            // Push changed kits
+            for (const kit of curr) {
+                const old = prevKits.find(k => k.id === kit.id);
+                if (!old || old.updatedAt !== kit.updatedAt) {
+                    pushBrandKitCloud(userId, kit.id, kit).catch(() => {});
+                }
+            }
+            // Detect deleted kits
+            for (const old of prevKits) {
+                if (!curr.find(k => k.id === old.id)) {
+                    deleteBrandKitCloud(old.id).catch(() => {});
+                }
+            }
+            prevKits = curr;
+        });
+
+        return () => unsubBrand();
     }, [userId]);
 
     return { isSyncing, syncStatus };

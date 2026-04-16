@@ -8,6 +8,7 @@
 import { useBrandKitStore, type AssetCategory, type AssetFormat } from './brandKitStore';
 import { uploadToCloud, getCurrentUserId, isStorageRef } from '@/services/cloudStorageService';
 import { resolveAsset, isAssetRef } from '@/services/assetService';
+import { pushBrandKitCloud } from '@/services/supabaseClient';
 
 /**
  * Save an image (from uploads or canvas) to the active Brand Kit,
@@ -73,7 +74,25 @@ export async function saveToBrandKit(
         metadata: { hasTransparency: false, dominantColors: [], suggestedPlacement: null },
     });
 
+    // ★ Push to cloud after adding asset
+    syncBrandKitToCloud(kitId).catch(() => {});
+
     return assetId;
+}
+
+/**
+ * Push the full BrandKit to Supabase (fire-and-forget).
+ * Should be called after any mutation to the brand kit.
+ */
+export async function syncBrandKitToCloud(kitId?: string): Promise<void> {
+    const store = useBrandKitStore.getState();
+    const targetId = kitId ?? store.activeKitId;
+    if (!targetId) return;
+    const kit = store.kits.find(k => k.id === targetId);
+    if (!kit) return;
+    const userId = await getCurrentUserId();
+    if (!userId) return;
+    await pushBrandKitCloud(userId, kit.id, kit);
 }
 
 // ── Internal Helpers ──
