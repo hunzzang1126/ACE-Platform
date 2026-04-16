@@ -91,40 +91,52 @@ export function useCloudSync() {
                     const mergedProjects = mergeByTimestamp(localProjects, cloudData.projects);
                     const mergedFolders = mergeByTimestamp(localFolders, cloudData.folders);
 
-                    // Merge creative sets: cloud wins on conflict, local-only items preserved
+                    // ★ Cloud is source of truth — DO NOT re-add local-only items.
+                    // If something exists locally but not in cloud, it was DELETED
+                    // on another device. Bringing it back would undo the delete.
+                    // Exception: items created in the last 60s (created right before sync).
                     const mergedCS: Record<string, CreativeSet> = {};
                     // Start with cloud data (source of truth)
                     for (const [id, cs] of Object.entries(cloudData.creativeSets)) {
                         mergedCS[id] = cs;
                     }
-                    // Add local-only items (not in cloud) and push them
-                    const localOnlyCS: CreativeSet[] = [];
-                    const localOnlyProjects: CreativeSetSummary[] = [];
+                    const now = Date.now();
+                    const RECENT_THRESHOLD = 60_000; // 60 seconds
                     for (const [id, cs] of Object.entries(localCS)) {
                         if (!mergedCS[id]) {
-                            mergedCS[id] = cs;
-                            localOnlyCS.push(cs);
+                            const projectEntry = localProjects.find(p => p.id === id);
+                            const projectAge = projectEntry?.createdAt
+                                ? now - new Date(projectEntry.createdAt).getTime()
+                                : Infinity;
+                            if (projectAge < RECENT_THRESHOLD) {
+                                mergedCS[id] = cs;
+                                console.log(`[useCloudSync] Keeping very recent local CS: ${id}`);
+                            } else {
+                                console.log(`[useCloudSync] Dropping deleted CS (not in cloud): ${id}`);
+                            }
                         }
                     }
+                    // Same for project summaries: only keep very recent ones
+                    const cloudProjectIds = new Set(mergedProjects.map(p => p.id));
                     for (const p of localProjects) {
-                        if (!mergedProjects.find(mp => mp.id === p.id)) {
-                            mergedProjects.push(p);
-                            localOnlyProjects.push(p);
+                        if (!cloudProjectIds.has(p.id)) {
+                            const age = p.createdAt
+                                ? now - new Date(p.createdAt).getTime()
+                                : Infinity;
+                            if (age < RECENT_THRESHOLD) {
+                                mergedProjects.push(p);
+                                console.log(`[useCloudSync] Keeping very recent local project: ${p.id}`);
+                            } else {
+                                console.log(`[useCloudSync] Dropping deleted project (not in cloud): ${p.id}`);
+                            }
                         }
                     }
 
-                    // Apply merged data to stores
+                    // ★ Apply merged data to stores
                     applyMergedData(
                         { projects: mergedProjects, folders: mergedFolders, creativeSets: mergedCS },
                         localProjects, localFolders, localCS,
                     );
-
-                    // ★ Push local-only items to cloud (they exist locally but not in cloud)
-                    if (localOnlyCS.length > 0 || localOnlyProjects.length > 0) {
-                        console.log(`[useCloudSync] Pushing ${localOnlyCS.length} local-only creative sets + ${localOnlyProjects.length} projects to cloud`);
-                        for (const cs of localOnlyCS) pushCreativeSet(userId, cs);
-                        for (const p of localOnlyProjects) pushProject(userId, p);
-                    }
 
                     console.log('[useCloudSync] Cloud-first sync complete — stores updated');
                     setSyncStatus('synced');
