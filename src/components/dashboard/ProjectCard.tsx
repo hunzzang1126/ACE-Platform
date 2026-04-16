@@ -116,7 +116,7 @@ export function ProjectCard({ id, name, variantCount, createdAt, createdBy, type
                                 autoFocus
                             />
                         ) : (
-                            <span onClick={() => onOpen(id)}>{name}</span>
+                            <span onClick={() => onOpen(id)} onDoubleClick={(e) => { e.stopPropagation(); handleRename(); }}>{name}</span>
                         )}
                     </div>
 
@@ -187,7 +187,7 @@ export function ProjectCard({ id, name, variantCount, createdAt, createdBy, type
                             autoFocus
                         />
                     ) : (
-                        <span className="project-card__name" onClick={() => onOpen(id)}>
+                        <span className="project-card__name" onClick={() => onOpen(id)} onDoubleClick={(e) => { e.stopPropagation(); handleRename(); }}>
                             {name}
                         </span>
                     )}

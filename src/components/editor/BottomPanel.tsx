@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────
 // State/logic → useBottomPanelState.ts
 // ─────────────────────────────────────────────────
-import { useState, useCallback, useMemo, useRef } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import type { BannerVariant } from '@/schema/design.types';
 import type { CanvasEngineActions, EngineNode } from '@/hooks/useCanvasEngine';
 import type { OverlayElement } from '@/hooks/useOverlayElements';
@@ -36,11 +36,22 @@ interface Props {
 }
 
 export function BottomPanel({ variant, engine, nodes, selection, actions, overlayElements = [], selectedOverlayId, onOverlaySelect, onOverlayMoveUp, onOverlayMoveDown, onOverlayReorderTo, onOverlaySetZIndex, onOverlayToggleLock, onOverlayToggleVisibility, onOverlayDuplicate, onOverlayRename, onOverlayDelete }: Props) {
+    // ── Progressive disclosure: hide timeline when no animations exist ──
+    const hasAnyAnimation = useMemo(() =>
+        variant.elements.some(el => el.animation && el.animation.preset !== 'none'),
+        [variant.elements]
+    );
     const [renamingId, setRenamingId] = useState<string | null>(null);
     const [renameValue, setRenameValue] = useState('');
     const [collapsed, setCollapsed] = useState(false);
+    const [panelMaxH, setPanelMaxH] = useState(200);
+    const resizingRef = useRef(false);
+    const resizeStartY = useRef(0);
+    const resizeStartH = useRef(200);
     const layerScrollRef = useRef<HTMLDivElement>(null);
     const timelineScrollRef = useRef<HTMLDivElement>(null);
+    const rulerRef = useRef<HTMLDivElement>(null);
+    const [draggingPlayhead, setDraggingPlayhead] = useState(false);
 
     const st = useBottomPanelState(engine, nodes, overlayElements);
     const { animPresets, playing, currentTime, duration, looping, speed, timelineBarsRef } = st;
@@ -90,18 +101,48 @@ export function BottomPanel({ variant, engine, nodes, selection, actions, overla
     const handleSelect = useCallback((id: number) => { actions?.selectNode(id); }, [actions]);
     const handleDelete = useCallback((id: number) => { if (!actions) return; actions.selectNode(id); actions.deleteSelected(); }, [actions]);
 
-    if (collapsed) return (<div className="bp-root bp-collapsed"><button className="bp-expand-btn" onClick={() => setCollapsed(false)}>▲ Layers &amp; Timeline</button></div>);
+    if (collapsed) return (<div className="bp-root bp-collapsed"><button className="bp-expand-btn" onClick={() => setCollapsed(false)}>▲ {hasAnyAnimation ? 'Layers & Timeline' : 'Layers'}</button></div>);
 
     const isDragOver = (idx: number) => dragState?.active && dragState.overIdx === idx && dragState.srcIdx !== idx;
     const isDraggingFn = (id: string) => dragState?.active && dragState.srcId === id;
 
 
+    // ── Resize handle drag ──
+    useEffect(() => {
+        const onMove = (e: MouseEvent) => {
+            if (resizingRef.current) {
+                const delta = resizeStartY.current - e.clientY;
+                setPanelMaxH(Math.max(80, Math.min(500, resizeStartH.current + delta)));
+            }
+            if (draggingPlayhead && rulerRef.current) {
+                const rect = rulerRef.current.getBoundingClientRect();
+                const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                st.handleSeek(pct * duration);
+            }
+        };
+        const onUp = () => {
+            resizingRef.current = false;
+            setDraggingPlayhead(false);
+        };
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+        return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    }, [draggingPlayhead, duration, st]);
+
+
 
     return (
         <div className="bp-root">
+            {/* Resize handle */}
+            <div
+                className="bp-resize-handle"
+                onMouseDown={(e) => { e.preventDefault(); resizingRef.current = true; resizeStartY.current = e.clientY; resizeStartH.current = panelMaxH; }}
+            >
+                <span className="bp-resize-dots">···</span>
+            </div>
             <div className="bp-controls">
                 <div className="bp-layer-header"><span className="bp-header-label">LAYERS</span><span className="bp-node-count">{nodes.length + overlayElements.length}</span></div>
-                <div className="bp-timeline-header">
+                {hasAnyAnimation && <div className="bp-timeline-header">
                     <div className="bp-playback">
                         <button className="bp-play-btn" title="Stop" onClick={st.handleStop}><IcStop size={11} /></button>
                         <button className="bp-play-btn" title={playing ? 'Pause' : 'Play'} onClick={playing ? st.handlePause : st.handlePlay}>{playing ? <IcPause size={11} /> : <IcPlay size={11} />}</button>
@@ -111,21 +152,25 @@ export function BottomPanel({ variant, engine, nodes, selection, actions, overla
                     <div className="bp-speed-group"><span>Speed:</span>{[0.5, 1, 2].map(s => (<button key={s} className="bp-play-btn" style={{ fontSize: 10, padding: '1px 4px', ...(speed === s ? { color: '#4a9eff' } : {}) }} onClick={() => st.handleSpeedChange(s)}>{s}x</button>))}</div>
                     <div className="bp-dur-group"><span>Dur:</span><input type="number" className="bp-dur-input" min="0.5" max="20" step="0.5" value={duration} onChange={e => st.handleDurationChange(parseFloat(e.target.value) || 5)} /></div>
                     <button className="bp-collapse-btn" onClick={() => setCollapsed(true)} title="Collapse">▼</button>
-                </div>
+                </div>}
             </div>
 
-            <div className="bp-ruler-row">
+            {hasAnyAnimation && <div className="bp-ruler-row">
                 <div className="bp-ruler-spacer" />
-                <div className="bp-ruler" style={{ position: 'relative' }} onClick={(e) => { const rect = e.currentTarget.getBoundingClientRect(); st.handleSeek(((e.clientX - rect.left) / rect.width) * duration); }}>
+                <div className="bp-ruler" ref={rulerRef} style={{ position: 'relative' }} onClick={(e) => { const rect = e.currentTarget.getBoundingClientRect(); st.handleSeek(((e.clientX - rect.left) / rect.width) * duration); }}>
                     {Array.from({ length: Math.ceil(duration) + 1 }, (_, i) => (
                         <span key={i} className="bp-ruler-tick" style={{ position: 'absolute', left: `${(i / duration) * 100}%`, transform: 'translateX(-50%)' }}>{i}.0</span>
                     ))}
-                    <div className="bp-playhead" style={{ left: `${(currentTime / duration) * 100}%` }} />
+                    <div
+                        className="bp-playhead"
+                        style={{ left: `${(currentTime / duration) * 100}%` }}
+                        onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); setDraggingPlayhead(true); }}
+                    />
                 </div>
-            </div>
+            </div>}
 
-            <div className="bp-rows">
-                <div className="bp-layer-list" ref={layerScrollRef} onScroll={handleLayerScroll}>
+            <div className="bp-rows" style={{ maxHeight: panelMaxH }}>
+                <div className="bp-layer-list" ref={layerScrollRef} onScroll={handleLayerScroll} style={hasAnyAnimation ? {} : { flex: 1, width: '100%', minWidth: 0 }}>
                     {unifiedLayers.map((layer, idx) => {
                         const dc = isDraggingFn(layer.id) ? 'bp-dragging' : '';
                         const dtc = isDragOver(idx) ? 'bp-drop-target' : '';
@@ -136,7 +181,7 @@ export function BottomPanel({ variant, engine, nodes, selection, actions, overla
                     {unifiedLayers.length === 0 && <div className="bp-empty">No layers yet</div>}
                 </div>
 
-                <div className="bp-timeline-bars" ref={(el) => { timelineScrollRef.current = el; (timelineBarsRef as React.MutableRefObject<HTMLDivElement | null>).current = el; }} onScroll={handleTimelineScroll}>
+                {hasAnyAnimation && <div className="bp-timeline-bars" ref={(el) => { timelineScrollRef.current = el; (timelineBarsRef as React.MutableRefObject<HTMLDivElement | null>).current = el; }} onScroll={handleTimelineScroll}>
                     {unifiedLayers.map((layer, idx) => {
                         const dc = isDraggingFn(layer.id) ? 'bp-dragging' : '';
                         const dtc = isDragOver(idx) ? 'bp-drop-target' : '';
@@ -154,7 +199,7 @@ export function BottomPanel({ variant, engine, nodes, selection, actions, overla
                         return (<TimelineBar key={`tl-${layer.id}`} elementId={elId} label={label} outLabel={outLabel} isSelected={!!isSelected} draggedClass={dc} dropTargetClass={dtc} barLeft={barLeft} barWidth={barWidth} barColor={barColor} currentTime={currentTime} duration={duration} hasAnim={config.anim !== 'none'} hasAnimOut={(config.animOut ?? 'none') !== 'none'} opacityStyle={layer.kind === 'overlay' ? 0.7 : undefined} justDragged={justDragged} onSelect={() => layer.kind === 'overlay' ? onOverlaySelect?.(elId) : handleSelect(layer.node!.id)} onBarMouseDown={st.handleBarMouseDown} onBarCursor={getBarCursor} onAnimClick={() => {}} nodeId={nodeId} />);
                     })}
                     {unifiedLayers.length === 0 && <div className="bp-empty">Press R, E, T, or I to add elements</div>}
-                </div>
+                </div>}
             </div>
 
 

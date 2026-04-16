@@ -141,6 +141,7 @@ export function GeneralEditorPage() {
                     onSizingModeChange={(mode) => useDesignStore.getState().setSizingMode(mode)}
                     isPlaying={previewPlaying}
                     onTogglePlay={togglePreviewPlay}
+                    hasAnyAnimation={creativeSet.variants.some(v => v.elements.some(el => el.animation && el.animation.preset !== 'none'))}
                 />
                 <main className="cs-main">
                     {/* ★ Locale Bar — language switcher pills */}

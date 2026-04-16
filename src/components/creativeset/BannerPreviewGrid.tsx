@@ -252,11 +252,29 @@ export function BannerPreviewGrid({ variants, visibleIds, externalPlaying }: Pro
                         >
                             <div className="banner-card-header" style={{ cursor: draggingId ? 'grabbing' : 'grab' }}>
                                 <span className="banner-card-dims">{width} x {height}{(variant.id in plugConnections) && <LinkedBadge variantId={variant.id} />}</span>
-                                {selectedIds.has(variant.id) && (
-                                    <span style={{ width: 16, height: 16, borderRadius: '50%', background: '#4a9eff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
-                                    </span>
-                                )}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                    {selectedIds.has(variant.id) && (
+                                        <span style={{ width: 16, height: 16, borderRadius: '50%', background: '#4a9eff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
+                                        </span>
+                                    )}
+                                    <button
+                                        className="banner-card-kebab"
+                                        onMouseDown={(e) => e.stopPropagation()}
+                                        onClick={(e) => { e.stopPropagation(); handleContextMenu(e, variant.id); }}
+                                        title="Options"
+                                        style={{
+                                            background: 'none', border: 'none', color: 'var(--text-muted)',
+                                            cursor: 'pointer', padding: '2px 4px', borderRadius: 4,
+                                            fontSize: 14, lineHeight: 1, opacity: 0.5,
+                                            transition: 'opacity 0.15s, color 0.15s',
+                                        }}
+                                        onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = 'var(--text-primary)'; }}
+                                        onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.5'; e.currentTarget.style.color = 'var(--text-muted)'; }}
+                                    >
+                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="3" r="1.5" /><circle cx="8" cy="8" r="1.5" /><circle cx="8" cy="13" r="1.5" /></svg>
+                                    </button>
+                                </div>
                             </div>
 
                             <div className="banner-card-preview" style={{ width: previewW, height: previewH, overflow: 'hidden' }}>
@@ -270,7 +288,7 @@ export function BannerPreviewGrid({ variants, visibleIds, externalPlaying }: Pro
                                 />
                             </div>
 
-                            {!isPlaying && (<div className="banner-card-play-overlay"><div className="banner-card-play-btn" onMouseDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); handleDoubleClick(variant.id); }} title="Open in Editor">▶</div></div>)}
+                            {!isPlaying && (<div className="banner-card-play-overlay"><div className="banner-card-play-btn" onMouseDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); handleDoubleClick(variant.id); }} title="Open in Editor">{hasAnyAnimation ? '\u25b6' : '\u270e'}</div></div>)}
                             <div className="banner-card-footer"><span className="banner-card-count">{variant.elements.length} {t('activity.elements')}</span><span className="banner-card-zoom">{Math.round(scale * 100)}%</span></div>
                         </div>
                     );

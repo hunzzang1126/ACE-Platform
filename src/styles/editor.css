@@ -1541,6 +1541,36 @@
 }
 
 /* ── Bottom Panel (Layers + Timeline) ── */
+/* Resize handle at panel top */
+.bp-resize-handle {
+    height: 8px;
+    cursor: ns-resize;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    transition: background 0.15s;
+    flex-shrink: 0;
+    user-select: none;
+}
+
+.bp-resize-handle:hover {
+    background: rgba(74, 158, 255, 0.08);
+}
+
+.bp-resize-dots {
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 2px;
+    line-height: 1;
+    opacity: 0.5;
+}
+
+.bp-resize-handle:hover .bp-resize-dots {
+    opacity: 1;
+    color: var(--accent, #4a9eff);
+}
+
 .bp-root {
     background: var(--bg-elevated);
     border-top: 1px solid var(--border-editor, rgba(0, 0, 0, 0.06));
@@ -1704,8 +1734,24 @@
     bottom: 0;
     width: 1px;
     background: #ea4335;
-    pointer-events: none;
+    pointer-events: auto;
     z-index: 2;
+    cursor: col-resize;
+}
+
+/* Premiere-style inverted triangle at top */
+.bp-playhead::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 7px solid #ea4335;
+    cursor: col-resize;
 }
 
 .bp-collapse-btn {

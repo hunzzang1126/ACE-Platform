@@ -65,7 +65,7 @@ export function AppSidebar() {
                 <nav className="sidebar-nav">
                     {navItems.map((item) => {
                         const isActive = location.pathname === item.path ||
-                            (item.path === '/' && location.pathname === '/');
+                            (item.path === '/' && (location.pathname === '/' || location.pathname === '/dashboard'));
                         return (
                             <button
                                 key={item.path}

@@ -14,6 +14,7 @@ interface Props {
     onSizingModeChange?: (mode: SizingMode) => void;
     isPlaying?: boolean;
     onTogglePlay?: () => void;
+    hasAnyAnimation?: boolean;
 }
 
 interface StatusCounts {
@@ -24,7 +25,7 @@ interface StatusCounts {
     approved: number;
 }
 
-export function SizeSidebar({ variants, visibleIds, onToggleVisibility, onAddSizeClick, sizingMode = 'uniform', onSizingModeChange, isPlaying = false, onTogglePlay }: Props) {
+export function SizeSidebar({ variants, visibleIds, onToggleVisibility, onAddSizeClick, sizingMode = 'uniform', onSizingModeChange, isPlaying = false, onTogglePlay, hasAnyAnimation = false }: Props) {
     const { t } = useAppI18n();
     const [sizesExpanded, setSizesExpanded] = useState(true);
     const [statusExpanded, setStatusExpanded] = useState(true);
@@ -72,8 +73,8 @@ export function SizeSidebar({ variants, visibleIds, onToggleVisibility, onAddSiz
                 </div>
             </div>
 
-            {/* Playback Controls */}
-            <div className="cs-sidebar-section">
+            {/* Playback Controls — only when animations exist */}
+            {hasAnyAnimation && <div className="cs-sidebar-section">
                 <div className="cs-sidebar-playback">
                     <button
                         className={`cs-play-btn ${isPlaying ? 'cs-play-btn--active' : ''}`}
@@ -84,7 +85,7 @@ export function SizeSidebar({ variants, visibleIds, onToggleVisibility, onAddSiz
                     </button>
                     <span className="cs-play-hint">Space</span>
                 </div>
-            </div>
+            </div>}
 
             {/* Quick Filters */}
             <div className="cs-sidebar-section">
