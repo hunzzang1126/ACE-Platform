@@ -66,7 +66,7 @@ describe('autoDesignService — callTemplateContent', () => {
         });
         const result = await callTemplateContent('design a banner', 300, 250, 'modern', new AbortController().signal);
         expect(result.headline).toBe('Get Started Today'); // "inter" is a junk value
-        expect(result.cta).toBe('Shop Now'); // "click here" is junk
+        expect(result.cta).toBe('Learn More'); // "click here" is junk
     });
 
     it('should handle API returning markdown-wrapped JSON', async () => {
@@ -83,6 +83,6 @@ describe('autoDesignService — callTemplateContent', () => {
         });
         const result = await callTemplateContent('anything', 300, 250, 'modern', new AbortController().signal);
         expect(result.headline).toBe('Get Started Today');
-        expect(result.cta).toBe('Shop Now');
+        expect(result.cta).toBe('Learn More');
     });
 });

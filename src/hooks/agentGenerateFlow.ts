@@ -262,6 +262,22 @@ async function buildAndRender(
     const { recolorTemplateElements } = await resilientImport(() => import('./agentColorRecolor'));
     allElements = recolorTemplateElements(allElements, guide);
 
+    // ★ CONTENT SUBSTITUTION: Replace template placeholder text with AI-generated copy.
+    // Without this, the template's original text (e.g., "Simplify your workflow") would render.
+    for (const el of allElements) {
+        if (el.type !== 'text' && !el.content) continue;
+        const name = (el.name ?? '').toLowerCase();
+        if (name.includes('headline') && !name.includes('sub')) {
+            if (content.headline) el.content = content.headline;
+        } else if (name.includes('subheadline') || name.includes('sub_headline') || name.includes('body')) {
+            if (content.subheadline) el.content = content.subheadline;
+        } else if (name.includes('cta') && name.includes('label')) {
+            if (content.cta) el.content = content.cta;
+        } else if (name.includes('tag')) {
+            if (content.tag) el.content = content.tag;
+        }
+    }
+
     if (bgResult.hasImage && bgResult.url) allElements = allElements.filter(el => el.name !== 'background');
     allElements = allElements.filter(el => { if (el.type === 'text' && (!el.content || el.content.trim() === '')) { console.log(`[Pipeline] Removing empty text: ${el.name}`); return false; } return true; });
 
