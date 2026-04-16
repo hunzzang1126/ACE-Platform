@@ -73,10 +73,7 @@ export function AiImageReplaceSection({ nodeId, nodeW, nodeH, canvasWidth, canva
         try {
             const result = await callImageGen(trimmed, nodeW, nodeH);
             if (result.success && result.imageUrl) {
-                const x = (actions as any).getNodePosition?.(nodeId)?.x ?? Math.round((canvasWidth - nodeW) / 2);
-                const y = (actions as any).getNodePosition?.(nodeId)?.y ?? Math.round((canvasHeight - nodeH) / 2);
-                actions.deleteNode(nodeId);
-                await actions.addImage(x, y, result.imageUrl, nodeW, nodeH);
+                await actions.replaceImageSrc(nodeId, result.imageUrl);
                 setPrompt('');
             } else {
                 setError(result.message || 'Image generation failed');
