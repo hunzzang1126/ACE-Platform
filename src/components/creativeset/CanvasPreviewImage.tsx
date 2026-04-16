@@ -87,34 +87,36 @@ export const CanvasPreviewImage = memo(function CanvasPreviewImage({ variant, re
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [variant.id, variant.elements, resolvedImageUrls]);
 
-    // ── Render base (non-animated) + sprites (animated elements individually) ──
+    // ── Render base (bg only) + ALL elements as individual sprites for correct z-order ──
+    // ★ REGRESSION FIX: Previously only animated elements were sprites.
+    // Non-animated elements stayed in the base and got covered by animated sprites.
+    // Now ALL elements become sprites when ANY element is animated.
     useEffect(() => {
         if (!hasTimeCtrl) return;
         let cancelled = false;
 
         (async () => {
             const { width: w, height: h } = variant.preset;
-            const ctrlIds = new Set(timeCtrlEls.map(el => el.id));
 
-            // Base: variant without animated elements
+            // Base: background color only (no elements) — sprites handle all elements
             const baseVariant: BannerVariant = {
                 ...resolvedVariant,
-                elements: resolvedVariant.elements.filter(el => !ctrlIds.has(el.id)),
+                elements: [],
             };
             try {
                 const bUrl = await renderVariantWithFabric(baseVariant);
                 if (!cancelled) setBaseUrl(bUrl);
             } catch { /* keep null */ }
 
-            // Sprites: each animated element alone on transparent bg
+            // Sprites: ALL elements as individual layers on transparent bg
+            const sorted = [...resolvedVariant.elements].sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
             const newSprites: SpriteData[] = [];
-            for (const el of timeCtrlEls) {
+            for (const el of sorted) {
                 if (cancelled) break;
-                const resolvedEl = resolvedVariant.elements.find(e => e.id === el.id) ?? el;
                 const spriteVariant: BannerVariant = {
                     ...resolvedVariant,
                     backgroundColor: 'rgba(0,0,0,0)',
-                    elements: [resolvedEl],
+                    elements: [el],
                 };
                 try {
                     const sUrl = await renderVariantWithFabric(spriteVariant);

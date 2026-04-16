@@ -17,8 +17,11 @@ describe('CanvasPreviewImage — sprite z-index ordering', () => {
         expect(src).toContain('zIndex: el.zIndex ?? 0');
     });
 
-    it('★ REGRESSION: sorts sprites by zIndex before rendering', () => {
-        expect(src).toContain('.sort((a, b) => a.zIndex - b.zIndex)');
+    it('★ REGRESSION: renders ALL elements as sprites for correct z-order', () => {
+        // Previously only animated elements were sprites, breaking z-order
+        // when animated elements had lower zIndex than non-animated ones
+        expect(src).toContain('elements: [],');
+        expect(src).toContain('ALL elements as individual layers');
     });
 
     it('★ REGRESSION: applies CSS z-index to sprite overlays', () => {
