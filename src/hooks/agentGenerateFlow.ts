@@ -77,9 +77,15 @@ export async function executeGenerateFlow(
     cb.setPhase?.('executing');
     const rendered = await buildAndRender(template, guide, content, canvasW, canvasH, bgResult, brand.logoUrl, brand.logoW, brand.logoH, engine, abort, cb);
 
-    // ── Phase 6: Vision QA (stepper: Finishing) ──
+    // ── Phase 6: Finalize (stepper: Finishing) ──
+    // ★ Vision QA removed — deterministic quality (recolor + contrast + layout validation)
+    // is more reliable and costs ZERO tokens vs. expensive post-hoc AI healing.
     cb.setPhase?.('reflecting');
-    await runVisionQA(engine, canvasW, canvasH, guide, template, rendered, abort, cb);
+    cb.addCard('finalize', 'Finalizing design', 'running');
+    try { engine.reorder_by_z_index?.(); } catch { /* ok */ }
+    try { engine.render_all?.(); } catch { /* ok */ }
+    cb.updateCard('finalize', 'done', `${rendered} elements · Design complete`);
+    cb.narrate(`Design finalized with ${rendered} elements. Style: ${guide.name}, Layout: ${template.name}.`);
 
     // ── Phase 7: Save to AI Memory ──
     // Records this design in Supabase ai_memory for cross-session learning
@@ -278,7 +284,21 @@ async function buildAndRender(
         }
     }
 
-    if (bgResult.hasImage && bgResult.url) allElements = allElements.filter(el => el.name !== 'background');
+    // ★ PHOTO CONTRAST: When a background image exists, ensure all text is readable.
+    // Force white text + drop shadow for photo backgrounds (zero tokens, max impact).
+    if (bgResult.hasImage && bgResult.url) {
+        for (const el of allElements) {
+            if (el.type === 'text') {
+                el.color_hex = '#FFFFFF';
+                el.shadow_blur = 8;
+                el.shadow_offset_x = 0;
+                el.shadow_offset_y = 2;
+                el.shadow_opacity = 0.6;
+            }
+        }
+        // Remove template background shape (photo replaces it)
+        allElements = allElements.filter(el => el.name !== 'background');
+    }
     allElements = allElements.filter(el => { if (el.type === 'text' && (!el.content || el.content.trim() === '')) { console.log(`[Pipeline] Removing empty text: ${el.name}`); return false; } return true; });
 
     const validation = validateLayout(allElements, canvasW, canvasH);
