@@ -340,48 +340,57 @@ export async function deleteTemplateOverride(
     }
 }
 
-// ── Brand Kit Cloud CRUD ────────────────────────
+// ── Brand Kit Cloud CRUD (Storage-based, no SQL table) ──
+
+const BRAND_KIT_BUCKET = 'ace-assets';
+const BRAND_KIT_FILE = 'brand_kit.json';
 
 /**
- * Push a full BrandKit to Supabase (upsert by id).
- * Stores the entire kit as JSONB for simplicity.
+ * Push a full BrandKit to Supabase Storage as JSON file.
+ * Path: ace-assets/{userId}/brand/brand_kit.json
  */
 export async function pushBrandKitCloud(
     userId: string,
-    kitId: string,
+    _kitId: string,
     data: unknown,
 ): Promise<void> {
     const sb = getSupabase();
     if (!sb) return;
-    const { error } = await sb.from('brand_kits').upsert(
-        { id: kitId, user_id: userId, data, updated_at: new Date().toISOString() },
-        { onConflict: 'id' },
-    );
+    const path = `${userId}/brand/${BRAND_KIT_FILE}`;
+    const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+    const { error } = await sb.storage.from(BRAND_KIT_BUCKET).upload(path, blob, { upsert: true });
     if (error) console.warn('[pushBrandKitCloud] Error:', error.message);
 }
 
 /**
- * Pull all BrandKits for a user from Supabase.
+ * Pull BrandKit data from Supabase Storage JSON file.
  */
 export async function pullBrandKitsCloud(
     userId: string,
 ): Promise<Array<{ id: string; data: unknown; updated_at: string }>> {
     const sb = getSupabase();
     if (!sb) return [];
-    const { data, error } = await sb
-        .from('brand_kits')
-        .select('id, data, updated_at')
-        .eq('user_id', userId);
+    const path = `${userId}/brand/${BRAND_KIT_FILE}`;
+    const { data, error } = await sb.storage.from(BRAND_KIT_BUCKET).download(path);
     if (error || !data) return [];
-    return data;
+    try {
+        const kit = JSON.parse(await data.text());
+        return [{ id: kit.id ?? 'default', data: kit, updated_at: kit.updatedAt ?? new Date().toISOString() }];
+    } catch {
+        return [];
+    }
 }
 
 /**
- * Delete a BrandKit from Supabase.
+ * Delete BrandKit JSON from Supabase Storage.
  */
 export async function deleteBrandKitCloud(kitId: string): Promise<void> {
     const sb = getSupabase();
     if (!sb) return;
-    const { error } = await sb.from('brand_kits').delete().eq('id', kitId);
+    // Need userId to construct path
+    const { data: { user } } = await sb.auth.getUser();
+    if (!user) return;
+    const path = `${user.id}/brand/${BRAND_KIT_FILE}`;
+    const { error } = await sb.storage.from(BRAND_KIT_BUCKET).remove([path]);
     if (error) console.warn('[deleteBrandKitCloud] Error:', error.message);
 }

@@ -60,11 +60,11 @@ describe('★ REGRESSION GUARD: Brand Kit Cloud Sync', () => {
         expect(src).toContain('deleteBrandKitCloud(old.id)');
     });
 
-    it('brand_kits_table.sql exists with RLS policies', () => {
-        const sql = readSrc('supabase/brand_kits_table.sql');
-        expect(sql).toContain('CREATE TABLE IF NOT EXISTS brand_kits');
-        expect(sql).toContain('ENABLE ROW LEVEL SECURITY');
-        expect(sql).toContain('auth.uid() = user_id');
+    it('brand kit uses ace-assets Storage bucket (not SQL table)', () => {
+        const src = readSrc('src/services/supabaseClient.ts');
+        expect(src).toContain('BRAND_KIT_BUCKET');
+        expect(src).toContain('brand_kit.json');
+        expect(src).not.toContain("from('brand_kits')");
     });
 
     it('brandKitStore uses IDB persistence (not localStorage)', () => {
