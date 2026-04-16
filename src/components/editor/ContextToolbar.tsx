@@ -15,11 +15,30 @@ import { FONT_FAMILIES } from './contextToolbarConstants';
 import type { AlignDirection } from '@/engines/alignElements';
 import { FontPicker } from './FontPicker';
 
-// ── Inline AI Replace (compact prompt in toolbar) ──
+// ── Reimagine — AI image replacement (compact toolbar widget) ──
+const SHIMMER_CSS = `
+@keyframes reimagine-shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+@keyframes reimagine-glow {
+  0%, 100% { box-shadow: 0 0 6px rgba(99,102,241,0.3); }
+  50% { box-shadow: 0 0 14px rgba(45,212,191,0.5); }
+}
+`;
+let _shimmerInjected = false;
+function injectShimmer() {
+    if (_shimmerInjected) return;
+    const s = document.createElement('style'); s.textContent = SHIMMER_CSS;
+    document.head.appendChild(s); _shimmerInjected = true;
+}
+
 function AiReplaceInline({ onReplace, w, h }: { onReplace: (url: string) => void; w: number; h: number }) {
     const [open, setOpen] = useState(false);
     const [prompt, setPrompt] = useState('');
     const [loading, setLoading] = useState(false);
+
+    useEffect(() => { injectShimmer(); }, []);
 
     const handleGo = async () => {
         const trimmed = prompt.trim();
@@ -32,32 +51,76 @@ function AiReplaceInline({ onReplace, w, h }: { onReplace: (url: string) => void
                 onReplace(result.imageUrl);
                 setPrompt(''); setOpen(false);
             }
-        } catch (err) { console.error('[AiReplace]', err); }
+        } catch (err) { console.error('[Reimagine]', err); }
         finally { setLoading(false); }
     };
 
     if (!open) return (
-        <button className="ctx-btn ctx-label-btn" onClick={() => setOpen(true)} title="AI Replace Image" style={{ color: '#2dd4bf', fontWeight: 600 }}>AI Replace</button>
+        <button
+            onClick={() => setOpen(true)}
+            title="Reimagine this image with AI"
+            style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                padding: '4px 12px', borderRadius: 6, border: 'none',
+                background: 'linear-gradient(135deg, #6366f1, #2dd4bf)',
+                backgroundSize: '200% auto',
+                animation: 'reimagine-shimmer 3s linear infinite',
+                color: '#fff', fontSize: 11, fontWeight: 700,
+                cursor: 'pointer', letterSpacing: 0.3,
+                transition: 'transform 0.15s, box-shadow 0.2s',
+                boxShadow: '0 1px 6px rgba(99,102,241,0.35)',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.05)'; e.currentTarget.style.boxShadow = '0 2px 12px rgba(45,212,191,0.5)'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = '0 1px 6px rgba(99,102,241,0.35)'; }}
+        >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <path d="M12 2l2 7h7l-5.5 4 2 7L12 16l-5.5 4 2-7L3 9h7z" />
+            </svg>
+            Reimagine
+        </button>
     );
 
     return (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <div style={{
+            display: 'flex', alignItems: 'center', gap: 4,
+            padding: '2px 4px', borderRadius: 8,
+            background: 'rgba(99,102,241,0.08)',
+            border: '1px solid rgba(99,102,241,0.25)',
+            animation: 'reimagine-glow 2s ease-in-out infinite',
+        }}>
             <input
                 autoFocus type="text" value={prompt}
                 onChange={e => setPrompt(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') handleGo(); if (e.key === 'Escape') { setOpen(false); setPrompt(''); } e.stopPropagation(); }}
-                placeholder="Describe..."
+                placeholder="A sunset over ocean..."
                 disabled={loading}
                 style={{
-                    width: 140, padding: '3px 8px',
-                    background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(45,212,191,0.4)',
-                    borderRadius: 4, color: '#e2e8f0', fontSize: 11, outline: 'none', fontFamily: 'inherit',
+                    width: 170, padding: '4px 10px',
+                    background: '#fff', border: '1px solid rgba(99,102,241,0.3)',
+                    borderRadius: 5, color: '#1a1a2e', fontSize: 11,
+                    outline: 'none', fontFamily: 'inherit',
                 }}
             />
-            <button className="ctx-btn" onClick={handleGo} disabled={loading || !prompt.trim()} style={{ color: '#2dd4bf', fontWeight: 600, fontSize: 11 }}>
-                {loading ? '...' : 'Go'}
+            <button
+                onClick={handleGo} disabled={loading || !prompt.trim()}
+                style={{
+                    padding: '4px 10px', borderRadius: 5, border: 'none',
+                    background: loading ? '#a5b4fc' : 'linear-gradient(135deg, #6366f1, #2dd4bf)',
+                    color: '#fff', fontSize: 11, fontWeight: 700,
+                    cursor: loading ? 'wait' : 'pointer',
+                    opacity: (!prompt.trim() && !loading) ? 0.5 : 1,
+                }}
+            >
+                {loading ? (
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ animation: 'spin 1s linear infinite' }}>
+                        <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                    </svg>
+                ) : 'Go'}
             </button>
-            <button className="ctx-btn" onClick={() => { setOpen(false); setPrompt(''); }} style={{ fontSize: 11, color: '#71717a' }}>x</button>
+            <button onClick={() => { setOpen(false); setPrompt(''); }} style={{
+                padding: '2px 5px', border: 'none', background: 'transparent',
+                color: '#71717a', fontSize: 13, cursor: 'pointer', lineHeight: 1,
+            }}>×</button>
         </div>
     );
 }
@@ -237,10 +300,11 @@ export function ContextToolbar({ nodes = [], selection = [], actions, selectedOv
     // ── Overlay image/video ──
     if (hasOverlay && (selectedOverlay.type === 'image' || selectedOverlay.type === 'video')) return (
         <div className="ctx-toolbar" role="toolbar">
-            <select className="ctx-select" value={selectedOverlay.objectFit || 'cover'} onChange={e => onOverlayUpdate?.(selectedOverlay.id, { objectFit: e.target.value as 'cover' | 'contain' | 'fill' })}><option value="cover">Cover</option><option value="contain">Contain</option><option value="fill">Fill</option></select>
             {selectedOverlay.type === 'image' && (
                 <AiReplaceInline w={selectedOverlay.w} h={selectedOverlay.h} onReplace={(url) => onOverlayUpdate?.(selectedOverlay.id, { src: url })} />
             )}
+            <div className="ctx-divider" />
+            <select className="ctx-select" value={selectedOverlay.objectFit || 'cover'} onChange={e => onOverlayUpdate?.(selectedOverlay.id, { objectFit: e.target.value as 'cover' | 'contain' | 'fill' })}><option value="cover">Cover</option><option value="contain">Contain</option><option value="fill">Fill</option></select>
             <InlineButtons />
         </div>
     );
@@ -259,15 +323,16 @@ export function ContextToolbar({ nodes = [], selection = [], actions, selectedOv
 
         return (
             <div className="ctx-toolbar" role="toolbar">
-                {selectedNode.type !== 'image' && <ColorPicker label="" color={fillHex} onChange={handleColorChange} />}
-                {selectedNode.type === 'image' && selectedNode.src && <RemoveBgToolbarBtn nodeId={selectedNode.id} imageSrc={selectedNode.src} actions={actions} />}
-                {selectedNode.type === 'image' && <FillToPageToolbarBtn nodeId={selectedNode.id} actions={actions} />}
                 {selectedNode.type === 'image' && (
                     <AiReplaceInline w={selectedNode.w} h={selectedNode.h} onReplace={async (url) => {
                         actions.deleteNode(selectedNode.id);
                         await actions.addImage(selectedNode.x, selectedNode.y, url, selectedNode.w, selectedNode.h);
                     }} />
                 )}
+                {selectedNode.type === 'image' && <div className="ctx-divider" />}
+                {selectedNode.type !== 'image' && <ColorPicker label="" color={fillHex} onChange={handleColorChange} />}
+                {selectedNode.type === 'image' && selectedNode.src && <RemoveBgToolbarBtn nodeId={selectedNode.id} imageSrc={selectedNode.src} actions={actions} />}
+                {selectedNode.type === 'image' && <FillToPageToolbarBtn nodeId={selectedNode.id} actions={actions} />}
                 <InlineButtons />
             </div>
         );
