@@ -11,7 +11,7 @@ import { EffectsSection } from '@/components/panels/EffectsSection';
 import { Section, ScrubField, PropField, OpacitySlider } from '@/components/panels/PropertyFields';
 import type { EngineNode, CanvasEngineActions } from '@/hooks/useCanvasEngine';
 import type { OverlayElement } from '@/hooks/useOverlayElements';
-import { FONT_FAMILIES, FONT_WEIGHTS, RemoveBgButton, FillToPageButton, SmartSizingSection } from './PropertyPanelSections';
+import { FONT_FAMILIES, FONT_WEIGHTS, RemoveBgButton, FillToPageButton, SmartSizingSection, AiImageReplaceSection } from './PropertyPanelSections';
 import { useAppI18n } from '@/i18n';
 
 interface Props {
@@ -156,6 +156,14 @@ export function PropertyPanel({ nodes = [], selection = [], actions, selectedOve
                             onSetSize={actions.setNodeSize}
                         />
                         <RemoveBgButton imageSrc={(selectedNode as any).src || (selectedNode as any).image_url} onResult={(dataUrl) => { (actions as any).replaceImageSrc?.(selectedNode.id, dataUrl); }} />
+                        <AiImageReplaceSection
+                            nodeId={selectedNode.id}
+                            nodeW={selectedNode.w}
+                            nodeH={selectedNode.h}
+                            canvasWidth={canvasWidth}
+                            canvasHeight={canvasHeight}
+                            actions={actions}
+                        />
                     </>
                 )}
                 <Section label={t('editor.alignToCanvas')}>

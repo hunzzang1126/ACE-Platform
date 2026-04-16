@@ -7,9 +7,10 @@
 // Reuses brandKitStore (same data as dashboard BrandCloudSection).
 // ─────────────────────────────────────────────────
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useBrandKitStore, type AssetCategory, type AssetFormat } from '@/stores/brandKitStore';
 import type { CanvasEngineActions } from '@/hooks/canvasTypes';
+import { resolveAsset, isAssetRef } from '@/services/assetService';
 import { sidebarBrandStyles as S } from './sidebarBrandStyles';
 
 interface Props {
@@ -82,6 +83,32 @@ export function SidebarBrandTab({ actions }: Props) {
     const [searchQuery, setSearchQuery] = useState('');
     const [isDragging, setIsDragging] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // ★ Resolve storage:// and idb:// refs to displayable URLs
+    const [resolvedUrls, setResolvedUrls] = useState<Record<string, string>>({});
+    useEffect(() => {
+        if (!kit) return;
+        const assets = kit.assets.filter(a => !a.deletedAt);
+        let cancelled = false;
+        (async () => {
+            const newUrls: Record<string, string> = {};
+            for (const a of assets) {
+                const displaySrc = a.thumbSrc || a.src;
+                if (isAssetRef(displaySrc)) {
+                    try {
+                        const resolved = await resolveAsset(displaySrc);
+                        if (!cancelled && resolved !== displaySrc) {
+                            newUrls[a.id] = resolved;
+                        }
+                    } catch { /* skip failed resolves */ }
+                }
+            }
+            if (!cancelled && Object.keys(newUrls).length > 0) {
+                setResolvedUrls(prev => ({ ...prev, ...newUrls }));
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [kit?.assets]);
 
     // ── Asset Upload ──
     const handleFileUpload = useCallback(async (files: FileList) => {
@@ -234,10 +261,10 @@ export function SidebarBrandTab({ actions }: Props) {
                             <div style={S.assetGrid}>
                                 {filteredAssets.map(a => (
                                     <div key={a.id} style={S.assetCard} onClick={() => handleAssetClick(a)} title={`${a.name} (${a.width}x${a.height})`}>
-                                        <img src={a.thumbSrc || a.src} alt={a.name} style={S.assetImg} />
+                                        <img src={resolvedUrls[a.id] || a.thumbSrc || a.src} alt={a.name} style={S.assetImg} />
                                         <div style={S.assetInfo}>
                                             <span style={S.assetName}>{a.name}</span>
-                                            <span style={S.assetMeta}>{formatBytes(a.sizeBytes)}</span>
+                                            <span style={S.assetMeta}>{a.sizeBytes > 0 ? formatBytes(a.sizeBytes) : 'Cloud'}</span>
                                         </div>
                                         <button style={S.assetDel} onClick={e => { e.stopPropagation(); removeAsset(kit!.id, a.id); }} title="Remove">
                                             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
