@@ -314,6 +314,34 @@
     white-space: nowrap;
 }
 
+.tmpl-card__name--editable {
+    cursor: text;
+    border-bottom: 1px dashed transparent;
+    transition: border-color 0.2s;
+}
+
+.tmpl-card__name--editable:hover {
+    border-bottom-color: rgba(99, 102, 241, 0.4);
+}
+
+.tmpl-card__name-input {
+    width: 100%;
+    font-size: 14px;
+    font-weight: 700;
+    color: #1e293b;
+    background: rgba(99, 102, 241, 0.06);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: 4px;
+    padding: 2px 6px;
+    outline: none;
+    font-family: inherit;
+}
+
+.tmpl-card__name-input:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+}
+
 .tmpl-card__meta {
     display: flex;
     align-items: center;

@@ -154,6 +154,20 @@ export const useTemplateStore = create<TemplateState>()(
                     Object.assign(tmpl, updates);
                     tmpl.updatedAt = new Date().toISOString();
                 });
+                // ★ Sync name/description changes to Supabase (template_overrides)
+                const tmpl = get().templates.find(t => t.id === id);
+                if (tmpl) {
+                    upsertTemplateOverride(id, {
+                        name: tmpl.name,
+                        description: tmpl.description ?? '',
+                        category: tmpl.category,
+                        tags: tmpl.tags,
+                        width: tmpl.width,
+                        height: tmpl.height,
+                        variantSnapshot: tmpl.variantSnapshot,
+                        thumbnailSrc: tmpl.thumbnailSrc,
+                    }).catch(err => console.warn('[templateStore] Sync name update failed:', err));
+                }
             },
 
             toggleFavorite: (id) => {

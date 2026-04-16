@@ -152,6 +152,27 @@ function TemplateCard({ template: t, isHovered, onHover, onUse, onToggleFav }: C
     // Clamp aspect ratio for card display
     const displayRatio = Math.max(0.6, Math.min(aspectRatio, 2.0));
 
+    // ★ Inline name editing
+    const [isEditing, setIsEditing] = useState(false);
+    const [editName, setEditName] = useState(t.name);
+    const nameInputRef = useRef<HTMLInputElement>(null);
+    const updateTemplate = useTemplateStore(s => s.updateTemplate);
+
+    const handleNameSave = useCallback(() => {
+        const trimmed = editName.trim();
+        if (trimmed && trimmed !== t.name) {
+            updateTemplate(t.id, { name: trimmed });
+        }
+        setIsEditing(false);
+    }, [editName, t.name, t.id, updateTemplate]);
+
+    useEffect(() => {
+        if (isEditing && nameInputRef.current) {
+            nameInputRef.current.focus();
+            nameInputRef.current.select();
+        }
+    }, [isEditing]);
+
     // ★ TRUE SCALE: measure wrapper → compute scale factor → apply to canvas
     const wrapRef = useRef<HTMLDivElement>(null);
     const [scale, setScale] = useState(0.3); // fallback
@@ -224,9 +245,26 @@ function TemplateCard({ template: t, isHovered, onHover, onUse, onToggleFav }: C
                 </div>
             </div>
 
-            {/* ── Info ── */}
+            {/* ── Info (editable name) ── */}
             <div className="tmpl-card__info">
-                <div className="tmpl-card__name">{t.name}</div>
+                {isEditing ? (
+                    <input
+                        ref={nameInputRef}
+                        className="tmpl-card__name-input"
+                        value={editName}
+                        onChange={e => setEditName(e.target.value)}
+                        onBlur={handleNameSave}
+                        onKeyDown={e => { if (e.key === 'Enter') handleNameSave(); if (e.key === 'Escape') { setEditName(t.name); setIsEditing(false); } }}
+                    />
+                ) : (
+                    <div
+                        className="tmpl-card__name tmpl-card__name--editable"
+                        onDoubleClick={() => { setEditName(t.name); setIsEditing(true); }}
+                        title="Double-click to rename"
+                    >
+                        {t.name}
+                    </div>
+                )}
                 <div className="tmpl-card__desc">{t.description}</div>
                 <div className="tmpl-card__meta">
                     {t.category} · {t.usageCount > 0 ? `${t.usageCount} uses` : 'New'}
