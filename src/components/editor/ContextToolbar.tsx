@@ -345,17 +345,34 @@ export function ContextToolbar({ nodes = [], selection = [], actions, selectedOv
 }
 
 function RemoveBgToolbarBtn({ nodeId, imageSrc, actions }: { nodeId: number; imageSrc: string; actions: CanvasEngineActions }) {
-    const [loading, setLoading] = useState(false);
+    const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
     const handleRemoveBg = async () => {
-        if (loading) return;
-        setLoading(true);
-        try { const blob = await removeBackgroundFromUrl(imageSrc); await actions.replaceImageSrc(nodeId, await blobToDataUrl(blob)); }
-        catch (err) { console.error('[RemoveBG] Failed:', err); }
-        finally { setLoading(false); }
+        if (status === 'loading') return;
+        setStatus('loading');
+        try {
+            const blob = await removeBackgroundFromUrl(imageSrc, (p) => {
+                // Progress updates handled by loading state
+            });
+            await actions.replaceImageSrc(nodeId, await blobToDataUrl(blob));
+            // ★ Import toast lazily to avoid circular deps
+            const { toast } = await import('@/components/ui/Toast');
+            toast.success('Background removed');
+            setStatus('idle');
+        } catch (err) {
+            setStatus('error');
+            const msg = err instanceof Error ? err.message : 'Unknown error';
+            // ★ Toast even in production (console.error is stripped)
+            try {
+                const { toast } = await import('@/components/ui/Toast');
+                toast.error(`Remove BG failed: ${msg.slice(0, 80)}`);
+            } catch { /* toast unavailable */ }
+            // Reset to idle after 3s so user can retry
+            setTimeout(() => setStatus('idle'), 3000);
+        }
     };
     return (
-        <button className="ctx-btn ctx-label-btn" onClick={handleRemoveBg} disabled={loading} title="Remove image background (AI)" style={{ color: loading ? '#a5b4fc' : '#818cf8', fontWeight: 600, cursor: loading ? 'wait' : 'pointer' }}>
-            {loading ? (<><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite', marginRight: 4 }}><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>Removing...</>) : 'Remove BG'}
+        <button className="ctx-btn ctx-label-btn" onClick={handleRemoveBg} disabled={status === 'loading'} title="Remove image background (AI)" style={{ color: status === 'error' ? '#ff6b6b' : status === 'loading' ? '#a5b4fc' : '#818cf8', fontWeight: 600, cursor: status === 'loading' ? 'wait' : 'pointer' }}>
+            {status === 'loading' ? (<><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite', marginRight: 4 }}><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>Removing...</>) : status === 'error' ? 'Failed — Retry?' : 'Remove BG'}
         </button>
     );
 }
