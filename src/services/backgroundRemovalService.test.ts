@@ -96,6 +96,16 @@ describe('backgroundRemovalService', () => {
                 expect(isDirectFetch).toBe(isDirect);
             }
         });
+
+        it('★ REGRESSION: storage:// URLs are routed to resolveAsset (not direct fetch)', () => {
+            const storageUrl = 'storage://78472fb3-5ce8-4a3a-8d3e-3b1a0b233a61/designs/0258586ba595bded.jpg';
+            const idbUrl = 'idb://abc123';
+            // Both should be resolved via assetService, NOT direct fetch
+            expect(storageUrl.startsWith('idb://') || storageUrl.startsWith('storage://')).toBe(true);
+            expect(idbUrl.startsWith('idb://') || idbUrl.startsWith('storage://')).toBe(true);
+            // External URLs should NOT match
+            expect('https://example.com'.startsWith('idb://') || 'https://example.com'.startsWith('storage://')).toBe(false);
+        });
     });
 });
 

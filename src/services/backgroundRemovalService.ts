@@ -77,12 +77,15 @@ export async function removeBackgroundFromUrl(
 ): Promise<Blob> {
     let blob: Blob;
 
-    if (imageUrl.startsWith('idb://')) {
-        // ★ Resolve idb:// asset ref to blob URL, then fetch
+    if (imageUrl.startsWith('idb://') || imageUrl.startsWith('storage://')) {
+        // ★ Resolve idb:// or storage:// asset ref to usable URL, then fetch
         const { resolveAsset } = await import('@/services/assetService');
-        const blobUrl = await resolveAsset(imageUrl);
-        if (blobUrl === imageUrl) throw new Error(`Asset not found in IndexedDB: ${imageUrl}`);
-        const response = await fetch(blobUrl);
+        const resolvedUrl = await resolveAsset(imageUrl);
+        if (resolvedUrl === imageUrl) {
+            throw new Error(`Asset not found: ${imageUrl.slice(0, 40)}...`);
+        }
+        const response = await fetch(resolvedUrl);
+        if (!response.ok) throw new Error(`Fetch failed: HTTP ${response.status}`);
         blob = await response.blob();
     } else if (imageUrl.startsWith('data:') || imageUrl.startsWith('blob:')) {
         // Data URLs and blob URLs can be fetched directly
