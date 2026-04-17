@@ -170,45 +170,80 @@ async function buildAndRender(
     allElements = recolorTemplateElements(allElements, guide);
 
     // ★ CONTENT SUBSTITUTION: Replace template placeholder text with AI-generated copy.
-    // Without this, the template's original text (e.g., "Simplify your workflow") would render.
+    // Strategy: try name-based mapping first, then fall back to font-size heuristic.
+    let headlineMapped = false;
     let subheadlineMapped = false;
+    let ctaMapped = false;
+    let tagMapped = false;
+
+    // Pass 1: Name-based mapping (exact keyword match)
     for (const el of allElements) {
         if (el.type !== 'text' && !el.content) continue;
         const name = (el.name ?? '').toLowerCase();
-        if (name.includes('headline') && !name.includes('sub')) {
-            if (content.headline) el.content = content.headline;
-        } else if (name.includes('subheadline') || name.includes('sub_headline') || name.includes('body')) {
+        if (!headlineMapped && name.includes('headline') && !name.includes('sub')) {
+            if (content.headline) { el.content = content.headline; headlineMapped = true; }
+        } else if (!subheadlineMapped && (name.includes('subheadline') || name.includes('sub_headline') || name.includes('body'))) {
             if (content.subheadline) { el.content = content.subheadline; subheadlineMapped = true; }
-        } else if (name.includes('cta') && name.includes('label')) {
-            if (content.cta) el.content = content.cta;
-        } else if (name.includes('tag')) {
-            if (content.tag) el.content = content.tag;
+        } else if (!ctaMapped && name.includes('cta') && name.includes('label')) {
+            if (content.cta) { el.content = content.cta; ctaMapped = true; }
+        } else if (!tagMapped && name.includes('tag')) {
+            if (content.tag) { el.content = content.tag; tagMapped = true; }
         }
     }
 
-    // ★ AUTO-CREATE SUBHEADLINE: If AI generated a subheadline but the template
-    // has no matching element, create one below the headline instead of silently dropping it.
+    // Pass 2: Font-size heuristic — if name-based mapping missed the headline/subheadline,
+    // sort text elements by font_size descending and assign by role (largest = headline).
+    if (!headlineMapped || !subheadlineMapped) {
+        const textEls = allElements
+            .filter(el => el.type === 'text' && !['cta_label', 'cta_button'].includes(el.name ?? ''))
+            .sort((a, b) => (b.font_size ?? 0) - (a.font_size ?? 0));
+
+        if (!headlineMapped && textEls[0] && content.headline) {
+            textEls[0].content = content.headline;
+            headlineMapped = true;
+            console.log(`[Pipeline] Heuristic headline: "${textEls[0].name}" (font_size=${textEls[0].font_size})`);
+        }
+        if (!subheadlineMapped && textEls[1] && content.subheadline) {
+            textEls[1].content = content.subheadline;
+            subheadlineMapped = true;
+            console.log(`[Pipeline] Heuristic subheadline: "${textEls[1].name}" (font_size=${textEls[1].font_size})`);
+        }
+        if (!tagMapped && textEls.length >= 3 && content.tag) {
+            const tagEl = textEls[textEls.length - 1]; // smallest text
+            tagEl!.content = content.tag;
+            tagMapped = true;
+        }
+    }
+
+    // ★ AUTO-CREATE SUBHEADLINE: If AI generated a subheadline but no element was mapped,
+    // create one below the headline with canvas-proportional sizing.
     if (content.subheadline && !subheadlineMapped) {
-        const headlineEl = allElements.find(el => (el.name ?? '').toLowerCase().includes('headline') && !(el.name ?? '').toLowerCase().includes('sub'));
+        const headlineEl = allElements.find(el =>
+            el.type === 'text' && el.content === content.headline
+        ) ?? allElements.find(el => (el.name ?? '').toLowerCase().includes('headline'));
         const headlineY = headlineEl?.y ?? canvasH * 0.3;
-        const headlineFontSize = headlineEl?.font_size ?? 24;
-        const subFontSize = Math.round(headlineFontSize * 0.6);
-        const subY = headlineY + headlineFontSize + 8;
+        const headlineH = headlineEl?.h ?? 60;
+        const headlineFontSize = headlineEl?.font_size ?? Math.round(canvasH * 0.06);
+        // ★ Canvas-proportional sizing: ~3.5% of canvas height, min 14px, max 32px
+        const subFontSize = Math.max(14, Math.min(32, Math.round(canvasH * 0.035)));
+        const subY = headlineY + headlineH + Math.round(canvasH * 0.02);
+        const subX = headlineEl?.x ?? Math.round(canvasW * 0.075);
+        const subW = headlineEl?.w ?? Math.round(canvasW * 0.85);
         allElements.push({
             name: 'subheadline',
             type: 'text',
             content: content.subheadline,
-            x: 0,
+            x: subX,
             y: subY,
-            w: canvasW * 0.85,
+            w: subW,
             h: 0,
             font_size: subFontSize,
             font_weight: '400',
-            text_align: 'center',
+            text_align: headlineEl?.text_align ?? 'center',
             color_hex: headlineEl?.color_hex ?? '#FFFFFF',
             line_height: 1.3,
         });
-        console.log(`[Pipeline] Auto-created subheadline: "${content.subheadline.slice(0, 40)}" at y=${subY}`);
+        console.log(`[Pipeline] Auto-created subheadline: "${content.subheadline.slice(0, 40)}" at y=${subY}, fontSize=${subFontSize}`);
     }
 
     // ★ PHOTO CONTRAST: When a background image exists, ensure all text is readable.

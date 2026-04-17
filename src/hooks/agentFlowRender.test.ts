@@ -73,12 +73,13 @@ describe('agentGenerateFlow — subheadline auto-creation', () => {
         expect(flowSrc).toContain("name: 'subheadline'");
     });
 
-    it('positions auto-created subheadline below headline', () => {
-        expect(flowSrc).toContain('headlineY + headlineFontSize + 8');
+    it('positions auto-created subheadline below headline using headlineH', () => {
+        expect(flowSrc).toContain('headlineY + headlineH');
     });
 
-    it('uses 60% of headline font size for subheadline', () => {
-        expect(flowSrc).toContain('headlineFontSize * 0.6');
+    it('uses canvas-proportional font size for subheadline (3.5% of height)', () => {
+        expect(flowSrc).toContain('canvasH * 0.035');
+        expect(flowSrc).toContain('Math.max(14, Math.min(32');
     });
 
     it('inherits color from headline element', () => {

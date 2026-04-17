@@ -333,3 +333,28 @@ describe('agentFlowTypes — setPhase interface', () => {
         expect(typesSrc).toContain("'thinking' | 'planning' | 'executing' | 'reflecting'");
     });
 });
+
+// ══════════════════════════════════════════════════
+// ★ REGRESSION: Content substitution heuristic
+// ══════════════════════════════════════════════════
+describe('★ REGRESSION: content substitution uses font-size heuristic', () => {
+    it('has Pass 2 font-size heuristic for unnamed text elements', () => {
+        expect(src).toContain('Font-size heuristic');
+        expect(src).toContain('Heuristic headline');
+    });
+
+    it('sorts text elements by font_size descending for role assignment', () => {
+        expect(src).toContain('.sort((a, b) => (b.font_size ?? 0) - (a.font_size ?? 0))');
+    });
+
+    it('auto-created subheadline uses canvas-proportional sizing', () => {
+        expect(src).toContain('canvasH * 0.035');
+        expect(src).toContain('Math.max(14, Math.min(32');
+    });
+
+    it('auto-created subheadline inherits headline x/w/textAlign', () => {
+        expect(src).toContain('headlineEl?.x');
+        expect(src).toContain('headlineEl?.w');
+        expect(src).toContain('headlineEl?.text_align');
+    });
+});
