@@ -1,16 +1,8 @@
-// ─────────────────────────────────────────────────
-// LoginPage — Premium login matching landing aesthetic
-// ─────────────────────────────────────────────────
-
-import { useState, useEffect, Suspense, lazy } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import { GlidLogo } from '@/components/brand/GlidLogo';
 import './login.css';
-
-const SpiralVortex = lazy(() =>
-    import('@/components/landing/SpiralVortex').then(m => ({ default: m.SpiralVortex }))
-);
 
 type Mode = 'signin' | 'signup';
 
@@ -45,10 +37,8 @@ export function LoginPage() {
 
     return (
         <div className="login-page">
-            {/* Animated background — same orbital rings as hero */}
-            <Suspense fallback={null}>
-                <SpiralVortex />
-            </Suspense>
+            {/* ★ CSS-only animated background — replaces Three.js SpiralVortex */}
+            <div className="login-bg-anim" />
 
             {/* Ambient glow blobs */}
             <div className="login-glow login-glow--1" />
