@@ -20,9 +20,12 @@ describe('DashboardPage — view mode toggle', () => {
         expect(dashSrc).toContain("'grid' | 'list'");
     });
 
-    it('persists viewMode to localStorage', () => {
+    it('persists viewMode to localStorage on change', () => {
         expect(dashSrc).toContain("localStorage.setItem('ace-dashboard-view'");
-        expect(dashSrc).toContain("localStorage.getItem('ace-dashboard-view'");
+    });
+
+    it('defaults to list view (no localStorage read)', () => {
+        expect(dashSrc).toContain("useState<'grid' | 'list'>('list')");
     });
 
     it('renders toggle buttons for grid and list', () => {
@@ -96,7 +99,8 @@ describe('EditorSidebar — ★ REGRESSION: image idbRef persistence', () => {
         expect(addImageCall![0]).toContain('entry.idbRef');
     });
 
-    it('has DATA INTEGRITY comment explaining the fix', () => {
-        expect(sidebarSrc).toContain('DATA INTEGRITY');
+    it('passes canvas dimensions for fill-to-page default', () => {
+        expect(sidebarSrc).toContain('actions.canvasWidth');
+        expect(sidebarSrc).toContain('actions.canvasHeight');
     });
 });
