@@ -178,6 +178,34 @@ describe('authStore', () => {
             await useAuthStore.getState().signUpWithEmail('existing@ace.design', 'password', 'Existing');
             expect(useAuthStore.getState().error).toBe('Email taken');
         });
+
+        it('★ REGRESSION: should sync session after successful signup (v0.0.0.611)', async () => {
+            // Before fix: signUpWithEmail set isLoading=false but never called
+            // syncSessionFromSupabase → user stuck on login page
+            vi.mocked(sbSignUpWithEmail).mockResolvedValueOnce({ error: null });
+            mockGetSession.mockResolvedValue({ data: { session: mockSupabaseSession() } });
+            mockFrom.mockReturnValue({ select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: null }) }) }) });
+
+            await useAuthStore.getState().signUpWithEmail('new@ace.design', 'password', 'New User');
+
+            const state = useAuthStore.getState();
+            expect(state.user?.email).toBe('test@ace.design');
+            expect(state.session?.accessToken).toBe('tok-123');
+            expect(state.isLoading).toBe(false);
+        });
+
+        it('★ REGRESSION: signup with email confirm ON → session null → user stays on login', async () => {
+            // When Supabase "Confirm email" is ON, getSession returns null after signup
+            vi.mocked(sbSignUpWithEmail).mockResolvedValueOnce({ error: null });
+            mockGetSession.mockResolvedValue({ data: { session: null } });
+
+            await useAuthStore.getState().signUpWithEmail('unconfirmed@ace.design', 'password', 'Unconfirmed');
+
+            const state = useAuthStore.getState();
+            expect(state.user).toBeNull(); // No user until email confirmed
+            expect(state.isLoading).toBe(false);
+            expect(state.error).toBeNull(); // No error — just waiting for confirmation
+        });
     });
 
     // ── OAuth Flows ──

@@ -90,3 +90,94 @@ describe('Image persistence — full pipeline e2e scenario', () => {
         expect(syncSaveSrc).toContain('if (original) img.src = original');
     });
 });
+
+// ══════════════════════════════════════════════════
+// ★ REGRESSION: Image fill-to-page default (v0.0.0.613)
+// Previously images were inserted at raw pixel size → distortion
+// ══════════════════════════════════════════════════
+describe('★ REGRESSION: Image insert uses fill-to-page by default', () => {
+    it('EditorSidebar passes canvas dimensions (not entry.width/height) to addImage', () => {
+        const sidebarSrc = readFileSync(resolve(__dirname, '../components/editor/EditorSidebar.tsx'), 'utf-8');
+        // Must use canvasWidth/canvasHeight, NOT entry.width/entry.height
+        expect(sidebarSrc).toContain('actions.canvasWidth');
+        expect(sidebarSrc).toContain('actions.canvasHeight');
+        expect(sidebarSrc).not.toContain('entry.width, entry.height');
+    });
+
+    it('addImage uses cover-mode uniform scaling (Math.max) when w/h provided', () => {
+        expect(fabricCanvasSrc).toContain('Math.max(w / natW, h / natH)');
+    });
+
+    it('addImage centers the image within the target area', () => {
+        expect(fabricCanvasSrc).toContain('(w - natW * scale) / 2');
+        expect(fabricCanvasSrc).toContain('(h - natH * scale) / 2');
+    });
+
+    it('addImage never uses independent scaleX/scaleY for cover mode', () => {
+        // In the cover-mode branch, scaleX and scaleY must be the same variable
+        expect(fabricCanvasSrc).toContain('scaleX = scale; scaleY = scale;');
+    });
+});
+
+describe('★ REGRESSION: Cover-mode scaling math', () => {
+    // Pure math tests — no mocking needed
+    function coverScale(natW: number, natH: number, targetW: number, targetH: number) {
+        const scale = Math.max(targetW / natW, targetH / natH);
+        return {
+            scale,
+            finalX: (targetW - natW * scale) / 2,
+            finalY: (targetH - natH * scale) / 2,
+            renderedW: natW * scale,
+            renderedH: natH * scale,
+        };
+    }
+
+    it('landscape image on square canvas: vertical overflow, centered', () => {
+        const r = coverScale(4000, 3000, 1080, 1080);
+        // scale = max(1080/4000, 1080/3000) = max(0.27, 0.36) = 0.36
+        expect(r.scale).toBe(0.36);
+        expect(r.renderedW).toBe(1440); // wider than canvas
+        expect(r.renderedH).toBe(1080); // exactly canvas height
+        expect(r.finalX).toBe(-180);    // centered: (1080-1440)/2
+        expect(r.finalY).toBe(0);
+    });
+
+    it('portrait image on square canvas: horizontal overflow, centered', () => {
+        const r = coverScale(3000, 4000, 1080, 1080);
+        expect(r.scale).toBe(0.36);
+        expect(r.renderedW).toBe(1080);
+        expect(r.renderedH).toBe(1440);
+        expect(r.finalX).toBe(0);
+        expect(r.finalY).toBe(-180);
+    });
+
+    it('square image on square canvas: exact fit', () => {
+        const r = coverScale(2000, 2000, 1080, 1080);
+        expect(r.scale).toBe(0.54);
+        expect(r.finalX).toBe(0);
+        expect(r.finalY).toBe(0);
+    });
+
+    it('wide banner (970x250): landscape image fills width', () => {
+        const r = coverScale(4000, 3000, 970, 250);
+        // scale = max(970/4000, 250/3000) = max(0.2425, 0.0833) = 0.2425
+        expect(r.scale).toBe(0.2425);
+        expect(r.renderedW).toBe(970);
+        expect(r.renderedH).toBeCloseTo(727.5);
+        expect(r.finalX).toBe(0);
+        expect(r.finalY).toBeCloseTo(-238.75);
+    });
+
+    it('cover mode always covers entire canvas — never leaves gaps', () => {
+        const scenarios = [
+            { natW: 4000, natH: 3000, tW: 1080, tH: 1080 },
+            { natW: 800, natH: 1200, tW: 300, tH: 250 },
+            { natW: 1920, natH: 1080, tW: 160, tH: 600 },
+        ];
+        for (const s of scenarios) {
+            const r = coverScale(s.natW, s.natH, s.tW, s.tH);
+            expect(r.renderedW).toBeGreaterThanOrEqual(s.tW);
+            expect(r.renderedH).toBeGreaterThanOrEqual(s.tH);
+        }
+    });
+});
