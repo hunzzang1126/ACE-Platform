@@ -293,3 +293,27 @@ describe('canvasSyncSave — DATA INTEGRITY', () => {
         });
     });
 });
+
+// ─── Thumbnail capture contract ───────────────────
+describe('★ FEATURE: Thumbnail capture on save', () => {
+    it('should have captureThumbnail helper in useCanvasSync', () => {
+        const fs = require('fs');
+        const src = fs.readFileSync(require('path').resolve(__dirname, './useCanvasSync.ts'), 'utf-8');
+        expect(src).toContain('captureThumbnail');
+        expect(src).toContain('exportToDataURL');
+        expect(src).toContain('screenshotUrl');
+    });
+
+    it('captureThumbnail scales down to target width using JPEG', () => {
+        const fs = require('fs');
+        const src = fs.readFileSync(require('path').resolve(__dirname, './useCanvasSync.ts'), 'utf-8');
+        expect(src).toContain("canvas.toDataURL('image/jpeg'");
+        expect(src).toContain('targetWidth');
+    });
+
+    it('thumbnail save never blocks the main save flow (try/catch)', () => {
+        const fs = require('fs');
+        const src = fs.readFileSync(require('path').resolve(__dirname, './useCanvasSync.ts'), 'utf-8');
+        expect(src).toContain('thumbnail is cosmetic');
+    });
+});

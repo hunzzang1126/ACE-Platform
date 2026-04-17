@@ -63,6 +63,24 @@ export function useCanvasSync(variantId: string | undefined, canvasW: number, ca
         replaceVariantElements(variantId, elements);
         asyncExtractAssets(elements, variantId, replaceVariantElements);
 
+        // ★ THUMBNAIL CAPTURE: Grab a low-res screenshot for dashboard cards.
+        // Runs async after save so it never blocks the save flow.
+        try {
+            const thumbDataUrl = engine.exportToDataURL?.();
+            if (thumbDataUrl && typeof thumbDataUrl === 'string') {
+                // Shrink to ~200px wide for minimal JSON storage (~5-10KB)
+                captureThumbnail(thumbDataUrl, 200).then((thumb) => {
+                    if (!thumb) return;
+                    useDesignStore.setState((state) => {
+                        const cs = state.allCreativeSets[state.activeCreativeSetId ?? ''];
+                        const v = cs?.variants.find((v) => v.id === variantId);
+                        if (v) v.screenshotUrl = thumb;
+                        if (cs && state.creativeSet?.id === cs.id) state.creativeSet = cs;
+                    });
+                });
+            }
+        } catch { /* thumbnail is cosmetic — never break save */ }
+
         const isMaster = cs.masterVariantId === variantId;
         const msg = isMaster ? `Saved ${elements.length} elements to master. Propagated to ${cs.variants.length - 1} sizes.` : `Saved ${elements.length} elements to variant.`;
         console.log(`[useCanvasSync] ${msg}`);
@@ -282,4 +300,23 @@ function restoreVideo(vid: VideoElement, canvasW: number, canvasH: number, overl
     }
 }
 
-
+// ── Thumbnail capture helper ──
+// Scales a full-res data URL down to targetWidth for dashboard cards (~5-10KB).
+async function captureThumbnail(dataUrl: string, targetWidth: number): Promise<string | null> {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+            const scale = targetWidth / Math.max(img.naturalWidth, 1);
+            const w = Math.round(img.naturalWidth * scale);
+            const h = Math.round(img.naturalHeight * scale);
+            const canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) { resolve(null); return; }
+            ctx.drawImage(img, 0, 0, w, h);
+            resolve(canvas.toDataURL('image/jpeg', 0.7)); // JPEG for smaller size
+        };
+        img.onerror = () => resolve(null);
+        img.src = dataUrl;
+    });
+}

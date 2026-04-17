@@ -10,6 +10,7 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
 const src = readFileSync(resolve(__dirname, './agentGenerateFlow.ts'), 'utf-8');
+const renderSrc = readFileSync(resolve(__dirname, './agentFlowRender.ts'), 'utf-8');
 
 describe('agentGenerateFlow — export', () => {
     it('exports executeGenerateFlow async function', () => {
@@ -230,8 +231,8 @@ describe('agentGenerateFlow — pipeline completeness', () => {
         expect(src).toContain('actionNames');
     });
 
-    it('Phase 6: runs vision QA loop', () => {
-        expect(src).toContain('runVisionHealingLoop');
+    it('Phase 6: runs vision QA loop (in agentFlowRender)', () => {
+        expect(renderSrc).toContain('runVisionHealingLoop');
     });
 
     it('Phase 7: saves to AI memory', () => {
@@ -239,14 +240,14 @@ describe('agentGenerateFlow — pipeline completeness', () => {
         expect(src).toContain('aiMemoryService');
     });
 
-    it('renders gradient rects for background elements', () => {
-        expect(src).toContain('add_gradient_rect');
-        expect(src).toContain('gradient_start_hex');
+    it('renders gradient rects (in agentFlowRender)', () => {
+        expect(renderSrc).toContain('add_gradient_rect');
+        expect(renderSrc).toContain('gradient_start_hex');
     });
 
-    it('renders rounded_rect for CTA buttons', () => {
-        expect(src).toContain('add_rounded_rect');
-        expect(src).toContain("type === 'rounded_rect'");
+    it('renders rounded_rect for CTA buttons (in agentFlowRender)', () => {
+        expect(renderSrc).toContain('add_rounded_rect');
+        expect(renderSrc).toContain("type === 'rounded_rect'");
     });
 
     it('clears scene before rendering', () => {

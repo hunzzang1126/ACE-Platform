@@ -1,13 +1,4 @@
-// ─────────────────────────────────────────────────
-// ProjectThumbnail — Proportional size rectangles preview
-// ─────────────────────────────────────────────────
-// Shows actual variant size proportions as mini rectangles
-// inside the project card. Each rectangle is scaled to fit
-// within the thumbnail area, giving users a visual sense
-// of what sizes exist in the project.
-// ─────────────────────────────────────────────────
-
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useDesignStore } from '@/stores/designStore';
 
 interface ProjectThumbnailProps {
@@ -23,6 +14,8 @@ interface VariantRect {
 }
 
 export function ProjectThumbnail({ setId, width = 200, height = 120 }: ProjectThumbnailProps) {
+    const [imgError, setImgError] = useState(false);
+
     const data = useMemo(() => {
         const cs = useDesignStore.getState().allCreativeSets[setId];
         if (!cs) return null;
@@ -45,8 +38,8 @@ export function ProjectThumbnail({ setId, width = 200, height = 120 }: ProjectTh
         return <EmptyPlaceholder width={width} height={height} />;
     }
 
-    // ★ If screenshot available, use it
-    if (data.screenshotUrl) {
+    // ★ If screenshot available and not broken, use it
+    if (data.screenshotUrl && !imgError) {
         return (
             <div style={{
                 width, height, borderRadius: 6, overflow: 'hidden',
@@ -57,12 +50,13 @@ export function ProjectThumbnail({ setId, width = 200, height = 120 }: ProjectTh
                     alt=""
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                     loading="lazy"
+                    onError={() => setImgError(true)}
                 />
             </div>
         );
     }
 
-    // ★ No screenshot — show proportional size rectangles
+    // ★ No screenshot or broken — show proportional size rectangles
     return <SizeRectangles rects={data.rects} width={width} height={height} />;
 }
 

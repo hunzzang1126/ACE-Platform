@@ -8,6 +8,8 @@
 
 import type { AgentFlowCallbacks, FlowEngine } from './agentFlowTypes';
 import { resilientImport } from '@/utils/resilientImport';
+import { renderElement, buildElementDetail } from './agentFlowRender';
+import { scanBrandCloud, selectTemplate } from './agentFlowHelpers';
 
 /** Execute the full design generation pipeline */
 export async function executeGenerateFlow(
@@ -112,117 +114,8 @@ export async function executeGenerateFlow(
 
 const pause = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-interface BrandScanResult {
-    context: string;
-    paletteHint: string;
-    fontHint: string;
-    assetHint: string;
-    logoUrl: string | null;
-    logoW: number;
-    logoH: number;
-    visionBlocks: any[];
-}
+// ★ scanBrandCloud, selectTemplate → extracted to agentFlowHelpers.ts
 
-async function scanBrandCloud(prompt: string, cb: AgentFlowCallbacks): Promise<BrandScanResult> {
-    cb.addCard('brand-scan', 'Scanning Brand Cloud', 'running');
-    const result: BrandScanResult = { context: '', paletteHint: '', fontHint: '', assetHint: '', logoUrl: null, logoW: 0, logoH: 0, visionBlocks: [] };
-
-    try {
-        const { useBrandKitStore } = await resilientImport(() => import('@/stores/brandKitStore'));
-        const kit = useBrandKitStore.getState().getActiveKit();
-        if (!kit) { cb.updateCard('brand-scan', 'done', 'No active brand kit'); return result; }
-
-        result.paletteHint = [`Brand colors: primary=${kit.palette.primary}, secondary=${kit.palette.secondary}`, `accent=${kit.palette.accent}, background=${kit.palette.background}, text=${kit.palette.text}`].join(', ');
-        result.fontHint = `Brand fonts: heading="${kit.typography.heading.family}", body="${kit.typography.body.family}", CTA="${kit.typography.cta.family}"`;
-
-        const activeAssets = kit.assets.filter(a => !a.deletedAt);
-        const logoAssets = activeAssets.filter(a => a.category === 'logo');
-        if (logoAssets.length > 0) {
-            const brandNameLower = (kit.guidelines?.name || kit.name || '').toLowerCase();
-            const brandTaglineLower = (kit.guidelines?.tagline || '').toLowerCase();
-            const pl = prompt.toLowerCase();
-            if (pl.includes(brandNameLower) || (brandTaglineLower && pl.includes(brandTaglineLower)) || pl.includes('logo') || pl.includes('brand') || pl.includes('로고') || pl.includes('브랜드')) {
-                const logo = logoAssets[0]!;
-                result.logoUrl = logo.src; result.logoW = logo.width; result.logoH = logo.height;
-            }
-        }
-
-        const promptLower = prompt.toLowerCase();
-        const matchedAssets = activeAssets.filter(a => a.tags.some(t => promptLower.includes(t.toLowerCase())) || promptLower.includes(a.name.toLowerCase()) || promptLower.includes(a.category));
-        if (matchedAssets.length > 0 || logoAssets.length > 0) {
-            const allRelevant = [...new Set([...logoAssets, ...matchedAssets])];
-            result.assetHint = `Brand assets: ${allRelevant.map(a => `"${a.name}" (${a.category}, ${a.width}x${a.height})`).join(', ')}`;
-        }
-
-        const g = kit.guidelines;
-        result.context = [`Brand: ${g.name || kit.name}`, g.tagline ? `Tagline: "${g.tagline}"` : '', g.voiceTone ? `Voice: ${g.voiceTone}` : '', g.ctaPhrases.length > 0 ? `CTA phrases: ${g.ctaPhrases.join(', ')}` : '', result.paletteHint, result.fontHint, result.assetHint].filter(Boolean).join('\n');
-
-        try {
-            const { buildBrandVisionBlocks } = await resilientImport(() => import('@/services/brandContextBuilder'));
-            result.visionBlocks = buildBrandVisionBlocks(kit);
-            if (result.visionBlocks.length > 0) cb.narrate(`AI can now visually see ${Math.floor(result.visionBlocks.length / 2)} brand asset(s).`);
-        } catch { /* optional */ }
-
-        const logoNote = logoAssets.length > 0 ? ` (${logoAssets.length} logo)` : '';
-        const assetNote = matchedAssets.length > 0 ? `${matchedAssets.length} matching asset(s)${logoNote}` : `${activeAssets.length} asset(s)${logoNote}`;
-        cb.updateCard('brand-scan', 'done', `${kit.name}: ${assetNote}`, { expandedDetail: result.context });
-        cb.narrate(`Brand kit "${kit.name}" loaded — ${assetNote}.`);
-    } catch {
-        cb.updateCard('brand-scan', 'done', 'Brand Cloud scan skipped');
-    }
-    return result;
-}
-
-async function selectTemplate(prompt: string, canvasW: number, canvasH: number, _brandVisionBlocks: any[], _abort: AbortController, cb: AgentFlowCallbacks) {
-    cb.narrate(`Selecting layout template for ${canvasW}×${canvasH}...`);
-    cb.addCard('structure', 'Selecting layout template', 'running');
-
-    // ★ KEYWORD-BASED MATCHING: Match prompt keywords against template names.
-    // Admin controls matching by naming templates descriptively in the admin editor.
-    // Examples: "Event Clean", "Sale Bold", "Minimal Photo", "Corporate Stack"
-    // Saves ~200 tokens vs. Vision AI template selection.
-    const { useTemplateStore } = await resilientImport(() => import('@/stores/templateStore'));
-    const allTemplates = useTemplateStore.getState().templates ?? [];
-
-    if (allTemplates.length === 0) throw new Error('No templates available in store');
-
-    const promptLower = prompt.toLowerCase();
-    const promptWords = promptLower.split(/\s+/);
-
-    // Score each template by how many of its name words match the prompt
-    let bestTemplate = allTemplates[0]!;
-    let bestScore = 0;
-
-    for (const tmpl of allTemplates) {
-        const nameWords = (tmpl.name || '').toLowerCase().split(/[\s\-_]+/);
-        const descWords = (tmpl.description || '').toLowerCase().split(/[\s\-_]+/);
-        const allWords = [...nameWords, ...descWords];
-        let score = 0;
-        for (const word of allWords) {
-            if (word.length < 3) continue; // skip short words
-            if (promptLower.includes(word)) score += 2;
-            if (promptWords.some(pw => pw.includes(word) || word.includes(pw))) score += 1;
-        }
-        // Bonus for matching keywords
-        const tags = (tmpl as any).tags ?? [];
-        for (const tag of tags) {
-            if (promptLower.includes(tag.toLowerCase())) score += 3;
-        }
-        if (score > bestScore) {
-            bestScore = score;
-            bestTemplate = tmpl;
-        }
-    }
-
-    const template = { id: bestTemplate.id, name: bestTemplate.name, description: bestTemplate.description ?? '' };
-    const method = bestScore > 0 ? `Matched by keywords (score: ${bestScore})` : 'Default template (no keyword match)';
-    cb.updateCard('structure', 'done', template.name, {
-        reasoning: method,
-        expandedDetail: `Template: ${template.name}\nID: ${template.id}\n${method}`,
-    });
-    cb.narrate(`Selected "${template.name}" — ${method}`);
-    return template;
-}
 
 async function generateBgImage(
     needsBackgroundImage: boolean, backgroundImagePrompt: string | undefined, prompt: string,
@@ -278,18 +171,44 @@ async function buildAndRender(
 
     // ★ CONTENT SUBSTITUTION: Replace template placeholder text with AI-generated copy.
     // Without this, the template's original text (e.g., "Simplify your workflow") would render.
+    let subheadlineMapped = false;
     for (const el of allElements) {
         if (el.type !== 'text' && !el.content) continue;
         const name = (el.name ?? '').toLowerCase();
         if (name.includes('headline') && !name.includes('sub')) {
             if (content.headline) el.content = content.headline;
         } else if (name.includes('subheadline') || name.includes('sub_headline') || name.includes('body')) {
-            if (content.subheadline) el.content = content.subheadline;
+            if (content.subheadline) { el.content = content.subheadline; subheadlineMapped = true; }
         } else if (name.includes('cta') && name.includes('label')) {
             if (content.cta) el.content = content.cta;
         } else if (name.includes('tag')) {
             if (content.tag) el.content = content.tag;
         }
+    }
+
+    // ★ AUTO-CREATE SUBHEADLINE: If AI generated a subheadline but the template
+    // has no matching element, create one below the headline instead of silently dropping it.
+    if (content.subheadline && !subheadlineMapped) {
+        const headlineEl = allElements.find(el => (el.name ?? '').toLowerCase().includes('headline') && !(el.name ?? '').toLowerCase().includes('sub'));
+        const headlineY = headlineEl?.y ?? canvasH * 0.3;
+        const headlineFontSize = headlineEl?.font_size ?? 24;
+        const subFontSize = Math.round(headlineFontSize * 0.6);
+        const subY = headlineY + headlineFontSize + 8;
+        allElements.push({
+            name: 'subheadline',
+            type: 'text',
+            content: content.subheadline,
+            x: 0,
+            y: subY,
+            w: canvasW * 0.85,
+            h: 0,
+            font_size: subFontSize,
+            font_weight: '400',
+            text_align: 'center',
+            color_hex: headlineEl?.color_hex ?? '#FFFFFF',
+            line_height: 1.3,
+        });
+        console.log(`[Pipeline] Auto-created subheadline: "${content.subheadline.slice(0, 40)}" at y=${subY}`);
     }
 
     // ★ PHOTO CONTRAST: When a background image exists, ensure all text is readable.
@@ -401,49 +320,4 @@ async function buildAndRender(
     return rendered;
 }
 
-function renderElement(engine: FlowEngine, el: any, canvasW: number, cacheGradientData: (key: string, start: string, end: string, angle: number) => void, guide?: any): number | null {
-    const hexToRgb = (hx: string): [number, number, number] => {
-        const c = hx.replace('#', '');
-        return [parseInt(c.slice(0, 2), 16) / 255, parseInt(c.slice(2, 4), 16) / 255, parseInt(c.slice(4, 6), 16) / 255];
-    };
-
-    if (el.type === 'text') {
-        const [tr, tg, tb] = el.color_hex ? hexToRgb(el.color_hex) : [1, 1, 1];
-        const fontFamily = el.font_family || guide?.typography?.primaryFont || 'Inter';
-        const fullFont = `${fontFamily}, system-ui, sans-serif`;
-        return engine.add_text(el.x ?? 0, el.y ?? 0, el.content || 'Text', el.font_size ?? 18, fullFont, el.font_weight ?? '700', tr, tg, tb, 1.0, (el.w && el.w > 0) ? el.w : canvasW * 0.85, el.text_align ?? 'center', el.name, el.line_height, el.letter_spacing);
-    } else if (el.gradient_start_hex && el.gradient_end_hex) {
-        const nodeId = engine.add_gradient_rect(el.x ?? 0, el.y ?? 0, el.w ?? 100, el.h ?? 100, el.gradient_start_hex, el.gradient_end_hex, el.gradient_angle ?? 135, el.radius ?? 0, el.name);
-        cacheGradientData(el.name ?? '', el.gradient_start_hex, el.gradient_end_hex, el.gradient_angle ?? 135);
-        if (nodeId != null) cacheGradientData(`engine-${nodeId}`, el.gradient_start_hex, el.gradient_end_hex, el.gradient_angle ?? 135);
-        return nodeId;
-    } else if (el.type === 'rounded_rect') {
-        return engine.add_rounded_rect(el.x ?? 0, el.y ?? 0, el.w ?? 100, el.h ?? 50, el.r ?? 0.5, el.g ?? 0.5, el.b ?? 0.5, el.a ?? 1, el.radius ?? 8, el.name);
-    } else if (el.type === 'ellipse') {
-        return engine.add_ellipse?.((el.x ?? 0) + (el.w ?? 50) / 2, (el.y ?? 0) + (el.h ?? 50) / 2, (el.w ?? 50) / 2, (el.h ?? 50) / 2, el.r ?? 0.5, el.g ?? 0.5, el.b ?? 0.5, el.a ?? 1) ?? null;
-    } else {
-        return engine.add_rect(el.x ?? 0, el.y ?? 0, el.w ?? 100, el.h ?? 50, el.r ?? 0.5, el.g ?? 0.5, el.b ?? 0.5, el.a ?? 1, el.name);
-    }
-}
-
-function buildElementDetail(el: any): string {
-    if (el.type === 'text') return `"${(el.content ?? '').slice(0, 25)}" ${el.font_size}px at (${Math.round(el.x ?? 0)}, ${Math.round(el.y ?? 0)})`;
-    if (el.gradient_start_hex) return `${el.gradient_start_hex} -> ${el.gradient_end_hex} ${Math.round(el.w ?? 0)}x${Math.round(el.h ?? 0)}`;
-    return `${el.type ?? 'rect'} at (${Math.round(el.x ?? 0)}, ${Math.round(el.y ?? 0)}) ${Math.round(el.w ?? 0)}x${Math.round(el.h ?? 0)}`;
-}
-
-async function runVisionQA(engine: FlowEngine, canvasW: number, canvasH: number, guide: any, template: any, rendered: number, abort: AbortController, cb: AgentFlowCallbacks) {
-    cb.narrate('Reviewing and optimizing design quality...');
-    cb.addCard('vision', 'Optimizing layout', 'running');
-    try {
-        const { runVisionHealingLoop } = await resilientImport(() => import('@/services/autoDesignLoop'));
-        const loopResult = await runVisionHealingLoop(engine, canvasW, canvasH, abort.signal, (msg: string) => cb.updateCard('vision', 'running', msg));
-        const fixNote = loopResult.fixesApplied > 0 ? ` · ${loopResult.fixesApplied} fix(es)` : '';
-        const methodNote = loopResult.healingMethod === 'patch' ? ' (auto-patched)' : '';
-        cb.updateCard('vision', loopResult.finalScore >= 80 ? 'done' : 'error', `Score: ${loopResult.finalScore}/100${fixNote}${methodNote}`);
-        cb.narrate(`Design quality review — score ${loopResult.finalScore}/100.${fixNote}\nStyle: ${guide.name}\nLayout: ${template.name}\nElements: ${rendered}\nCanvas: ${canvasW}x${canvasH}px`);
-    } catch {
-        cb.updateCard('vision', 'done', 'Vision check skipped');
-        cb.narrate(`Design placed with ${rendered} elements using ${guide.name}.\nCanvas: ${canvasW}x${canvasH}px`);
-    }
-}
+// ★ renderElement, buildElementDetail, runVisionQA → extracted to agentFlowRender.ts
