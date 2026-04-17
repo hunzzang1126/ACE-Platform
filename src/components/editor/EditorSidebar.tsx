@@ -206,9 +206,11 @@ export function EditorSidebar({ actions, nodes = [], selection = [], onTriggerIm
                                 onTriggerVideoUpload={onTriggerVideoUpload}
                                 onImageSelect={(blobUrl, entry) => {
                                     if (actions?.addImage) {
-                                        // ★ DATA INTEGRITY: Pass idbRef so the stable reference
-                                        // is stored on the Fabric object, preventing image loss.
-                                        actions.addImage(0, 0, blobUrl, entry.width, entry.height, entry.idbRef);
+                                        // ★ Don't pass entry.width/height — those are natural image pixels
+                                        // (e.g. 4000x3000) which would create a 1:1 scale element way
+                                        // larger than the canvas. Let addImage auto-fit to canvas size.
+                                        // Pass idbRef as persistRef for stable storage reference.
+                                        actions.addImage(0, 0, blobUrl, undefined, undefined, entry.idbRef);
                                     }
                                 }}
                             />

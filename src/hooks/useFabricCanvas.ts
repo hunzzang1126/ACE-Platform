@@ -231,8 +231,21 @@ export function useFabricCanvas(width: number, height: number, _addDemoShapes = 
         try {
             const img = await FabricImage.fromURL(src, { crossOrigin: 'anonymous' });
             const natW = img.width ?? 200; const natH = img.height ?? 200;
-            const targetW = w ?? Math.min(natW, width * 0.6); const scale = targetW / natW;
-            img.set({ left: x, top: y, scaleX: targetW / natW, scaleY: (h ?? natH * scale) / natH });
+            let scaleX: number, scaleY: number, finalX = x, finalY = y;
+            if (w != null && h != null) {
+                // ★ Cover mode: uniform scale to fill target area without distortion
+                const scale = Math.max(w / natW, h / natH);
+                scaleX = scale; scaleY = scale;
+            } else {
+                // Auto-fit: scale to 60% of artboard width, preserve aspect ratio
+                const targetW = w ?? Math.min(natW, width * 0.6);
+                const scale = targetW / natW;
+                scaleX = scale; scaleY = scale;
+                // Center on artboard
+                finalX = (width - natW * scale) / 2;
+                finalY = (height - natH * scale) / 2;
+            }
+            img.set({ left: finalX, top: finalY, scaleX, scaleY });
             (img as any).__glidId = id; (img as any).__glidName = `Image #${id}`; (img as any).__glidZIndex = getUserObjects().length; patchAceProps(img);
             // ★ DATA INTEGRITY: Store stable idb:// ref so fabricToEngineNode
             // uses it instead of the transient blob: URL. Prevents image loss on session end.
