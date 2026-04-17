@@ -113,7 +113,11 @@ export const useAuthStore = create<AuthState>()(
                     set({ error, isLoading: false });
                     return;
                 }
-                set({ isLoading: false, error: null });
+                // ★ Sync session after signup — without this, user stays on login page.
+                // If "Confirm email" is enabled in Supabase, getSession() returns null
+                // and user sees "Check your email" (handled by syncSessionFromSupabase).
+                // If disabled, session is created immediately → redirect to dashboard.
+                await get().syncSessionFromSupabase();
             },
 
             signInWithGoogle: async () => {
