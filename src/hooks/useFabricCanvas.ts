@@ -236,6 +236,9 @@ export function useFabricCanvas(width: number, height: number, _addDemoShapes = 
                 // ★ Cover mode: uniform scale to fill target area without distortion
                 const scale = Math.max(w / natW, h / natH);
                 scaleX = scale; scaleY = scale;
+                // Center the cover-scaled image within the target area
+                finalX = x + (w - natW * scale) / 2;
+                finalY = y + (h - natH * scale) / 2;
             } else {
                 // Auto-fit: scale to 60% of artboard width, preserve aspect ratio
                 const targetW = w ?? Math.min(natW, width * 0.6);
