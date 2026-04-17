@@ -175,27 +175,31 @@ async function buildAndRender(
     let subheadlineMapped = false;
     let ctaMapped = false;
     let tagMapped = false;
+    const mappedElements = new Set<any>(); // Track Pass 1 mapped elements for Pass 2 exclusion
 
     // Pass 1: Name-based mapping (exact keyword match)
     for (const el of allElements) {
         if (el.type !== 'text' && !el.content) continue;
         const name = (el.name ?? '').toLowerCase();
         if (!headlineMapped && name.includes('headline') && !name.includes('sub')) {
-            if (content.headline) { el.content = content.headline; headlineMapped = true; }
+            if (content.headline) { el.content = content.headline; headlineMapped = true; mappedElements.add(el); }
         } else if (!subheadlineMapped && (name.includes('subheadline') || name.includes('sub_headline') || name.includes('body'))) {
-            if (content.subheadline) { el.content = content.subheadline; subheadlineMapped = true; }
+            if (content.subheadline) { el.content = content.subheadline; subheadlineMapped = true; mappedElements.add(el); }
         } else if (!ctaMapped && name.includes('cta') && name.includes('label')) {
-            if (content.cta) { el.content = content.cta; ctaMapped = true; }
+            if (content.cta) { el.content = content.cta; ctaMapped = true; mappedElements.add(el); }
         } else if (!tagMapped && name.includes('tag')) {
-            if (content.tag) { el.content = content.tag; tagMapped = true; }
+            if (content.tag) { el.content = content.tag; tagMapped = true; mappedElements.add(el); }
         }
     }
 
     // Pass 2: Font-size heuristic — if name-based mapping missed the headline/subheadline,
     // sort text elements by font_size descending and assign by role (largest = headline).
+    // ★ Exclude elements already mapped in Pass 1 to prevent overwriting.
     if (!headlineMapped || !subheadlineMapped) {
         const textEls = allElements
-            .filter(el => el.type === 'text' && !['cta_label', 'cta_button'].includes(el.name ?? ''))
+            .filter(el => el.type === 'text'
+                && !['cta_label', 'cta_button'].includes(el.name ?? '')
+                && !mappedElements.has(el))
             .sort((a, b) => (b.font_size ?? 0) - (a.font_size ?? 0));
 
         if (!headlineMapped && textEls[0] && content.headline) {

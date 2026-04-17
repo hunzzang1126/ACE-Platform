@@ -63,3 +63,41 @@ describe('ContextToolbar — dependencies', () => {
         expect(src).toContain('CanvasEngineActions');
     });
 });
+
+// ══════════════════════════════════════════════════
+// ★ REGRESSION: RemoveBG error feedback (v0.0.0.606)
+// Previously errors were swallowed by console.error (stripped in prod)
+// ══════════════════════════════════════════════════
+describe('★ REGRESSION: RemoveBG error feedback via toast', () => {
+    it('uses status state instead of simple loading boolean', () => {
+        expect(src).toContain("useState<'idle' | 'loading' | 'error'>");
+    });
+
+    it('shows toast.success on successful background removal', () => {
+        expect(src).toContain("toast.success('Background removed')");
+    });
+
+    it('shows toast.error with message on failure', () => {
+        expect(src).toContain('toast.error(`Remove BG failed:');
+    });
+
+    it('displays "Failed — Retry?" text on error state', () => {
+        expect(src).toContain("'Failed — Retry?'");
+    });
+
+    it('resets to idle after 3s timeout on error', () => {
+        expect(src).toContain("setTimeout(() => setStatus('idle'), 3000)");
+    });
+
+    it('uses red color for error state', () => {
+        expect(src).toContain("'#ff6b6b'");
+    });
+
+    it('imports toast lazily to avoid circular deps', () => {
+        expect(src).toContain("await import('@/components/ui/Toast')");
+    });
+
+    it('passes progress callback to removeBackgroundFromUrl', () => {
+        expect(src).toContain('removeBackgroundFromUrl(imageSrc, (p)');
+    });
+});
