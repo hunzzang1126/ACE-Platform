@@ -71,7 +71,7 @@ export function getOpenRouterHeaders(): Record<string, string> {
     };
 }
 
-async function getProxyHeaders(): Promise<Record<string, string>> {
+export async function getProxyHeaders(): Promise<Record<string, string>> {
     const isLocalDev = typeof window !== 'undefined' && window.location.hostname === 'localhost';
 
     if (isLocalDev) {

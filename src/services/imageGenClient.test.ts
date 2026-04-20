@@ -6,6 +6,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('@/config/apiKeys', () => ({
     getOpenRouterKey: vi.fn().mockReturnValue('test-key'),
+    isAiAvailable: vi.fn().mockReturnValue(true),
+    isProxyMode: vi.fn().mockReturnValue(false),
 }));
 
 vi.mock('@/services/openRouterClient', () => ({
@@ -29,7 +31,7 @@ vi.mock('./imageGenHelpers', () => ({
 }));
 
 import { generateImage, generateBackgroundImage } from './imageGenClient';
-import { getOpenRouterKey } from '@/config/apiKeys';
+import { isAiAvailable } from '@/config/apiKeys';
 import { generateFallbackImage } from './imageGenHelpers';
 import type { ImageGenRequest, ImageGenResult, ImageGenModel } from './imageGenClient';
 
@@ -53,8 +55,8 @@ describe('imageGenClient', () => {
 
     // ── generateImage ──
     describe('generateImage', () => {
-        it('should use fallback when no API key', async () => {
-            vi.mocked(getOpenRouterKey).mockReturnValueOnce('');
+        it('should use fallback when AI not available', async () => {
+            vi.mocked(isAiAvailable).mockReturnValueOnce(false);
             const result = await generateImage({ prompt: 'test', width: 300, height: 250 });
             expect(result.isFallback).toBe(true);
         });
@@ -99,7 +101,7 @@ describe('imageGenClient', () => {
     // ── generateBackgroundImage ──
     describe('generateBackgroundImage', () => {
         it('should enhance the background prompt', async () => {
-            vi.mocked(getOpenRouterKey).mockReturnValueOnce('');
+            vi.mocked(isAiAvailable).mockReturnValueOnce(false);
             const result = await generateBackgroundImage('sunset beach', 300, 250, ['#ff6b35']);
             expect(result).toBeDefined();
         });

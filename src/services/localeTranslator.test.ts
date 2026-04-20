@@ -14,6 +14,12 @@ describe('localeTranslator — architecture', () => {
         expect(src).toContain('max_tokens: 1024');
     });
 
+    it('★ REGRESSION: uses callOpenRouterApi proxy, never direct fetch with key', () => {
+        expect(src).toContain('callOpenRouterApi');
+        expect(src).not.toContain("'Authorization': `Bearer ${apiKey}`");
+        expect(src).not.toContain('openrouter.ai/api/v1/chat/completions');
+    });
+
     it('uses low temperature for consistent quality', () => {
         expect(src).toContain('temperature: 0.3');
     });
@@ -68,8 +74,8 @@ describe('localeTranslator — supported languages', () => {
 });
 
 describe('localeTranslator — error handling', () => {
-    it('handles missing API key gracefully', () => {
-        expect(src).toContain("'API key not configured'");
+    it('handles missing AI availability gracefully', () => {
+        expect(src).toContain("'AI not available'");
     });
 
     it('strips markdown fences from response', () => {
@@ -78,7 +84,6 @@ describe('localeTranslator — error handling', () => {
     });
 
     it('returns error on API failure', () => {
-        expect(src).toContain('API error');
         expect(src).toContain('Translation failed');
     });
 });

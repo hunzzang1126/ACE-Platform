@@ -4,7 +4,7 @@
 // Helpers → imageGenHelpers.ts
 // ─────────────────────────────────────────────────────────────
 
-import { getOpenRouterKey } from '@/config/apiKeys';
+import { isAiAvailable } from '@/config/apiKeys';
 import { getOpenRouterUrl, getOpenRouterHeaders } from '@/services/openRouterClient';
 import { getModelId, type AceModelRole } from '@/services/modelRouter';
 import { extractImageUrl, resizeImageToTarget, generateFallbackImage, buildEnhancedPrompt, snapToFluxResolution } from './imageGenHelpers';
@@ -41,8 +41,7 @@ export async function generateImage(
     request: ImageGenRequest,
     signal?: AbortSignal,
 ): Promise<ImageGenResult> {
-    const key = getOpenRouterKey();
-    if (!key) { console.info('[ImageGen] No API key — using gradient fallback'); return generateFallbackImage(request); }
+    if (!isAiAvailable()) { console.info('[ImageGen] AI not available — using gradient fallback'); return generateFallbackImage(request); }
 
     const model = request.model ?? 'flux';
     if (model === 'fallback') return generateFallbackImage(request);

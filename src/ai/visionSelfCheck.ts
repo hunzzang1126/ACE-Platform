@@ -15,7 +15,7 @@ import { resolveConstraints } from '@/schema/constraints.types';
 import type { BannerVariant } from '@/schema/design.types';
 import type { TextElement, ShapeElement, ButtonElement } from '@/schema/elements.types';
 import { getAspectCategory } from '@/schema/layoutRoles';
-import { getOpenRouterKey } from '@/config/apiKeys';
+import { isAiAvailable } from '@/config/apiKeys';
 import { callOpenRouterApi } from '@/services/openRouterClient';
 import { getModelId } from '@/services/modelRouter';
 
@@ -97,7 +97,7 @@ export async function runVisionSelfCheck(
 ): Promise<VisionCheckResult> {
     const cfg = { ...DEFAULT_CONFIG, ...config };
 
-    if (!getOpenRouterKey()) {
+    if (!isAiAvailable()) {
         return { passed: true, issues: [], loopCount: 0 };
     }
 

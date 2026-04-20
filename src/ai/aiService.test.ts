@@ -19,7 +19,11 @@ const { mockGetKey, mockLoadConfig, mockSaveConfig, mockBuildContext, mockBuildS
     mockExecuteToolCall: vi.fn().mockReturnValue({ success: true, message: 'done' }),
 }));
 
-vi.mock('@/config/apiKeys', () => ({ getOpenRouterKey: mockGetKey }));
+vi.mock('@/config/apiKeys', () => ({
+    getOpenRouterKey: mockGetKey,
+    isAiAvailable: vi.fn().mockImplementation(() => !!mockGetKey()),
+    isProxyMode: vi.fn().mockReturnValue(false),
+}));
 vi.mock('./aiServiceTypes', () => ({
     loadConfig: mockLoadConfig,
     saveConfig: mockSaveConfig,
@@ -62,7 +66,7 @@ describe('AiService — config', () => {
         expect(svc.isConfigured()).toBe(true);
     });
 
-    it('isConfigured returns false when no key', () => {
+    it('isConfigured returns false when no key and not proxy', () => {
         mockGetKey.mockReturnValueOnce('');
         const svc = new AiService([]);
         expect(svc.isConfigured()).toBe(false);
@@ -126,6 +130,6 @@ describe('AiService — chat error', () => {
             onReflection: vi.fn(), onComplete: vi.fn(), onError: vi.fn(),
         };
         await svc.chat('Hello', null, progress);
-        expect(progress.onError).toHaveBeenCalledWith(expect.stringContaining('API key'));
+        expect(progress.onError).toHaveBeenCalledWith(expect.stringContaining('not available'));
     });
 });

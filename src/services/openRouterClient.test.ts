@@ -249,14 +249,13 @@ describe('ai-proxy edge function — structure', () => {
         expect(edgeSrc).not.toContain('VITE_OPENROUTER');
     });
 
-    it('★ REGRESSION: does NOT use supabase.auth.getUser() — gateway handles auth', () => {
-        // getUser() caused 401 because Supabase gateway already validates JWT
-        // before edge function code runs. Double-validation = always fail.
-        expect(edgeSrc).not.toContain('auth.getUser');
+    it('★ SECURITY: validates JWT with supabase.auth.getUser()', () => {
+        // Production edge function verifies JWT to ensure only authenticated users use AI
+        expect(edgeSrc).toContain('auth.getUser');
     });
 
-    it('★ REGRESSION: does NOT import supabase client (unnecessary overhead)', () => {
-        expect(edgeSrc).not.toContain("from 'https://esm.sh/@supabase/supabase-js");
+    it('★ SECURITY: imports supabase client for JWT verification', () => {
+        expect(edgeSrc).toContain("from 'https://esm.sh/@supabase/supabase-js");
     });
 
     it('catches errors and returns 500 with message', () => {
@@ -268,8 +267,8 @@ describe('ai-proxy edge function — structure', () => {
         expect(edgeSrc).toContain("'Content-Type': 'application/json'");
     });
 
-    it('uses glid.studio as HTTP-Referer', () => {
-        expect(edgeSrc).toContain('https://glid.studio');
+    it('uses ace.design as HTTP-Referer', () => {
+        expect(edgeSrc).toContain('https://ace.design');
     });
 });
 

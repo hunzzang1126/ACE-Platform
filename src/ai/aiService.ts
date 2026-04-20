@@ -9,7 +9,8 @@ import { getToolsForPage } from './agentTools';
 import { toClaudeTools } from './aceToolDef';
 import { executeToolCall, type ExecutionResult } from './commandExecutor';
 import { buildContext, buildContextSystemPrompt, enrichMessageWithContext } from './contextRouter';
-import { getOpenRouterKey } from '@/config/apiKeys';
+import { isAiAvailable } from '@/config/apiKeys';
+import { getOpenRouterUrl } from '@/services/openRouterClient';
 import type { AiConfig, LiveProgress, ToolExecutorOverride, ClaudeContentBlock, ClaudeMessage, ClaudeResponse } from './aiServiceTypes';
 import { loadConfig, saveConfig, sleep, nextFrame, humanizeToolStep } from './aiServiceTypes';
 
@@ -34,7 +35,7 @@ export class AiService {
     getContext(): AgentContext { return this.context; }
     updateConfig(config: Partial<AiConfig>): void { this.config = { ...this.config, ...config }; saveConfig(this.config); }
     getConfig(): AiConfig { return { ...this.config }; }
-    isConfigured(): boolean { return !!getOpenRouterKey(); }
+    isConfigured(): boolean { return isAiAvailable(); }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private _designContext: { creativeSet: any | null; masterVariantId?: string } = { creativeSet: null };
@@ -49,7 +50,7 @@ export class AiService {
     }
 
     async chat(userMessage: string, engine: Engine, progress: LiveProgress, executorOverride?: ToolExecutorOverride): Promise<void> {
-        if (!getOpenRouterKey()) { progress.onError('OpenRouter API key not configured. Set VITE_OPENROUTER_API_KEY in .env'); return; }
+        if (!isAiAvailable()) { progress.onError('AI is not available. Check your configuration.'); return; }
         this.context.addMessage({ role: 'user', content: userMessage, timestamp: Date.now() });
 
         const pathname = typeof window !== 'undefined' ? window.location.pathname : '/';
@@ -142,9 +143,8 @@ export class AiService {
         if (planDefaults?.allowedModels && !planDefaults.allowedModels.includes(model)) { model = planDefaults.defaultModel; }
         console.info(`[AiService] Model selection: requested="${requestedModel}" → actual="${model}" | plan="${userPlan}" | allowed=[${planDefaults?.allowedModels?.join(', ')}]`);
 
-        const apiKey = getOpenRouterKey();
-        const isLocalDev = typeof window !== 'undefined' && window.location.hostname === 'localhost';
-        const apiUrl = isLocalDev ? '/api/openrouter/v1/chat/completions' : 'https://openrouter.ai/api/v1/chat/completions';
+        // ★ Use the unified proxy URL — never send API key directly from client
+        const apiUrl = getOpenRouterUrl();
 
         const openAiMessages: Array<Record<string, unknown>> = [];
         if (systemPrompt) openAiMessages.push({ role: 'system', content: systemPrompt });
@@ -168,8 +168,11 @@ export class AiService {
         const openAiTools = tools.length > 0 ? tools.map(t => ({ type: 'function' as const, function: { name: t.name, description: t.description, parameters: t.input_schema } })) : undefined;
         const body: Record<string, unknown> = { model, max_tokens: 4096, messages: openAiMessages, tools: openAiTools, stream: true };
 
+        // ★ Import getProxyHeaders dynamically to get JWT in production / direct key in dev
         for (let attempt = 0; attempt <= 1; attempt++) {
-            const resp = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}`, 'HTTP-Referer': 'https://ace.design', 'X-Title': 'Glid Design Engine' }, body: JSON.stringify(body) });
+            const { getProxyHeaders } = await import('@/services/openRouterClient');
+            const headers = await getProxyHeaders();
+            const resp = await fetch(apiUrl, { method: 'POST', headers, body: JSON.stringify(body) });
             if (resp.ok) return await this.parseSSEStream(resp, model, progress);
             if (resp.status === 429 && attempt < 1) { progress.onThinking('Rate limited. Retrying in 10s...'); await sleep(10000); continue; }
             const errorText = await resp.text();

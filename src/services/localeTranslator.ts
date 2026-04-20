@@ -1,12 +1,5 @@
-// ─────────────────────────────────────────────────
-// localeTranslator — Dedicated ad-copy translation
-// ─────────────────────────────────────────────────
-// Bypasses the full AI agent loop. Makes a single,
-// focused API call with marketing-specific instructions.
-// No tool schemas, no system prompt overhead → cheaper + better.
-// ─────────────────────────────────────────────────
-
-import { getOpenRouterKey } from '@/config/apiKeys';
+import { isAiAvailable } from '@/config/apiKeys';
+import { callOpenRouterApi } from '@/services/openRouterClient';
 
 /** Language metadata for translation quality */
 const LANGUAGE_META: Record<string, { english: string; native: string; adStyle: string }> = {
@@ -38,11 +31,10 @@ export interface TranslationResult {
 
 /**
  * Translate ad copy using a dedicated, focused API call.
- * No tool overhead — just translation with marketing quality instructions.
+ * ★ Routes through the unified proxy — API key never touches the client in production.
  */
 export async function translateAdCopy(input: TranslationInput): Promise<TranslationResult> {
-    const apiKey = getOpenRouterKey();
-    if (!apiKey) return { success: false, translations: {}, error: 'API key not configured' };
+    if (!isAiAvailable()) return { success: false, translations: {}, error: 'AI not available' };
 
     const targetMeta = getLangMeta(input.targetLang);
     const sourceMeta = getLangMeta(input.sourceLang);
@@ -73,36 +65,16 @@ RESPOND WITH ONLY a valid JSON object mapping element names to translated text.
 Example: {"Headline": "translated headline", "Subline": "translated subline"}
 No markdown, no explanation, no code blocks. ONLY the JSON object.`;
 
-    const isLocalDev = typeof window !== 'undefined' && window.location.hostname === 'localhost';
-    const apiUrl = isLocalDev
-        ? '/api/openrouter/v1/chat/completions'
-        : 'https://openrouter.ai/api/v1/chat/completions';
-
     try {
-        const resp = await fetch(apiUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
-                'HTTP-Referer': 'https://ace.design',
-                'X-Title': 'Glid Translator',
-            },
-            body: JSON.stringify({
-                model: 'anthropic/claude-sonnet-4',
-                max_tokens: 1024,
-                temperature: 0.3, // Low temp for consistent, high-quality translations
-                messages: [{ role: 'user', content: prompt }],
-                // No tools — pure text completion
-            }),
-        });
+        // ★ Use callOpenRouterApi — routes through Edge Function proxy in production
+        const data = await callOpenRouterApi({
+            model: 'anthropic/claude-sonnet-4',
+            max_tokens: 1024,
+            temperature: 0.3, // Low temp for consistent, high-quality translations
+            messages: [{ role: 'user', content: prompt }],
+        }) as { content?: Array<{ type: string; text?: string }> };
 
-        if (!resp.ok) {
-            const errText = await resp.text();
-            return { success: false, translations: {}, error: `API error ${resp.status}: ${errText.slice(0, 200)}` };
-        }
-
-        const data = await resp.json();
-        const content = data.choices?.[0]?.message?.content ?? '';
+        const content = data.content?.find(c => c.type === 'text')?.text ?? '';
 
         // Parse JSON from response (strip any markdown fences if present)
         const cleaned = content.replace(/```json?\s*/g, '').replace(/```\s*/g, '').trim();

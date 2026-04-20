@@ -11,6 +11,8 @@ vi.mock('@/utils/screenshotCapture', () => ({
 
 vi.mock('@/config/apiKeys', () => ({
     getOpenRouterKey: vi.fn().mockReturnValue('test-key'),
+    isAiAvailable: vi.fn().mockReturnValue(true),
+    isProxyMode: vi.fn().mockReturnValue(false),
 }));
 
 vi.mock('@/services/openRouterClient', () => ({
@@ -32,7 +34,7 @@ vi.mock('@/schema/layoutRoles', () => ({
 import { runVisionSelfCheck, runBatchVisionCheck } from './visionSelfCheck';
 import type { VisionCheckResult, VisionIssue, VisionSelfCheckConfig } from './visionSelfCheck';
 import { callOpenRouterApi } from '@/services/openRouterClient';
-import { getOpenRouterKey } from '@/config/apiKeys';
+import { isAiAvailable } from '@/config/apiKeys';
 import type { BannerVariant } from '@/schema/design.types';
 
 // ── Factory ──
@@ -78,8 +80,8 @@ describe('visionSelfCheck', () => {
 
     // ── runVisionSelfCheck ──
     describe('runVisionSelfCheck', () => {
-        it('should pass when API key is missing', async () => {
-            vi.mocked(getOpenRouterKey).mockReturnValueOnce('');
+        it('should pass when AI is not available', async () => {
+            vi.mocked(isAiAvailable).mockReturnValueOnce(false);
             const result = await runVisionSelfCheck(makeVariant());
             expect(result.passed).toBe(true);
             expect(result.issues).toEqual([]);
@@ -156,7 +158,7 @@ describe('visionSelfCheck', () => {
         });
 
         it('should return Map keyed by variant id', async () => {
-            vi.mocked(getOpenRouterKey).mockReturnValue('');
+            vi.mocked(isAiAvailable).mockReturnValue(false);
             const results = await runBatchVisionCheck([makeVariant({ id: 'test-id' })]);
             expect(results.has('test-id')).toBe(true);
         });
