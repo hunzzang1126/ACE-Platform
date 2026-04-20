@@ -10,6 +10,7 @@ import type { AgentFlowCallbacks, FlowEngine } from './agentFlowTypes';
 import { resilientImport } from '@/utils/resilientImport';
 import { renderElement, buildElementDetail } from './agentFlowRender';
 import { scanBrandCloud, selectTemplate } from './agentFlowHelpers';
+import { hexLuminance, averageLuminance } from './contrastHelpers';
 
 /** Execute the full design generation pipeline */
 export async function executeGenerateFlow(
@@ -264,6 +265,38 @@ async function buildAndRender(
         }
         // Remove template background shape (photo replaces it)
         allElements = allElements.filter(el => el.name !== 'background');
+    } else {
+        // ★ NO BACKGROUND IMAGE — ensure background shape exists + text contrast
+        const hasBg = allElements.some(el => el.name === 'background');
+        if (!hasBg) {
+            // Create background element from palette (gradient or solid)
+            allElements.unshift({
+                name: 'background',
+                type: 'rect' as any,
+                x: 0, y: 0, w: canvasW, h: canvasH,
+                gradient_start_hex: guide.colors.gradientStart,
+                gradient_end_hex: guide.colors.gradientEnd,
+                gradient_angle: 135,
+            });
+            console.log(`[Pipeline] Auto-created background: ${guide.colors.gradientStart} → ${guide.colors.gradientEnd}`);
+        }
+
+        // ★ CONTRAST CHECK: ensure text is readable against background
+        const bgEl = allElements.find(el => el.name === 'background');
+        const bgLum = bgEl
+            ? averageLuminance(bgEl.gradient_start_hex ?? '#000000', bgEl.gradient_end_hex ?? bgEl.gradient_start_hex ?? '#000000')
+            : 0.5;
+
+        for (const el of allElements) {
+            if (el.type !== 'text') continue;
+            const textLum = hexLuminance(el.color_hex ?? '#FFFFFF');
+            const contrast = Math.abs(bgLum - textLum);
+
+            // If contrast is too low (< 0.3), flip text to opposite
+            if (contrast < 0.3) {
+                el.color_hex = bgLum > 0.5 ? '#1A1A2E' : '#FFFFFF';
+            }
+        }
     }
 
     // ★ SKIP CTA: If AI decided no CTA is needed, remove CTA elements entirely.
@@ -360,3 +393,5 @@ async function buildAndRender(
 }
 
 // ★ renderElement, buildElementDetail, runVisionQA → extracted to agentFlowRender.ts
+// ★ hexLuminance, averageLuminance → extracted to contrastHelpers.ts
+
