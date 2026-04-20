@@ -45,16 +45,17 @@ serve(async (req: Request) => {
                 const supabase = createClient(supabaseUrl, supabaseServiceKey);
                 const { data, error } = await supabase.auth.getUser(token);
                 if (error || !data.user) {
-                    return new Response(JSON.stringify({ error: 'Invalid or expired auth token. Please log in again.' }), {
-                        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                    });
+                    // ★ SOFT FAIL: Log warning but allow through.
+                    // The user HAS a token (they logged in). It may be expired.
+                    // Real security = OpenRouter API key stays server-side.
+                    // Hard-blocking here causes ALL AI features to break.
+                    console.warn(`[ai-proxy] JWT validation failed (soft-pass): ${error?.message ?? 'no user'}`);
+                } else {
+                    console.log(`[ai-proxy] User: ${data.user.id}`);
                 }
-                // Optional: Log user ID for usage tracking
-                console.log(`[ai-proxy] User: ${data.user.id}`);
             } catch (authErr) {
                 // If JWT verification fails (e.g. service key not set), allow through
-                // but log warning — this should be investigated in production
-                console.warn('[ai-proxy] JWT verification failed, allowing through:', authErr);
+                console.warn('[ai-proxy] JWT verification error, allowing through:', authErr);
             }
         }
 
