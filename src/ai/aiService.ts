@@ -177,11 +177,24 @@ export class AiService {
             const resp = await fetch(apiUrl, { method: 'POST', headers, body: JSON.stringify(body) });
             if (resp.ok) return await this.parseSSEStream(resp, model, progress);
             if (resp.status === 429 && attempt < 1) { progress.onThinking('Rate limited. Retrying in 10s...'); await sleep(10000); continue; }
+            // ★ Retry on 400 with fresh JWT — OpenRouter sometimes rejects stale requests
+            if (resp.status === 400 && attempt < 1) {
+                console.warn(`[AiService] 400 from API — refreshing session and retrying (attempt ${attempt + 1})`);
+                try {
+                    const { getSupabase } = await import('@/services/supabaseClient');
+                    const sb = getSupabase();
+                    if (sb) await sb.auth.refreshSession();
+                } catch { /* ignore refresh failure */ }
+                progress.onThinking('Retrying request...');
+                await sleep(1000);
+                continue;
+            }
             const errorText = await resp.text();
+            console.error(`[AiService] API Error ${resp.status}:`, errorText.slice(0, 300));
             try { const errJson = JSON.parse(errorText); progress.onError(errJson?.error?.message || `API Error ${resp.status}`); } catch { progress.onError(`API Error ${resp.status}: ${errorText.substring(0, 200)}`); }
             return null;
         }
-        progress.onError('Rate limited. Please wait a moment and try again.');
+        progress.onError('Request failed after retries. Please try again.');
         return null;
     }
 

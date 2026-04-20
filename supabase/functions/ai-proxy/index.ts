@@ -67,6 +67,7 @@ serve(async (req: Request) => {
         }
 
         const body = await req.json();
+        console.log(`[ai-proxy] → OpenRouter | model=${body.model} | msgs=${body.messages?.length ?? 0} | tools=${body.tools?.length ?? 0} | stream=${body.stream ?? false}`);
 
         const openRouterRes = await fetch(OPENROUTER_BASE, {
             method: 'POST',
@@ -80,6 +81,11 @@ serve(async (req: Request) => {
         });
 
         const responseData = await openRouterRes.text();
+
+        // ★ Log errors for debugging
+        if (!openRouterRes.ok) {
+            console.error(`[ai-proxy] ← OpenRouter ${openRouterRes.status}: ${responseData.slice(0, 500)}`);
+        }
 
         return new Response(responseData, {
             status: openRouterRes.status,

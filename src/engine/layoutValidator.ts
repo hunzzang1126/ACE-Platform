@@ -151,7 +151,10 @@ function fixOverlaps(
         for (let i = 0; i < elements.length; i++) {
             const el = elements[i]!;
             if (el.type !== 'text') continue;
-            textBoxes.push({ x: el.x, y: el.y, w: el.w, h: el.h, name: el.name ?? `text_${i}`, idx: i });
+            const h = el.h > 0 ? el.h : estimateTextHeight(el);
+            // ★ Also update el.h so render uses correct height
+            if (el.h <= 0) el.h = h;
+            textBoxes.push({ x: el.x, y: el.y, w: el.w, h, name: el.name ?? `text_${i}`, idx: i });
         }
         textBoxes.sort((a, b) => a.y - b.y);
 

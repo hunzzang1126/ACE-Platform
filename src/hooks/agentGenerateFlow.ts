@@ -227,13 +227,26 @@ async function buildAndRender(
             el.type === 'text' && el.content === content.headline
         ) ?? allElements.find(el => (el.name ?? '').toLowerCase().includes('headline'));
         const headlineY = headlineEl?.y ?? canvasH * 0.3;
-        const headlineH = headlineEl?.h ?? 60;
         const headlineFontSize = headlineEl?.font_size ?? Math.round(canvasH * 0.06);
+        // ★ Estimate actual headline height from content + font size (not el.h which can be 0 or stale)
+        const headlineContent = headlineEl?.content ?? content.headline ?? '';
+        const headlineW = headlineEl?.w ?? Math.round(canvasW * 0.85);
+        const isBold = headlineEl?.font_weight && parseInt(headlineEl.font_weight) >= 600;
+        const charWidth = headlineFontSize * (isBold ? 0.65 : 0.50);
+        const charsPerLine = Math.max(1, Math.floor(headlineW / charWidth));
+        const headlineLines = Math.max(1, Math.ceil(headlineContent.length / charsPerLine));
+        const estimatedHeadlineH = Math.round(headlineFontSize * 1.45 * headlineLines + 8);
+        const headlineH = Math.max(headlineEl?.h ?? 0, estimatedHeadlineH);
         // ★ Canvas-proportional sizing: ~3.5% of canvas height, min 14px, max 32px
         const subFontSize = Math.max(14, Math.min(32, Math.round(canvasH * 0.035)));
         const subY = headlineY + headlineH + Math.round(canvasH * 0.02);
         const subX = headlineEl?.x ?? Math.round(canvasW * 0.075);
         const subW = headlineEl?.w ?? Math.round(canvasW * 0.85);
+        // ★ Estimate subheadline height (NEVER h: 0 — breaks overlap detection)
+        const subCharWidth = subFontSize * 0.50;
+        const subCharsPerLine = Math.max(1, Math.floor(subW / subCharWidth));
+        const subLines = Math.max(1, Math.ceil(content.subheadline.length / subCharsPerLine));
+        const subH = Math.round(subFontSize * 1.45 * subLines + 8);
         allElements.push({
             name: 'subheadline',
             type: 'text',
@@ -241,14 +254,14 @@ async function buildAndRender(
             x: subX,
             y: subY,
             w: subW,
-            h: 0,
+            h: subH,
             font_size: subFontSize,
             font_weight: '400',
             text_align: headlineEl?.text_align ?? 'center',
             color_hex: headlineEl?.color_hex ?? '#FFFFFF',
             line_height: 1.3,
         });
-        console.log(`[Pipeline] Auto-created subheadline: "${content.subheadline.slice(0, 40)}" at y=${subY}, fontSize=${subFontSize}`);
+        console.log(`[Pipeline] Auto-created subheadline: "${content.subheadline.slice(0, 40)}" at y=${subY}, h=${subH}, fontSize=${subFontSize}`);
     }
 
     // ★ PHOTO CONTRAST: When a background image exists, ensure all text is readable.
