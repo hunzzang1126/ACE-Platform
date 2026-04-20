@@ -157,33 +157,75 @@ export async function executeToolCall(
                 const newText = params.new_text as string;
                 if (!elementName || newText === undefined) return { success: false, message: 'element_name and new_text are required.' };
 
-                // ★ Try engine first (visual update on canvas editor)
+                // ★ Also update store FIRST (for persistence + size dashboard sync)
+                const storeResult = await executeDesignCommand('update_element_text', params);
+
+                // ★ Try engine (visual update on canvas editor)
                 let engineUpdated = 0;
                 if (engine?.get_all_nodes && engine?.set_text_content) {
                     try {
                         const nodes = JSON.parse(engine.get_all_nodes() ?? '[]');
-                        const nodeNames = nodes.map((n: any) => `"${n.name}" (type=${n.type}, id=${n.id})`);
-                        console.log(`[update_element_text] Looking for "${elementName}" among ${nodes.length} nodes: ${nodeNames.join(', ')}`);
-                        for (const node of nodes) {
+                        const textNodes = nodes.filter((n: any) => n.type === 'text' || n.content !== undefined);
+                        const nodeNames = textNodes.map((n: any) => `"${n.name}" (id=${n.id})`);
+                        console.log(`[update_element_text] Looking for "${elementName}" among ${textNodes.length} text nodes: ${nodeNames.join(', ')}`);
+
+                        // Pass 1: name-based matching
+                        for (const node of textNodes) {
                             const nodeName = (node.name ?? '').toLowerCase();
-                            if (nodeName.includes(elementName) && (node.type === 'text' || node.content !== undefined)) {
-                                console.log(`[update_element_text] ✓ Match: "${node.name}" (id=${node.id}) → "${newText.slice(0, 30)}"`);
+                            if (nodeName.includes(elementName)) {
+                                console.log(`[update_element_text] ✓ Name match: "${node.name}" (id=${node.id}) → "${newText.slice(0, 30)}"`);
                                 engine.set_text_content(node.id, newText);
                                 engineUpdated++;
                             }
                         }
+
+                        // Pass 2: If name match failed, try to find the element that the
+                        // STORE just updated. The store knows which element was matched
+                        // (by name). We can look at what the store says the old content was
+                        // vs what's on canvas → match by content similarity.
                         if (engineUpdated === 0) {
-                            console.warn(`[update_element_text] ✗ No match for "${elementName}". Available: ${nodeNames.join(', ')}`);
+                            console.warn(`[update_element_text] ✗ No name match for "${elementName}". Trying content-based fallback...`);
+                            // Get store element names for this element_name
+                            const { useDesignStore } = await import('@/stores/designStore');
+                            const cs = useDesignStore.getState().creativeSet;
+                            if (cs) {
+                                const master = cs.variants.find(v => v.id === cs.masterVariantId);
+                                const storeEl = master?.elements.find(
+                                    (e: any) => e.name.toLowerCase().includes(elementName) && (e.type === 'text' || e.type === 'button')
+                                );
+                                if (storeEl) {
+                                    // The store element now has newText. Find the canvas node
+                                    // that DOESN'T have newText yet (it has the old text).
+                                    // All canvas text nodes that don't match newText are candidates.
+                                    // Pick the one whose name is closest to the store element name.
+                                    for (const node of textNodes) {
+                                        const nodeContent = (node.content ?? '').trim();
+                                        // If canvas still has old content (not yet updated)
+                                        if (nodeContent !== newText.trim() && nodeContent.length > 0) {
+                                            const nodeName = (node.name ?? '').toLowerCase();
+                                            const storeElName = (storeEl.name ?? '').toLowerCase();
+                                            // Try exact store name match, or same position, or just the largest text
+                                            if (nodeName === storeElName || nodeName.includes(storeElName) || storeElName.includes(nodeName)) {
+                                                console.log(`[update_element_text] ✓ Content-fallback match: "${node.name}" (id=${node.id})`);
+                                                engine.set_text_content(node.id, newText);
+                                                engineUpdated++;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if (engineUpdated === 0) {
+                            console.warn(`[update_element_text] ✗ No match at all for "${elementName}". Available: ${nodeNames.join(', ')}`);
                         }
                     } catch (e) { console.warn('[update_element_text] Engine update failed:', e); }
                 }
 
-                // ★ Also update store (for persistence + size dashboard sync)
-                const storeResult = await executeDesignCommand('update_element_text', params);
                 if (engineUpdated > 0) {
                     return { success: true, message: `Updated text to "${newText}" on ${engineUpdated} element(s) matching "${params.element_name}" (canvas + store).` };
                 }
-                // Fallback: if no engine, store-only result
                 return storeResult ?? { success: false, message: `No element matching "${params.element_name}" found.` };
             }
 

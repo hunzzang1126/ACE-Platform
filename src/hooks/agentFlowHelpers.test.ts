@@ -212,7 +212,7 @@ describe('★ REGRESSION: commandExecutor update_element_text diagnostics', () =
     });
 
     it('logs successful match with node id', () => {
-        expect(execSrc).toContain('[update_element_text] ✓ Match');
+        expect(execSrc).toContain('[update_element_text] ✓ Name match');
     });
 
     it('warns when no match found with available nodes list', () => {
