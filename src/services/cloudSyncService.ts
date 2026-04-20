@@ -159,16 +159,29 @@ export async function pullFromCloud(userId: string): Promise<boolean> {
             console.warn('[cloudSync] Pull creative_sets error:', csErr.message);
         }
 
-        // ★ Local-first architecture: IndexedDB is the source of truth.
-        // Cloud pull is for READING/LOGGING only — never create local state from cloud.
-        // The old code called createCreativeSet() which generated NEW UUIDs,
-        // causing infinite phantom set creation on every refresh (ID mismatch loop).
-        if (cloudProjects && cloudProjects.length > 0) {
-            console.log(`[cloudSync] Found ${cloudProjects.length} projects in cloud (read-only, not creating local copies)`);
+        // ★ Bidirectional merge — Feature flag gated (default ON)
+        const useBidirectionalSync = localStorage.getItem('ace-feature-bidirectional-sync') !== 'false';
+
+        if (useBidirectionalSync && cloudProjects && cloudProjects.length > 0) {
+            const { mergeProjectLists } = await import('./cloudMergeEngine');
+            const localSets = useProjectStore.getState().creativeSets;
+            const mergeResult = mergeProjectLists(localSets, cloudProjects);
+
+            if (mergeResult.added > 0 || mergeResult.updated > 0 || mergeResult.deletedLocally > 0) {
+                useProjectStore.setState({ creativeSets: mergeResult.merged });
+                console.log(`[cloudSync] Merged: +${mergeResult.added} new, ${mergeResult.updated} updated, ${mergeResult.deletedLocally} deleted`);
+                if (mergeResult.conflicts.length > 0) {
+                    console.log('[cloudSync] Conflicts:', mergeResult.conflicts.join('; '));
+                }
+            } else {
+                console.log(`[cloudSync] ${cloudProjects.length} cloud projects — already in sync`);
+            }
+        } else if (cloudProjects && cloudProjects.length > 0) {
+            // Fallback: read-only mode (original behavior)
+            console.log(`[cloudSync] Found ${cloudProjects.length} projects in cloud (read-only, sync disabled)`);
         }
 
         if (cloudSets && cloudSets.length > 0) {
-            // For now, just log — merging full creative sets requires care
             console.log(`[cloudSync] Found ${cloudSets.length} creative sets in cloud`);
         }
 
