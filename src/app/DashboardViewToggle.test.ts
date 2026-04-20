@@ -104,3 +104,77 @@ describe('EditorSidebar — ★ REGRESSION: image idbRef persistence', () => {
         expect(sidebarSrc).toContain('actions.canvasHeight');
     });
 });
+
+// ══════════════════════════════════════════════════
+// ★ REGRESSION: Simplified project cards (v0.0.0.617)
+// Heavy ProjectThumbnail replaced with minimal icon + size label
+// ══════════════════════════════════════════════════
+const cssSrc = readFileSync(resolve(__dirname, '../styles/dashboard.css'), 'utf-8');
+
+describe('★ REGRESSION: Simplified project cards (v0.0.0.617)', () => {
+    it('ProjectCard does NOT import ProjectThumbnail', () => {
+        expect(cardSrc).not.toContain("import { ProjectThumbnail }");
+        expect(cardSrc).not.toContain("from './ProjectThumbnail'");
+    });
+
+    it('grid card uses SVG icon instead of rendered thumbnail', () => {
+        // Should have inline SVG for the layout icon
+        expect(cardSrc).toContain('<svg');
+        expect(cardSrc).toContain('project-card__preview');
+    });
+
+    it('grid card shows size count in preview area', () => {
+        expect(cardSrc).toContain('project-card__preview-size');
+        // Pluralization logic
+        expect(cardSrc).toContain("variantCount !== 1 ? 's' : ''");
+    });
+
+    it('grid card does NOT have preview-more badge (removed)', () => {
+        expect(cardSrc).not.toContain('project-card__preview-more');
+    });
+});
+
+describe('★ REGRESSION: Dashboard CSS — minimal card preview', () => {
+    it('preview area is 120px tall (compact)', () => {
+        expect(cssSrc).toContain('height: 120px');
+    });
+
+    it('preview uses flex column for icon + label stack', () => {
+        // The preview class should have flex-direction: column
+        const previewBlock = cssSrc.substring(
+            cssSrc.indexOf('.project-card__preview {'),
+            cssSrc.indexOf('}', cssSrc.indexOf('.project-card__preview {')) + 1
+        );
+        expect(previewBlock).toContain('flex-direction: column');
+        expect(previewBlock).toContain('align-items: center');
+        expect(previewBlock).toContain('justify-content: center');
+    });
+
+    it('has preview-size class for the size label', () => {
+        expect(cssSrc).toContain('.project-card__preview-size');
+    });
+
+    it('does NOT have old preview-grid or preview-rect classes', () => {
+        expect(cssSrc).not.toContain('.project-card__preview-grid');
+        expect(cssSrc).not.toContain('.project-card__preview-rect');
+    });
+
+    it('does NOT have old preview-more badge styles', () => {
+        expect(cssSrc).not.toContain('.project-card__preview-more');
+    });
+});
+
+describe('DashboardPage — localStorage bidirectional persistence', () => {
+    it('reads from localStorage on mount', () => {
+        expect(dashSrc).toContain("localStorage.getItem('ace-dashboard-view')");
+    });
+
+    it('writes to localStorage on change', () => {
+        expect(dashSrc).toContain("localStorage.setItem('ace-dashboard-view', mode)");
+    });
+
+    it('defaults to grid when no localStorage value', () => {
+        // The fallback is || 'grid'
+        expect(dashSrc).toContain("|| 'grid'");
+    });
+});
