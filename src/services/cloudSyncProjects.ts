@@ -20,6 +20,9 @@ export function debouncedSync(key: string, fn: () => Promise<void>) {
 // ── Projects ──
 export async function pushProject(userId: string, project: CreativeSetSummary): Promise<void> {
     const sb = getSupabase(); if (!sb) return;
+    // ★ Check if project is trashed — never overwrite deleted_at
+    const { data: existing } = await sb.from('projects').select('deleted_at').eq('id', project.id).maybeSingle();
+    if (existing?.deleted_at) return; // Already trashed — skip push to avoid resurrection
     const { error } = await sb.from('projects').upsert({ id: project.id, user_id: userId, name: project.name, folder_id: project.folderId ?? null, variant_count: project.variantCount, created_at: project.createdAt, updated_at: project.updatedAt }, { onConflict: 'id' });
     if (error) console.warn('[cloudSync] pushProject error:', error.message);
 }
@@ -47,6 +50,9 @@ export async function deleteProjectPermanently(projectId: string): Promise<void>
 // ── Creative Sets ──
 export async function pushCreativeSet(userId: string, cs: CreativeSet): Promise<void> {
     const sb = getSupabase(); if (!sb) return;
+    // ★ Check if project is trashed — never overwrite deleted_at
+    const { data: existingProject } = await sb.from('projects').select('deleted_at').eq('id', cs.id).maybeSingle();
+    if (existingProject?.deleted_at) return; // Already trashed — skip to avoid resurrection
     await sb.from('projects').upsert({ id: cs.id, user_id: userId, name: cs.name, variant_count: cs.variants?.length ?? 1, created_at: cs.createdAt, updated_at: cs.updatedAt }, { onConflict: 'id' });
     const row = { id: cs.id, project_id: cs.id, user_id: userId, data: cs, version: 1, created_at: cs.createdAt, updated_at: cs.updatedAt };
     const { data: existing } = await sb.from('creative_sets').select('id').eq('id', cs.id).maybeSingle();
