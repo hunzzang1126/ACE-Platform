@@ -10,6 +10,7 @@ import type { SceneNodeInfo } from './agentContext';
 import type { Engine, ExecutionResult } from './executorHelpers';
 import { generateImage } from '@/services/imageGenClient';
 import type { ImageGenResult } from '@/services/imageGenClient';
+import { analyzeScene } from './executorCompound';
 import { executeDesignCommand } from './executors/designExecutor';
 
 // Re-export types for consumers
@@ -144,8 +145,14 @@ export async function executeToolCall(
                 return { success: false, message: 'generate_full_design is handled by the agent orchestrator.' };
             }
 
+            // ── Analyze Scene ─────────────────────────
+            case 'analyze_scene': {
+                const result = analyzeScene(trackedNodes);
+                return { success: true, message: result };
+            }
+
             // ── Design Store Commands ────────────────
-            // add_text, add_button, execute_dynamic_action, analyze_scene
+            // add_text, add_button, execute_dynamic_action
             // + any remaining store-based commands
             default: {
                 const designResult = await executeDesignCommand(toolName, params);
