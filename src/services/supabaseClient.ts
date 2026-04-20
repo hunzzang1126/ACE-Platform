@@ -364,13 +364,18 @@ export async function pushBrandKitCloud(
 
 /**
  * Pull BrandKit data from Supabase Storage JSON file.
+ * ★ Checks file existence first to avoid 400 console errors.
  */
 export async function pullBrandKitsCloud(
     userId: string,
 ): Promise<Array<{ id: string; data: unknown; updated_at: string }>> {
     const sb = getSupabase();
     if (!sb) return [];
-    const path = `${userId}/brand/${BRAND_KIT_FILE}`;
+    const folder = `${userId}/brand`;
+    // ★ List files first to avoid 400 on download when file doesn't exist
+    const { data: files, error: listError } = await sb.storage.from(BRAND_KIT_BUCKET).list(folder, { limit: 1, search: BRAND_KIT_FILE });
+    if (listError || !files || files.length === 0) return [];
+    const path = `${folder}/${BRAND_KIT_FILE}`;
     const { data, error } = await sb.storage.from(BRAND_KIT_BUCKET).download(path);
     if (error || !data) return [];
     try {
