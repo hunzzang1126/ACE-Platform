@@ -154,19 +154,21 @@ export const useTemplateStore = create<TemplateState>()(
                     Object.assign(tmpl, updates);
                     tmpl.updatedAt = new Date().toISOString();
                 });
-                // ★ Sync name/description changes to Supabase (template_overrides)
+                // ★ Sync name/description changes to Supabase
                 const tmpl = get().templates.find(t => t.id === id);
                 if (tmpl) {
-                    upsertTemplateOverride(id, {
-                        name: tmpl.name,
-                        description: tmpl.description ?? '',
-                        category: tmpl.category,
-                        tags: tmpl.tags,
-                        width: tmpl.width,
-                        height: tmpl.height,
-                        variantSnapshot: tmpl.variantSnapshot,
-                        thumbnailSrc: tmpl.thumbnailSrc,
-                    }).catch(err => console.warn('[templateStore] Sync name update failed:', err));
+                    (async () => {
+                        try {
+                            const { useAuthStore } = await import('@/stores/authStore');
+                            const userId = useAuthStore.getState().user?.id;
+                            if (userId) {
+                                await upsertTemplateOverride(
+                                    id, tmpl.variantSnapshot, userId,
+                                    tmpl.width, tmpl.height, tmpl.name,
+                                );
+                            }
+                        } catch (err) { console.warn('[templateStore] Sync name update failed:', err); }
+                    })();
                 }
             },
 
@@ -363,9 +365,23 @@ export const useTemplateStore = create<TemplateState>()(
             syncOverridesFromCloud: async () => {
                 try {
                     const cloudOverrides = await fetchTemplateOverrides();
-                    if (Object.keys(cloudOverrides).length === 0) return;
+                    const cloudIds = new Set(Object.keys(cloudOverrides));
 
                     set(state => {
+                        // ★ DELETION SYNC: Remove local templates NOT in cloud
+                        // Cloud is source of truth — if admin deleted it, remove everywhere
+                        state.templates = state.templates.filter(t => {
+                            // Keep user-saved templates (from saveAsTemplate, start with 'tmpl-')
+                            if (t.id.startsWith('tmpl-')) return true;
+                            // Keep if exists in cloud
+                            if (cloudIds.has(t.id)) return true;
+                            // Not in cloud + not user-saved = admin deleted → remove
+                            console.log(`[templateStore] Removing deleted template: ${t.id} (${t.name})`);
+                            delete state.templateOverrides[t.id];
+                            return false;
+                        });
+
+                        // ★ ADD/UPDATE from cloud
                         for (const [id, override] of Object.entries(cloudOverrides)) {
                             state.templateOverrides[id] = override.snapshot;
                             const tmpl = state.templates.find(t => t.id === id);
@@ -377,11 +393,10 @@ export const useTemplateStore = create<TemplateState>()(
                                 if (override.name) tmpl.name = override.name;
                                 tmpl.updatedAt = new Date().toISOString();
                             } else {
-                                // ★ Unknown template from cloud — create locally (custom or renamed)
+                                // ★ Unknown template from cloud — create locally
                                 let metaName = override.name ?? 'Custom Template';
                                 let metaCategory: TemplateCategory = 'social';
                                 if (!override.name) {
-                                    // Fallback: read from __customMeta embedded in snapshot
                                     try {
                                         const parsed = JSON.parse(override.snapshot);
                                         if (parsed.__customMeta?.name) metaName = parsed.__customMeta.name;
@@ -399,7 +414,7 @@ export const useTemplateStore = create<TemplateState>()(
                             }
                         }
                     });
-                    console.log('[templateStore] Synced', Object.keys(cloudOverrides).length, 'overrides from cloud');
+                    console.log('[templateStore] Synced', cloudIds.size, 'templates from cloud (source of truth)');
                 } catch (e) {
                     console.warn('[templateStore] Cloud sync failed (will use local):', e);
                 }
