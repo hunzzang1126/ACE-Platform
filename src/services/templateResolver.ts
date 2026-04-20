@@ -71,8 +71,16 @@ export function resolveTemplateElements(
     const nativeW = tmpl.width || 1080;
     const nativeH = tmpl.height || 1080;
 
+    console.log(`[templateResolver] "${templateId}" native=${nativeW}x${nativeH} → target=${canvasW}x${canvasH} | scaleX=${(canvasW/nativeW).toFixed(3)} scaleY=${(canvasH/nativeH).toFixed(3)} | elements=${elements.length}`);
+
     // Convert DesignElement[] → RenderElement[] with scaling
-    return elements.map(el => designToRender(el, nativeW, nativeH, canvasW, canvasH));
+    const result = elements.map(el => designToRender(el, nativeW, nativeH, canvasW, canvasH));
+    for (const r of result) {
+        if (r.type === 'text') {
+            console.log(`[templateResolver]   text "${r.name}" fontSize=${r.font_size} pos=(${r.x},${r.y}) size=${r.w}x${r.h} align=${r.text_align}`);
+        }
+    }
+    return result;
 }
 
 /**
