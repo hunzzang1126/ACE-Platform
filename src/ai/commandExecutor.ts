@@ -162,12 +162,18 @@ export async function executeToolCall(
                 if (engine?.get_all_nodes && engine?.set_text_content) {
                     try {
                         const nodes = JSON.parse(engine.get_all_nodes() ?? '[]');
+                        const nodeNames = nodes.map((n: any) => `"${n.name}" (type=${n.type}, id=${n.id})`);
+                        console.log(`[update_element_text] Looking for "${elementName}" among ${nodes.length} nodes: ${nodeNames.join(', ')}`);
                         for (const node of nodes) {
                             const nodeName = (node.name ?? '').toLowerCase();
                             if (nodeName.includes(elementName) && (node.type === 'text' || node.content !== undefined)) {
+                                console.log(`[update_element_text] ✓ Match: "${node.name}" (id=${node.id}) → "${newText.slice(0, 30)}"`);
                                 engine.set_text_content(node.id, newText);
                                 engineUpdated++;
                             }
+                        }
+                        if (engineUpdated === 0) {
+                            console.warn(`[update_element_text] ✗ No match for "${elementName}". Available: ${nodeNames.join(', ')}`);
                         }
                     } catch (e) { console.warn('[update_element_text] Engine update failed:', e); }
                 }

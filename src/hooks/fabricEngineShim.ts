@@ -272,11 +272,16 @@ export function createEngineShim(
         },
         set_text_content: (id: number, text: string) => {
             const obj = findById(id);
-            if (obj && 'text' in obj) { obj.set({ text } as any); fc.renderAll(); syncState(); }
+            if (obj && 'text' in obj) {
+                obj.set({ text } as any);
+                obj.setCoords(); // ★ CRITICAL: Recalculate bounding box for new text
+                fc.renderAll();
+                syncState();
+            }
         },
         set_fill_hex: (id: number, hex: string) => {
             const obj = findById(id);
-            if (obj) { obj.set({ fill: hex }); fc.renderAll(); }
+            if (obj) { obj.set({ fill: hex }); fc.renderAll(); syncState(); }
         },
         set_position: (id: number, x: number, y: number) => {
             const obj = findById(id);
