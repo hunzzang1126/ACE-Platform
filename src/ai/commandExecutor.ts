@@ -151,6 +151,66 @@ export async function executeToolCall(
                 return { success: true, message: result };
             }
 
+            // ── Update Element Text (engine + store) ─────
+            case 'update_element_text': {
+                const elementName = (params.element_name as string || '').toLowerCase();
+                const newText = params.new_text as string;
+                if (!elementName || newText === undefined) return { success: false, message: 'element_name and new_text are required.' };
+
+                // ★ Try engine first (visual update on canvas editor)
+                let engineUpdated = 0;
+                if (engine?.get_all_nodes && engine?.set_text_content) {
+                    try {
+                        const nodes = JSON.parse(engine.get_all_nodes() ?? '[]');
+                        for (const node of nodes) {
+                            const nodeName = (node.name ?? '').toLowerCase();
+                            if (nodeName.includes(elementName) && (node.type === 'text' || node.content !== undefined)) {
+                                engine.set_text_content(node.id, newText);
+                                engineUpdated++;
+                            }
+                        }
+                    } catch (e) { console.warn('[update_element_text] Engine update failed:', e); }
+                }
+
+                // ★ Also update store (for persistence + size dashboard sync)
+                const storeResult = await executeDesignCommand('update_element_text', params);
+                if (engineUpdated > 0) {
+                    return { success: true, message: `Updated text to "${newText}" on ${engineUpdated} element(s) matching "${params.element_name}" (canvas + store).` };
+                }
+                // Fallback: if no engine, store-only result
+                return storeResult ?? { success: false, message: `No element matching "${params.element_name}" found.` };
+            }
+
+            // ── Update Element Property (engine + store) ──
+            case 'update_element_property': {
+                const elementName = (params.element_name as string || '').toLowerCase();
+                const property = params.property as string;
+                const rawValue = params.value as string;
+                if (!elementName || !property) return { success: false, message: 'element_name and property are required.' };
+
+                // ★ Try engine first (visual update)
+                let engineUpdated = 0;
+                if (engine?.get_all_nodes) {
+                    try {
+                        const nodes = JSON.parse(engine.get_all_nodes() ?? '[]');
+                        for (const node of nodes) {
+                            if ((node.name ?? '').toLowerCase().includes(elementName)) {
+                                if (property === 'color' && engine.set_fill_hex) { engine.set_fill_hex(node.id, rawValue); engineUpdated++; }
+                                else if (property === 'fontSize' && engine.set_font_size) { engine.set_font_size(node.id, Number(rawValue)); engineUpdated++; }
+                                else if (property === 'opacity' && engine.set_opacity) { engine.set_opacity(node.id, Number(rawValue)); engineUpdated++; }
+                            }
+                        }
+                    } catch (e) { console.warn('[update_element_property] Engine update failed:', e); }
+                }
+
+                // ★ Also update store
+                const storeResult = await executeDesignCommand('update_element_property', params);
+                if (engineUpdated > 0) {
+                    return { success: true, message: `Set "${property}" = "${rawValue}" on ${engineUpdated} element(s) matching "${params.element_name}" (canvas + store).` };
+                }
+                return storeResult ?? { success: false, message: `No element matching "${params.element_name}" found.` };
+            }
+
             // ── Design Store Commands ────────────────
             // add_text, add_button, execute_dynamic_action
             // + any remaining store-based commands

@@ -270,6 +270,10 @@ export function createEngineShim(
             const obj = findById(id);
             if (obj && 'fontSize' in obj) { obj.set({ fontSize: size } as any); fc.renderAll(); syncState(); }
         },
+        set_text_content: (id: number, text: string) => {
+            const obj = findById(id);
+            if (obj && 'text' in obj) { obj.set({ text } as any); fc.renderAll(); syncState(); }
+        },
         set_fill_hex: (id: number, hex: string) => {
             const obj = findById(id);
             if (obj) { obj.set({ fill: hex }); fc.renderAll(); }
