@@ -24,6 +24,7 @@ import type { EngineNode } from '@/hooks/canvasTypes';
 import { useEditorPageSave, useEditorRestore, useEditorAutoSync, useEditorAutoSave } from './useEditorPageEffects';
 import { useEyedropper } from '@/hooks/useEyedropper';
 import { OnboardingGuide } from '@/components/onboarding/OnboardingGuide';
+import { LiveSizePreview } from '@/components/editor/LiveSizePreview';
 import type { GuideStep } from '@/components/onboarding/OnboardingGuide';
 
 const EDITOR_GUIDE_STEPS: GuideStep[] = [
@@ -45,6 +46,8 @@ export function DetailEditorPage() {
     const overrideTemplate = useTemplateStore(s => s.overrideTemplate);
     const setEditingTemplateId = useTemplateStore(s => s.setEditingTemplateId);
     const navigate = useNavigate();
+    // ★ Live multi-size preview (feature flag — default ON)
+    const showLivePreview = localStorage.getItem('ace-feature-live-preview') !== 'false';
 
     useEffect(() => { setLayer('detail'); setActiveVariant(variantId ?? null); return () => setActiveVariant(null); }, [variantId, setLayer, setActiveVariant]);
 
@@ -120,6 +123,7 @@ export function DetailEditorPage() {
                     <ContextToolbar nodes={state.nodes} selection={state.selection} actions={actions} selectedOverlay={overlay.selectedOverlayElement} onOverlayUpdate={overlay.updateElement} canvasWidth={width} canvasHeight={height} />
                 </EditorCanvas>
                 {exportPanelOpen && (<ExportPanel nodes={state.nodes} canvasWidth={width} canvasHeight={height} onExportHTML5={handleExportHTML5} onExportPNG={handleExportPNG} onExportJPG={handleExportJPG} onExportGIF={() => alert('GIF export coming soon')} onClose={toggleExportPanel} />)}
+                {showLivePreview && <LiveSizePreview currentVariantId={variantId} />}
             </div>
             <BottomPanel variant={variant} engine={engineRef.current} nodes={state.nodes} selection={state.selection} actions={actions} overlayElements={overlay.overlayElements} selectedOverlayId={overlay.selectedOverlayId} onOverlaySelect={handleOverlaySelect} onOverlayMoveUp={overlay.moveUp} onOverlayMoveDown={overlay.moveDown} onOverlayReorderTo={overlay.reorderTo} onOverlaySetZIndex={overlay.setZIndex} onOverlayToggleLock={overlay.toggleLock} onOverlayToggleVisibility={overlay.toggleVisibility} onOverlayDuplicate={overlay.duplicateOverlay} onOverlayRename={overlay.renameOverlay} onOverlayDelete={overlay.deleteElement} />
             {authModalOpen && (<AuthModal onClose={toggleAuthModal} onSuccess={toggleAuthModal} />)}
