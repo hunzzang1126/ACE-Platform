@@ -334,9 +334,8 @@ describe('agentFlowTypes — setPhase interface', () => {
     });
 });
 
-// ══════════════════════════════════════════════════
-// ★ REGRESSION: Content substitution heuristic
-// ══════════════════════════════════════════════════
+const helpersSrc = readFileSync(resolve(__dirname, './agentFlowHelpers.ts'), 'utf-8');
+
 describe('★ REGRESSION: content substitution uses font-size heuristic', () => {
     it('has Pass 2 font-size heuristic for unnamed text elements', () => {
         expect(src).toContain('Font-size heuristic');
@@ -347,14 +346,19 @@ describe('★ REGRESSION: content substitution uses font-size heuristic', () => 
         expect(src).toContain('.sort((a, b) => (b.font_size ?? 0) - (a.font_size ?? 0))');
     });
 
-    it('auto-created subheadline uses canvas-proportional sizing', () => {
-        expect(src).toContain('canvasH * 0.035');
-        expect(src).toContain('Math.max(14, Math.min(32');
+    it('auto-created subheadline uses canvas-proportional sizing (in helpers)', () => {
+        expect(helpersSrc).toContain('canvasH * 0.035');
+        expect(helpersSrc).toContain('Math.max(14, Math.min(32');
     });
 
-    it('auto-created subheadline inherits headline x/w/textAlign', () => {
-        expect(src).toContain('headlineEl?.x');
-        expect(src).toContain('headlineEl?.w');
-        expect(src).toContain('headlineEl?.text_align');
+    it('auto-created subheadline inherits headline x/w/textAlign (in helpers)', () => {
+        expect(helpersSrc).toContain('headlineEl?.x');
+        expect(helpersSrc).toContain('headlineEl?.w');
+        expect(helpersSrc).toContain('headlineEl?.text_align');
+    });
+
+    it('recalcTextHeights auto-shrinks fonts exceeding 40% canvas', () => {
+        expect(helpersSrc).toContain('canvasH * 0.4');
+        expect(helpersSrc).toContain('el.font_size > 12');
     });
 });

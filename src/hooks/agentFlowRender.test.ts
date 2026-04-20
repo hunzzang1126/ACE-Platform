@@ -70,27 +70,37 @@ describe('agentGenerateFlow — subheadline auto-creation', () => {
 
     it('★ REGRESSION: creates subheadline element when template lacks one', () => {
         expect(flowSrc).toContain("content.subheadline && !subheadlineMapped");
-        expect(flowSrc).toContain("name: 'subheadline'");
+        // Subheadline creation extracted to helper
+        expect(helpersSrc).toContain("name: 'subheadline'");
     });
 
     it('positions auto-created subheadline below headline using headlineH', () => {
-        expect(flowSrc).toContain('headlineY + headlineH');
+        expect(helpersSrc).toContain('headlineY + headlineH');
     });
 
     it('uses canvas-proportional font size for subheadline (3.5% of height)', () => {
-        expect(flowSrc).toContain('canvasH * 0.035');
-        expect(flowSrc).toContain('Math.max(14, Math.min(32');
+        expect(helpersSrc).toContain('canvasH * 0.035');
+        expect(helpersSrc).toContain('Math.max(14, Math.min(32');
     });
 
     it('inherits color from headline element', () => {
-        expect(flowSrc).toContain("headlineEl?.color_hex ?? '#FFFFFF'");
+        expect(helpersSrc).toContain("headlineEl?.color_hex ?? '#FFFFFF'");
     });
 
     it('imports renderElement from agentFlowRender', () => {
         expect(flowSrc).toContain("import { renderElement, buildElementDetail } from './agentFlowRender'");
     });
 
-    it('imports scanBrandCloud from agentFlowHelpers', () => {
-        expect(flowSrc).toContain("import { scanBrandCloud, selectTemplate } from './agentFlowHelpers'");
+    it('imports helpers including autoCreateSubheadline', () => {
+        expect(flowSrc).toContain("autoCreateSubheadline");
+        expect(flowSrc).toContain("recalcTextHeights");
+    });
+
+    it('exports recalcTextHeights from helpers', () => {
+        expect(helpersSrc).toContain('export function recalcTextHeights');
+    });
+
+    it('exports autoCreateSubheadline from helpers', () => {
+        expect(helpersSrc).toContain('export function autoCreateSubheadline');
     });
 });
