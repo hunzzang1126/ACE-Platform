@@ -3,7 +3,6 @@
 // ─────────────────────────────────────────────────
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useProjectStore } from '@/stores/projectStore';
-import { ProjectThumbnail } from './ProjectThumbnail';
 import { ShareModal } from './ShareModal';
 
 interface ProjectCardProps {
@@ -82,8 +81,7 @@ export function ProjectCard({ id, name, variantCount, createdAt, createdBy, type
         if (type === 'set') duplicateCreativeSet(id);
     }, [id, type, duplicateCreativeSet]);
 
-    // Preview thumbnail uses actual design data
-    const showThumbnail = viewMode === 'grid';
+
 
     // ── List View ──
     if (viewMode === 'list') {
@@ -166,12 +164,14 @@ export function ProjectCard({ id, name, variantCount, createdAt, createdBy, type
                 onContextMenu={handleContextMenu}
             >
                 <div className="project-card__preview">
-                    <ProjectThumbnail setId={id} width={200} height={120} />
-                    {variantCount > 1 && (
-                        <span className="project-card__preview-more">
-                            {variantCount} sizes
-                        </span>
-                    )}
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted, #a1a1aa)" strokeWidth="1.2" strokeLinecap="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                        <line x1="3" y1="9" x2="21" y2="9" />
+                        <line x1="9" y1="3" x2="9" y2="21" />
+                    </svg>
+                    <span className="project-card__preview-size">
+                        {variantCount} size{variantCount !== 1 ? 's' : ''}
+                    </span>
                 </div>
 
                 {/* Info */}

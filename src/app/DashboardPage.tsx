@@ -38,7 +38,9 @@ export function DashboardPage() {
     const { t } = useAppI18n();
     const [searchParams, setSearchParams] = useSearchParams();
     const [searchQuery, setSearchQuery] = useState('');
-    const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
+    const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => {
+        return (localStorage.getItem('ace-dashboard-view') as 'grid' | 'list') || 'grid';
+    });
     const handleViewChange = useCallback((mode: 'grid' | 'list') => {
         setViewMode(mode);
         localStorage.setItem('ace-dashboard-view', mode);

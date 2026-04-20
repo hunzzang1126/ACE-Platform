@@ -24,8 +24,8 @@ describe('DashboardPage — view mode toggle', () => {
         expect(dashSrc).toContain("localStorage.setItem('ace-dashboard-view'");
     });
 
-    it('defaults to list view (no localStorage read)', () => {
-        expect(dashSrc).toContain("useState<'grid' | 'list'>('list')");
+    it('reads viewMode from localStorage (user preference)', () => {
+        expect(dashSrc).toContain("localStorage.getItem('ace-dashboard-view'");
     });
 
     it('renders toggle buttons for grid and list', () => {
@@ -72,10 +72,10 @@ describe('ProjectCard — list view rendering', () => {
         expect(cardSrc).toContain('project-card__rename');
     });
 
-    it('uses ProjectThumbnail for grid preview', () => {
-        expect(cardSrc).toContain("viewMode === 'grid'");
-        // ProjectThumbnail renders real design data instead of generic rectangles
-        expect(cardSrc).toContain("ProjectThumbnail");
+    it('uses simple icon for grid preview (no heavy thumbnail)', () => {
+        // ProjectThumbnail was removed for clean minimal cards
+        expect(cardSrc).not.toContain('ProjectThumbnail');
+        expect(cardSrc).toContain('project-card__preview-size');
     });
 
     it('supports context menu in list mode', () => {

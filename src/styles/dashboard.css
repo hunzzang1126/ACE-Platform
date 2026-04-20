@@ -503,45 +503,22 @@
 }
 
 .project-card__preview {
-    height: 140px;
+    height: 120px;
     background: var(--bg-elevated);
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 8px;
     position: relative;
     overflow: hidden;
 }
 
-.project-card__preview-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    align-items: center;
-    justify-content: center;
-    padding: 16px;
-}
-
-.project-card__preview-rect {
-    background: rgba(0, 0, 0, 0.03);
-    border: 1px solid rgba(0, 0, 0, 0.05);
-    border-radius: 3px;
-}
-
-.project-card__preview-more {
-    position: absolute;
-    bottom: 8px;
-    right: 10px;
-    font-size: 10px;
-    font-weight: 600;
-    color: #475569;
-    background: rgba(255,255,255,0.85);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    padding: 3px 9px;
-    border-radius: 10px;
-    border: 1px solid rgba(0,0,0,0.06);
-    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-    letter-spacing: 0.01em;
+.project-card__preview-size {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-muted);
+    letter-spacing: 0.02em;
 }
 
 .project-card__info {
