@@ -171,15 +171,15 @@ export class AiService {
         const body: Record<string, unknown> = { model, max_tokens: 4096, messages: openAiMessages, tools: openAiTools, stream: true };
 
         // ★ Import getProxyHeaders dynamically to get JWT in production / direct key in dev
-        for (let attempt = 0; attempt <= 1; attempt++) {
+        for (let attempt = 0; attempt <= 2; attempt++) {
             const { getProxyHeaders } = await import('@/services/openRouterClient');
             const headers = await getProxyHeaders();
             const resp = await fetch(apiUrl, { method: 'POST', headers, body: JSON.stringify(body) });
             if (resp.ok) return await this.parseSSEStream(resp, model, progress);
-            if (resp.status === 429 && attempt < 1) { progress.onThinking('Rate limited. Retrying in 10s...'); await sleep(10000); continue; }
-            // ★ Retry on 400 with fresh JWT — OpenRouter sometimes rejects stale requests
-            if (resp.status === 400 && attempt < 1) {
-                console.warn(`[AiService] 400 from API — refreshing session and retrying (attempt ${attempt + 1})`);
+            if (resp.status === 429 && attempt < 2) { progress.onThinking('Rate limited. Retrying in 10s...'); await sleep(10000); continue; }
+            // ★ Retry on 400/401 with fresh JWT — expired tokens or stale requests
+            if ((resp.status === 400 || resp.status === 401) && attempt < 2) {
+                console.warn(`[AiService] ${resp.status} from API — refreshing session and retrying (attempt ${attempt + 1})`);
                 try {
                     const { getSupabase } = await import('@/services/supabaseClient');
                     const sb = getSupabase();
