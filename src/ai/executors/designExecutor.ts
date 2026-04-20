@@ -40,20 +40,32 @@ export function executeDesignTool(
             const elementName = (params.element_name as string || '').toLowerCase();
             const newText = params.new_text as string;
             if (!elementName || newText === undefined) return { success: false, message: 'element_name and new_text are required.' };
-            let updated = 0;
+            // ★ Count matches first (read-only scan)
+            let matchCount = 0;
             for (const variant of cs.variants) {
                 for (const el of variant.elements) {
                     if (el.name.toLowerCase().includes(elementName)) {
                         const raw = el as any;
-                        if (el.type === 'text' && 'content' in raw) { raw.content = newText; updated++; }
-                        else if (el.type === 'button' && 'label' in raw) { raw.label = newText; updated++; }
-                        else if ('content' in raw) { raw.content = newText; updated++; }
+                        if ((el.type === 'text' && 'content' in raw) || (el.type === 'button' && 'label' in raw) || 'content' in raw) matchCount++;
                     }
                 }
             }
-            if (updated === 0) return { success: false, message: `No element matching "${params.element_name}" found.` };
-            useDesignStore.setState((state) => { state.creativeSet = cs; });
-            return { success: true, message: `Updated text to "${newText}" on ${updated} element(s) matching "${params.element_name}" across all sizes.` };
+            if (matchCount === 0) return { success: false, message: `No element matching "${params.element_name}" found. Available: ${cs.variants[0]?.elements.map(e => `"${e.name}" (${e.type})`).join(', ')}` };
+            // ★ Mutate via immer draft (not external object)
+            useDesignStore.setState((state) => {
+                if (!state.creativeSet) return;
+                for (const variant of state.creativeSet.variants) {
+                    for (const el of variant.elements) {
+                        if (el.name.toLowerCase().includes(elementName)) {
+                            const raw = el as any;
+                            if (el.type === 'text' && 'content' in raw) raw.content = newText;
+                            else if (el.type === 'button' && 'label' in raw) raw.label = newText;
+                            else if ('content' in raw) raw.content = newText;
+                        }
+                    }
+                }
+            });
+            return { success: true, message: `Updated text to "${newText}" on ${matchCount} element(s) matching "${params.element_name}" across all sizes.` };
         }
 
         case 'update_element_property': {
@@ -66,11 +78,16 @@ export function executeDesignTool(
             let value: unknown = rawValue;
             const numericProps = ['fontSize', 'opacity', 'borderRadius', 'lineHeight', 'letterSpacing', 'fontWeight', 'zIndex'];
             if (numericProps.includes(property)) { value = Number(rawValue); if (!Number.isFinite(value as number)) return { success: false, message: `Invalid numeric value "${rawValue}" for property "${property}".` }; }
-            let updated = 0;
-            for (const variant of cs.variants) { for (const el of variant.elements) { if (el.name.toLowerCase().includes(elementName)) { (el as any)[property] = value; updated++; } } }
-            if (updated === 0) return { success: false, message: `No element matching "${params.element_name}" found.` };
-            useDesignStore.setState((state) => { state.creativeSet = cs; });
-            return { success: true, message: `Set "${property}" = "${rawValue}" on ${updated} element(s) matching "${params.element_name}".` };
+            // ★ Count matches first
+            let matchCount = 0;
+            for (const variant of cs.variants) { for (const el of variant.elements) { if (el.name.toLowerCase().includes(elementName)) matchCount++; } }
+            if (matchCount === 0) return { success: false, message: `No element matching "${params.element_name}" found. Available: ${cs.variants[0]?.elements.map(e => `"${e.name}" (${e.type})`).join(', ')}` };
+            // ★ Mutate via immer draft
+            useDesignStore.setState((state) => {
+                if (!state.creativeSet) return;
+                for (const variant of state.creativeSet.variants) { for (const el of variant.elements) { if (el.name.toLowerCase().includes(elementName)) (el as any)[property] = value; } }
+            });
+            return { success: true, message: `Set "${property}" = "${rawValue}" on ${matchCount} element(s) matching "${params.element_name}".` };
         }
 
         case 'add_text': return handleAddText(params);

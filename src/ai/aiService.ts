@@ -94,10 +94,12 @@ export class AiService {
                 for (let i = 0; i < toolBlocks.length; i++) {
                     const tc = toolBlocks[i]!;
                     const params = (tc.input ?? {}) as Record<string, unknown>;
+                    console.log(`[AI Tool] Calling: ${tc.name}`, JSON.stringify(params).slice(0, 300));
                     progress.onStepStart(i, tc.name!, params); await nextFrame();
                     const startTime = Date.now();
                     const overrideResult = executorOverride?.(tc.name!, params);
                     const result: ExecutionResult = overrideResult ?? await executeToolCall(engine, tc.name!, params, this.trackedNodes);
+                    console.log(`[AI Tool] Result: ${tc.name} → ${result.success ? '✅' : '❌'} ${result.message?.slice(0, 200)}`);
                     progress.onStepComplete(i, result); await sleep(200);
                     toolResults.push({ type: 'tool_result', tool_use_id: tc.id!, content: JSON.stringify(result), is_error: !result.success });
                     toolRecords.push({ name: tc.name!, input: params, result, durationMs: Date.now() - startTime });
