@@ -8,6 +8,7 @@
 import {
     Canvas, Shadow, ActiveSelection, type FabricObject,
 } from 'fabric';
+import { loadGoogleFont } from '@/services/fontLoader';
 import {
     nextId, rgbToHex, isArtboard, fabricToEngineNode, GLID_CUSTOM_PROPS,
     patchAceProps,
@@ -285,7 +286,14 @@ export function createEngineShim(
         },
         set_font_family: (id: number, family: string) => {
             const obj = findById(id);
-            if (obj && 'fontFamily' in obj) { obj.set({ fontFamily: family } as any); obj.setCoords(); fc.renderAll(); syncState(); }
+            if (!obj || !('fontFamily' in obj)) return;
+            // ★ Load Google Font first, then apply
+            loadGoogleFont(family).then(() => {
+                obj.set({ fontFamily: family } as any);
+                obj.setCoords();
+                fc.renderAll();
+                syncState();
+            });
         },
         set_font_weight: (id: number, weight: number) => {
             const obj = findById(id);

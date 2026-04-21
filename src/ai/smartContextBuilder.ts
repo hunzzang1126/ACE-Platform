@@ -10,6 +10,7 @@ import { loadUserPrefs, prefsToPromptSection } from '@/stores/userPrefs';
 import { buildDesignSystemPrompt } from '@/ai/prompts/bannerDesignPrompt';
 import { paletteToPromptSection, type BrandPalette } from '@/engine/brandPalette';
 import { memoryToPromptSection } from '@/services/aiMemoryService';
+import { getFontContextForAI } from './fontRecommendations';
 
 // Re-export everything from helpers for backward compatibility
 export {
@@ -128,6 +129,7 @@ export function contextToPromptSection(ctx: SmartContext): string {
         const brandColors = ctx.brand ? { primary: ctx.brand.primaryColor, secondary: ctx.brand.secondaryColor } : undefined;
         lines.push('', buildDesignSystemPrompt(ctx.activeVariant.width, ctx.activeVariant.height, ctx.activeVariant.aspectCategory, brandColors));
         if (ctx.generatedPalette) { lines.push('', paletteToPromptSection(ctx.generatedPalette)); }
+        lines.push('', '## Font Guidance', getFontContextForAI());
     }
 
     return lines.join('\n');
