@@ -157,70 +157,87 @@ export async function executeToolCall(
                 const newText = params.new_text as string;
                 if (!elementName || newText === undefined) return { success: false, message: 'element_name and new_text are required.' };
 
-                // ★ Also update store FIRST (for persistence + size dashboard sync)
-                const storeResult = await executeDesignCommand('update_element_text', params);
-
-                // ★ Try engine (visual update on canvas editor)
-                let engineUpdated = 0;
-                if (engine?.get_all_nodes && engine?.set_text_content) {
+                // ★ Read canvas text BEFORE store update (to know old content)
+                let canvasTextBefore: { id: number; name: string; content: string; fontSize: number }[] = [];
+                if (engine?.get_all_nodes) {
                     try {
                         const nodes = JSON.parse(engine.get_all_nodes() ?? '[]');
-                        const textNodes = nodes.filter((n: any) => n.type === 'text' || n.content !== undefined);
-                        const nodeNames = textNodes.map((n: any) => `"${n.name}" (id=${n.id})`);
-                        console.log(`[update_element_text] Looking for "${elementName}" among ${textNodes.length} text nodes: ${nodeNames.join(', ')}`);
+                        canvasTextBefore = nodes
+                            .filter((n: any) => n.type === 'text' || n.content !== undefined)
+                            .map((n: any) => ({ id: n.id, name: n.name ?? '', content: (n.content ?? '').trim(), fontSize: n.fontSize ?? 0 }));
+                    } catch { /* ok */ }
+                }
 
-                        // Pass 1: name-based matching
-                        for (const node of textNodes) {
-                            const nodeName = (node.name ?? '').toLowerCase();
-                            if (nodeName.includes(elementName)) {
-                                console.log(`[update_element_text] ✓ Name match: "${node.name}" (id=${node.id}) → "${newText.slice(0, 30)}"`);
-                                engine.set_text_content(node.id, newText);
-                                engineUpdated++;
-                            }
+                // ★ Update store (all variants)
+                const storeResult = await executeDesignCommand('update_element_text', params);
+
+                // ★ Visual update on canvas
+                let engineUpdated = 0;
+                if (engine?.set_text_content && canvasTextBefore.length > 0) {
+                    // Pass 1: name-based matching (fast path)
+                    for (const node of canvasTextBefore) {
+                        if (node.name.toLowerCase().includes(elementName)) {
+                            console.log(`[update_element_text] ✓ Name match: "${node.name}" (id=${node.id})`);
+                            engine.set_text_content(node.id, newText);
+                            engineUpdated++;
                         }
+                    }
 
-                        // Pass 2: If name match failed, try to find the element that the
-                        // STORE just updated. The store knows which element was matched
-                        // (by name). We can look at what the store says the old content was
-                        // vs what's on canvas → match by content similarity.
-                        if (engineUpdated === 0) {
-                            console.warn(`[update_element_text] ✗ No name match for "${elementName}". Trying content-based fallback...`);
-                            // Get store element names for this element_name
+                    // Pass 2: store→canvas content sync (robust fallback)
+                    // Find which store element was updated, then match to canvas by OLD content
+                    if (engineUpdated === 0) {
+                        console.warn(`[update_element_text] ✗ Name match failed. Using store→canvas sync...`);
+                        try {
                             const { useDesignStore } = await import('@/stores/designStore');
                             const cs = useDesignStore.getState().creativeSet;
                             if (cs) {
                                 const master = cs.variants.find(v => v.id === cs.masterVariantId);
-                                const storeEl = master?.elements.find(
-                                    (e: any) => e.name.toLowerCase().includes(elementName) && (e.type === 'text' || e.type === 'button')
-                                );
-                                if (storeEl) {
-                                    // The store element now has newText. Find the canvas node
-                                    // that DOESN'T have newText yet (it has the old text).
-                                    // All canvas text nodes that don't match newText are candidates.
-                                    // Pick the one whose name is closest to the store element name.
-                                    for (const node of textNodes) {
-                                        const nodeContent = (node.content ?? '').trim();
-                                        // If canvas still has old content (not yet updated)
-                                        if (nodeContent !== newText.trim() && nodeContent.length > 0) {
-                                            const nodeName = (node.name ?? '').toLowerCase();
-                                            const storeElName = (storeEl.name ?? '').toLowerCase();
-                                            // Try exact store name match, or same position, or just the largest text
-                                            if (nodeName === storeElName || nodeName.includes(storeElName) || storeElName.includes(nodeName)) {
-                                                console.log(`[update_element_text] ✓ Content-fallback match: "${node.name}" (id=${node.id})`);
-                                                engine.set_text_content(node.id, newText);
-                                                engineUpdated++;
-                                                break;
-                                            }
+                                if (master) {
+                                    // Find the store element that was just updated
+                                    const updatedStoreEls = master.elements.filter((e: any) =>
+                                        e.name.toLowerCase().includes(elementName) &&
+                                        (e.type === 'text' || e.type === 'button') &&
+                                        ((e as any).content === newText || (e as any).label === newText)
+                                    );
+                                    for (const storeEl of updatedStoreEls) {
+                                        // Find canvas node: same name OR only text node with non-matching content
+                                        let matched = canvasTextBefore.find(cn =>
+                                            cn.name.toLowerCase() === storeEl.name.toLowerCase() && cn.content !== newText.trim()
+                                        );
+                                        // Broader: any canvas node whose name partially matches
+                                        if (!matched) {
+                                            matched = canvasTextBefore.find(cn => {
+                                                const cnLow = cn.name.toLowerCase();
+                                                const seLow = storeEl.name.toLowerCase();
+                                                return (cnLow.includes(seLow) || seLow.includes(cnLow)) && cn.content !== newText.trim();
+                                            });
+                                        }
+                                        // Last resort: match by font size similarity (±30%)
+                                        if (!matched && (storeEl as any).fontSize) {
+                                            const seFontSize = (storeEl as any).fontSize;
+                                            matched = canvasTextBefore.find(cn =>
+                                                cn.content !== newText.trim() &&
+                                                cn.fontSize > 0 &&
+                                                Math.abs(cn.fontSize - seFontSize) / seFontSize < 0.3
+                                            );
+                                        }
+                                        if (matched) {
+                                            console.log(`[update_element_text] ✓ Store→Canvas sync: store="${storeEl.name}" → canvas="${matched.name}" (id=${matched.id})`);
+                                            engine.set_text_content(matched.id, newText);
+                                            engineUpdated++;
+                                            // Remove from candidates so we don't double-match
+                                            canvasTextBefore = canvasTextBefore.filter(cn => cn.id !== matched!.id);
                                         }
                                     }
                                 }
                             }
-                        }
+                        } catch (e) { console.warn('[update_element_text] Store→Canvas sync failed:', e); }
+                    }
 
-                        if (engineUpdated === 0) {
-                            console.warn(`[update_element_text] ✗ No match at all for "${elementName}". Available: ${nodeNames.join(', ')}`);
-                        }
-                    } catch (e) { console.warn('[update_element_text] Engine update failed:', e); }
+                    if (engineUpdated === 0) {
+                        const available = canvasTextBefore.map(n => `"${n.name}" (id=${n.id})`).join(', ');
+                        console.warn(`[update_element_text] ✗ No match at all for "${elementName}". Canvas nodes: ${available}`);
+                    }
                 }
 
                 if (engineUpdated > 0) {

@@ -52,8 +52,9 @@ describe('★ REGRESSION (v627): commandExecutor — update_element_text dual up
         expect(src).toContain("case 'update_element_text'");
     });
 
-    it('should update engine FIRST via set_text_content', () => {
-        expect(src).toContain('engine.set_text_content(node.id, newText)');
+    it('should update engine via set_text_content', () => {
+        expect(src).toContain('engine.set_text_content(');
+        expect(src).toContain('newText');
     });
 
     it('should ALSO update designStore for persistence', () => {
@@ -65,7 +66,7 @@ describe('★ REGRESSION (v627): commandExecutor — update_element_text dual up
     });
 
     it('should match elements by name (case-insensitive)', () => {
-        expect(src).toContain('nodeName.includes(elementName)');
+        expect(src).toContain('.toLowerCase().includes(elementName)');
     });
 });
 

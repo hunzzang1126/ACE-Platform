@@ -199,27 +199,37 @@ describe('★ REGRESSION: Fabric shim text update includes setCoords', () => {
     });
 });
 
-// ══════════════════════════════════════════════════
-// ★ REGRESSION: update_element_text matching + logging
-// ══════════════════════════════════════════════════
 describe('★ REGRESSION: commandExecutor update_element_text diagnostics', () => {
     const execSrc = require('fs').readFileSync(
         require('path').resolve(__dirname, '../ai/commandExecutor.ts'), 'utf-8'
     );
 
-    it('logs all available node names when searching', () => {
-        expect(execSrc).toContain('[update_element_text] Looking for');
+    it('reads canvas text BEFORE store update', () => {
+        expect(execSrc).toContain('canvasTextBefore');
+        // Store update must come after canvas snapshot
+        const snapshotIdx = execSrc.indexOf('canvasTextBefore');
+        const storeUpdateIdx = execSrc.indexOf("executeDesignCommand('update_element_text'");
+        expect(snapshotIdx).toBeLessThan(storeUpdateIdx);
     });
 
-    it('logs successful match with node id', () => {
+    it('has Pass 1 name-based matching', () => {
         expect(execSrc).toContain('[update_element_text] ✓ Name match');
     });
 
-    it('warns when no match found with available nodes list', () => {
-        expect(execSrc).toContain('[update_element_text] ✗ No match');
+    it('has Pass 2 store→canvas sync fallback', () => {
+        expect(execSrc).toContain('Store→Canvas sync');
+        expect(execSrc).toContain('store→canvas sync');
+    });
+
+    it('matches by font size similarity as last resort', () => {
+        expect(execSrc).toContain('fontSize - seFontSize');
+    });
+
+    it('warns when no match found', () => {
+        expect(execSrc).toContain('[update_element_text] ✗ No match at all');
     });
 
     it('calls set_text_content on matched nodes', () => {
-        expect(execSrc).toContain('engine.set_text_content(node.id, newText)');
+        expect(execSrc).toContain('engine.set_text_content(');
     });
 });
