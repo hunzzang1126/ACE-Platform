@@ -148,14 +148,18 @@ export function BannerPreviewGrid({ variants, visibleIds, externalPlaying }: Pro
     const [resolvedImageUrls, setResolvedImageUrls] = useState<Record<string, string>>({});
     const visibleVariants = useMemo(() => variants.filter(v => visibleIds.has(v.id)), [variants, visibleIds]);
 
-    const canvasHeight = useMemo(() => {
+    const canvasDims = useMemo(() => {
+        let maxX = 0;
         let maxY = 0;
         visibleVariants.forEach((v, idx) => {
             const pos = cardPositions[v.id] ?? autoGridPos(idx);
-            const h = Math.round(v.preset.height * getPreviewScale(v.preset.width, v.preset.height, zoom));
+            const scale = getPreviewScale(v.preset.width, v.preset.height, zoom);
+            const w = Math.round(v.preset.width * scale);
+            const h = Math.round(v.preset.height * scale);
+            maxX = Math.max(maxX, pos.x + w + 40);
             maxY = Math.max(maxY, pos.y + h + 100);
         });
-        return maxY;
+        return { w: maxX, h: maxY };
     }, [visibleVariants, cardPositions, autoGridPos, zoom]);
 
     // Restore video blobs
@@ -275,7 +279,7 @@ export function BannerPreviewGrid({ variants, visibleIds, externalPlaying }: Pro
                 {!hasAnyAnimation && (<span className="banner-no-anim-hint">{t('size.addAnimNote')}</span>)}
             </div>
 
-            <div className="banner-grid" ref={gridContainerRef} style={{ position: 'relative', minHeight: Math.max(600, canvasHeight + 40), overflow: 'visible' }}>
+            <div className="banner-grid" ref={gridContainerRef} style={{ position: 'relative', minWidth: canvasDims.w, minHeight: Math.max(600, canvasDims.h + 40), overflow: 'visible' }}>
                 <PlugCanvas variants={visibleVariants} cardRefs={cardRefs} containerRef={gridContainerRef} />
                 {visibleVariants.map((variant, idx) => {
                     const { width, height } = variant.preset;
