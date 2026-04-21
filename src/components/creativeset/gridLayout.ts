@@ -19,10 +19,10 @@ export interface CardSize {
  * Scale a variant preview card to fit within the base preview dimensions.
  * Returns a uniform scale factor so all cards scale proportionally with zoom.
  */
-export function getPreviewScale(w: number, h: number, zoom: number): number {
+export function getPreviewScale(width: number, height: number, zoom: number): number {
     const maxW = BASE_PREVIEW_WIDTH * zoom;
     const maxH = BASE_PREVIEW_HEIGHT * zoom;
-    return Math.min(maxW / w, maxH / h, 1 * zoom);
+    return Math.min(maxW / width, maxH / height, 1 * zoom);
 }
 
 /**

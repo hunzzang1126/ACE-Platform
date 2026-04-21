@@ -68,7 +68,6 @@ export async function renderVariantWithFabric(variant: BannerVariant): Promise<s
  * Returns a complete HTML string with embedded CSS @keyframes.
  */
 export function renderVariantToHTML5(variant: BannerVariant): string {
-    const { width: w, height: h } = variant.preset;
     const cssBlocks: string[] = [];
 
     // Collect font animation CSS from text elements
