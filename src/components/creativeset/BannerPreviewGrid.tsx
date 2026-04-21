@@ -18,6 +18,7 @@ import { PreviewContextMenu } from './PreviewContextMenu';
 import { CanvasPreviewImage } from './CanvasPreviewImage';
 import { LinkedBadge } from './LinkedBadge';
 import { useAppI18n } from '@/i18n';
+import { BASE_PREVIEW_WIDTH, BASE_PREVIEW_HEIGHT, GRID_GAP, GRID_COLS, getPreviewScale, computeAutoPositions } from './gridLayout';
 
 interface ContextMenuState { x: number; y: number; variantId: string; }
 
@@ -31,7 +32,6 @@ interface Props {
     externalPlaying?: boolean;
 }
 
-import { BASE_PREVIEW_WIDTH, BASE_PREVIEW_HEIGHT, GRID_GAP, GRID_COLS, getPreviewScale, computeAutoPositions } from './gridLayout';
 
 const TIMELINE_DURATION = 5;
 const ZOOM_KEY = 'ace-size-dash-zoom';
