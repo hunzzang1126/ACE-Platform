@@ -13,6 +13,8 @@ import type { EngineNode, CanvasEngineActions } from '@/hooks/useCanvasEngine';
 import type { OverlayElement } from '@/hooks/useOverlayElements';
 import { FONT_FAMILIES_BY_CATEGORY, FONT_WEIGHTS, RemoveBgButton, FillToPageButton, SmartSizingSection, AiImageReplaceSection, AiOverlayReplaceSection } from './PropertyPanelSections';
 import { loadGoogleFont } from '@/services/fontLoader';
+import { FONT_ANIM_PRESETS } from '@/ai/fontAnimPresets';
+import { FONT_ATTR_MAP } from '@/ai/fontAttributeDb';
 import { useAppI18n } from '@/i18n';
 
 interface Props {
@@ -155,6 +157,27 @@ export function PropertyPanel({ nodes = [], selection = [], actions, selectedOve
                         <div className="pp-align-row">{(['left', 'center', 'right'] as const).map((align) => (<button key={align} className={`pp-align-btn ${(selectedNode.textAlign || 'left') === align ? 'active' : ''}`} onClick={() => actions.updateText?.(selectedNode.id, { textAlign: align })}>{align === 'left' && <IcAlignLeft size={14} />}{align === 'center' && <IcAlignCenterH size={14} />}{align === 'right' && <IcAlignRight size={14} />}</button>))}</div>
                         <ScrubField label={t('editor.letterSpacing')} value={selectedNode.letterSpacing ?? 0} min={-10} max={40} step={0.5} unit="px" onChange={(v) => actions.updateText?.(selectedNode.id, { letterSpacing: v })} />
                         <ScrubField label={t('editor.lineHeight')} value={selectedNode.lineHeight ?? 1.4} min={0.5} max={4} step={0.05} unit="×" onChange={(v) => actions.updateText?.(selectedNode.id, { lineHeight: v })} />
+                    </Section>
+                    <Section label="Font Animation">
+                        {(() => {
+                            const fontName = selectedNode.fontFamily?.split(',')[0]?.trim() || 'Inter';
+                            const attrs = FONT_ATTR_MAP.get(fontName);
+                            const isVariable = attrs?.hasVariable ?? false;
+                            const currentPreset = (selectedNode as any).fontAnimation?.presetId || 'none';
+                            return isVariable ? (
+                                <select
+                                    className="pp-select"
+                                    value={currentPreset}
+                                    onChange={(e) => actions.updateText?.(selectedNode.id, { fontAnimation: { presetId: e.target.value, enabled: e.target.value !== 'none' } } as any)}
+                                >
+                                    {FONT_ANIM_PRESETS.map(p => (<option key={p.id} value={p.id}>{p.label}</option>))}
+                                </select>
+                            ) : (
+                                <div style={{ fontSize: 11, color: '#6b7280', fontStyle: 'italic' }}>
+                                    Variable font required — current: {fontName}
+                                </div>
+                            );
+                        })()}
                     </Section>
                 )}
                 {!isTextNode && selectedNode.type !== 'image' && (<Section label={t('editor.fill')}><ColorPicker label={t('editor.color')} color={currentFillHex} onChange={handleColorChange} /></Section>)}

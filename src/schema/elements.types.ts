@@ -69,6 +69,11 @@ export interface TextElement extends BaseElement {
     autoShrink: boolean;
     /** Localization key (translation integration) */
     localizationKey?: string;
+    /** Variable Font animation (optional) */
+    fontAnimation?: {
+        presetId: string;
+        enabled: boolean;
+    };
 }
 
 // ── Image ──
