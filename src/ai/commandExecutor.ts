@@ -157,15 +157,24 @@ export async function executeToolCall(
                 const newText = params.new_text as string;
                 if (!elementName || newText === undefined) return { success: false, message: 'element_name and new_text are required.' };
 
+                // ★ DIAGNOSTIC: Log engine state
+                console.log(`[update_element_text] ▶ element="${elementName}" newText="${newText.slice(0, 40)}"`);
+                console.log(`[update_element_text] engine exists: ${!!engine}, get_all_nodes: ${!!engine?.get_all_nodes}, set_text_content: ${!!engine?.set_text_content}`);
+
                 // ★ Read canvas text BEFORE store update (to know old content)
                 let canvasTextBefore: { id: number; name: string; content: string; fontSize: number }[] = [];
                 if (engine?.get_all_nodes) {
                     try {
-                        const nodes = JSON.parse(engine.get_all_nodes() ?? '[]');
+                        const raw = engine.get_all_nodes() ?? '[]';
+                        const nodes = JSON.parse(raw);
+                        console.log(`[update_element_text] Canvas has ${nodes.length} total nodes`);
                         canvasTextBefore = nodes
                             .filter((n: any) => n.type === 'text' || n.content !== undefined)
                             .map((n: any) => ({ id: n.id, name: n.name ?? '', content: (n.content ?? '').trim(), fontSize: n.fontSize ?? 0 }));
-                    } catch { /* ok */ }
+                        console.log(`[update_element_text] ${canvasTextBefore.length} text nodes: ${canvasTextBefore.map(n => `"${n.name}"(id=${n.id})`).join(', ')}`);
+                    } catch (e) { console.error('[update_element_text] get_all_nodes FAILED:', e); }
+                } else {
+                    console.warn('[update_element_text] ⚠ NO ENGINE — canvas update impossible!');
                 }
 
                 // ★ Update store (all variants)
