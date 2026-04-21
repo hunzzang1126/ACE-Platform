@@ -7,6 +7,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { FONT_FAMILIES, FONT_FAMILIES_BY_CATEGORY, ensureGoogleFont } from './contextToolbarConstants';
+import { hasMoodKeywords, matchFontsFromText } from '@/ai/fontMatcher';
 import './FontPicker.css';
 
 interface Props {
@@ -44,10 +45,19 @@ export function FontPicker({ value, onChange }: Props) {
         if (open) { inputRef.current?.focus(); setSearch(''); setHighlightIdx(-1); }
     }, [open]);
 
-    // Filter fonts
-    const filteredFonts = search.trim()
-        ? FONT_FAMILIES.filter(f => f.toLowerCase().includes(search.toLowerCase()))
-        : null;
+    // Filter fonts — mood keywords trigger AI matching, otherwise name search
+    const filteredFonts = (() => {
+        const q = search.trim();
+        if (!q) return null;
+        if (hasMoodKeywords(q)) {
+            // Mood search: "luxury" → AI-ranked fonts
+            return matchFontsFromText(q, 15);
+        }
+        // Name search: "Inter" → font name filter
+        return FONT_FAMILIES.filter(f => f.toLowerCase().includes(q.toLowerCase()));
+    })();
+
+    const isMoodSearch = search.trim() ? hasMoodKeywords(search.trim()) : false;
 
     // Keyboard navigation
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -99,7 +109,7 @@ export function FontPicker({ value, onChange }: Props) {
                             ref={inputRef}
                             className="fp-search"
                             type="text"
-                            placeholder="Search fonts..."
+                            placeholder="Search fonts or moods (luxury, modern...)"
                             value={search}
                             onChange={e => { setSearch(e.target.value); setHighlightIdx(0); }}
                             onKeyDown={handleKeyDown}
@@ -107,7 +117,7 @@ export function FontPicker({ value, onChange }: Props) {
                     </div>
                     <div className="fp-list" ref={listRef}>
                         {filteredFonts ? (
-                            // Filtered flat list
+                            isMoodSearch && <div className="fp-group-label" style={{ color: '#2DD4BF' }}>AI Match</div>,
                             filteredFonts.length === 0
                                 ? <div className="fp-empty">No fonts found</div>
                                 : filteredFonts.map((f, i) => (

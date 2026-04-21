@@ -11,6 +11,7 @@ import { buildDesignSystemPrompt } from '@/ai/prompts/bannerDesignPrompt';
 import { paletteToPromptSection, type BrandPalette } from '@/engine/brandPalette';
 import { memoryToPromptSection } from '@/services/aiMemoryService';
 import { getFontContextForAI } from './fontRecommendations';
+import { matchFontsFromText } from './fontMatcher';
 
 // Re-export everything from helpers for backward compatibility
 export {
@@ -129,7 +130,13 @@ export function contextToPromptSection(ctx: SmartContext): string {
         const brandColors = ctx.brand ? { primary: ctx.brand.primaryColor, secondary: ctx.brand.secondaryColor } : undefined;
         lines.push('', buildDesignSystemPrompt(ctx.activeVariant.width, ctx.activeVariant.height, ctx.activeVariant.aspectCategory, brandColors));
         if (ctx.generatedPalette) { lines.push('', paletteToPromptSection(ctx.generatedPalette)); }
-        lines.push('', '## Font Guidance', getFontContextForAI());
+        const fontCtx = getFontContextForAI();
+        const brandFont = ctx.brand?.fontFamily || '';
+        const smartRecs = matchFontsFromText(brandFont, 5);
+        lines.push('', '## Font Guidance', fontCtx);
+        if (smartRecs.length > 0) {
+            lines.push(`Fonts that complement current design: ${smartRecs.join(', ')}`);
+        }
     }
 
     return lines.join('\n');
