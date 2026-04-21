@@ -31,14 +31,20 @@ interface Props {
     externalPlaying?: boolean;
 }
 
-const MAX_PREVIEW_WIDTH = 280;
-const MAX_PREVIEW_HEIGHT = 360;
+const BASE_PREVIEW_WIDTH = 280;
+const BASE_PREVIEW_HEIGHT = 360;
 const TIMELINE_DURATION = 5;
 const GRID_GAP = 32;
 const GRID_COLS = 3;
+const ZOOM_KEY = 'ace-size-dash-zoom';
+const ZOOM_MIN = 0.5;
+const ZOOM_MAX = 2.0;
+const ZOOM_DEFAULT = 1.0;
 
-function getPreviewScale(w: number, h: number) {
-    return Math.min(MAX_PREVIEW_WIDTH / w, MAX_PREVIEW_HEIGHT / h, 1);
+function getPreviewScale(w: number, h: number, zoom: number) {
+    const maxW = BASE_PREVIEW_WIDTH * zoom;
+    const maxH = BASE_PREVIEW_HEIGHT * zoom;
+    return Math.min(maxW / w, maxH / h, 1 * zoom);
 }
 
 export function BannerPreviewGrid({ variants, visibleIds, externalPlaying }: Props) {
@@ -50,6 +56,17 @@ export function BannerPreviewGrid({ variants, visibleIds, externalPlaying }: Pro
     const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
     const gridContainerRef = useRef<HTMLDivElement>(null);
     const plugConnections = useDesignStore(s => s.creativeSet?.plugConnections) ?? {};
+
+    // ── Zoom ──
+    const [zoom, setZoom] = useState(() => {
+        const stored = localStorage.getItem(ZOOM_KEY);
+        return stored ? Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Number(stored))) : ZOOM_DEFAULT;
+    });
+    const handleZoomChange = useCallback((val: number) => {
+        const clamped = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, val));
+        setZoom(clamped);
+        localStorage.setItem(ZOOM_KEY, String(clamped));
+    }, []);
 
     // ── Card positions (free-form layout) ──
     const storedPositionsRaw = useDesignStore(s => s.creativeSet?.cardPositions);
@@ -69,9 +86,9 @@ export function BannerPreviewGrid({ variants, visibleIds, externalPlaying }: Pro
     const autoGridPos = useCallback((idx: number): { x: number; y: number } => {
         const col = idx % GRID_COLS;
         const row = Math.floor(idx / GRID_COLS);
-        const colWidth = MAX_PREVIEW_WIDTH + GRID_GAP + 40;
-        return { x: col * colWidth, y: row * (MAX_PREVIEW_HEIGHT + 100 + GRID_GAP) };
-    }, []);
+        const colWidth = Math.round(BASE_PREVIEW_WIDTH * zoom) + GRID_GAP + 40;
+        return { x: col * colWidth, y: row * (Math.round(BASE_PREVIEW_HEIGHT * zoom) + 100 + GRID_GAP) };
+    }, [zoom]);
 
     // ── Drag handlers ──
     const handleCardDragStart = useCallback((e: React.MouseEvent, variantId: string, currentPos: { x: number; y: number }) => {
@@ -135,11 +152,11 @@ export function BannerPreviewGrid({ variants, visibleIds, externalPlaying }: Pro
         let maxY = 0;
         visibleVariants.forEach((v, idx) => {
             const pos = cardPositions[v.id] ?? autoGridPos(idx);
-            const h = Math.round(v.preset.height * getPreviewScale(v.preset.width, v.preset.height));
+            const h = Math.round(v.preset.height * getPreviewScale(v.preset.width, v.preset.height, zoom));
             maxY = Math.max(maxY, pos.y + h + 100);
         });
         return maxY;
-    }, [visibleVariants, cardPositions, autoGridPos]);
+    }, [visibleVariants, cardPositions, autoGridPos, zoom]);
 
     // Restore video blobs
     useEffect(() => {
@@ -225,6 +242,35 @@ export function BannerPreviewGrid({ variants, visibleIds, externalPlaying }: Pro
     return (
         <div className="banner-grid-wrapper">
             <div className="banner-grid-toolbar">
+                <div className="banner-zoom-control">
+                    <button
+                        className="banner-zoom-btn"
+                        onClick={() => handleZoomChange(zoom - 0.1)}
+                        disabled={zoom <= ZOOM_MIN}
+                        title="Zoom out"
+                    >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                    </button>
+                    <input
+                        type="range"
+                        className="banner-zoom-slider"
+                        min={ZOOM_MIN}
+                        max={ZOOM_MAX}
+                        step={0.05}
+                        value={zoom}
+                        onChange={(e) => handleZoomChange(Number(e.target.value))}
+                        title={`${Math.round(zoom * 100)}%`}
+                    />
+                    <button
+                        className="banner-zoom-btn"
+                        onClick={() => handleZoomChange(zoom + 0.1)}
+                        disabled={zoom >= ZOOM_MAX}
+                        title="Zoom in"
+                    >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                    </button>
+                    <span className="banner-zoom-label">{Math.round(zoom * 100)}%</span>
+                </div>
                 {isPlaying && (<div className="banner-play-progress"><div className="banner-play-progress-bar" style={{ width: `${(currentTime / TIMELINE_DURATION) * 100}%` }} /></div>)}
                 {!hasAnyAnimation && (<span className="banner-no-anim-hint">{t('size.addAnimNote')}</span>)}
             </div>
@@ -233,7 +279,7 @@ export function BannerPreviewGrid({ variants, visibleIds, externalPlaying }: Pro
                 <PlugCanvas variants={visibleVariants} cardRefs={cardRefs} containerRef={gridContainerRef} />
                 {visibleVariants.map((variant, idx) => {
                     const { width, height } = variant.preset;
-                    const scale = getPreviewScale(width, height);
+                    const scale = getPreviewScale(width, height, zoom);
                     const previewW = Math.round(width * scale);
                     const previewH = Math.round(height * scale);
                     const pos = cardPositions[variant.id] ?? autoGridPos(idx);
