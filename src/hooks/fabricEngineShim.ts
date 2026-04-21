@@ -16,6 +16,7 @@ import {
 import { createAnimationMethods } from './shimAnimation';
 import { createTextEffectMethods } from './shimTextEffects';
 import { createCreatorMethods } from './shimCreators';
+import { createFontAnimMethods } from './shimFontAnimation';
 import type { ShimContext } from './shimTypes';
 
 /**
@@ -39,6 +40,7 @@ export function createEngineShim(
         ...createCreatorMethods(ctx),
         ...createTextEffectMethods(ctx),
         ...createAnimationMethods(fc, userObjects),
+        ...createFontAnimMethods(fc, findById),
 
         // ── Query ────────────────────────────────────────
         // ★ _findById: internal — used by restoreImage to set __glidPersistSrc
