@@ -12,8 +12,6 @@ import {
 } from 'fabric';
 import { constraintsToAbsolute, hexToRgbFloat } from '@/engine/elementConverters';
 import { applyTextEffectCSS } from '@/hooks/shimTextEffects';
-import { getAnimPreset } from '@/ai/fontAnimPresets';
-import { generateFontAnimCSS } from '@/services/fontAnimGenerator';
 import type { BannerVariant } from '@/schema/design.types';
 import type { ShapeElement, TextElement, ImageElement } from '@/schema/elements.types';
 
@@ -63,26 +61,9 @@ export async function renderVariantWithFabric(variant: BannerVariant): Promise<s
     return dataUrl;
 }
 
-/**
- * Generate HTML5 banner code for a variant, including font animations.
- * Returns a complete HTML string with embedded CSS @keyframes.
- */
-export function renderVariantToHTML5(variant: BannerVariant): string {
-    const cssBlocks: string[] = [];
-
-    // Collect font animation CSS from text elements
-    for (const el of variant.elements) {
-        if (el.type === 'text' && el.fontAnimation?.enabled) {
-            const preset = getAnimPreset(el.fontAnimation.presetId);
-            const css = generateFontAnimCSS(el.id, preset);
-            if (css) cssBlocks.push(css);
-        }
-    }
-
-    // Return CSS blocks (to be included in HTML5 export template)
-    // This is a data helper — the actual HTML template assembly is done by the export UI
-    return cssBlocks.join('\n\n');
-}
+// NOTE: renderVariantToHTML5 (font animation CSS export) moved to
+// a separate lazy-loaded module to avoid circular dependency.
+// Will be implemented when HTML5 export UI is wired up.
 
 // ── Element adders (mirror shimCreators.ts logic) ──
 
