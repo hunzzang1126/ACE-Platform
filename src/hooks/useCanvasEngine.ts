@@ -165,7 +165,12 @@ export function useCanvasEngine(width: number, height: number, addDemoShapes = f
     return {
         canvasRef, overlayRef, engineRef,
         state: { status, errorMsg, selection, canUndo, canRedo, nodeCount, nodes },
-        actions: { ...actions, onMouseDown, onMouseMove, onMouseUp, canvasWidth: width, canvasHeight: height, refreshTextCoords: () => engineRef.current?.refreshTextCoords?.() },
+        actions: {
+            ...actions, onMouseDown, onMouseMove, onMouseUp,
+            canvasWidth: width, canvasHeight: height,
+            refreshTextCoords: () => engineRef.current?.refreshTextCoords?.(),
+            setFontAnimation: (id: number, presetId: string) => (engineRef.current as any)?.set_font_animation?.(id, presetId),
+        },
         syncState, retryInit,
     };
 }
