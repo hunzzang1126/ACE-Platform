@@ -213,9 +213,17 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         if (!serviceRef.current) serviceRef.current = new AiService([]);
         serviceRef.current.updateConfig(config);
 
+        // Tools that need engine (Fabric canvas) update — must NOT be intercepted by dashboard override
+        const ENGINE_REQUIRED_TOOLS = new Set(['update_element_text', 'update_element_property']);
+
         const dashboardOverride: ToolExecutorOverride = (toolName, params) => {
             if (toolName === 'generate_full_design') {
                 return { success: true, message: `[GENERATE_FULL_DESIGN] Launching pipeline for: "${(params.prompt as string ?? '').slice(0, 80)}"`, data: { __meta_tool: 'generate_full_design', prompt: params.prompt ?? '' } };
+            }
+            // ★ If engine is available, let update_element_text/property go to commandExecutor
+            // so it updates BOTH store AND canvas. Dashboard route only updates store.
+            if (ENGINE_REQUIRED_TOOLS.has(toolName) && engineRef.current) {
+                return null; // → falls through to commandExecutor
             }
             if (DASHBOARD_TOOL_NAMES.has(toolName)) { const result = executeDashboardTool(toolName, params, navigate); return { success: result.success, message: result.message, data: result.data }; }
             return null;
