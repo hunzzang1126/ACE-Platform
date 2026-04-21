@@ -31,21 +31,13 @@ interface Props {
     externalPlaying?: boolean;
 }
 
-const BASE_PREVIEW_WIDTH = 280;
-const BASE_PREVIEW_HEIGHT = 360;
+import { BASE_PREVIEW_WIDTH, BASE_PREVIEW_HEIGHT, GRID_GAP, GRID_COLS, getPreviewScale, computeAutoPositions } from './gridLayout';
+
 const TIMELINE_DURATION = 5;
-const GRID_GAP = 32;
-const GRID_COLS = 3;
 const ZOOM_KEY = 'ace-size-dash-zoom';
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 2.0;
 const ZOOM_DEFAULT = 1.0;
-
-function getPreviewScale(w: number, h: number, zoom: number) {
-    const maxW = BASE_PREVIEW_WIDTH * zoom;
-    const maxH = BASE_PREVIEW_HEIGHT * zoom;
-    return Math.min(maxW / w, maxH / h, 1 * zoom);
-}
 
 export function BannerPreviewGrid({ variants, visibleIds, externalPlaying }: Props) {
     const navigate = useNavigate();
@@ -83,12 +75,24 @@ export function BannerPreviewGrid({ variants, visibleIds, externalPlaying }: Pro
     const [draggingId, setDraggingId] = useState<string | null>(null);
     const dragCooldownRef = useRef(false);
 
+    // Compute actual scaled card sizes for layout
+    const cardSizes = useMemo(() => {
+        return visibleVariants.map(v => {
+            const scale = getPreviewScale(v.preset.width, v.preset.height, zoom);
+            return { id: v.id, w: Math.round(v.preset.width * scale), h: Math.round(v.preset.height * scale) };
+        });
+    }, [visibleVariants, zoom]);
+
+    const autoPositions = useMemo(() => computeAutoPositions(cardSizes, zoom), [cardSizes, zoom]);
+
     const autoGridPos = useCallback((idx: number): { x: number; y: number } => {
+        const variant = visibleVariants[idx];
+        if (variant && autoPositions[variant.id]) return autoPositions[variant.id];
         const col = idx % GRID_COLS;
         const row = Math.floor(idx / GRID_COLS);
         const colWidth = Math.round(BASE_PREVIEW_WIDTH * zoom) + GRID_GAP + 40;
         return { x: col * colWidth, y: row * (Math.round(BASE_PREVIEW_HEIGHT * zoom) + 100 + GRID_GAP) };
-    }, [zoom]);
+    }, [visibleVariants, autoPositions, zoom]);
 
     // ── Drag handlers ──
     const handleCardDragStart = useCallback((e: React.MouseEvent, variantId: string, currentPos: { x: number; y: number }) => {
