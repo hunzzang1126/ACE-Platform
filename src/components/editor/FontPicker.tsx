@@ -6,7 +6,7 @@
 // ─────────────────────────────────────────────────
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { FONT_FAMILIES, ensureGoogleFont } from './contextToolbarConstants';
+import { FONT_FAMILIES, FONT_FAMILIES_BY_CATEGORY, ensureGoogleFont } from './contextToolbarConstants';
 import './FontPicker.css';
 
 interface Props {
@@ -14,29 +14,10 @@ interface Props {
     onChange: (fontFamily: string) => void;
 }
 
-/** Extract display name from "Inter, sans-serif" → "Inter" */
-function displayName(full: string): string {
-    return full.split(',')[0].trim();
-}
-
-/** Group fonts by category based on suffix */
-function getCategory(full: string): string {
-    if (full.includes('serif') && !full.includes('sans-serif')) return 'Serif';
-    if (full.includes('monospace')) return 'Mono';
-    return 'Sans-Serif';
-}
-
-// Pre-group fonts
-const FONT_GROUPS = (() => {
-    const groups: { label: string; fonts: string[] }[] = [];
-    const map = new Map<string, string[]>();
-    for (const f of FONT_FAMILIES) {
-        const cat = getCategory(f);
-        if (!map.has(cat)) { map.set(cat, []); groups.push({ label: cat, fonts: map.get(cat)! }); }
-        map.get(cat)!.push(f);
-    }
-    return groups;
-})();
+// Pre-group fonts using centralized categories
+const FONT_GROUPS = Object.entries(FONT_FAMILIES_BY_CATEGORY).map(
+    ([label, fonts]) => ({ label, fonts })
+);
 
 export function FontPicker({ value, onChange }: Props) {
     const [open, setOpen] = useState(false);
@@ -65,7 +46,7 @@ export function FontPicker({ value, onChange }: Props) {
 
     // Filter fonts
     const filteredFonts = search.trim()
-        ? FONT_FAMILIES.filter(f => displayName(f).toLowerCase().includes(search.toLowerCase()))
+        ? FONT_FAMILIES.filter(f => f.toLowerCase().includes(search.toLowerCase()))
         : null;
 
     // Keyboard navigation
@@ -104,7 +85,7 @@ export function FontPicker({ value, onChange }: Props) {
                 onClick={() => setOpen(!open)}
                 style={{ fontFamily: value }}
             >
-                {displayName(value)}
+                {value}
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginLeft: 4, opacity: 0.4, flexShrink: 0 }}>
                     <polyline points="6 9 12 15 18 9" />
                 </svg>
@@ -137,7 +118,7 @@ export function FontPicker({ value, onChange }: Props) {
                                         onClick={() => handleSelect(f)}
                                         onMouseEnter={() => setHighlightIdx(i)}
                                     >
-                                        {displayName(f)}
+                                        {f}
                                         {f === value && <span className="fp-check">&#10003;</span>}
                                     </button>
                                 ))
@@ -156,7 +137,7 @@ export function FontPicker({ value, onChange }: Props) {
                                                 onClick={() => handleSelect(f)}
                                                 onMouseEnter={() => setHighlightIdx(globalIdx)}
                                             >
-                                                {displayName(f)}
+                                                {f}
                                                 {f === value && <span className="fp-check">&#10003;</span>}
                                             </button>
                                         );

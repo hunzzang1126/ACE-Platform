@@ -13,19 +13,48 @@ import type { LayoutRole } from '@/schema/layoutRoles';
 
 // ── Constants ──
 
-export const FONT_FAMILIES = [
-    'Inter, sans-serif', 'Roboto, sans-serif', 'Open Sans, sans-serif',
-    'Lato, sans-serif', 'Poppins, sans-serif', 'Montserrat, sans-serif',
-    'Outfit, sans-serif', 'Nunito, sans-serif', 'Raleway, sans-serif',
-    'Work Sans, sans-serif', 'DM Sans, sans-serif', 'Manrope, sans-serif',
-    'Plus Jakarta Sans, sans-serif', 'Space Grotesk, sans-serif',
-    'Sora, sans-serif', 'Figtree, sans-serif',
-    'Playfair Display, serif', 'Merriweather, serif', 'Lora, serif',
-    'Georgia, serif', 'Times New Roman, serif',
-    'Oswald, sans-serif', 'Bebas Neue, sans-serif', 'Anton, sans-serif',
-    'JetBrains Mono, monospace', 'Fira Code, monospace', 'Courier New, monospace',
-    'Arial, sans-serif', 'Helvetica, sans-serif',
-];
+export const FONT_FAMILIES_BY_CATEGORY: Record<string, string[]> = {
+    'Modern Sans': [
+        'Inter', 'Outfit', 'DM Sans', 'Manrope', 'Plus Jakarta Sans',
+        'Space Grotesk', 'Sora', 'Urbanist', 'Figtree',
+    ],
+    'Classic Sans': [
+        'Roboto', 'Open Sans', 'Lato', 'Poppins', 'Montserrat',
+        'Nunito', 'Nunito Sans', 'Raleway', 'Work Sans',
+        'Source Sans 3', 'IBM Plex Sans', 'Noto Sans',
+    ],
+    'Serif': [
+        'Playfair Display', 'Cormorant Garant', 'Libre Baskerville',
+        'Merriweather', 'Lora', 'EB Garamond', 'DM Serif Display',
+        'Cormorant', 'Source Serif 4', 'Noto Serif',
+    ],
+    'Display / Impact': [
+        'Bebas Neue', 'Oswald', 'Anton', 'Staatliches',
+        'Exo 2', 'Rajdhani', 'Orbitron',
+    ],
+    'Friendly / Rounded': [
+        'Quicksand', 'Comfortaa', 'Varela Round', 'Fredoka',
+        'Baloo 2',
+    ],
+    'Handwritten': [
+        'Caveat', 'Pacifico', 'Lobster', 'Dancing Script',
+        'Nanum Pen Script',
+    ],
+    'Monospace': [
+        'JetBrains Mono', 'Fira Code', 'Source Code Pro',
+    ],
+    'Korean': [
+        'Noto Sans KR', 'Noto Serif KR', 'Gothic A1',
+        'Nanum Gothic', 'Nanum Myeongjo', 'Do Hyeon',
+        'Jua', 'Black Han Sans',
+    ],
+    'System': [
+        'Arial', 'Helvetica', 'Georgia', 'Times New Roman', 'Courier New',
+    ],
+};
+
+// Flat list for backward compatibility
+export const FONT_FAMILIES: string[] = Object.values(FONT_FAMILIES_BY_CATEGORY).flat();
 
 export const FONT_WEIGHTS = [
     { label: 'Light', value: '300' },

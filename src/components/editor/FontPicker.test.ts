@@ -58,16 +58,15 @@ describe('FontPicker utilities', () => {
 
     // Font list integrity
     describe('FONT_FAMILIES list', () => {
-        // Import lazily to avoid Google Fonts side effect in test
-        it('has at least 20 fonts', async () => {
+        it('has at least 50 fonts', async () => {
             const { FONT_FAMILIES } = await import('./contextToolbarConstants');
-            expect(FONT_FAMILIES.length).toBeGreaterThanOrEqual(20);
+            expect(FONT_FAMILIES.length).toBeGreaterThanOrEqual(50);
         });
 
-        it('all entries have fallback family', async () => {
+        it('all entries are clean names (no comma fallback)', async () => {
             const { FONT_FAMILIES } = await import('./contextToolbarConstants');
             for (const f of FONT_FAMILIES) {
-                expect(f).toContain(',');
+                expect(f).not.toContain(',');
             }
         });
 

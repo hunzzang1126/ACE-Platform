@@ -11,7 +11,8 @@ import { EffectsSection } from '@/components/panels/EffectsSection';
 import { Section, ScrubField, PropField, OpacitySlider } from '@/components/panels/PropertyFields';
 import type { EngineNode, CanvasEngineActions } from '@/hooks/useCanvasEngine';
 import type { OverlayElement } from '@/hooks/useOverlayElements';
-import { FONT_FAMILIES, FONT_WEIGHTS, RemoveBgButton, FillToPageButton, SmartSizingSection, AiImageReplaceSection, AiOverlayReplaceSection } from './PropertyPanelSections';
+import { FONT_FAMILIES_BY_CATEGORY, FONT_WEIGHTS, RemoveBgButton, FillToPageButton, SmartSizingSection, AiImageReplaceSection, AiOverlayReplaceSection } from './PropertyPanelSections';
+import { loadGoogleFont } from '@/services/fontLoader';
 import { useAppI18n } from '@/i18n';
 
 interface Props {
@@ -55,8 +56,12 @@ export function PropertyPanel({ nodes = [], selection = [], actions, selectedOve
             <aside className="pp-root">
                 <div className="pp-header"><span className="pp-title">{t('editor.text')}</span></div>
                 <Section label={t('editor.typography')}>
-                    <select className="pp-select" value={selectedOverlay.fontFamily || 'Inter, sans-serif'} onChange={(e) => onOverlayUpdate?.(selectedOverlay.id, { fontFamily: e.target.value })}>
-                        {FONT_FAMILIES.map((f) => (<option key={f} value={f}>{f.split(',')[0]}</option>))}
+                    <select className="pp-select" value={selectedOverlay.fontFamily || 'Inter'} onChange={(e) => { const f = e.target.value; loadGoogleFont(f); onOverlayUpdate?.(selectedOverlay.id, { fontFamily: f }); }}>
+                        {Object.entries(FONT_FAMILIES_BY_CATEGORY).map(([cat, fonts]) => (
+                            <optgroup key={cat} label={cat}>
+                                {fonts.map((f) => (<option key={f} value={f}>{f}</option>))}
+                            </optgroup>
+                        ))}
                     </select>
                     <select className="pp-select" value={selectedOverlay.fontWeight || '400'} onChange={(e) => onOverlayUpdate?.(selectedOverlay.id, { fontWeight: e.target.value })}>
                         {FONT_WEIGHTS.map((fw) => (<option key={fw.value} value={fw.value}>{fw.label}</option>))}
@@ -137,7 +142,13 @@ export function PropertyPanel({ nodes = [], selection = [], actions, selectedOve
                 <div className="pp-header"><span className="pp-title">{nodeTitle}</span><span className="pp-subtitle">ID: {selectedNode.id}</span></div>
                 {isTextNode && (
                     <Section label={t('editor.typography')}>
-                        <select className="pp-select" value={selectedNode.fontFamily || 'Inter, sans-serif'} onChange={(e) => actions.updateText?.(selectedNode.id, { fontFamily: e.target.value })}>{FONT_FAMILIES.map((f) => (<option key={f} value={f}>{f.split(',')[0]}</option>))}</select>
+                        <select className="pp-select" value={selectedNode.fontFamily || 'Inter'} onChange={(e) => { const f = e.target.value; loadGoogleFont(f); actions.updateText?.(selectedNode.id, { fontFamily: f }); }}>
+                            {Object.entries(FONT_FAMILIES_BY_CATEGORY).map(([cat, fonts]) => (
+                                <optgroup key={cat} label={cat}>
+                                    {fonts.map((f) => (<option key={f} value={f}>{f}</option>))}
+                                </optgroup>
+                            ))}
+                        </select>
                         <select className="pp-select" value={selectedNode.fontWeight || '400'} onChange={(e) => actions.updateText?.(selectedNode.id, { fontWeight: e.target.value })}>{FONT_WEIGHTS.map((fw) => (<option key={fw.value} value={fw.value}>{fw.label}</option>))}</select>
                         <ScrubField label={t('editor.fontSize')} value={selectedNode.fontSize ?? 18} min={1} max={999} unit="px" onChange={(v) => actions.updateText?.(selectedNode.id, { fontSize: v })} />
                         <ColorPicker label={t('editor.textColor')} color={selectedNode.color || '#000000'} onChange={(c) => actions.updateText?.(selectedNode.id, { color: c })} />
