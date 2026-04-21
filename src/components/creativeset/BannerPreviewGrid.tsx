@@ -18,7 +18,6 @@ import { PreviewContextMenu } from './PreviewContextMenu';
 import { CanvasPreviewImage } from './CanvasPreviewImage';
 import { LinkedBadge } from './LinkedBadge';
 import { useAppI18n } from '@/i18n';
-import { BASE_PREVIEW_WIDTH, BASE_PREVIEW_HEIGHT, GRID_GAP, GRID_COLS, getPreviewScale, computeAutoPositions } from './gridLayout';
 
 interface ContextMenuState { x: number; y: number; variantId: string; }
 
@@ -32,12 +31,21 @@ interface Props {
     externalPlaying?: boolean;
 }
 
-
+const BASE_PREVIEW_WIDTH = 280;
+const BASE_PREVIEW_HEIGHT = 360;
 const TIMELINE_DURATION = 5;
+const GRID_GAP = 32;
+const GRID_COLS = 3;
 const ZOOM_KEY = 'ace-size-dash-zoom';
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 2.0;
 const ZOOM_DEFAULT = 1.0;
+
+function getPreviewScale(w: number, h: number, zoom: number) {
+    const maxW = BASE_PREVIEW_WIDTH * zoom;
+    const maxH = BASE_PREVIEW_HEIGHT * zoom;
+    return Math.min(maxW / w, maxH / h, 1 * zoom);
+}
 
 export function BannerPreviewGrid({ variants, visibleIds, externalPlaying }: Props) {
     const navigate = useNavigate();
@@ -75,24 +83,12 @@ export function BannerPreviewGrid({ variants, visibleIds, externalPlaying }: Pro
     const [draggingId, setDraggingId] = useState<string | null>(null);
     const dragCooldownRef = useRef(false);
 
-    // Compute actual scaled card sizes for layout
-    const cardSizes = useMemo(() => {
-        return visibleVariants.map(v => {
-            const scale = getPreviewScale(v.preset.width, v.preset.height, zoom);
-            return { id: v.id, w: Math.round(v.preset.width * scale), h: Math.round(v.preset.height * scale) };
-        });
-    }, [visibleVariants, zoom]);
-
-    const autoPositions = useMemo(() => computeAutoPositions(cardSizes, zoom), [cardSizes, zoom]);
-
     const autoGridPos = useCallback((idx: number): { x: number; y: number } => {
-        const variant = visibleVariants[idx];
-        if (variant && autoPositions[variant.id]) return autoPositions[variant.id];
         const col = idx % GRID_COLS;
         const row = Math.floor(idx / GRID_COLS);
         const colWidth = Math.round(BASE_PREVIEW_WIDTH * zoom) + GRID_GAP + 40;
         return { x: col * colWidth, y: row * (Math.round(BASE_PREVIEW_HEIGHT * zoom) + 100 + GRID_GAP) };
-    }, [visibleVariants, autoPositions, zoom]);
+    }, [zoom]);
 
     // ── Drag handlers ──
     const handleCardDragStart = useCallback((e: React.MouseEvent, variantId: string, currentPos: { x: number; y: number }) => {
@@ -152,18 +148,14 @@ export function BannerPreviewGrid({ variants, visibleIds, externalPlaying }: Pro
     const [resolvedImageUrls, setResolvedImageUrls] = useState<Record<string, string>>({});
     const visibleVariants = useMemo(() => variants.filter(v => visibleIds.has(v.id)), [variants, visibleIds]);
 
-    const canvasDims = useMemo(() => {
-        let maxX = 0;
+    const canvasHeight = useMemo(() => {
         let maxY = 0;
         visibleVariants.forEach((v, idx) => {
             const pos = cardPositions[v.id] ?? autoGridPos(idx);
-            const scale = getPreviewScale(v.preset.width, v.preset.height, zoom);
-            const w = Math.round(v.preset.width * scale);
-            const h = Math.round(v.preset.height * scale);
-            maxX = Math.max(maxX, pos.x + w + 40);
+            const h = Math.round(v.preset.height * getPreviewScale(v.preset.width, v.preset.height, zoom));
             maxY = Math.max(maxY, pos.y + h + 100);
         });
-        return { w: maxX, h: maxY };
+        return maxY;
     }, [visibleVariants, cardPositions, autoGridPos, zoom]);
 
     // Restore video blobs
@@ -283,7 +275,7 @@ export function BannerPreviewGrid({ variants, visibleIds, externalPlaying }: Pro
                 {!hasAnyAnimation && (<span className="banner-no-anim-hint">{t('size.addAnimNote')}</span>)}
             </div>
 
-            <div className="banner-grid" ref={gridContainerRef} style={{ position: 'relative', minWidth: canvasDims.w, minHeight: Math.max(600, canvasDims.h + 40), overflow: 'visible' }}>
+            <div className="banner-grid" ref={gridContainerRef} style={{ position: 'relative', minHeight: Math.max(600, canvasHeight + 40), overflow: 'visible' }}>
                 <PlugCanvas variants={visibleVariants} cardRefs={cardRefs} containerRef={gridContainerRef} />
                 {visibleVariants.map((variant, idx) => {
                     const { width, height } = variant.preset;

@@ -147,8 +147,6 @@ export interface CanvasEngineActions {
     canvasHeight: number;
     /** Refresh text coordinate calculations after font loading */
     refreshTextCoords?: () => void;
-    /** Variable Font animation — start/stop RAF preview */
-    setFontAnimation?: (id: number, presetId: string) => void;
 }
 
 export interface UseCanvasEngineResult {

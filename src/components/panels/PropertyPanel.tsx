@@ -168,11 +168,7 @@ export function PropertyPanel({ nodes = [], selection = [], actions, selectedOve
                                 <select
                                     className="pp-select"
                                     value={currentPreset}
-                                    onChange={(e) => {
-                                        const pid = e.target.value;
-                                        actions.updateText?.(selectedNode.id, { fontAnimation: { presetId: pid, enabled: pid !== 'none' } } as any);
-                                        actions.setFontAnimation?.(selectedNode.id, pid);
-                                    }}
+                                    onChange={(e) => actions.updateText?.(selectedNode.id, { fontAnimation: { presetId: e.target.value, enabled: e.target.value !== 'none' } } as any)}
                                 >
                                     {FONT_ANIM_PRESETS.map(p => (<option key={p.id} value={p.id}>{p.label}</option>))}
                                 </select>
