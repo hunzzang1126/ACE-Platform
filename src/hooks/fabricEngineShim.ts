@@ -283,26 +283,43 @@ export function createEngineShim(
             const obj = findById(id);
             if (obj) { obj.set({ fill: hex }); fc.renderAll(); syncState(); }
         },
+        set_font_family: (id: number, family: string) => {
+            const obj = findById(id);
+            if (obj && 'fontFamily' in obj) { obj.set({ fontFamily: family } as any); obj.setCoords(); fc.renderAll(); syncState(); }
+        },
+        set_font_weight: (id: number, weight: number) => {
+            const obj = findById(id);
+            if (obj && 'fontWeight' in obj) { obj.set({ fontWeight: weight } as any); obj.setCoords(); fc.renderAll(); syncState(); }
+        },
         set_position: (id: number, x: number, y: number) => {
             const obj = findById(id);
-            if (obj) { obj.set({ left: x, top: y }); obj.setCoords(); fc.renderAll(); }
+            if (!obj) return;
+            // -1 sentinel = keep current value
+            const newX = x >= 0 ? x : (obj.left ?? 0);
+            const newY = y >= 0 ? y : (obj.top ?? 0);
+            obj.set({ left: newX, top: newY }); obj.setCoords(); fc.renderAll(); syncState();
         },
         set_angle: (id: number, angle: number) => {
             const obj = findById(id);
-            if (obj) { obj.set({ angle }); obj.setCoords(); fc.renderAll(); }
+            if (obj) { obj.set({ angle }); obj.setCoords(); fc.renderAll(); syncState(); }
         },
         set_size: (id: number, w: number, h: number) => {
             const obj = findById(id);
             if (!obj) return;
+            // -1 sentinel = keep current value
+            const curW = (obj as any).width ?? 100;
+            const curH = (obj as any).height ?? 100;
+            const newW = w >= 0 ? w : curW;
+            const newH = h >= 0 ? h : curH;
             if (obj.type === 'image') {
-                const natW = (obj as any).width ?? w;
-                const natH = (obj as any).height ?? h;
-                const scale = Math.min(w / Math.max(natW, 1), h / Math.max(natH, 1));
+                const natW = (obj as any).width ?? newW;
+                const natH = (obj as any).height ?? newH;
+                const scale = Math.min(newW / Math.max(natW, 1), newH / Math.max(natH, 1));
                 obj.set({ scaleX: scale, scaleY: scale });
             } else {
-                obj.set({ width: w, height: h, scaleX: 1, scaleY: 1 });
+                obj.set({ width: newW, height: newH, scaleX: 1, scaleY: 1 });
             }
-            obj.setCoords(); fc.renderAll();
+            obj.setCoords(); fc.renderAll(); syncState();
         },
         fill_to_page: (id?: number) => {
             let obj: FabricObject | undefined;

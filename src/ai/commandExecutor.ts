@@ -17,6 +17,62 @@ import { executeDesignCommand } from './executors/designExecutor';
 export type { ExecutionResult } from './executorHelpers';
 
 /**
+ * Apply a property change to a Fabric canvas node via the engine shim.
+ * Returns true if the engine method existed and was called.
+ */
+function applyPropertyToEngine(engine: Engine, nodeId: number, property: string, rawValue: string): boolean {
+    const numVal = Number(rawValue);
+    switch (property) {
+        // ── Color ──
+        case 'color':
+        case 'fill':
+        case 'backgroundColor':
+            if (engine.set_fill_hex) { engine.set_fill_hex(nodeId, rawValue); return true; }
+            return false;
+
+        // ── Typography ──
+        case 'fontSize':
+            if (engine.set_font_size) { engine.set_font_size(nodeId, numVal); return true; }
+            return false;
+        case 'fontFamily':
+            if (engine.set_font_family) { engine.set_font_family(nodeId, rawValue); return true; }
+            return false;
+        case 'fontWeight':
+            if (engine.set_font_weight) { engine.set_font_weight(nodeId, numVal); return true; }
+            return false;
+
+        // ── Transform ──
+        case 'x':
+            if (engine.set_position) { engine.set_position(nodeId, numVal, -1); return true; }
+            return false;
+        case 'y':
+            if (engine.set_position) { engine.set_position(nodeId, -1, numVal); return true; }
+            return false;
+        case 'width':
+        case 'w':
+            if (engine.set_size) { engine.set_size(nodeId, numVal, -1); return true; }
+            return false;
+        case 'height':
+        case 'h':
+            if (engine.set_size) { engine.set_size(nodeId, -1, numVal); return true; }
+            return false;
+        case 'angle':
+        case 'rotation':
+            if (engine.set_angle) { engine.set_angle(nodeId, numVal); return true; }
+            return false;
+
+        // ── Visual ──
+        case 'opacity':
+            if (engine.set_opacity) { engine.set_opacity(nodeId, numVal); return true; }
+            return false;
+
+        default:
+            console.log(`[applyPropertyToEngine] No engine handler for "${property}" — store-only update`);
+            return false;
+    }
+}
+
+/**
  * Execute a single tool call.
  * Only handles the 7 essential tools — everything else is eval.
  */
@@ -269,9 +325,8 @@ export async function executeToolCall(
                         const nodes = JSON.parse(engine.get_all_nodes() ?? '[]');
                         for (const node of nodes) {
                             if ((node.name ?? '').toLowerCase().includes(elementName)) {
-                                if (property === 'color' && engine.set_fill_hex) { engine.set_fill_hex(node.id, rawValue); engineUpdated++; }
-                                else if (property === 'fontSize' && engine.set_font_size) { engine.set_font_size(node.id, Number(rawValue)); engineUpdated++; }
-                                else if (property === 'opacity' && engine.set_opacity) { engine.set_opacity(node.id, Number(rawValue)); engineUpdated++; }
+                                const updated = applyPropertyToEngine(engine, node.id, property, rawValue);
+                                if (updated) engineUpdated++;
                             }
                         }
                     } catch (e) { console.warn('[update_element_property] Engine update failed:', e); }
