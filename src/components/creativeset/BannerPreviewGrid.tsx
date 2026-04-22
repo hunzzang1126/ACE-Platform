@@ -86,8 +86,11 @@ export function BannerPreviewGrid({ variants, visibleIds, externalPlaying }: Pro
     const autoGridPos = useCallback((idx: number): { x: number; y: number } => {
         const col = idx % GRID_COLS;
         const row = Math.floor(idx / GRID_COLS);
+        // ★ Use uniform slot size = BASE dimensions * zoom + padding
+        // This guarantees no overlap regardless of card aspect ratio
         const colWidth = Math.round(BASE_PREVIEW_WIDTH * zoom) + GRID_GAP + 40;
-        return { x: col * colWidth, y: row * (Math.round(BASE_PREVIEW_HEIGHT * zoom) + 100 + GRID_GAP) };
+        const rowHeight = Math.round(BASE_PREVIEW_HEIGHT * zoom) + 100 + GRID_GAP;
+        return { x: col * colWidth, y: row * rowHeight };
     }, [zoom]);
 
     // ── Drag handlers ──
@@ -152,8 +155,8 @@ export function BannerPreviewGrid({ variants, visibleIds, externalPlaying }: Pro
         let maxY = 0;
         visibleVariants.forEach((v, idx) => {
             const pos = cardPositions[v.id] ?? autoGridPos(idx);
-            const h = Math.round(v.preset.height * getPreviewScale(v.preset.width, v.preset.height, zoom));
-            maxY = Math.max(maxY, pos.y + h + 100);
+            const scaledH = Math.round(v.preset.height * getPreviewScale(v.preset.width, v.preset.height, zoom));
+            maxY = Math.max(maxY, pos.y + scaledH + 100);
         });
         return maxY;
     }, [visibleVariants, cardPositions, autoGridPos, zoom]);
