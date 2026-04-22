@@ -6,14 +6,15 @@
 //   - Carbon provides: position, size, spacing, typography for each element
 //   - Templates are NOT involved. Zero template dependency.
 //
-// Carbon tokens used:
-//   spacing() — element margins/padding (8px grid snapped)
-//   resolveTypeStyle() — font size/weight/lineHeight per breakpoint
-//   columns() — element widths from 16-column grid
+// ★ KEY ADAPTATION: Carbon is designed for WEB (1056px viewport).
+//   Ad creatives need BIGGER type relative to canvas.
+//   We apply an "ad impact multiplier" on top of Carbon's type scale.
+//   Web headline: 60px on 1080px page = 5.5% = readable
+//   Ad headline: 120px on 1080px canvas = 11% = IMPACTFUL
 // ─────────────────────────────────────────────────
 
 import type { RenderElement } from '@/services/autoDesignTypes';
-import { spacing, resolveTypeStyle, scaledFontSize, TYPE_SCALE_PX } from './adapter';
+import { spacing, resolveTypeStyle, TYPE_SCALE_PX, miniUnit } from './adapter';
 import { columns, centeredX, getMargin } from './gridSystem';
 import { getAspectCategory } from '@/schema/layoutRoles';
 import type { AspectCategory } from '@/schema/layoutRoles';
@@ -39,20 +40,16 @@ export interface DesignPalette {
 // ── Layout Rule Per Aspect Category ──────────────
 
 interface ElementRule {
-    /** Type style from Carbon (e.g. 'display01', 'expressiveHeading04') */
     typeStyle: string;
-    /** Number of grid columns for width (out of 16) */
     cols: number;
-    /** Horizontal alignment */
     align: 'center' | 'left' | 'right';
-    /** Spacing step for top margin (index into Carbon spacing scale) */
-    topSpacingStep: number;
-    /** Max lines before text truncation */
+    /** Spacing step between this element and previous (Carbon spacing index 0-12) */
+    gapStep: number;
     maxLines?: number;
-    /** Override font weight (else uses Carbon style default) */
     fontWeight?: number;
-    /** Text alignment */
     textAlign?: 'left' | 'center' | 'right';
+    /** Ad impact multiplier: scales Carbon font size for ad creative impact */
+    adScale: number;
 }
 
 interface LayoutRuleSet {
@@ -60,128 +57,114 @@ interface LayoutRuleSet {
     subline: ElementRule;
     cta: ElementRule;
     tag: ElementRule;
+    /** Minimum CTA height as fraction of canvasMin */
+    ctaHeightFactor: number;
 }
 
 // ── Aspect-Category Layout Rules ─────────────────
-// These define WHERE each element goes, using Carbon tokens.
-// All spacing values reference the Carbon spacing scale.
-// All widths reference the 16-column grid.
-// All typography references Carbon type styles.
 
 const SQUARE_RULES: LayoutRuleSet = {
     headline: {
-        typeStyle: 'display01',
+        typeStyle: 'display03', // Carbon display03: 42→96px across breakpoints
         cols: 14, align: 'center',
-        topSpacingStep: 8, // spacing08 = 40px base
-        maxLines: 3, fontWeight: 600,
-        textAlign: 'center',
+        gapStep: 6, maxLines: 3, fontWeight: 700,
+        textAlign: 'center', adScale: 1.6,
     },
     subline: {
-        typeStyle: 'expressiveHeading04',
-        cols: 12, align: 'center',
-        topSpacingStep: 5, // spacing05 = 16px base
-        textAlign: 'center',
+        typeStyle: 'expressiveHeading05', // 32→60px
+        cols: 13, align: 'center',
+        gapStep: 5, textAlign: 'center', adScale: 1.3,
     },
     cta: {
         typeStyle: 'heading03',
-        cols: 8, align: 'center',
-        topSpacingStep: 7, // spacing07 = 32px base
-        fontWeight: 600,
-        textAlign: 'center',
+        cols: 10, align: 'center',
+        gapStep: 7, fontWeight: 600,
+        textAlign: 'center', adScale: 1.4,
     },
     tag: {
         typeStyle: 'label02',
         cols: 10, align: 'center',
-        topSpacingStep: 6,
-        textAlign: 'center',
+        gapStep: 4, textAlign: 'center', adScale: 1.6,
     },
+    ctaHeightFactor: 0.055,
 };
 
 const LANDSCAPE_RULES: LayoutRuleSet = {
     headline: {
-        typeStyle: 'expressiveHeading05',
+        typeStyle: 'expressiveHeading06',
         cols: 14, align: 'center',
-        topSpacingStep: 7,
-        maxLines: 2, fontWeight: 600,
-        textAlign: 'center',
+        gapStep: 5, maxLines: 2, fontWeight: 700,
+        textAlign: 'center', adScale: 1.5,
     },
     subline: {
-        typeStyle: 'expressiveHeading03',
+        typeStyle: 'expressiveHeading04',
         cols: 12, align: 'center',
-        topSpacingStep: 4,
-        textAlign: 'center',
+        gapStep: 4, textAlign: 'center', adScale: 1.3,
     },
     cta: {
         typeStyle: 'productiveHeading03',
         cols: 8, align: 'center',
-        topSpacingStep: 6,
-        fontWeight: 600,
-        textAlign: 'center',
+        gapStep: 5, fontWeight: 600,
+        textAlign: 'center', adScale: 1.3,
     },
     tag: {
         typeStyle: 'label02',
         cols: 10, align: 'center',
-        topSpacingStep: 5,
-        textAlign: 'center',
+        gapStep: 3, textAlign: 'center', adScale: 1.4,
     },
+    ctaHeightFactor: 0.07,
 };
 
 const PORTRAIT_RULES: LayoutRuleSet = {
     headline: {
-        typeStyle: 'expressiveHeading05',
+        typeStyle: 'display01',
         cols: 14, align: 'center',
-        topSpacingStep: 8,
-        maxLines: 4, fontWeight: 600,
-        textAlign: 'center',
+        gapStep: 6, maxLines: 4, fontWeight: 700,
+        textAlign: 'center', adScale: 1.5,
     },
     subline: {
-        typeStyle: 'expressiveHeading03',
+        typeStyle: 'expressiveHeading04',
         cols: 13, align: 'center',
-        topSpacingStep: 5,
-        textAlign: 'center',
+        gapStep: 5, textAlign: 'center', adScale: 1.3,
     },
     cta: {
         typeStyle: 'productiveHeading03',
         cols: 12, align: 'center',
-        topSpacingStep: 7,
-        fontWeight: 600,
-        textAlign: 'center',
+        gapStep: 7, fontWeight: 600,
+        textAlign: 'center', adScale: 1.3,
     },
     tag: {
         typeStyle: 'label02',
         cols: 12, align: 'center',
-        topSpacingStep: 5,
-        textAlign: 'center',
+        gapStep: 4, textAlign: 'center', adScale: 1.5,
     },
+    ctaHeightFactor: 0.06,
 };
 
 const ULTRA_WIDE_RULES: LayoutRuleSet = {
     headline: {
-        typeStyle: 'expressiveHeading04',
+        typeStyle: 'expressiveHeading05',
         cols: 6, align: 'left',
-        topSpacingStep: 5,
-        maxLines: 1, fontWeight: 600,
-        textAlign: 'left',
+        gapStep: 3, maxLines: 1, fontWeight: 700,
+        textAlign: 'left', adScale: 1.4,
     },
     subline: {
         typeStyle: 'expressiveHeading03',
         cols: 5, align: 'center',
-        topSpacingStep: 3,
-        textAlign: 'center',
+        gapStep: 3, textAlign: 'center', adScale: 1.2,
     },
     cta: {
         typeStyle: 'productiveHeading02',
         cols: 3, align: 'right',
-        topSpacingStep: 5,
-        fontWeight: 600,
-        textAlign: 'center',
+        gapStep: 3, fontWeight: 600,
+        textAlign: 'center', adScale: 1.3,
     },
     tag: {
         typeStyle: 'label01',
         cols: 3, align: 'left',
-        topSpacingStep: 3,
-        textAlign: 'left',
+        gapStep: 2, textAlign: 'left', adScale: 1.3,
     },
+    ctaHeightFactor: 0.35,
 };
 
 const RULES_MAP: Record<AspectCategory, LayoutRuleSet> = {
@@ -193,17 +176,6 @@ const RULES_MAP: Record<AspectCategory, LayoutRuleSet> = {
 
 // ── Main API ─────────────────────────────────────
 
-/**
- * Build design elements from AI-generated content using Carbon layout rules.
- * NO template dependency. Carbon tokens determine all positions and sizes.
- *
- * @param content - AI-generated text content
- * @param palette - AI-generated color palette
- * @param canvasW - canvas width
- * @param canvasH - canvas height
- * @param hasBgImage - whether AI generated a background image
- * @returns RenderElement[] ready for canvas rendering
- */
 export function buildDesignElements(
     content: DesignContent,
     palette: DesignPalette,
@@ -215,6 +187,7 @@ export function buildDesignElements(
     const rules = RULES_MAP[category];
     const canvasMin = Math.min(canvasW, canvasH);
     const elements: RenderElement[] = [];
+    const isUltraWide = category === 'ultra-wide';
 
     // ── Background (AI-decided) ──
     if (!hasBgImage) {
@@ -228,80 +201,109 @@ export function buildDesignElements(
         });
     }
 
-    // ── Vertical flow cursor ──
-    // Elements are placed top-to-bottom with Carbon spacing between them.
-    let cursorY = spacing(rules.headline.topSpacingStep, canvasMin);
-
-    // Determine text color based on background
     const textColor = hasBgImage ? '#FFFFFF' : palette.foreground;
-    const isUltraWide = category === 'ultra-wide';
 
-    // ── Tag (above headline if present) ──
+    // ── Build content block (measure all heights first) ──
+    // We build all text elements first, then CENTER the block vertically.
+    const contentBlock: { element: RenderElement; gapBefore: number }[] = [];
+
+    // Tag
     if (content.tag) {
         const el = buildTextElement('tag_text', content.tag, rules.tag,
             canvasW, canvasH, canvasMin, textColor, palette);
-        el.y = cursorY;
-        elements.push(el);
-        cursorY += el.h + spacing(rules.tag.topSpacingStep, canvasMin);
+        contentBlock.push({ element: el, gapBefore: 0 });
     }
 
-    // ── Headline (always present) ──
+    // Headline
     const headlineEl = buildTextElement('headline', content.headline, rules.headline,
         canvasW, canvasH, canvasMin, textColor, palette);
+    contentBlock.push({
+        element: headlineEl,
+        gapBefore: contentBlock.length > 0 ? spacing(rules.tag.gapStep, canvasMin) : 0,
+    });
 
-    if (isUltraWide) {
-        // Ultra-wide: headline on left side, vertically centered
-        headlineEl.y = Math.round((canvasH - headlineEl.h) / 2);
-    } else {
-        headlineEl.y = cursorY;
-    }
-    elements.push(headlineEl);
-    cursorY = headlineEl.y + headlineEl.h;
-
-    // ── Subheadline (optional) ──
+    // Subheadline
     if (content.subheadline) {
-        cursorY += spacing(rules.subline.topSpacingStep, canvasMin);
         const subEl = buildTextElement('subheadline', content.subheadline, rules.subline,
             canvasW, canvasH, canvasMin, textColor, palette);
+        contentBlock.push({ element: subEl, gapBefore: spacing(rules.subline.gapStep, canvasMin) });
+    }
 
-        if (isUltraWide) {
-            subEl.y = Math.round((canvasH - subEl.h) / 2);
-        } else {
-            subEl.y = cursorY;
+    // ── Calculate total content height ──
+    let totalContentH = 0;
+    for (const item of contentBlock) {
+        totalContentH += item.gapBefore + (item.element.h ?? 0);
+    }
+
+    // ── CTA dimensions (calculated early for vertical layout) ──
+    let ctaH = 0;
+    let ctaGap = 0;
+    if (content.cta) {
+        const ctaType = resolveTypeStyle(rules.cta.typeStyle, canvasMin);
+        const ctaFontSize = Math.max(10, Math.round(ctaType.fontSize * rules.cta.adScale));
+        ctaH = Math.max(
+            Math.round(canvasMin * rules.ctaHeightFactor),
+            Math.round(ctaFontSize * 2.5),
+        );
+        ctaGap = spacing(rules.cta.gapStep, canvasMin);
+        totalContentH += ctaGap + ctaH;
+    }
+
+    // ── Vertical centering ──
+    // Place content block in the vertical center of the canvas.
+    // For ultra-wide: use horizontal layout instead.
+    let startY: number;
+    if (isUltraWide) {
+        startY = Math.round((canvasH - totalContentH) / 2);
+    } else {
+        // Center with slight upward bias (golden ratio ~38% from top)
+        const goldenTop = Math.round(canvasH * 0.38 - totalContentH / 2);
+        const minTop = spacing(5, canvasMin); // minimum top margin
+        startY = Math.max(minTop, goldenTop);
+    }
+
+    // ── If content overflows canvas, compress everything to fit ──
+    let compressionRatio = 1;
+    if (totalContentH > canvasH * 0.92) {
+        compressionRatio = (canvasH * 0.88) / totalContentH;
+        totalContentH = Math.round(totalContentH * compressionRatio);
+        for (const item of contentBlock) {
+            item.element.h = Math.round((item.element.h ?? 0) * compressionRatio);
+            item.element.font_size = Math.max(8, Math.round((item.element.font_size ?? 16) * compressionRatio));
+            item.gapBefore = Math.round(item.gapBefore * compressionRatio);
         }
-        elements.push(subEl);
-        cursorY = subEl.y + subEl.h;
+        ctaH = Math.round(ctaH * compressionRatio);
+        ctaGap = Math.round(ctaGap * compressionRatio);
+        startY = Math.max(spacing(3, canvasMin), Math.round((canvasH - totalContentH) / 2));
+    }
+
+    // ── Place content elements ──
+    let cursorY = startY;
+    for (const item of contentBlock) {
+        cursorY += item.gapBefore;
+        item.element.y = cursorY;
+        elements.push(item.element);
+        cursorY += item.element.h ?? 0;
     }
 
     // ── CTA Button (optional) ──
     if (content.cta) {
         const ctaRule = rules.cta;
         const ctaType = resolveTypeStyle(ctaRule.typeStyle, canvasMin);
-        const ctaFontSize = Math.max(8, Math.round(ctaType.fontSize));
+        const ctaFontSize = Math.max(10, Math.round(ctaType.fontSize * ctaRule.adScale));
         const ctaW = columns(ctaRule.cols, canvasW);
-        const ctaH = Math.max(32, Math.round(ctaFontSize * 2.5));
-        const ctaRadius = Math.round(ctaH / 2); // pill shape
+        const ctaRadius = Math.round(ctaH / 2);
 
         let ctaX: number;
         if (ctaRule.align === 'center') ctaX = centeredX(ctaRule.cols, canvasW);
         else if (ctaRule.align === 'right') ctaX = canvasW - ctaW - getMargin(canvasW);
         else ctaX = getMargin(canvasW);
 
-        let ctaY: number;
-        if (isUltraWide) {
-            ctaY = Math.round((canvasH - ctaH) / 2);
-        } else {
-            // CTA anchored to bottom area
-            const bottomMargin = spacing(7, canvasMin);
-            ctaY = canvasH - ctaH - bottomMargin;
-            // But don't overlap with content above
-            const minCtaY = cursorY + spacing(ctaRule.topSpacingStep, canvasMin);
-            ctaY = Math.max(ctaY, minCtaY);
-        }
-        // ★ Safety clamp: CTA must not exceed canvas bounds
+        let ctaY = cursorY + ctaGap;
+        // Safety clamp
         ctaY = Math.min(ctaY, canvasH - ctaH);
+        ctaY = Math.max(ctaY, 0);
 
-        // CTA button shape
         elements.push({
             name: 'cta_button',
             type: 'rounded_rect' as any,
@@ -310,7 +312,6 @@ export function buildDesignElements(
             radius: ctaRadius,
         });
 
-        // CTA label
         elements.push({
             name: 'cta_label',
             type: 'text' as any,
@@ -340,16 +341,17 @@ function buildTextElement(
     palette: DesignPalette,
 ): RenderElement {
     const typeStyle = resolveTypeStyle(rule.typeStyle, canvasMin);
-    const fontSize = Math.max(8, Math.round(typeStyle.fontSize));
+
+    // ★ Ad Impact Scaling: Carbon web font × adScale = ad-ready font size
+    const fontSize = Math.max(10, Math.round(typeStyle.fontSize * rule.adScale));
     const w = columns(rule.cols, canvasW);
     const lineHeight = typeStyle.lineHeight;
 
-    // Estimate height from content length + font size
+    // Estimate height
     const charsPerLine = Math.max(1, Math.floor(w / (fontSize * 0.55)));
     const lines = Math.min(rule.maxLines ?? 10, Math.max(1, Math.ceil(content.length / charsPerLine)));
     const h = Math.round(fontSize * lineHeight * lines + 8);
 
-    // X position based on alignment
     let x: number;
     if (rule.align === 'center') x = centeredX(rule.cols, canvasW);
     else if (rule.align === 'right') x = canvasW - w - getMargin(canvasW);
@@ -358,7 +360,7 @@ function buildTextElement(
     return {
         name,
         type: 'text' as any,
-        x, y: 0, // Y is set by the caller (vertical flow)
+        x, y: 0,
         w, h,
         content,
         font_size: fontSize,
