@@ -247,7 +247,8 @@ async function buildAndRender(
         ]);
         allElements = allElements.filter(el => {
             if (el.type === 'text') return true; // always keep text
-            if (STRUCTURAL_RECT_NAMES.has(el.name ?? '')) {
+            const nameLower = (el.name ?? '').toLowerCase();
+            if (STRUCTURAL_RECT_NAMES.has(nameLower)) {
                 console.log(`[Pipeline] Removing structural rect "${el.name}" (photo bg replaces it)`);
                 return false;
             }
@@ -255,7 +256,7 @@ async function buildAndRender(
         });
     } else {
         // ★ NO BACKGROUND IMAGE — ensure background shape exists + text contrast
-        const hasBg = allElements.some(el => el.name === 'background');
+        const hasBg = allElements.some(el => (el.name ?? '').toLowerCase() === 'background');
         if (!hasBg) {
             // Create background element from palette (gradient or solid)
             allElements.unshift({
@@ -270,7 +271,7 @@ async function buildAndRender(
         }
 
         // ★ CONTRAST CHECK: ensure text is readable against background
-        const bgEl = allElements.find(el => el.name === 'background');
+        const bgEl = allElements.find(el => (el.name ?? '').toLowerCase() === 'background');
         const bgLum = bgEl
             ? averageLuminance(bgEl.gradient_start_hex ?? '#000000', bgEl.gradient_end_hex ?? bgEl.gradient_start_hex ?? '#000000')
             : 0.5;
