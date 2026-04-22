@@ -231,13 +231,11 @@ async function buildAndRender(
     // ★ PHOTO CONTRAST: When a background image exists, ensure all text is readable.
     // Force white text + drop shadow for photo backgrounds (zero tokens, max impact).
     if (bgResult.hasImage && bgResult.url) {
+        // ★ Force white text for readability on photo backgrounds.
+        // No shadow applied — user can add via Effects panel if needed.
         for (const el of allElements) {
             if (el.type === 'text') {
                 el.color_hex = '#FFFFFF';
-                el.shadow_blur = 8;
-                el.shadow_offset_x = 0;
-                el.shadow_offset_y = 2;
-                el.shadow_opacity = 0.6;
             }
         }
         // ★ Remove ALL structural overlay rects — photo replaces the entire background layer.
