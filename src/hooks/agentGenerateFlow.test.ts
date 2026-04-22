@@ -336,17 +336,24 @@ describe('agentFlowTypes — setPhase interface', () => {
 
 const helpersSrc = readFileSync(resolve(__dirname, './agentFlowHelpers.ts'), 'utf-8');
 
-describe('★ REGRESSION: content substitution uses font-size heuristic', () => {
-    it('has Pass 2 font-size heuristic for unnamed text elements', () => {
-        expect(src).toContain('Font-size heuristic');
-        expect(src).toContain('Heuristic headline');
+describe('★ REGRESSION: Carbon Design System replaces template content substitution', () => {
+    it('uses Carbon buildDesignElements for layout (USE_CARBON_LAYOUT)', () => {
+        expect(src).toContain('USE_CARBON_LAYOUT');
+        expect(src).toContain('buildDesignElements');
     });
 
-    it('sorts text elements by font_size descending for role assignment', () => {
-        expect(src).toContain('.sort((a, b) => (b.font_size ?? 0) - (a.font_size ?? 0))');
+    it('passes all content fields to Carbon layout engine', () => {
+        expect(src).toContain('content.headline');
+        expect(src).toContain('content.subheadline');
+        expect(src).toContain('content.cta');
+        expect(src).toContain('content.tag');
     });
 
-    it('auto-created subheadline uses canvas-proportional sizing (in helpers)', () => {
+    it('backup path still has resolveTemplateElements for rollback', () => {
+        expect(src).toContain('resolveTemplateElements');
+    });
+
+    it('auto-created subheadline helper still exported (backup path)', () => {
         expect(helpersSrc).toContain('canvasH * 0.035');
         expect(helpersSrc).toContain('Math.max(14, Math.min(32');
     });

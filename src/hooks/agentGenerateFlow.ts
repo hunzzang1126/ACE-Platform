@@ -159,136 +159,49 @@ async function buildAndRender(
 
     const { validateLayout } = await resilientImport(() => import('@/engine/layoutValidator'));
 
-    // ★ CLOUD-FIRST: Read template elements from Supabase (via templateStore)
-    // resolveTemplateElements() handles: snapshot parsing, DesignElement → RenderElement
-    // conversion, and proportional scaling from template native size to actual canvas.
-    const { resolveTemplateElements } = await resilientImport(() => import('@/services/templateResolver'));
-    let allElements = resolveTemplateElements(template.id, canvasW, canvasH);
+    // ★ CARBON DESIGN SYSTEM — AI content + Carbon layout rules.
+    // Templates are NOT used for layout. Carbon tokens decide all positions.
+    // Feature flag: set to false for instant rollback to old template pipeline.
+    const USE_CARBON_LAYOUT = true;
 
-    // ★ STRIP TEMPLATE BACKGROUNDS IMMEDIATELY — templates provide LAYOUT only.
-    // Background is always decided by AI: photo (generateBgImage) or palette gradient.
-    // Template backgrounds must never reach the canvas.
-    const BACKGROUND_NAMES = new Set([
-        'background', 'accent_zone', 'accent_glow', 'text_overlay',
-        'accent_diagonal', 'bottom_border', 'bottom_accent',
-    ]);
-    const beforeCount = allElements.length;
-    allElements = allElements.filter(el => {
-        if (el.type === 'text') return true; // always keep text
-        const nameLower = (el.name ?? '').toLowerCase();
-        if (BACKGROUND_NAMES.has(nameLower)) {
-            console.log(`[Pipeline] Stripped template bg element "${el.name}" — AI decides background`);
-            return false;
-        }
-        return true;
-    });
-    if (allElements.length < beforeCount) {
-        console.log(`[Pipeline] Stripped ${beforeCount - allElements.length} bg elements from template`);
-    }
+    let allElements: any[];
 
-    // ★ RECOLOR: Replace template's original colors with AI-generated palette.
-    const { recolorTemplateElements } = await resilientImport(() => import('./agentColorRecolor'));
-    allElements = recolorTemplateElements(allElements, guide);
-
-    // ★ CONTENT SUBSTITUTION: Replace template placeholder text with AI-generated copy.
-    // Strategy: try name-based mapping first, then fall back to font-size heuristic.
-    let headlineMapped = false;
-    let subheadlineMapped = false;
-    let ctaMapped = false;
-    let tagMapped = false;
-    const mappedElements = new Set<any>(); // Track Pass 1 mapped elements for Pass 2 exclusion
-
-    // Pass 1: Name-based mapping (exact keyword match)
-    for (const el of allElements) {
-        if (el.type !== 'text' && !el.content) continue;
-        const name = (el.name ?? '').toLowerCase();
-        if (!headlineMapped && name.includes('headline') && !name.includes('sub')) {
-            if (content.headline) { el.content = content.headline; headlineMapped = true; mappedElements.add(el); }
-        } else if (!subheadlineMapped && (name.includes('subheadline') || name.includes('sub_headline') || name.includes('body'))) {
-            if (content.subheadline) { el.content = content.subheadline; subheadlineMapped = true; mappedElements.add(el); }
-        } else if (!ctaMapped && name.includes('cta') && name.includes('label')) {
-            if (content.cta) { el.content = content.cta; ctaMapped = true; mappedElements.add(el); }
-        } else if (!tagMapped && name.includes('tag')) {
-            if (content.tag) { el.content = content.tag; tagMapped = true; mappedElements.add(el); }
-        }
-    }
-
-    // Pass 2: Font-size heuristic — if name-based mapping missed the headline/subheadline,
-    // sort text elements by font_size descending and assign by role (largest = headline).
-    // ★ Exclude elements already mapped in Pass 1 to prevent overwriting.
-    if (!headlineMapped || !subheadlineMapped) {
-        const textEls = allElements
-            .filter(el => el.type === 'text'
-                && !['cta_label', 'cta_button'].includes(el.name ?? '')
-                && !mappedElements.has(el))
-            .sort((a, b) => (b.font_size ?? 0) - (a.font_size ?? 0));
-
-        if (!headlineMapped && textEls[0] && content.headline) {
-            textEls[0].content = content.headline;
-            headlineMapped = true;
-            console.log(`[Pipeline] Heuristic headline: "${textEls[0].name}" (font_size=${textEls[0].font_size})`);
-        }
-        if (!subheadlineMapped && textEls[1] && content.subheadline) {
-            textEls[1].content = content.subheadline;
-            subheadlineMapped = true;
-            console.log(`[Pipeline] Heuristic subheadline: "${textEls[1].name}" (font_size=${textEls[1].font_size})`);
-        }
-        if (!tagMapped && textEls.length >= 3 && content.tag) {
-            const tagEl = textEls[textEls.length - 1]; // smallest text
-            tagEl!.content = content.tag;
-            tagMapped = true;
-        }
-    }
-
-    // ★ Recalculate text heights after content substitution (template heights are stale)
-    recalcTextHeights(allElements, canvasH);
-
-    // ★ AUTO-CREATE SUBHEADLINE (extracted to helper)
-    if (content.subheadline && !subheadlineMapped) {
-        autoCreateSubheadline(allElements, content, canvasW, canvasH);
-    }
-
-    // ★ BACKGROUND DECISION: Template bg elements are already stripped (line 170+).
-    // Here we only decide: photo or gradient.
-    if (bgResult.hasImage && bgResult.url) {
-        // Photo background → white text for readability
-        for (const el of allElements) {
-            if (el.type === 'text') el.color_hex = '#FFFFFF';
-        }
+    if (USE_CARBON_LAYOUT) {
+        // ── NEW: Carbon-powered layout ──
+        const { buildDesignElements } = await resilientImport(() => import('@/carbon/layoutComposer'));
+        allElements = buildDesignElements(
+            { headline: content.headline, subheadline: content.subheadline, cta: content.cta, tag: content.tag },
+            {
+                gradientStart: guide.colors.gradientStart,
+                gradientEnd: guide.colors.gradientEnd,
+                accent: guide.colors.accent ?? guide.colors.gradientStart,
+                foreground: guide.colors.foreground ?? '#FFFFFF',
+                background: guide.colors.background ?? '#0B0F1A',
+                typography: guide.typography,
+            },
+            canvasW, canvasH,
+            bgResult.hasImage && !!bgResult.url,
+        );
+        console.log(`[Pipeline/Carbon] Built ${allElements.length} elements via Carbon layout engine`);
     } else {
-        // No photo → create gradient background from AI palette
-        allElements.unshift({
-            name: 'background',
-            type: 'rect' as any,
-            x: 0, y: 0, w: canvasW, h: canvasH,
-            gradient_start_hex: guide.colors.gradientStart,
-            gradient_end_hex: guide.colors.gradientEnd,
-            gradient_angle: 135,
-        });
-        console.log(`[Pipeline] Created gradient background: ${guide.colors.gradientStart} → ${guide.colors.gradientEnd}`);
-
-        // Contrast check: ensure text is readable against gradient
-        const bgLum = averageLuminance(guide.colors.gradientStart, guide.colors.gradientEnd);
-        for (const el of allElements) {
-            if (el.type !== 'text') continue;
-            const textLum = hexLuminance(el.color_hex ?? '#FFFFFF');
-            if (Math.abs(bgLum - textLum) < 0.3) {
-                el.color_hex = bgLum > 0.5 ? '#1A1A2E' : '#FFFFFF';
-            }
-        }
-    }
-
-    // ★ SKIP CTA: If AI decided no CTA is needed, remove CTA elements entirely.
-    // This prevents orphan CTA buttons/labels on non-commercial designs.
-    if (!content.cta) {
+        // ── OLD: Template-based layout (backup — will be removed after stabilization) ──
+        const { resolveTemplateElements } = await resilientImport(() => import('@/services/templateResolver'));
+        allElements = resolveTemplateElements(template.id, canvasW, canvasH);
+        // Strip template backgrounds
+        const BG_NAMES = new Set(['background', 'accent_zone', 'accent_glow', 'text_overlay', 'accent_diagonal', 'bottom_border', 'bottom_accent']);
         allElements = allElements.filter(el => {
-            const name = (el.name ?? '').toLowerCase();
-            if (name.includes('cta') || (name.includes('button') && el.type !== 'text')) {
-                console.log(`[Pipeline] Skipping CTA element (not needed): ${el.name}`);
-                return false;
-            }
-            return true;
+            if (el.type === 'text') return true;
+            return !BG_NAMES.has((el.name ?? '').toLowerCase());
         });
+        // Recolor
+        const { recolorTemplateElements } = await resilientImport(() => import('./agentColorRecolor'));
+        allElements = recolorTemplateElements(allElements, guide);
+        // Background
+        if (bgResult.hasImage && bgResult.url) {
+            for (const el of allElements) { if (el.type === 'text') el.color_hex = '#FFFFFF'; }
+        } else {
+            allElements.unshift({ name: 'background', type: 'rect' as any, x: 0, y: 0, w: canvasW, h: canvasH, gradient_start_hex: guide.colors.gradientStart, gradient_end_hex: guide.colors.gradientEnd, gradient_angle: 135 });
+        }
     }
 
     allElements = allElements.filter(el => { if (el.type === 'text' && (!el.content || el.content.trim() === '')) { console.log(`[Pipeline] Removing empty text: ${el.name}`); return false; } return true; });

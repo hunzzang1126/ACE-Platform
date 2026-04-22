@@ -62,45 +62,38 @@ describe('agentFlowHelpers — extracted helpers', () => {
     });
 });
 
-describe('agentGenerateFlow — subheadline auto-creation', () => {
-    it('★ REGRESSION: tracks subheadlineMapped flag', () => {
-        expect(flowSrc).toContain('let subheadlineMapped = false');
-        expect(flowSrc).toContain('subheadlineMapped = true');
+describe('agentGenerateFlow — Carbon Design System integration', () => {
+    it('★ REGRESSION: uses Carbon layout engine (USE_CARBON_LAYOUT flag)', () => {
+        expect(flowSrc).toContain('USE_CARBON_LAYOUT');
+        expect(flowSrc).toContain('buildDesignElements');
     });
 
-    it('★ REGRESSION: creates subheadline element when template lacks one', () => {
-        expect(flowSrc).toContain("content.subheadline && !subheadlineMapped");
-        // Subheadline creation extracted to helper
-        expect(helpersSrc).toContain("name: 'subheadline'");
+    it('★ REGRESSION: imports Carbon layout composer', () => {
+        expect(flowSrc).toContain('@/carbon/layoutComposer');
     });
 
-    it('positions auto-created subheadline below headline using headlineH', () => {
-        expect(helpersSrc).toContain('headlineY + headlineH');
+    it('★ REGRESSION: passes content to Carbon (headline, subheadline, cta, tag)', () => {
+        expect(flowSrc).toContain('content.headline');
+        expect(flowSrc).toContain('content.subheadline');
+        expect(flowSrc).toContain('content.cta');
+        expect(flowSrc).toContain('content.tag');
     });
 
-    it('uses canvas-proportional font size for subheadline (3.5% of height)', () => {
-        expect(helpersSrc).toContain('canvasH * 0.035');
-        expect(helpersSrc).toContain('Math.max(14, Math.min(32');
+    it('★ REGRESSION: passes palette to Carbon', () => {
+        expect(flowSrc).toContain('guide.colors.gradientStart');
+        expect(flowSrc).toContain('guide.colors.gradientEnd');
+        expect(flowSrc).toContain('guide.typography');
     });
 
-    it('inherits color from headline element', () => {
-        expect(helpersSrc).toContain("headlineEl?.color_hex ?? '#FFFFFF'");
+    it('★ REGRESSION: has backup template path for rollback', () => {
+        expect(flowSrc).toContain('resolveTemplateElements');
     });
 
-    it('imports renderElement from agentFlowRender', () => {
-        expect(flowSrc).toContain("import { renderElement, buildElementDetail } from './agentFlowRender'");
-    });
-
-    it('imports helpers including autoCreateSubheadline', () => {
-        expect(flowSrc).toContain("autoCreateSubheadline");
-        expect(flowSrc).toContain("recalcTextHeights");
-    });
-
-    it('exports recalcTextHeights from helpers', () => {
-        expect(helpersSrc).toContain('export function recalcTextHeights');
-    });
-
-    it('exports autoCreateSubheadline from helpers', () => {
+    it('helpers still export autoCreateSubheadline (used by backup path)', () => {
         expect(helpersSrc).toContain('export function autoCreateSubheadline');
+    });
+
+    it('helpers still export recalcTextHeights', () => {
+        expect(helpersSrc).toContain('export function recalcTextHeights');
     });
 });
