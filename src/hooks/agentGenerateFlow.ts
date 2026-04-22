@@ -165,8 +165,28 @@ async function buildAndRender(
     const { resolveTemplateElements } = await resilientImport(() => import('@/services/templateResolver'));
     let allElements = resolveTemplateElements(template.id, canvasW, canvasH);
 
+    // ★ STRIP TEMPLATE BACKGROUNDS IMMEDIATELY — templates provide LAYOUT only.
+    // Background is always decided by AI: photo (generateBgImage) or palette gradient.
+    // Template backgrounds must never reach the canvas.
+    const BACKGROUND_NAMES = new Set([
+        'background', 'accent_zone', 'accent_glow', 'text_overlay',
+        'accent_diagonal', 'bottom_border', 'bottom_accent',
+    ]);
+    const beforeCount = allElements.length;
+    allElements = allElements.filter(el => {
+        if (el.type === 'text') return true; // always keep text
+        const nameLower = (el.name ?? '').toLowerCase();
+        if (BACKGROUND_NAMES.has(nameLower)) {
+            console.log(`[Pipeline] Stripped template bg element "${el.name}" — AI decides background`);
+            return false;
+        }
+        return true;
+    });
+    if (allElements.length < beforeCount) {
+        console.log(`[Pipeline] Stripped ${beforeCount - allElements.length} bg elements from template`);
+    }
+
     // ★ RECOLOR: Replace template's original colors with AI-generated palette.
-    // Background is decided FIRST (Phase 4) — now all elements harmonize with it.
     const { recolorTemplateElements } = await resilientImport(() => import('./agentColorRecolor'));
     allElements = recolorTemplateElements(allElements, guide);
 
@@ -228,61 +248,31 @@ async function buildAndRender(
         autoCreateSubheadline(allElements, content, canvasW, canvasH);
     }
 
-    // ★ PHOTO CONTRAST: When a background image exists, ensure all text is readable.
-    // Force white text + drop shadow for photo backgrounds (zero tokens, max impact).
+    // ★ BACKGROUND DECISION: Template bg elements are already stripped (line 170+).
+    // Here we only decide: photo or gradient.
     if (bgResult.hasImage && bgResult.url) {
-        // ★ Force white text for readability on photo backgrounds.
-        // No shadow applied — user can add via Effects panel if needed.
+        // Photo background → white text for readability
         for (const el of allElements) {
-            if (el.type === 'text') {
-                el.color_hex = '#FFFFFF';
-            }
+            if (el.type === 'text') el.color_hex = '#FFFFFF';
         }
-        // ★ Remove ALL structural overlay rects — photo replaces the entire background layer.
-        // These rects (accent_zone, accent_glow, text_overlay, etc.) were designed for
-        // gradient backgrounds to add depth. On a photo they just cover the image.
-        const STRUCTURAL_RECT_NAMES = new Set([
-            'background', 'accent_zone', 'accent_glow', 'text_overlay',
-            'accent_diagonal', 'bottom_border', 'bottom_accent',
-        ]);
-        allElements = allElements.filter(el => {
-            if (el.type === 'text') return true; // always keep text
-            const nameLower = (el.name ?? '').toLowerCase();
-            if (STRUCTURAL_RECT_NAMES.has(nameLower)) {
-                console.log(`[Pipeline] Removing structural rect "${el.name}" (photo bg replaces it)`);
-                return false;
-            }
-            return true;
-        });
     } else {
-        // ★ NO BACKGROUND IMAGE — ensure background shape exists + text contrast
-        const hasBg = allElements.some(el => (el.name ?? '').toLowerCase() === 'background');
-        if (!hasBg) {
-            // Create background element from palette (gradient or solid)
-            allElements.unshift({
-                name: 'background',
-                type: 'rect' as any,
-                x: 0, y: 0, w: canvasW, h: canvasH,
-                gradient_start_hex: guide.colors.gradientStart,
-                gradient_end_hex: guide.colors.gradientEnd,
-                gradient_angle: 135,
-            });
-            console.log(`[Pipeline] Auto-created background: ${guide.colors.gradientStart} → ${guide.colors.gradientEnd}`);
-        }
+        // No photo → create gradient background from AI palette
+        allElements.unshift({
+            name: 'background',
+            type: 'rect' as any,
+            x: 0, y: 0, w: canvasW, h: canvasH,
+            gradient_start_hex: guide.colors.gradientStart,
+            gradient_end_hex: guide.colors.gradientEnd,
+            gradient_angle: 135,
+        });
+        console.log(`[Pipeline] Created gradient background: ${guide.colors.gradientStart} → ${guide.colors.gradientEnd}`);
 
-        // ★ CONTRAST CHECK: ensure text is readable against background
-        const bgEl = allElements.find(el => (el.name ?? '').toLowerCase() === 'background');
-        const bgLum = bgEl
-            ? averageLuminance(bgEl.gradient_start_hex ?? '#000000', bgEl.gradient_end_hex ?? bgEl.gradient_start_hex ?? '#000000')
-            : 0.5;
-
+        // Contrast check: ensure text is readable against gradient
+        const bgLum = averageLuminance(guide.colors.gradientStart, guide.colors.gradientEnd);
         for (const el of allElements) {
             if (el.type !== 'text') continue;
             const textLum = hexLuminance(el.color_hex ?? '#FFFFFF');
-            const contrast = Math.abs(bgLum - textLum);
-
-            // If contrast is too low (< 0.3), flip text to opposite
-            if (contrast < 0.3) {
+            if (Math.abs(bgLum - textLum) < 0.3) {
                 el.color_hex = bgLum > 0.5 ? '#1A1A2E' : '#FFFFFF';
             }
         }
