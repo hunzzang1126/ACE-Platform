@@ -86,32 +86,31 @@ describe('agentGenerateFlow — user preferences', () => {
 });
 
 // ══════════════════════════════════════════════════
-// ★ REGRESSION: Template source is Supabase-only (cloud-first)
+// ★ REGRESSION: Carbon replaces templates as primary layout engine
 // ══════════════════════════════════════════════════
-describe('★ REGRESSION: template uses Supabase resolver (not hardcoded build)', () => {
-    it('uses resolveTemplateElements from templateResolver', () => {
+describe('★ REGRESSION: Carbon primary, template only in backup path', () => {
+    it('main flow does NOT call selectTemplate directly', () => {
+        // selectTemplate is imported but only used in backup path inside buildAndRender
+        const mainFlow = src.split('async function buildAndRender')[0]!;
+        expect(mainFlow).not.toContain('selectTemplate(');
+    });
+
+    it('backup path still uses resolveTemplateElements', () => {
         expect(src).toContain('resolveTemplateElements');
         expect(src).toContain('templateResolver');
     });
 
-    it('does NOT call template.build() — removed in v0.0.0.555', () => {
+    it('does NOT call template.build()', () => {
         expect(src).not.toContain('template.build(');
     });
 
-    it('does NOT reference REF_SIZE or refAspect — scaling handled by resolver', () => {
-        expect(src).not.toContain('REF_SIZE');
-        expect(src).not.toContain('refAspect');
+    it('backup path fetches template internally (not from caller)', () => {
+        expect(src).toContain('resolveTemplateElements(tmpl.id');
     });
 
-    it('does NOT manually scale x/y/w/h — resolver handles via constraintsToAbsolute', () => {
-        expect(src).not.toContain('scaleX = canvasW / refW');
-        expect(src).not.toContain('scaleY = canvasH / refH');
-    });
-
-    it('★ REGRESSION: resolver reads from templateStore (Supabase-synced)', () => {
-        // The old flow used DESIGN_TEMPLATES (hardcoded array)
-        // New flow uses templateStore which syncs from Supabase template_overrides
-        expect(src).toContain('resolveTemplateElements(template.id');
+    it('Carbon path uses buildDesignElements as primary', () => {
+        expect(src).toContain('USE_CARBON_LAYOUT');
+        expect(src).toContain('buildDesignElements');
     });
 });
 
@@ -211,9 +210,10 @@ describe('reference-size scaling — math verification', () => {
 // Source: pipeline completeness checks
 // ══════════════════════════════════════════════════
 describe('agentGenerateFlow — pipeline completeness', () => {
-    it('Phase 3: selects template via AI or fallback', () => {
-        expect(src).toContain('selectTemplate');
-        expect(src).toContain('Template Selection');
+    it('Phase 3: generates color palette (template selection removed)', () => {
+        expect(src).toContain('generateColorPalette');
+        // Template selection no longer in main flow — Carbon handles layout
+        expect(src).toContain('Color Palette');
     });
 
     it('Phase 4: generates color palette via AI', () => {

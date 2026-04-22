@@ -2,8 +2,7 @@
 // agentGenerateFlow — AI Design Generation Pipeline
 // ─────────────────────────────────────────────────
 // Phases: Canvas Scan → Brand Cloud → Copywriting →
-// Template Selection → Color Palette → BG Image →
-// Template Build → Multi-pass Render → Vision QA
+// Color Palette → BG Image → Carbon Layout → Render
 // ─────────────────────────────────────────────────
 
 import type { AgentFlowCallbacks, FlowEngine } from './agentFlowTypes';
@@ -53,12 +52,8 @@ export async function executeGenerateFlow(
     cb.narrate(`Copy ready: "${content.headline}"`);
     await pause(400);
 
-    // ── Phase 3: Template Selection ──
-    const template = await selectTemplate(prompt, canvasW, canvasH, brand.visionBlocks, abort, cb);
-    await pause(400);
-
-    // ── Phase 4: Color Palette ──
-    cb.narrate(`Selecting colors for the "${template.name}" layout...`);
+    // ── Phase 3: Color Palette (Carbon handles layout — no template needed) ──
+    cb.narrate('Determining the perfect color palette...');
     cb.addCard('palette', 'Determining color palette', 'running');
 
     const { generateColorPalette } = await resilientImport(() => import('@/services/designStyleGuides'));
@@ -76,9 +71,9 @@ export async function executeGenerateFlow(
     const bgResult = await generateBgImage(needsBackgroundImage, backgroundImagePrompt, prompt, canvasW, canvasH, guide, abort, cb);
     await pause(300);
 
-    // ── Phase 5: Template Build (stepper: Executing) ──
+    // ── Phase 4: Carbon Layout + Render (stepper: Executing) ──
     cb.setPhase?.('executing');
-    const rendered = await buildAndRender(template, guide, content, canvasW, canvasH, bgResult, brand.logoUrl, brand.logoW, brand.logoH, engine, abort, cb);
+    const rendered = await buildAndRender(prompt, guide, content, canvasW, canvasH, bgResult, brand.logoUrl, brand.logoW, brand.logoH, engine, abort, cb);
 
     // ── Phase 6: Finalize (stepper: Finishing) ──
     // ★ Vision QA removed — deterministic quality (recolor + contrast + layout validation)
@@ -88,7 +83,7 @@ export async function executeGenerateFlow(
     try { engine.reorder_by_z_index?.(); } catch { /* ok */ }
     try { engine.render_all?.(); } catch { /* ok */ }
     cb.updateCard('finalize', 'done', `${rendered} elements · Design complete`);
-    cb.narrate(`Design finalized with ${rendered} elements. Style: ${guide.name}, Layout: ${template.name}.`);
+    cb.narrate(`Design finalized with ${rendered} elements. Style: ${guide.name}, Layout: Carbon Design System.`);
 
     // ── Phase 7: Save to AI Memory ──
     // Records this design in Supabase ai_memory for cross-session learning
@@ -148,14 +143,14 @@ async function generateBgImage(
 }
 
 async function buildAndRender(
-    template: import('@/services/designTemplates').DesignTemplate,
+    prompt: string,
     guide: any, content: any, canvasW: number, canvasH: number,
     bgResult: { hasImage: boolean; url: string | null },
     brandLogoUrl: string | null, brandLogoW: number, brandLogoH: number,
     engine: FlowEngine, abort: AbortController, cb: AgentFlowCallbacks,
 ): Promise<number> {
-    cb.narrate(`Building the layout: ${template.name}...`);
-    cb.addCard('build', 'Combining layout', 'running');
+    cb.narrate('Building the layout with Carbon Design System...');
+    cb.addCard('build', 'Carbon layout engine', 'running');
 
     const { validateLayout } = await resilientImport(() => import('@/engine/layoutValidator'));
 
@@ -184,19 +179,15 @@ async function buildAndRender(
         );
         console.log(`[Pipeline/Carbon] Built ${allElements.length} elements via Carbon layout engine`);
     } else {
-        // ── OLD: Template-based layout (backup — will be removed after stabilization) ──
+        // ── OLD: Template-based layout (backup — fetch template internally) ──
+        const { selectTemplate: selectTmpl } = await resilientImport(() => import('./agentFlowHelpers'));
+        const tmpl = await selectTmpl(prompt ?? '', canvasW, canvasH, [], abort, cb);
         const { resolveTemplateElements } = await resilientImport(() => import('@/services/templateResolver'));
-        allElements = resolveTemplateElements(template.id, canvasW, canvasH);
-        // Strip template backgrounds
+        allElements = resolveTemplateElements(tmpl.id, canvasW, canvasH);
         const BG_NAMES = new Set(['background', 'accent_zone', 'accent_glow', 'text_overlay', 'accent_diagonal', 'bottom_border', 'bottom_accent']);
-        allElements = allElements.filter(el => {
-            if (el.type === 'text') return true;
-            return !BG_NAMES.has((el.name ?? '').toLowerCase());
-        });
-        // Recolor
+        allElements = allElements.filter(el => el.type === 'text' || !BG_NAMES.has((el.name ?? '').toLowerCase()));
         const { recolorTemplateElements } = await resilientImport(() => import('./agentColorRecolor'));
         allElements = recolorTemplateElements(allElements, guide);
-        // Background
         if (bgResult.hasImage && bgResult.url) {
             for (const el of allElements) { if (el.type === 'text') el.color_hex = '#FFFFFF'; }
         } else {
