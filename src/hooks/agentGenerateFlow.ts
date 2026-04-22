@@ -240,8 +240,21 @@ async function buildAndRender(
                 el.shadow_opacity = 0.6;
             }
         }
-        // Remove template background shape (photo replaces it)
-        allElements = allElements.filter(el => el.name !== 'background');
+        // ★ Remove ALL structural overlay rects — photo replaces the entire background layer.
+        // These rects (accent_zone, accent_glow, text_overlay, etc.) were designed for
+        // gradient backgrounds to add depth. On a photo they just cover the image.
+        const STRUCTURAL_RECT_NAMES = new Set([
+            'background', 'accent_zone', 'accent_glow', 'text_overlay',
+            'accent_diagonal', 'bottom_border', 'bottom_accent',
+        ]);
+        allElements = allElements.filter(el => {
+            if (el.type === 'text') return true; // always keep text
+            if (STRUCTURAL_RECT_NAMES.has(el.name ?? '')) {
+                console.log(`[Pipeline] Removing structural rect "${el.name}" (photo bg replaces it)`);
+                return false;
+            }
+            return true;
+        });
     } else {
         // ★ NO BACKGROUND IMAGE — ensure background shape exists + text contrast
         const hasBg = allElements.some(el => el.name === 'background');
