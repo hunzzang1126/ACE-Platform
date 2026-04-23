@@ -138,25 +138,27 @@ RULES:
    - Choose fonts that feel right for the mood — trust your judgment
    - NEVER return "Inter" for both — that's boring and generic
 7. Decide if a BACKGROUND IMAGE is needed. Be SELECTIVE — only use images when a real visual scene adds value:
-   USE IMAGE (true):
-   - User explicitly asks for background/image/photo → ALWAYS YES
-   - Sports/athletics (stadiums, fields, athletes in action) → YES
-   - Food/restaurant (appetizing dishes, dining scenes) → YES
-   - Travel/tourism (scenic destinations, landmarks) → YES
-   - Fashion/beauty (model shots, product lifestyle) → YES
-   - Automotive (cars, showrooms) → YES
-   - Real estate/architecture (buildings, interiors) → YES
-   - Entertainment/events (concerts, festivals, movies) → YES
-   
-   DO NOT USE IMAGE (false) — gradient backgrounds work better:
-   - Finance/fintech/banking/insurance → NO (use dark gradient)
-   - SaaS/software/dashboard/analytics → NO (use gradient)
-   - B2B/enterprise/consulting → NO (use gradient)
-   - Abstract concepts (innovation, growth, AI) → NO (use gradient)
-   - Simple sale/discount/promo ads → NO (bold colors, no image needed)
-   - Minimalist/clean/Apple-style → NO (gradient is more elegant)
-   - Data/charts/statistics → NO
-   - When the prompt has NO physical/visual subject → NO
+    USE IMAGE (true):
+    - User explicitly asks for background/image/photo → ALWAYS YES
+    - Product ads (phones, shoes, watches, electronics, beverages, cosmetics) → YES (product hero shot)
+    - Sports/athletics (stadiums, fields, athletes in action) → YES
+    - Food/restaurant (appetizing dishes, dining scenes) → YES
+    - Travel/tourism (scenic destinations, landmarks) → YES
+    - Fashion/beauty (model shots, product lifestyle) → YES
+    - Automotive (cars, showrooms) → YES
+    - Real estate/architecture (buildings, interiors) → YES
+    - Entertainment/events (concerts, festivals, movies) → YES
+    - Retail/e-commerce (physical products being sold) → YES
+    
+    DO NOT USE IMAGE (false) — gradient backgrounds work better:
+    - Finance/fintech/banking/insurance → NO (use dark gradient)
+    - SaaS/software/dashboard/analytics → NO (use gradient)
+    - B2B/enterprise/consulting → NO (use gradient)
+    - Abstract concepts (innovation, growth, AI) → NO (use gradient)
+    - Simple sale/discount/promo ads with NO physical product → NO (bold colors)
+    - Minimalist/clean brand campaigns with NO product shown → NO (gradient)
+    - Data/charts/statistics → NO
+    - When the prompt has NO physical/visual subject → NO
    
    If YES, write a short Imagen prompt describing the ideal background.
    CRITICAL FOR PEOPLE: If the user mentions PEOPLE or PROFESSIONS (doctor, dentist, nurse, model, athlete, chef, etc.),
