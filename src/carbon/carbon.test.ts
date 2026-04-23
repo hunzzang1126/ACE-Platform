@@ -10,6 +10,7 @@ import {
 import { columns, centeredX, getGutter, getMargin } from './gridSystem';
 import { buildDesignElements } from './layoutComposer';
 import type { DesignContent, DesignPalette } from './layoutComposer';
+import { hexLuminance, darkenHex, lightenHex } from './colorHelpers';
 
 // ── Adapter Tests ────────────────────────────────
 
@@ -309,5 +310,82 @@ describe('Carbon Layout Composer', () => {
                 expect(t.color_hex).toBe('#FFFFFF');
             }
         });
+    });
+
+    describe('★ visual impact guard — flat gradient correction', () => {
+        it('darkens near-white gradient start when both colors are light', () => {
+            const lightPalette: DesignPalette = {
+                gradientStart: '#F8F8F8', gradientEnd: '#FFFFFF',
+                accent: '#FF0000', foreground: '#000000', background: '#FFFFFF',
+                typography: { primaryFont: 'Inter', secondaryFont: 'Inter' },
+            };
+            const content: DesignContent = { headline: 'Test' };
+            const elements = buildDesignElements(content, lightPalette, 1080, 1080, false);
+            const bg = elements.find(el => el.name === 'background');
+            expect(bg).toBeDefined();
+            // Should NOT be near-white anymore — darkened by guard
+            expect(bg!.gradient_start_hex).not.toBe('#F8F8F8');
+            expect(bg!.gradient_start_hex).not.toBe('#FFFFFF');
+        });
+
+        it('preserves good gradients without modification', () => {
+            const goodPalette: DesignPalette = {
+                gradientStart: '#0a0a0a', gradientEnd: '#1e293b',
+                accent: '#3b82f6', foreground: '#FFFFFF', background: '#0a0a0a',
+                typography: { primaryFont: 'Inter', secondaryFont: 'Inter' },
+            };
+            const content: DesignContent = { headline: 'Test' };
+            const elements = buildDesignElements(content, goodPalette, 1080, 1080, false);
+            const bg = elements.find(el => el.name === 'background');
+            // Good gradient should pass through unchanged
+            expect(bg!.gradient_start_hex).toBe('#0a0a0a');
+        });
+
+        it('forces contrast when foreground matches background', () => {
+            const lowContrastPalette: DesignPalette = {
+                gradientStart: '#EEEEEE', gradientEnd: '#F5F5F5',
+                accent: '#FF0000', foreground: '#DDDDDD', background: '#EEEEEE',
+                typography: { primaryFont: 'Inter', secondaryFont: 'Inter' },
+            };
+            const content: DesignContent = { headline: 'Test' };
+            const elements = buildDesignElements(content, lowContrastPalette, 1080, 1080, false);
+            const headline = elements.find(el => el.name === 'headline');
+            // Text should NOT be light on light background
+            expect(headline!.color_hex).not.toBe('#DDDDDD');
+        });
+    });
+});
+
+// ── Color Helper Tests ────────────────────────────
+
+describe('Carbon Color Helpers', () => {
+
+    it('hexLuminance: white = 1, black = 0', () => {
+        expect(hexLuminance('#FFFFFF')).toBeCloseTo(1, 1);
+        expect(hexLuminance('#000000')).toBeCloseTo(0, 1);
+    });
+
+    it('hexLuminance: mid-gray ≈ 0.5', () => {
+        const lum = hexLuminance('#808080');
+        expect(lum).toBeGreaterThan(0.2);
+        expect(lum).toBeLessThan(0.6);
+    });
+
+    it('darkenHex: darkens by given factor', () => {
+        const result = darkenHex('#FFFFFF', 0.5);
+        expect(result.toLowerCase()).toBe('#808080');
+    });
+
+    it('darkenHex: 0 factor = no change', () => {
+        expect(darkenHex('#FF0000', 0)).toBe('#ff0000');
+    });
+
+    it('lightenHex: lightens by given factor', () => {
+        const result = lightenHex('#000000', 0.5);
+        expect(result.toLowerCase()).toBe('#808080');
+    });
+
+    it('lightenHex: 0 factor = no change', () => {
+        expect(lightenHex('#FF0000', 0)).toBe('#ff0000');
     });
 });

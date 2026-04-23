@@ -17,7 +17,9 @@ import type { RenderElement } from '@/services/autoDesignTypes';
 import { spacing, resolveTypeStyle, TYPE_SCALE_PX, miniUnit } from './adapter';
 import { columns, centeredX, getMargin } from './gridSystem';
 import { getAspectCategory } from '@/schema/layoutRoles';
-import type { AspectCategory } from '@/schema/layoutRoles';
+import { hexR, hexG, hexB, hexLuminance, darkenHex, lightenHex } from './colorHelpers';
+import { RULES_MAP } from './layoutRules';
+import type { ElementRule } from './layoutRules';
 
 // ── Public Types ─────────────────────────────────
 
@@ -37,144 +39,9 @@ export interface DesignPalette {
     typography: { primaryFont: string; secondaryFont: string };
 }
 
-// ── Layout Rule Per Aspect Category ──────────────
-
-interface ElementRule {
-    typeStyle: string;
-    cols: number;
-    align: 'center' | 'left' | 'right';
-    /** Spacing step between this element and previous (Carbon spacing index 0-12) */
-    gapStep: number;
-    maxLines?: number;
-    fontWeight?: number;
-    textAlign?: 'left' | 'center' | 'right';
-    /** Ad impact multiplier: scales Carbon font size for ad creative impact */
-    adScale: number;
-}
-
-interface LayoutRuleSet {
-    headline: ElementRule;
-    subline: ElementRule;
-    cta: ElementRule;
-    tag: ElementRule;
-    /** Minimum CTA height as fraction of canvasMin */
-    ctaHeightFactor: number;
-}
-
-// ── Aspect-Category Layout Rules ─────────────────
-
-const SQUARE_RULES: LayoutRuleSet = {
-    headline: {
-        typeStyle: 'display03', // Carbon display03: 42→96px across breakpoints
-        cols: 14, align: 'center',
-        gapStep: 6, maxLines: 3, fontWeight: 700,
-        textAlign: 'center', adScale: 1.6,
-    },
-    subline: {
-        typeStyle: 'expressiveHeading05', // 32→60px
-        cols: 13, align: 'center',
-        gapStep: 5, textAlign: 'center', adScale: 1.3,
-    },
-    cta: {
-        typeStyle: 'heading03',
-        cols: 10, align: 'center',
-        gapStep: 7, fontWeight: 600,
-        textAlign: 'center', adScale: 1.4,
-    },
-    tag: {
-        typeStyle: 'label02',
-        cols: 10, align: 'center',
-        gapStep: 4, textAlign: 'center', adScale: 1.6,
-    },
-    ctaHeightFactor: 0.055,
-};
-
-const LANDSCAPE_RULES: LayoutRuleSet = {
-    headline: {
-        typeStyle: 'expressiveHeading06',
-        cols: 14, align: 'center',
-        gapStep: 5, maxLines: 2, fontWeight: 700,
-        textAlign: 'center', adScale: 1.5,
-    },
-    subline: {
-        typeStyle: 'expressiveHeading04',
-        cols: 12, align: 'center',
-        gapStep: 4, textAlign: 'center', adScale: 1.3,
-    },
-    cta: {
-        typeStyle: 'productiveHeading03',
-        cols: 8, align: 'center',
-        gapStep: 5, fontWeight: 600,
-        textAlign: 'center', adScale: 1.3,
-    },
-    tag: {
-        typeStyle: 'label02',
-        cols: 10, align: 'center',
-        gapStep: 3, textAlign: 'center', adScale: 1.4,
-    },
-    ctaHeightFactor: 0.07,
-};
-
-const PORTRAIT_RULES: LayoutRuleSet = {
-    headline: {
-        typeStyle: 'display01',
-        cols: 14, align: 'center',
-        gapStep: 6, maxLines: 4, fontWeight: 700,
-        textAlign: 'center', adScale: 1.5,
-    },
-    subline: {
-        typeStyle: 'expressiveHeading04',
-        cols: 13, align: 'center',
-        gapStep: 5, textAlign: 'center', adScale: 1.3,
-    },
-    cta: {
-        typeStyle: 'productiveHeading03',
-        cols: 12, align: 'center',
-        gapStep: 7, fontWeight: 600,
-        textAlign: 'center', adScale: 1.3,
-    },
-    tag: {
-        typeStyle: 'label02',
-        cols: 12, align: 'center',
-        gapStep: 4, textAlign: 'center', adScale: 1.5,
-    },
-    ctaHeightFactor: 0.06,
-};
-
-const ULTRA_WIDE_RULES: LayoutRuleSet = {
-    headline: {
-        typeStyle: 'expressiveHeading05',
-        cols: 6, align: 'left',
-        gapStep: 3, maxLines: 1, fontWeight: 700,
-        textAlign: 'left', adScale: 1.4,
-    },
-    subline: {
-        typeStyle: 'expressiveHeading03',
-        cols: 5, align: 'center',
-        gapStep: 3, textAlign: 'center', adScale: 1.2,
-    },
-    cta: {
-        typeStyle: 'productiveHeading02',
-        cols: 3, align: 'right',
-        gapStep: 3, fontWeight: 600,
-        textAlign: 'center', adScale: 1.3,
-    },
-    tag: {
-        typeStyle: 'label01',
-        cols: 3, align: 'left',
-        gapStep: 2, textAlign: 'left', adScale: 1.3,
-    },
-    ctaHeightFactor: 0.35,
-};
-
-const RULES_MAP: Record<AspectCategory, LayoutRuleSet> = {
-    'square': SQUARE_RULES,
-    'landscape': LANDSCAPE_RULES,
-    'portrait': PORTRAIT_RULES,
-    'ultra-wide': ULTRA_WIDE_RULES,
-};
 
 // ── Main API ─────────────────────────────────────
+
 
 export function buildDesignElements(
     content: DesignContent,
@@ -190,18 +57,54 @@ export function buildDesignElements(
     const isUltraWide = category === 'ultra-wide';
 
     // ── Background (AI-decided) ──
+    // ★ Visual Impact Guard: detect flat/boring gradients and fix them.
     if (!hasBgImage) {
+        let gStart = palette.gradientStart;
+        let gEnd = palette.gradientEnd;
+
+        // If gradient colors are too similar or both very light → boring flat bg.
+        // Fix: darken the start to create visible depth.
+        const startLum = hexLuminance(gStart);
+        const endLum = hexLuminance(gEnd);
+        const lumDiff = Math.abs(startLum - endLum);
+
+        if (lumDiff < 0.08) {
+            // Colors are nearly identical → force a meaningful gradient
+            if (startLum > 0.7) {
+                // Both light → darken start significantly for depth
+                gStart = darkenHex(gStart, 0.65);
+            } else {
+                // Both dark → lighten end for contrast
+                gEnd = lightenHex(gEnd, 0.3);
+            }
+        }
+
         elements.push({
             name: 'background',
             type: 'rect' as any,
             x: 0, y: 0, w: canvasW, h: canvasH,
-            gradient_start_hex: palette.gradientStart,
-            gradient_end_hex: palette.gradientEnd,
+            gradient_start_hex: gStart,
+            gradient_end_hex: gEnd,
             gradient_angle: 135,
         });
     }
 
-    const textColor = hasBgImage ? '#FFFFFF' : palette.foreground;
+    // ★ Text color with contrast guarantee
+    let textColor: string;
+    if (hasBgImage) {
+        textColor = '#FFFFFF';
+    } else {
+        // Check if foreground actually contrasts against the gradient
+        const bgLum = hexLuminance(palette.gradientStart);
+        const fgLum = hexLuminance(palette.foreground);
+        const contrast = Math.abs(bgLum - fgLum);
+        if (contrast < 0.3) {
+            // Poor contrast → force high-contrast text
+            textColor = bgLum > 0.5 ? '#1A1A2E' : '#FFFFFF';
+        } else {
+            textColor = palette.foreground;
+        }
+    }
 
     // ── Build content block (measure all heights first) ──
     // We build all text elements first, then CENTER the block vertically.
@@ -375,14 +278,3 @@ function buildTextElement(
     };
 }
 
-// ── Color Helpers ────────────────────────────────
-
-function hexR(hex: string): number {
-    return parseInt(hex.replace('#', '').substring(0, 2), 16) / 255;
-}
-function hexG(hex: string): number {
-    return parseInt(hex.replace('#', '').substring(2, 4), 16) / 255;
-}
-function hexB(hex: string): number {
-    return parseInt(hex.replace('#', '').substring(4, 6), 16) / 255;
-}
