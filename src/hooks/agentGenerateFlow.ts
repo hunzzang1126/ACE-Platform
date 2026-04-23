@@ -8,7 +8,7 @@
 import type { AgentFlowCallbacks, FlowEngine } from './agentFlowTypes';
 import { resilientImport } from '@/utils/resilientImport';
 import { renderElement, buildElementDetail } from './agentFlowRender';
-import { scanBrandCloud, selectTemplate, recalcTextHeights, autoCreateSubheadline } from './agentFlowHelpers';
+import { scanBrandCloud, recalcTextHeights, autoCreateSubheadline } from './agentFlowHelpers';
 import { hexLuminance, averageLuminance } from './contrastHelpers';
 
 /** Execute the full design generation pipeline */
