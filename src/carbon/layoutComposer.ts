@@ -250,10 +250,10 @@ function buildTextElement(
     const w = columns(rule.cols, canvasW);
     const lineHeight = typeStyle.lineHeight;
 
-    // Estimate height
-    const charsPerLine = Math.max(1, Math.floor(w / (fontSize * 0.55)));
+    // Estimate height — 0.6 avg char width factor for mixed-case Latin text
+    const charsPerLine = Math.max(1, Math.floor(w / (fontSize * 0.6)));
     const lines = Math.min(rule.maxLines ?? 10, Math.max(1, Math.ceil(content.length / charsPerLine)));
-    const h = Math.round(fontSize * lineHeight * lines + 8);
+    const h = Math.round(fontSize * lineHeight * lines + fontSize * 0.3); // padding = 30% of fontSize
 
     let x: number;
     if (rule.align === 'center') x = centeredX(rule.cols, canvasW);

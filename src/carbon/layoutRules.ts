@@ -37,20 +37,20 @@ const SQUARE_RULES: LayoutRuleSet = {
         textAlign: 'center', adScale: 1.6,
     },
     subline: {
-        typeStyle: 'expressiveHeading05',
+        typeStyle: 'heading04',  // 28px at lg → ×1.3 = 36px (38% of headline)
         cols: 13, align: 'center',
-        gapStep: 5, textAlign: 'center', adScale: 1.3,
+        gapStep: 8, textAlign: 'center', adScale: 1.3,
     },
     cta: {
         typeStyle: 'heading03',
         cols: 10, align: 'center',
-        gapStep: 7, fontWeight: 600,
+        gapStep: 9, fontWeight: 600,
         textAlign: 'center', adScale: 1.4,
     },
     tag: {
         typeStyle: 'label02',
         cols: 10, align: 'center',
-        gapStep: 4, textAlign: 'center', adScale: 1.6,
+        gapStep: 5, textAlign: 'center', adScale: 1.6,
     },
     ctaHeightFactor: 0.055,
 };
@@ -59,24 +59,24 @@ const LANDSCAPE_RULES: LayoutRuleSet = {
     headline: {
         typeStyle: 'expressiveHeading06',
         cols: 14, align: 'center',
-        gapStep: 5, maxLines: 2, fontWeight: 700,
+        gapStep: 6, maxLines: 2, fontWeight: 700,
         textAlign: 'center', adScale: 1.5,
     },
     subline: {
-        typeStyle: 'expressiveHeading04',
+        typeStyle: 'heading04',
         cols: 12, align: 'center',
-        gapStep: 4, textAlign: 'center', adScale: 1.3,
+        gapStep: 7, textAlign: 'center', adScale: 1.3,
     },
     cta: {
         typeStyle: 'productiveHeading03',
         cols: 8, align: 'center',
-        gapStep: 5, fontWeight: 600,
+        gapStep: 8, fontWeight: 600,
         textAlign: 'center', adScale: 1.3,
     },
     tag: {
         typeStyle: 'label02',
         cols: 10, align: 'center',
-        gapStep: 3, textAlign: 'center', adScale: 1.4,
+        gapStep: 4, textAlign: 'center', adScale: 1.4,
     },
     ctaHeightFactor: 0.07,
 };
@@ -89,20 +89,20 @@ const PORTRAIT_RULES: LayoutRuleSet = {
         textAlign: 'center', adScale: 1.5,
     },
     subline: {
-        typeStyle: 'expressiveHeading04',
+        typeStyle: 'heading04',
         cols: 13, align: 'center',
-        gapStep: 5, textAlign: 'center', adScale: 1.3,
+        gapStep: 8, textAlign: 'center', adScale: 1.3,
     },
     cta: {
         typeStyle: 'productiveHeading03',
         cols: 12, align: 'center',
-        gapStep: 7, fontWeight: 600,
+        gapStep: 9, fontWeight: 600,
         textAlign: 'center', adScale: 1.3,
     },
     tag: {
         typeStyle: 'label02',
         cols: 12, align: 'center',
-        gapStep: 4, textAlign: 'center', adScale: 1.5,
+        gapStep: 5, textAlign: 'center', adScale: 1.5,
     },
     ctaHeightFactor: 0.06,
 };
