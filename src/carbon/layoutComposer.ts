@@ -18,8 +18,8 @@ import { spacing, resolveTypeStyle, TYPE_SCALE_PX, miniUnit } from './adapter';
 import { columns, centeredX, getMargin } from './gridSystem';
 import { getAspectCategory } from '@/schema/layoutRoles';
 import { hexR, hexG, hexB, hexLuminance, darkenHex, lightenHex } from './colorHelpers';
-import { RULES_MAP } from './layoutRules';
-import type { ElementRule } from './layoutRules';
+import { getLayoutRules } from './layoutRules';
+import type { ElementRule, LayoutVariant } from './layoutRules';
 
 // ── Public Types ─────────────────────────────────
 
@@ -40,8 +40,10 @@ export interface DesignPalette {
 }
 
 
-// ── Main API ─────────────────────────────────────
-
+export interface BuildResult {
+    elements: RenderElement[];
+    variant: LayoutVariant;
+}
 
 export function buildDesignElements(
     content: DesignContent,
@@ -49,9 +51,10 @@ export function buildDesignElements(
     canvasW: number,
     canvasH: number,
     hasBgImage: boolean,
-): RenderElement[] {
+    layoutVariant?: LayoutVariant,
+): BuildResult {
     const category = getAspectCategory(canvasW, canvasH);
-    const rules = RULES_MAP[category];
+    const { rules, variant } = getLayoutRules(category, layoutVariant);
     const canvasMin = Math.min(canvasW, canvasH);
     const elements: RenderElement[] = [];
     const isUltraWide = category === 'ultra-wide';
@@ -230,7 +233,7 @@ export function buildDesignElements(
         });
     }
 
-    return elements;
+    return { elements, variant };
 }
 
 // ── Internal Helpers ─────────────────────────────

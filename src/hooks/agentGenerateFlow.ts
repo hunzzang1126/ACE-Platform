@@ -164,7 +164,7 @@ async function buildAndRender(
     if (USE_CARBON_LAYOUT) {
         // ── NEW: Carbon-powered layout ──
         const { buildDesignElements } = await resilientImport(() => import('@/carbon/layoutComposer'));
-        allElements = buildDesignElements(
+        const result = buildDesignElements(
             { headline: content.headline, subheadline: content.subheadline, cta: content.cta, tag: content.tag },
             {
                 gradientStart: guide.colors.gradientStart,
@@ -177,7 +177,9 @@ async function buildAndRender(
             canvasW, canvasH,
             bgResult.hasImage && !!bgResult.url,
         );
-        console.log(`[Pipeline/Carbon] Built ${allElements.length} elements via Carbon layout engine`);
+        allElements = result.elements;
+        console.log(`[Pipeline/Carbon] Built ${allElements.length} elements via Carbon (variant: ${result.variant})`);
+        cb.narrate(`Layout: Carbon Design System (${result.variant})`);
     } else {
         // ── OLD: Template-based layout (backup — fetch template internally) ──
         const { selectTemplate: selectTmpl } = await resilientImport(() => import('./agentFlowHelpers'));
@@ -271,6 +273,20 @@ async function buildAndRender(
 
     try { engine.reorder_by_z_index?.(); } catch { /* ok */ }
     try { engine.render_all?.(); } catch { /* ok */ }
+
+    // ★ CRITICAL: Sync rendered elements to designStore.
+    // Without this, store-based tools (add_button, add_text) trigger a store→canvas
+    // re-sync that wipes elements that only exist on the canvas engine.
+    try {
+        const { syncElementsToStore } = await resilientImport(() => import('./agentFlowStoreSync'));
+        syncElementsToStore(allElements, canvasW, canvasH, {
+            gradientStart: guide.colors.gradientStart,
+            gradientEnd: guide.colors.gradientEnd,
+            typography: guide.typography,
+        });
+    } catch (syncErr) {
+        console.warn('[Pipeline] Store sync failed (non-critical):', syncErr);
+    }
 
     return rendered;
 }

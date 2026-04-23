@@ -176,7 +176,7 @@ describe('Carbon Layout Composer', () => {
     describe('buildDesignElements() — square canvas', () => {
         it('generates headline element', () => {
             const content: DesignContent = { headline: 'Test Headline' };
-            const elements = buildDesignElements(content, palette, 1080, 1080, false);
+            const { elements } = buildDesignElements(content, palette, 1080, 1080, false);
             const headline = elements.find(el => el.name === 'headline');
             expect(headline).toBeDefined();
             expect(headline!.content).toBe('Test Headline');
@@ -185,7 +185,7 @@ describe('Carbon Layout Composer', () => {
 
         it('generates gradient background when no photo', () => {
             const content: DesignContent = { headline: 'Test' };
-            const elements = buildDesignElements(content, palette, 1080, 1080, false);
+            const { elements } = buildDesignElements(content, palette, 1080, 1080, false);
             const bg = elements.find(el => el.name === 'background');
             expect(bg).toBeDefined();
             expect(bg!.gradient_start_hex).toBe('#6366F1');
@@ -193,14 +193,14 @@ describe('Carbon Layout Composer', () => {
 
         it('skips background when photo exists', () => {
             const content: DesignContent = { headline: 'Test' };
-            const elements = buildDesignElements(content, palette, 1080, 1080, true);
+            const { elements } = buildDesignElements(content, palette, 1080, 1080, true);
             const bg = elements.find(el => el.name === 'background');
             expect(bg).toBeUndefined();
         });
 
         it('generates CTA when provided', () => {
             const content: DesignContent = { headline: 'Test', cta: 'Buy Now' };
-            const elements = buildDesignElements(content, palette, 1080, 1080, false);
+            const { elements } = buildDesignElements(content, palette, 1080, 1080, false);
             const ctaBtn = elements.find(el => el.name === 'cta_button');
             const ctaLabel = elements.find(el => el.name === 'cta_label');
             expect(ctaBtn).toBeDefined();
@@ -210,14 +210,14 @@ describe('Carbon Layout Composer', () => {
 
         it('skips subheadline when not provided', () => {
             const content: DesignContent = { headline: 'Test' };
-            const elements = buildDesignElements(content, palette, 1080, 1080, false);
+            const { elements } = buildDesignElements(content, palette, 1080, 1080, false);
             const sub = elements.find(el => el.name === 'subheadline');
             expect(sub).toBeUndefined();
         });
 
         it('includes subheadline when provided', () => {
             const content: DesignContent = { headline: 'H', subheadline: 'Sub' };
-            const elements = buildDesignElements(content, palette, 1080, 1080, false);
+            const { elements } = buildDesignElements(content, palette, 1080, 1080, false);
             const sub = elements.find(el => el.name === 'subheadline');
             expect(sub).toBeDefined();
             expect(sub!.content).toBe('Sub');
@@ -232,7 +232,7 @@ describe('Carbon Layout Composer', () => {
                 cta: 'Click Me',
                 tag: 'Sale',
             };
-            const elements = buildDesignElements(content, palette, 1080, 1080, false);
+            const { elements } = buildDesignElements(content, palette, 1080, 1080, false);
             const positioned = elements.filter(el => el.type === 'text' || el.name === 'cta_button');
 
             for (let i = 0; i < positioned.length; i++) {
@@ -276,7 +276,7 @@ describe('Carbon Layout Composer', () => {
                     subheadline: 'Sub text here',
                     cta: 'Learn More',
                 };
-                const elements = buildDesignElements(content, palette, w!, h!, false);
+                const { elements } = buildDesignElements(content, palette, w!, h!, false);
                 for (const el of elements) {
                     expect(el.x ?? 0).toBeGreaterThanOrEqual(0);
                     expect(el.y ?? 0).toBeGreaterThanOrEqual(0);
@@ -292,7 +292,7 @@ describe('Carbon Layout Composer', () => {
             const content: DesignContent = {
                 headline: 'H', subheadline: 'S', tag: 'T',
             };
-            const elements = buildDesignElements(content, palette, 1080, 1080, false);
+            const { elements } = buildDesignElements(content, palette, 1080, 1080, false);
             const h = elements.find(el => el.name === 'headline')!;
             const s = elements.find(el => el.name === 'subheadline')!;
             const t = elements.find(el => el.name === 'tag_text')!;
@@ -304,7 +304,7 @@ describe('Carbon Layout Composer', () => {
     describe('photo background → white text', () => {
         it('sets text to white on photo bg', () => {
             const content: DesignContent = { headline: 'H', subheadline: 'S' };
-            const elements = buildDesignElements(content, palette, 1080, 1080, true);
+            const { elements } = buildDesignElements(content, palette, 1080, 1080, true);
             const texts = elements.filter(el => el.type === 'text');
             for (const t of texts) {
                 expect(t.color_hex).toBe('#FFFFFF');
@@ -320,7 +320,7 @@ describe('Carbon Layout Composer', () => {
                 typography: { primaryFont: 'Inter', secondaryFont: 'Inter' },
             };
             const content: DesignContent = { headline: 'Test' };
-            const elements = buildDesignElements(content, lightPalette, 1080, 1080, false);
+            const { elements } = buildDesignElements(content, lightPalette, 1080, 1080, false);
             const bg = elements.find(el => el.name === 'background');
             expect(bg).toBeDefined();
             // Should NOT be near-white anymore — darkened by guard
@@ -335,7 +335,7 @@ describe('Carbon Layout Composer', () => {
                 typography: { primaryFont: 'Inter', secondaryFont: 'Inter' },
             };
             const content: DesignContent = { headline: 'Test' };
-            const elements = buildDesignElements(content, goodPalette, 1080, 1080, false);
+            const { elements } = buildDesignElements(content, goodPalette, 1080, 1080, false);
             const bg = elements.find(el => el.name === 'background');
             // Good gradient should pass through unchanged
             expect(bg!.gradient_start_hex).toBe('#0a0a0a');
@@ -348,7 +348,7 @@ describe('Carbon Layout Composer', () => {
                 typography: { primaryFont: 'Inter', secondaryFont: 'Inter' },
             };
             const content: DesignContent = { headline: 'Test' };
-            const elements = buildDesignElements(content, lowContrastPalette, 1080, 1080, false);
+            const { elements } = buildDesignElements(content, lowContrastPalette, 1080, 1080, false);
             const headline = elements.find(el => el.name === 'headline');
             // Text should NOT be light on light background
             expect(headline!.color_hex).not.toBe('#DDDDDD');
