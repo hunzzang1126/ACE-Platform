@@ -114,11 +114,17 @@ export class AiService {
                     const NO_RETRY_TOOLS = new Set(['analyze_scene', 'undo_ai_action']);
                     const overrideResult = executorOverride?.(tc.name!, params);
                     let result: ExecutionResult = overrideResult ?? await executeToolCall(engine, tc.name!, params, this.trackedNodes);
-                    // ★ Auto-retry once on failure (non-query tools only)
+                    // ★ Error-aware auto-retry: re-execute once, but narrate the error to the user
                     if (!result.success && !NO_RETRY_TOOLS.has(tc.name!) && !overrideResult) {
-                        console.log(`[AI Tool] Retry: ${tc.name} (first attempt failed)`);
+                        console.log(`[AI Tool] Retry: ${tc.name} — error: ${result.message.slice(0, 100)}`);
+                        progress.onToken(`Retrying ${tc.name}... `);
                         await sleep(300);
                         result = await executeToolCall(engine, tc.name!, params, this.trackedNodes);
+                        if (!result.success) {
+                            // ★ Error context is passed to AI via tool_result (is_error=true)
+                            // The AI sees the error message in the next round and can self-correct
+                            progress.onToken(`[${tc.name} failed: ${result.message.slice(0, 60)}] `);
+                        }
                     }
                     console.log(`[AI Tool] Result: ${tc.name} → ${result.success ? 'OK' : 'FAIL'} ${result.message?.slice(0, 200)}`);
                     progress.onStepComplete(i, result); await sleep(200);

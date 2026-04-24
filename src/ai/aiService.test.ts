@@ -133,3 +133,38 @@ describe('AiService — chat error', () => {
         expect(progress.onError).toHaveBeenCalledWith(expect.stringContaining('not available'));
     });
 });
+
+// ══════════════════════════════════════════════════
+// v692: Error-aware retry + narration
+// ══════════════════════════════════════════════════
+
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+
+describe('★ v692: Error-aware auto-retry with context', () => {
+    const aiSrc = readFileSync(resolve(__dirname, './aiService.ts'), 'utf-8');
+
+    it('narrates retry attempt to user via onToken', () => {
+        expect(aiSrc).toContain("progress.onToken(`Retrying ${tc.name}");
+    });
+
+    it('narrates error message on second failure', () => {
+        expect(aiSrc).toContain('failed:');
+        expect(aiSrc).toContain('result.message.slice(0, 60)');
+    });
+
+    it('passes error context to AI via is_error tool_result', () => {
+        expect(aiSrc).toContain('is_error: !result.success');
+    });
+
+    it('skips retry for analyze_scene and undo tools', () => {
+        expect(aiSrc).toContain("'analyze_scene'");
+        expect(aiSrc).toContain("'undo_ai_action'");
+        expect(aiSrc).toContain('NO_RETRY_TOOLS.has(tc.name!)');
+    });
+
+    it('3-tier model routing: planner → executor', () => {
+        expect(aiSrc).toContain("role = round <= 1 ? 'planner' : 'executor'");
+    });
+});
+

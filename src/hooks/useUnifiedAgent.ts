@@ -263,14 +263,14 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
             },
             onReflection: () => updateCard('reflection', 'done'),
             onToken: (token: string) => {
-                // ★ Streaming narration: accumulate tokens, emit at sentence boundaries
+                // ★ Character-level streaming: every token updates narration instantly (Cursor-style)
                 streamBuf.current += token;
-                const buf = streamBuf.current;
-                // Emit when we hit a sentence boundary (. ! ? or newline) with at least 20 chars
-                const boundary = buf.length >= 20 && /[.!?\n]$/.test(buf.trim());
-                if (boundary) {
-                    narrate(buf.trim());
-                    streamBuf.current = '';
+                // Throttle: emit at most every 30ms to avoid excessive React re-renders
+                const now = Date.now();
+                const lastEmit = (streamBuf as any)._lastEmit ?? 0;
+                if (now - lastEmit >= 30 || /[.!?\n]$/.test(token)) {
+                    narrate(streamBuf.current.trim());
+                    (streamBuf as any)._lastEmit = now;
                 }
             },
             onComplete: () => {},

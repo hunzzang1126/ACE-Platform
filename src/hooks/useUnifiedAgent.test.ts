@@ -124,3 +124,75 @@ describe('★ REGRESSION (v641): commandExecutor property updates reach canvas',
         expect(execSrc).toContain("executeDesignCommand('update_element_property'");
     });
 });
+
+// ═══════════════════════════════════════════════════
+// v691→v692: Character-level streaming narration
+// ═══════════════════════════════════════════════════
+
+describe('★ v692: Character-level streaming narration', () => {
+
+    it('declares streamBuf ref for token accumulation', () => {
+        expect(src).toContain("streamBuf = useRef('')");
+    });
+
+    it('onToken appends tokens to streamBuf', () => {
+        expect(src).toContain('streamBuf.current += token');
+    });
+
+    it('uses 30ms throttle for React render performance', () => {
+        expect(src).toContain('now - lastEmit >= 30');
+    });
+
+    it('emits immediately on sentence boundaries', () => {
+        expect(src).toContain("/[.!?\\n]$/.test(token)");
+    });
+
+    it('calls narrate with full accumulated text (character-level)', () => {
+        expect(src).toContain('narrate(streamBuf.current.trim())');
+    });
+
+    it('tracks _lastEmit timestamp for throttling', () => {
+        expect(src).toContain('_lastEmit');
+    });
+
+    it('flushes remaining tokens after chat completes', () => {
+        expect(src).toContain('streamBuf.current.trim()');
+        const flushIdx = src.indexOf('Flush any remaining streamed tokens');
+        expect(flushIdx).toBeGreaterThan(-1);
+    });
+});
+
+// ═══════════════════════════════════════════════════
+// v691: Auto-resize orchestration after design gen
+// ═══════════════════════════════════════════════════
+
+describe('★ v691: Auto-resize after generate_full_design', () => {
+
+    it('checks for multi-variant creative set', () => {
+        expect(src).toContain('cs.variants.length > 1');
+    });
+
+    it('imports orchestrateResize dynamically', () => {
+        expect(src).toContain("import('@/ai/services/resizeOrchestrator')");
+    });
+
+    it('calls orchestrateResize with creativeSet and progress callback', () => {
+        expect(src).toContain('orchestrateResize(cs,');
+    });
+
+    it('narrates smart sizing progress', () => {
+        expect(src).toContain('Smart sizing all variants');
+    });
+
+    it('resize failure is non-blocking', () => {
+        expect(src).toContain('Auto-resize failed (non-blocking)');
+    });
+
+    it('resize runs AFTER generateFlow, not before', () => {
+        const genIdx = src.indexOf('runGenerateFlow(pendingDesignPrompt)');
+        const resizeIdx = src.indexOf('orchestrateResize(cs,');
+        expect(genIdx).toBeGreaterThan(-1);
+        expect(resizeIdx).toBeGreaterThan(-1);
+        expect(resizeIdx).toBeGreaterThan(genIdx);
+    });
+});
