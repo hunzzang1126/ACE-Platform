@@ -48,7 +48,11 @@ const AD_SIZES: [number, number, string][] = [
     [1080, 1920, 'Story'],
 ];
 
-const VARIANTS: LayoutVariant[] = ['centered', 'left-hero', 'offset-right'];
+const VARIANTS: LayoutVariant[] = [
+    'centered', 'left-hero', 'offset-right',
+    'top-heavy', 'bottom-stack', 'split-left',
+    'minimal-center', 'bold-statement', 'editorial', 'compact-bar',
+];
 const ASPECTS: AspectCategory[] = ['square', 'landscape', 'portrait', 'ultra-wide'];
 
 // ─────────────────────────────────────────────────
@@ -351,14 +355,13 @@ describe('★ REGRESSION: Compression for small canvases', () => {
 // ─────────────────────────────────────────────────
 
 describe('★ REGRESSION: Variant selection', () => {
-    it('random variant selection produces all 3 variants over 30 calls', () => {
+    it('random variant selection produces all 10 variants over 100 calls', () => {
         const seen = new Set<string>();
-        for (let i = 0; i < 30; i++) {
+        for (let i = 0; i < 100; i++) {
             const { variant } = getLayoutRules('square');
             seen.add(variant);
         }
-        // With 30 random picks from 3 options, probability of missing one is ~(2/3)^30 ≈ 0.000005
-        expect(seen.size).toBe(3);
+        expect(seen.size).toBe(10);
     });
 });
 

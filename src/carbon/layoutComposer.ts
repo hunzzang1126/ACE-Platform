@@ -113,27 +113,34 @@ export function buildDesignElements(
     // We build all text elements first, then CENTER the block vertically.
     const contentBlock: { element: RenderElement; gapBefore: number }[] = [];
 
-    // Tag
-    if (content.tag) {
+    // ── Content ordering (controlled by layout variant) ──
+    const order = rules.contentOrder ?? 'standard';
+
+    const addTag = () => {
+        if (!content.tag) return;
         const el = buildTextElement('tag_text', content.tag, rules.tag,
             canvasW, canvasH, canvasMin, textColor, palette);
-        contentBlock.push({ element: el, gapBefore: 0 });
-    }
-
-    // Headline
-    const headlineEl = buildTextElement('headline', content.headline, rules.headline,
-        canvasW, canvasH, canvasMin, textColor, palette);
-    contentBlock.push({
-        element: headlineEl,
-        gapBefore: contentBlock.length > 0 ? spacing(rules.tag.gapStep, canvasMin) : 0,
-    });
-
-    // Subheadline
-    if (content.subheadline) {
+        contentBlock.push({ element: el, gapBefore: contentBlock.length > 0 ? spacing(rules.tag.gapStep, canvasMin) : 0 });
+    };
+    const addHeadline = () => {
+        const headlineEl = buildTextElement('headline', content.headline, rules.headline,
+            canvasW, canvasH, canvasMin, textColor, palette);
+        contentBlock.push({
+            element: headlineEl,
+            gapBefore: contentBlock.length > 0 ? spacing(rules.tag.gapStep, canvasMin) : 0,
+        });
+    };
+    const addSubheadline = () => {
+        if (!content.subheadline) return;
         const subEl = buildTextElement('subheadline', content.subheadline, rules.subline,
             canvasW, canvasH, canvasMin, textColor, palette);
         contentBlock.push({ element: subEl, gapBefore: spacing(rules.subline.gapStep, canvasMin) });
-    }
+    };
+
+    // Execute in order
+    if (order === 'headline-first') { addHeadline(); addTag(); addSubheadline(); }
+    else if (order === 'tag-last') { addHeadline(); addSubheadline(); addTag(); }
+    else { addTag(); addHeadline(); addSubheadline(); }
 
     // ── Calculate total content height ──
     let totalContentH = 0;
@@ -155,12 +162,19 @@ export function buildDesignElements(
         totalContentH += ctaGap + ctaH;
     }
 
-    // ── Vertical centering ──
-    // Place content block in the vertical center of the canvas.
-    // For ultra-wide: use horizontal layout instead.
+    // ── Vertical positioning (controlled by verticalBias) ──
+    const bias = rules.verticalBias ?? 'center';
     let startY: number;
     if (isUltraWide) {
         startY = Math.round((canvasH - totalContentH) / 2);
+    } else if (bias === 'top') {
+        // Top-heavy: content starts at ~15% from top
+        const topTarget = Math.round(canvasH * 0.12);
+        startY = Math.max(spacing(3, canvasMin), topTarget);
+    } else if (bias === 'bottom') {
+        // Bottom-stack: content ends at ~85% from top
+        const bottomTarget = Math.round(canvasH * 0.85 - totalContentH);
+        startY = Math.max(spacing(3, canvasMin), bottomTarget);
     } else {
         // Center with slight upward bias (golden ratio ~38% from top)
         const goldenTop = Math.round(canvasH * 0.38 - totalContentH / 2);
