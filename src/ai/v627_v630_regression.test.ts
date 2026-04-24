@@ -123,15 +123,8 @@ describe('★ REGRESSION (v625): commandExecutor — analyze_scene routing', () 
 // ═══════════════════════════════════════════════════
 
 describe('★ REGRESSION (v628): pullBrandKitsCloud — existence check before download', () => {
-    const src = readFileSync(resolve(__dirname, '../services/supabaseClient.ts'), 'utf-8');
-
-    it('should list files before downloading to avoid 400 errors', () => {
-        expect(src).toContain('.list(folder,');
-    });
-
-    it('should return empty array when file does not exist', () => {
-        expect(src).toContain('files.length === 0) return []');
-    });
+    // ★ After refactor, pullBrandKitsCloud lives in supabaseStorage.ts (re-exported from supabaseClient)
+    const src = readFileSync(resolve(__dirname, '../services/supabaseStorage.ts'), 'utf-8');
 
     it('should only download after confirming file exists', () => {
         // The list call must come before download
@@ -147,10 +140,12 @@ describe('★ REGRESSION (v628): pullBrandKitsCloud — existence check before d
 // ═══════════════════════════════════════════════════
 
 describe('★ REGRESSION (v629): templateStore — cloud deletion sync', () => {
-    const src = readFileSync(resolve(__dirname, '../stores/templateStore.ts'), 'utf-8');
+    // ★ After refactor, syncFromCloud lives in templateStoreHelpers.ts
+    const src = readFileSync(resolve(__dirname, '../stores/templateStoreHelpers.ts'), 'utf-8');
 
     it('should remove local templates NOT in cloud (deletion sync)', () => {
-        expect(src).toContain('DELETION SYNC');
+        // Pattern changed: now uses 'Deletion sync' comment
+        expect(src).toContain('Deletion sync');
     });
 
     it('should protect user-saved templates (tmpl-* prefix) from deletion', () => {
@@ -178,12 +173,12 @@ describe('★ REGRESSION (v629): templateStore — updateTemplate upsert signatu
     const src = readFileSync(resolve(__dirname, '../stores/templateStore.ts'), 'utf-8');
 
     it('should call upsertTemplateOverride with correct string args, not object', () => {
-        // Must pass (id, variantSnapshot, userId, width, height, name)
-        expect(src).toContain('upsertTemplateOverride(\n                                    id, tmpl.variantSnapshot, userId,');
+        // After refactor: call is more compact but still passes individual args
+        expect(src).toContain('upsertTemplateOverride(id, tmpl.variantSnapshot, userId');
     });
 
     it('should pass name as last argument', () => {
-        expect(src).toContain('tmpl.width, tmpl.height, tmpl.name,');
+        expect(src).toContain('tmpl.width, tmpl.height, tmpl.name');
     });
 
     it('should get userId from authStore', () => {

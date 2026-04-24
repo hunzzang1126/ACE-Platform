@@ -64,31 +64,31 @@ describe('supabaseClient — onboarding', () => {
     });
 });
 
-describe('supabaseClient — templates', () => {
+describe('supabaseClient — templates (re-exported from supabaseStorage)', () => {
     it('exports fetchTemplateOverrides', () => {
-        expect(src).toContain('export async function fetchTemplateOverrides');
+        expect(src).toContain('fetchTemplateOverrides');
     });
 
     it('exports upsertTemplateOverride', () => {
-        expect(src).toContain('export async function upsertTemplateOverride');
+        expect(src).toContain('upsertTemplateOverride');
     });
 
     it('exports deleteTemplateOverride', () => {
-        expect(src).toContain('export async function deleteTemplateOverride');
+        expect(src).toContain('deleteTemplateOverride');
     });
 });
 
-describe('supabaseClient — brand kit cloud sync', () => {
+describe('supabaseClient — brand kit cloud sync (re-exported from supabaseStorage)', () => {
     it('exports pushBrandKitCloud', () => {
-        expect(src).toContain('export async function pushBrandKitCloud');
+        expect(src).toContain('pushBrandKitCloud');
     });
 
     it('exports pullBrandKitsCloud', () => {
-        expect(src).toContain('export async function pullBrandKitsCloud');
+        expect(src).toContain('pullBrandKitsCloud');
     });
 
     it('exports deleteBrandKitCloud', () => {
-        expect(src).toContain('export async function deleteBrandKitCloud');
+        expect(src).toContain('deleteBrandKitCloud');
     });
 });
 

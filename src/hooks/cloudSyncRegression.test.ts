@@ -61,7 +61,8 @@ describe('★ REGRESSION GUARD: Brand Kit Cloud Sync', () => {
     });
 
     it('brand kit uses ace-assets Storage bucket (not SQL table)', () => {
-        const src = readSrc('src/services/supabaseClient.ts');
+        // ★ After refactor, brand kit CRUD lives in supabaseStorage.ts (re-exported from supabaseClient)
+        const src = readSrc('src/services/supabaseStorage.ts');
         expect(src).toContain('BRAND_KIT_BUCKET');
         expect(src).toContain('brand_kit.json');
         expect(src).not.toContain("from('brand_kits')");

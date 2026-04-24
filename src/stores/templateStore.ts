@@ -1,4 +1,5 @@
 // templateStore — Design template library (save, override, admin CRUD)
+// ★ BUILT_IN_TEMPLATES removed — cloud-only architecture
 
 import { idbStorage } from './idbStorageAdapter';
 import { create } from 'zustand';
@@ -154,6 +155,7 @@ export const useTemplateStore = create<TemplateState>()(
             // ★ Delegated to templateStoreHelpers.ts
             overrideTemplate: (...args) => createOverrideHandler(set, get)(...args),
             clearOverride: (id) => {
+                // Cloud-only: just remove the template (no built-in revert)
                 set(state => { delete state.templateOverrides[id]; state.templates = state.templates.filter(t => t.id !== id); });
                 deleteTemplateOverride(id).catch(e => console.warn('[templateStore] Failed to delete override:', e));
             },
