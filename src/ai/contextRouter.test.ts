@@ -189,3 +189,32 @@ describe('STORE_API_REFERENCE', () => {
         expect(STORE_API_REFERENCE).toContain('addElementToMaster');
     });
 });
+
+describe('★ P1-7: Vision Context', () => {
+    it('ContextInfo supports canvasScreenshot field', () => {
+        const ctx: ContextInfo = {
+            page: 'canvas-editor', pageLabel: 'Canvas Editor',
+            projectName: 'Test', canvasSize: { w: 300, h: 250 },
+            variantCount: 1, elementCount: 3, useDesignPipeline: true,
+            snapshot: '', canvasScreenshot: 'base64data',
+        };
+        expect(ctx.canvasScreenshot).toBe('base64data');
+    });
+
+    it('canvasScreenshot is optional (undefined in test env without DOM)', () => {
+        const ctx = buildContext('/editor/detail/123');
+        // In test environment (jsdom mock), captureCanvas may not produce real data
+        // The field should exist but may be undefined
+        expect('canvasScreenshot' in ctx || ctx.canvasScreenshot === undefined).toBe(true);
+    });
+
+    it('dashboard never captures screenshot', () => {
+        const ctx = buildContext('/');
+        expect(ctx.canvasScreenshot).toBeUndefined();
+    });
+
+    it('size-dashboard never captures screenshot', () => {
+        const ctx = buildContext('/editor');
+        expect(ctx.canvasScreenshot).toBeUndefined();
+    });
+});

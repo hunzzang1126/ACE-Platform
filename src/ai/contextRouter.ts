@@ -48,6 +48,8 @@ export interface ContextInfo {
     memory?: string;
     /** User's selected UI language (e.g. 'ko', 'en', 'ja') */
     language?: string;
+    /** Base64 canvas screenshot for vision context (canvas-editor only) */
+    canvasScreenshot?: string;
 }
 
 // ── Page Detection ───────────────────────────────
@@ -230,6 +232,23 @@ export function buildContext(pathname: string, memory?: string): ContextInfo {
         'canvas-editor': 'Canvas Editor',
     };
 
+    // ★ P1-7: Canvas screenshot for vision context (synchronous — captureCanvas uses toDataURL)
+    let canvasScreenshot: string | undefined;
+    if (page === 'canvas-editor' && elementCount > 0 && typeof document !== 'undefined') {
+        try {
+            // captureCanvas is synchronous (DOM toDataURL). Import at top would break tests
+            // that run without DOM, so we guard with typeof document check.
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            const { captureCanvas } = require('@/services/visionService') as { captureCanvas: (opts?: any) => string | null };
+            // 512px max — keeps vision tokens low (~85 tokens for a small image)
+            const base64 = captureCanvas({ maxDimension: 512, format: 'image/jpeg', quality: 0.7 });
+            if (base64 && base64.length > 100) {
+                canvasScreenshot = base64;
+                console.info(`[Context] Canvas screenshot captured: ${Math.round(base64.length / 1024)}KB`);
+            }
+        } catch { /* Canvas capture failed — non-critical, continue without */ }
+    }
+
     return {
         page,
         pageLabel: pageLabels[page],
@@ -241,6 +260,7 @@ export function buildContext(pathname: string, memory?: string): ContextInfo {
         snapshot: '', // populated via buildWorkspaceSnapshot() during prompt build
         memory,
         language: getUserLanguage(),
+        canvasScreenshot,
     };
 }
 

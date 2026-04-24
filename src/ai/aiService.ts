@@ -64,13 +64,13 @@ export class AiService {
         progress.onThinking('Analyzing your request...');
         await nextFrame();
 
-        try { await this.agenticLoop(engine, systemPrompt, enrichedMessage, progress, ctx.page, executorOverride); }
+        try { await this.agenticLoop(engine, systemPrompt, enrichedMessage, progress, ctx.page, executorOverride, ctx.canvasScreenshot); }
         catch (err) { progress.onError(`AI Error: ${err}`); }
         this.saveInteractionMemory(userMessage).catch(() => {});
     }
 
-    private async agenticLoop(engine: Engine, systemPrompt: string, enrichedUserMessage: string, progress: LiveProgress, page: import('./contextRouter').PageContext, executorOverride?: ToolExecutorOverride): Promise<void> {
-        const messages = this.buildClaudeMessages(enrichedUserMessage);
+    private async agenticLoop(engine: Engine, systemPrompt: string, enrichedUserMessage: string, progress: LiveProgress, page: import('./contextRouter').PageContext, executorOverride?: ToolExecutorOverride, canvasScreenshot?: string): Promise<void> {
+        const messages = this.buildClaudeMessages(enrichedUserMessage, canvasScreenshot);
         const tools = toClaudeTools(getToolsForPage(page));
         let rounds = 0, finished = false;
         const allToolRecords: ToolCallRecord[] = [];
@@ -120,7 +120,7 @@ export class AiService {
         if (rounds >= this.config.maxToolRounds && !finished) progress.onError(`Reached maximum tool rounds (${this.config.maxToolRounds}).`);
     }
 
-    private buildClaudeMessages(currentMessage?: string): ClaudeMessage[] {
+    private buildClaudeMessages(currentMessage?: string, canvasScreenshot?: string): ClaudeMessage[] {
         const messages: ClaudeMessage[] = [];
         const all = this.context.getHistory().filter(m => m.role === 'user' || m.role === 'assistant');
         const RECENT_WINDOW = 10;
@@ -131,7 +131,18 @@ export class AiService {
             messages.push({ role: 'assistant', content: 'Understood.' });
         }
         for (const msg of all.slice(-RECENT_WINDOW)) messages.push({ role: msg.role as 'user' | 'assistant', content: msg.content });
-        if (currentMessage && messages.length > 0 && messages[messages.length - 1]!.role === 'user') messages[messages.length - 1]!.content = currentMessage;
+        if (currentMessage && messages.length > 0 && messages[messages.length - 1]!.role === 'user') {
+            // ★ P1-7: If canvas screenshot available, send as multimodal (image + text)
+            if (canvasScreenshot) {
+                messages[messages.length - 1]!.content = [
+                    { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${canvasScreenshot}`, detail: 'low' } },
+                    { type: 'text', text: `[Current canvas screenshot attached above]\n\n${currentMessage}` },
+                ] as any;
+                console.info('[AiService] ★ Vision context: canvas screenshot injected into user message');
+            } else {
+                messages[messages.length - 1]!.content = currentMessage;
+            }
+        }
         return messages;
     }
 
