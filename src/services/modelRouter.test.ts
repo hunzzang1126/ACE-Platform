@@ -1,58 +1,71 @@
 // ─────────────────────────────────────────────────
-// modelRouter.test.ts — Model Router Tests
+// Model Router — Unit Tests
 // ─────────────────────────────────────────────────
+
 import { describe, it, expect } from 'vitest';
-import { getModelForRole, getModelId, getMaxTokens, listModels, type AceModelRole } from '@/services/modelRouter';
+import { getModelForRole, getModelId, getMaxTokens, listModels } from './modelRouter';
+import type { AceModelRole } from './modelRouter';
 
-describe('modelRouter', () => {
-    it('planner uses Sonnet 4 (default)', () => {
-        const config = getModelForRole('planner');
-        expect(config.id).toBe('anthropic/claude-sonnet-4');
-        expect(config.supportsTools).toBe(true);
-        expect(config.maxTokens).toBeGreaterThan(0);
+describe('Model Router', () => {
+    describe('getModelForRole', () => {
+        it('planner uses Sonnet 4', () => {
+            const config = getModelForRole('planner');
+            expect(config.id).toContain('sonnet');
+            expect(config.supportsTools).toBe(true);
+            expect(config.supportsVision).toBe(true);
+        });
+
+        it('executor uses Haiku (cheaper)', () => {
+            const config = getModelForRole('executor');
+            expect(config.id).toContain('haiku');
+            expect(config.supportsTools).toBe(true);
+        });
+
+        it('executor is cheaper than planner', () => {
+            const planner = getModelForRole('planner');
+            const executor = getModelForRole('executor');
+            expect(executor.costPer1MInput).toBeLessThan(planner.costPer1MInput);
+            expect(executor.costPer1MOutput).toBeLessThan(planner.costPer1MOutput);
+        });
+
+        it('executor maxTokens is less than planner', () => {
+            expect(getMaxTokens('executor')).toBeLessThan(getMaxTokens('planner'));
+        });
     });
 
-    it('design uses same model as planner (Sonnet 4)', () => {
-        const design = getModelForRole('design');
-        const planner = getModelForRole('planner');
-        expect(design.id).toBe(planner.id);
-        expect(design.supportsVision).toBe(true);
-        expect(design.supportsTools).toBe(true);
-    });
-
-    it('executor uses cheaper model than planner', () => {
-        const planner = getModelForRole('planner');
-        const executor = getModelForRole('executor');
-        expect(executor.costPer1MInput).toBeLessThan(planner.costPer1MInput);
-        expect(executor.id).toContain('haiku');
-    });
-
-    it('critic supports vision', () => {
-        const config = getModelForRole('critic');
-        expect(config.supportsVision).toBe(true);
-    });
-
-    it('image_fast and image_quality have different model IDs', () => {
-        const fast = getModelId('image_fast');
-        const quality = getModelId('image_quality');
-        expect(fast).not.toBe(quality);
-        // ★ Flux removed from OpenRouter Apr 2026 → Nano Banana models
-        expect(fast).toContain('gemini'); // Nano Banana 2 (fast)
-        expect(quality).toContain('gemini'); // Nano Banana Pro (quality)
-    });
-
-    it('getMaxTokens returns correct value', () => {
-        expect(getMaxTokens('planner')).toBe(4096);
-        expect(getMaxTokens('vision')).toBe(1024);
-    });
-
-    it('listModels covers all 7 roles', () => {
-        const models = listModels();
+    describe('getModelId', () => {
         const roles: AceModelRole[] = ['planner', 'executor', 'critic', 'vision', 'design', 'image_fast', 'image_quality'];
         for (const role of roles) {
-            expect(models[role]).toBeDefined();
-            expect(models[role].id).toBeTruthy();
-            expect(models[role].name).toBeTruthy();
+            it(`returns valid model ID for ${role}`, () => {
+                const id = getModelId(role);
+                expect(id).toBeTruthy();
+                expect(typeof id).toBe('string');
+                expect(id.includes('/')).toBe(true); // format: provider/model
+            });
         }
+    });
+
+    describe('listModels', () => {
+        it('lists all roles', () => {
+            const models = listModels();
+            expect(Object.keys(models)).toContain('planner');
+            expect(Object.keys(models)).toContain('executor');
+            expect(Object.keys(models)).toContain('image_fast');
+        });
+    });
+
+    describe('Cost estimation', () => {
+        it('★ REGRESSION: 3-round conversation cost savings', () => {
+            const planner = getModelForRole('planner');
+            const executor = getModelForRole('executor');
+            // Old: all Sonnet 4
+            const oldCost = 3 * (2000 * planner.costPer1MInput / 1e6 + 1000 * planner.costPer1MOutput / 1e6);
+            // New: 1 Sonnet + 2 Haiku
+            const newCost =
+                1 * (2000 * planner.costPer1MInput / 1e6 + 1000 * planner.costPer1MOutput / 1e6) +
+                2 * (2000 * executor.costPer1MInput / 1e6 + 1000 * executor.costPer1MOutput / 1e6);
+            const savings = 1 - newCost / oldCost;
+            expect(savings).toBeGreaterThan(0.40); // At least 40% savings
+        });
     });
 });

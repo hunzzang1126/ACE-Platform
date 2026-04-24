@@ -78,7 +78,7 @@ export class AiService {
 
         while (!finished && rounds < this.config.maxToolRounds) {
             rounds++;
-            const response = await this.callClaude(systemPrompt, messages, tools, progress);
+            const response = await this.callClaude(systemPrompt, messages, tools, progress, rounds);
             if (!response) { progress.onError('No response from AI'); return; }
 
             const textBlocks = response.content.filter(b => b.type === 'text');
@@ -135,15 +135,26 @@ export class AiService {
         return messages;
     }
 
-    private async callClaude(systemPrompt: string, messages: ClaudeMessage[], tools: ReturnType<typeof toClaudeTools>, progress: LiveProgress): Promise<ClaudeResponse | null> {
+    private async callClaude(systemPrompt: string, messages: ClaudeMessage[], tools: ReturnType<typeof toClaudeTools>, progress: LiveProgress, round = 1): Promise<ClaudeResponse | null> {
         const { useAuthStore } = await import('@/stores/authStore');
         const { PLAN_LIMITS } = await import('@/schema/planTypes');
+        const { getModelForRole } = await import('@/services/modelRouter');
         const userPlan = useAuthStore.getState().user?.plan ?? 'starter';
         const planDefaults = PLAN_LIMITS[userPlan];
-        let model = this.config.model || planDefaults?.defaultModel || 'anthropic/claude-sonnet-4';
+
+        // ★ 3-tier model routing: Round 1 = planner (reasoning), Round 2+ = executor (cheap)
+        const role = round <= 1 ? 'planner' : 'executor';
+        const routedModel = getModelForRole(role);
+        let model = this.config.model || planDefaults?.defaultModel || routedModel.id;
+
+        // If user has a specific model set AND it matches planner, downgrade on round 2+
+        if (round > 1 && model === getModelForRole('planner').id) {
+            model = routedModel.id; // Switch to Haiku for execution rounds
+        }
+
         const requestedModel = model;
         if (planDefaults?.allowedModels && !planDefaults.allowedModels.includes(model)) { model = planDefaults.defaultModel; }
-        console.info(`[AiService] Model selection: requested="${requestedModel}" → actual="${model}" | plan="${userPlan}" | allowed=[${planDefaults?.allowedModels?.join(', ')}]`);
+        console.info(`[AiService] Model routing: round=${round} role="${role}" model="${model}" | plan="${userPlan}"`);
 
         // ★ Use the unified proxy URL — never send API key directly from client
         const apiUrl = getOpenRouterUrl();
@@ -168,7 +179,7 @@ export class AiService {
         }
 
         const openAiTools = tools.length > 0 ? tools.map(t => ({ type: 'function' as const, function: { name: t.name, description: t.description, parameters: t.input_schema } })) : undefined;
-        const body: Record<string, unknown> = { model, max_tokens: 4096, messages: openAiMessages, tools: openAiTools, stream: true };
+        const body: Record<string, unknown> = { model, max_tokens: routedModel.maxTokens || 4096, messages: openAiMessages, tools: openAiTools, stream: true };
 
         // ★ Import getProxyHeaders dynamically to get JWT in production / direct key in dev
         for (let attempt = 0; attempt <= 2; attempt++) {

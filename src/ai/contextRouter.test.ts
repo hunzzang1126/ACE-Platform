@@ -141,6 +141,18 @@ describe('buildContextSystemPrompt', () => {
         const prompt = buildContextSystemPrompt(ctx);
         expect(prompt).toContain('Respond in Japanese');
     });
+
+    it('★ QUALITY GATE: canvas-editor prompt under 2000 chars (~500 tokens)', () => {
+        const ctx = buildContext('/editor/detail/123');
+        const prompt = buildContextSystemPrompt(ctx);
+        expect(prompt.length, `Prompt is ${prompt.length} chars — must be under 2000`).toBeLessThan(2000);
+    });
+
+    it('★ QUALITY GATE: dashboard prompt under 1500 chars', () => {
+        const ctx = buildContext('/');
+        const prompt = buildContextSystemPrompt(ctx);
+        expect(prompt.length, `Prompt is ${prompt.length} chars — must be under 1500`).toBeLessThan(1500);
+    });
 });
 
 describe('enrichMessageWithContext', () => {
