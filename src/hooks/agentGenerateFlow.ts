@@ -58,17 +58,24 @@ export async function executeGenerateFlow(
 
     const { generateColorPalette } = await resilientImport(() => import('@/services/designStyleGuides'));
     const colorPrompt = brand.paletteHint ? `${prompt}\n\n[BRAND PALETTE]\n${brand.paletteHint}\nPrefer these brand colors when they fit the mood.` : prompt;
-    const { palette: guide, reasoning: colorReasoning, needsBackgroundImage, backgroundImagePrompt } = await generateColorPalette(colorPrompt, abort.signal);
+    const { palette: guide, reasoning: colorReasoning, needsBackgroundImage: aiNeedsImage, backgroundImagePrompt } = await generateColorPalette(colorPrompt, abort.signal);
+
+    // ★ Code-first image decision: deterministic for 80% of cases, AI only for ambiguous.
+    const { decideBackgroundImage } = await resilientImport(() => import('@/services/backgroundImageDecider'));
+    const codeDecision = decideBackgroundImage(prompt);
+    const finalNeedsImage = codeDecision.confidence === 'high' ? codeDecision.needsImage : aiNeedsImage;
+    const imageSource = codeDecision.confidence === 'high' ? `Code: ${codeDecision.reason}` : `AI: ${aiNeedsImage ? 'yes' : 'no'}`;
+    console.log(`[Pipeline] Image decision: ${finalNeedsImage} (${imageSource})`);
 
     cb.updateCard('palette', 'done', guide.name, {
         reasoning: colorReasoning,
-        expandedDetail: [`Background: ${guide.colors.gradientStart} -> ${guide.colors.gradientEnd}`, `Accent: ${guide.colors.accent}`, `Text: ${guide.colors.foreground}`, `Font: ${guide.typography.primaryFont} / ${guide.typography.secondaryFont}`, needsBackgroundImage ? 'Background Image: YES' : 'Background Image: NO'].join('\n'),
+        expandedDetail: [`Background: ${guide.colors.gradientStart} -> ${guide.colors.gradientEnd}`, `Accent: ${guide.colors.accent}`, `Text: ${guide.colors.foreground}`, `Font: ${guide.typography.primaryFont} / ${guide.typography.secondaryFont}`, finalNeedsImage ? `Background Image: YES (${imageSource})` : `Background Image: NO (${imageSource})`].join('\n'),
     });
     cb.narrate(colorReasoning || `Color palette: ${guide.name}`);
     await pause(400);
 
     // ── Phase 4.5: Background Image ──
-    const bgResult = await generateBgImage(needsBackgroundImage, backgroundImagePrompt, prompt, canvasW, canvasH, guide, abort, cb);
+    const bgResult = await generateBgImage(finalNeedsImage, backgroundImagePrompt, prompt, canvasW, canvasH, guide, abort, cb);
     await pause(300);
 
     // ── Phase 4: Carbon Layout + Render (stepper: Executing) ──
