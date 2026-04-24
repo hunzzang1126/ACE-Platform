@@ -12,6 +12,7 @@ import { generateImage } from '@/services/imageGenClient';
 import type { ImageGenResult } from '@/services/imageGenClient';
 import { analyzeScene } from './executorCompound';
 import { executeDesignCommand } from './executors/designExecutor';
+import { validateToolParams } from './toolParamValidator';
 
 // Re-export types for consumers
 export type { ExecutionResult } from './executorHelpers';
@@ -82,19 +83,29 @@ export async function executeToolCall(
     params: Record<string, unknown>,
     trackedNodes: SceneNodeInfo[],
 ): Promise<ExecutionResult> {
-    // Helper
-    const str = (key: string, fallback = ''): string => {
-        const v = params[key];
-        return typeof v === 'string' ? v : fallback;
-    };
-    const num = (key: string, fallback = 0): number => {
-        const v = params[key];
-        if (v === undefined || v === null) return fallback;
-        const n = Number(v);
-        return Number.isFinite(n) ? n : fallback;
-    };
-
     try {
+        // ★ VALIDATION GUARD: Check params before execution
+        const validation = validateToolParams(toolName, params);
+        if (!validation.valid) {
+            return {
+                success: false,
+                message: `Invalid parameters for ${toolName}: ${validation.errors.join('; ')}`,
+            };
+        }
+        // Use sanitized params (auto-fixed hex colors, clamped numbers, etc.)
+        const p = validation.sanitized;
+        // Re-bind helpers to sanitized params
+        const str = (key: string, fallback = ''): string => {
+            const v = p[key];
+            return typeof v === 'string' ? v : fallback;
+        };
+        const num = (key: string, fallback = 0): number => {
+            const v = p[key];
+            if (v === undefined || v === null) return fallback;
+            const n = Number(v);
+            return Number.isFinite(n) ? n : fallback;
+        };
+
         switch (toolName) {
 
             // ── Image Generation ─────────────────────

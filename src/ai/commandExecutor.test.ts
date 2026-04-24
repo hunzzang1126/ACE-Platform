@@ -85,16 +85,10 @@ describe('commandExecutor', () => {
             expect(result.message).toBe('Content policy violation');
         });
 
-        it('should use default prompt when none provided', async () => {
-            vi.mocked(generateImage).mockResolvedValueOnce({
-                success: true, imageUrl: 'url', model: 'flux', message: 'ok',
-            });
-
-            await executeToolCall(makeEngine(), 'generate_image', {}, []);
-
-            expect(generateImage).toHaveBeenCalledWith(
-                expect.objectContaining({ prompt: expect.stringContaining('abstract background') }),
-            );
+        it('should reject empty prompt via validation guard', async () => {
+            const result = await executeToolCall(makeEngine(), 'generate_image', {}, []);
+            expect(result.success).toBe(false);
+            expect(result.message).toContain('Invalid parameters');
         });
 
         it('should use canvas dimensions from engine', async () => {
@@ -104,7 +98,7 @@ describe('commandExecutor', () => {
 
             await executeToolCall(
                 makeEngine({ canvas_width: () => 728, canvas_height: () => 90 }),
-                'generate_image', { prompt: 'bg' }, [],
+                'generate_image', { prompt: 'blue background image' }, [],
             );
 
             expect(generateImage).toHaveBeenCalledWith(
@@ -148,7 +142,7 @@ describe('commandExecutor', () => {
                 {}, [],
             );
             expect(result.success).toBe(false);
-            expect(result.message).toContain('No prompt');
+            expect(result.message).toContain('prompt');
         });
 
         it('should delete existing bg and add new image', async () => {
@@ -220,10 +214,10 @@ describe('commandExecutor', () => {
 
             const result = await executeToolCall(
                 makeEngine(), 'add_text',
-                { content: 'Hello' }, [],
+                { text: 'Hello' }, [],
             );
 
-            expect(executeDesignCommand).toHaveBeenCalledWith('add_text', { content: 'Hello' });
+            expect(executeDesignCommand).toHaveBeenCalledWith('add_text', expect.objectContaining({ text: 'Hello' }));
             expect(result.success).toBe(true);
         });
 
@@ -248,7 +242,7 @@ describe('commandExecutor', () => {
 
             const result = await executeToolCall(
                 makeEngine(), 'add_text',
-                { content: 'test' }, [],
+                { text: 'test' }, [],
             );
 
             expect(result.success).toBe(false);
