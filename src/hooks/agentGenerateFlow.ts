@@ -295,6 +295,24 @@ async function buildAndRender(
         console.warn('[Pipeline] Store sync failed (non-critical):', syncErr);
     }
 
+    // ★ HALLUCINATION GUARD: Verify planned elements actually rendered.
+    try {
+        const { verifyRender, hallucinationNarration } = await resilientImport(
+            () => import('./hallucinationGuard')
+        );
+        const verification = verifyRender(
+            allElements, rendered,
+            () => engine.get_all_nodes(),
+        );
+        console.log(`[Pipeline/HallucinationGuard] ${verification.summary}`);
+        if (!verification.passed) {
+            cb.narrate(hallucinationNarration(verification));
+            cb.addCard('verify-warn', 'Render verification', 'error', {
+                expandedDetail: verification.summary,
+            });
+        }
+    } catch { /* guard failure is non-blocking */ }
+
     return rendered;
 }
 
