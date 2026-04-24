@@ -53,6 +53,12 @@ export class AiService {
         if (!isAiAvailable()) { progress.onError('AI is not available. Check your configuration.'); return; }
         this.context.addMessage({ role: 'user', content: userMessage, timestamp: Date.now() });
 
+        // ★ Refresh AI memory before building context (memory → system prompt)
+        try {
+            const { refreshMemoryCache } = await import('./smartContextHelpers');
+            await refreshMemoryCache();
+        } catch { /* non-critical */ }
+
         const pathname = typeof window !== 'undefined' ? window.location.pathname : '/';
         const ctx = buildContext(pathname);
         const systemPrompt = buildContextSystemPrompt(ctx);
@@ -111,6 +117,17 @@ export class AiService {
                     progress.onStepComplete(i, result); await sleep(200);
                     toolResults.push({ type: 'tool_result', tool_use_id: tc.id!, content: JSON.stringify(result), is_error: !result.success });
                     toolRecords.push({ name: tc.name!, input: params, result, durationMs: Date.now() - startTime });
+
+                    // ★ Track AI changes for multi-turn context ("undo that", "do same to X")
+                    if (result.success && tc.name !== 'analyze_scene') {
+                        try {
+                            const { pushAiChange } = await import('./smartContextBuilder');
+                            const elementName = typeof params.element_name === 'string' ? params.element_name
+                                : typeof params.name === 'string' ? params.name
+                                : typeof params.description === 'string' ? params.description.slice(0, 40) : tc.name!;
+                            pushAiChange({ tool: tc.name!, elementName, summary: result.message.slice(0, 80), timestamp: Date.now() });
+                        } catch { /* non-critical */ }
+                    }
                 }
                 allToolRecords.push(...toolRecords);
                 messages.push({ role: 'user', content: toolResults });

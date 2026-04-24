@@ -170,7 +170,6 @@ Element constraints shape:
 
 export function buildContextSystemPrompt(ctx: ContextInfo): string {
     const snapshot = buildWorkspaceSnapshot(ctx);
-    const mem = ctx.memory ? `\nUser prefs: ${ctx.memory}` : '';
 
     // ★ Common header: 2 lines. Same for all pages.
     // Language: UI pref takes priority, but also auto-detect input language
@@ -179,6 +178,17 @@ export function buildContextSystemPrompt(ctx: ContextInfo): string {
         : ' If the user writes in a non-English language, respond in that language.';
     const header = `You are Glid, ACE creative platform AI. Be concise. Explain before executing.${langInstr}`;
 
+    // ★ CRITICAL FIX: Inject smart context (memory, actions, brand, fonts)
+    // This was built but NEVER wired into the actual prompt — now it is.
+    let smartSection = '';
+    try {
+        const { buildSmartContext, contextToPromptSection } = require('./smartContextBuilder');
+        const pageName = ctx.page === 'canvas-editor' ? 'editor'
+            : ctx.page === 'size-dashboard' ? 'size-dashboard' : 'dashboard';
+        const smartCtx = buildSmartContext(pageName, useDesignStore.getState().creativeSet);
+        smartSection = contextToPromptSection(smartCtx);
+    } catch { /* non-critical — fall back to basic context */ }
+
     switch (ctx.page) {
         case 'dashboard':
             return `${header}
@@ -186,27 +196,30 @@ ${snapshot}
 Tools: execute_dynamic_action (JS eval on stores)
 Dashboard has NO canvas. You CANNOT design here.
 Workflow: 1) create_creative_set → 2) navigate_to editor → 3) THEN design.
-For project CRUD: use execute_dynamic_action with useProjectStore/useDesignStore.${mem}`;
+For project CRUD: use execute_dynamic_action with useProjectStore/useDesignStore.
+${smartSection}`;
 
         case 'size-dashboard':
             return `${header}
 ${snapshot}
-Tools: update_element_text, update_element_property, execute_dynamic_action, analyze_scene
+Tools: update_element_text, update_element_property, execute_dynamic_action, analyze_scene, undo_ai_action
 CRITICAL: You are on the SIZE DASHBOARD. Work with EXISTING elements ONLY.
 - To change text: update_element_text(element_name, new_text) — applies to ALL variants
 - To change style: update_element_property(element_name, property, value) — applies to ALL variants
 - NEVER create new elements. If user asks to add elements, tell them to open the canvas editor.
 For localization: use execute_dynamic_action with setLocaleData.
-For variants: useDesignStore.getState().addVariant({ width, height, label })${mem}`;
+For variants: useDesignStore.getState().addVariant({ width, height, label })
+${smartSection}`;
 
         case 'canvas-editor': {
             const empty = ctx.elementCount === 0;
             return `${header}
 ${snapshot}
-Tools: generate_full_design, replace_background_image, generate_image, add_text, add_button, execute_dynamic_action, analyze_scene
+Tools: generate_full_design, replace_background_image, generate_image, add_text, add_button, execute_dynamic_action, analyze_scene, undo_ai_action
 ${empty ? '★ Canvas empty → Use generate_full_design for ANY new design request. It creates the COMPLETE ad (layout + text + CTA + image). NEVER use generate_image alone for new designs.' : 'For modifications → execute_dynamic_action. For redesign → generate_full_design.'}
 For background → replace_background_image. Use analyze_scene to read store API.
-Write real marketing copy. No placeholder text.${mem}`;
+Write real marketing copy. No placeholder text.
+${smartSection}`;
         }
     }
 }
