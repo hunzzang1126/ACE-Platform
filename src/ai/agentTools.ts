@@ -187,6 +187,15 @@ const update_element_property: ToolDefinition = {
     category: 'transform',
 };
 
+// ── 10. Undo AI Action ─────────────────────────────
+
+const undo_ai_action: ToolDefinition = {
+    name: 'undo_ai_action',
+    description: 'Undo the last AI action. Restores design elements to the state before the previous AI operation. Use when user says "undo", "revert", "go back", "cancel that".',
+    parameters: { type: 'object', properties: {}, required: [] },
+    category: 'undo',
+};
+
 // ── All Tools Registry ────────────────────────────
 
 export const ALL_TOOLS: ToolDefinition[] = [
@@ -199,6 +208,7 @@ export const ALL_TOOLS: ToolDefinition[] = [
     analyze_scene,
     update_element_text,
     update_element_property,
+    undo_ai_action,
 ];
 
 /**
@@ -269,7 +279,7 @@ export function getToolsForPage(page: PageContext): ToolDefinition[] {
         case 'size-dashboard':
             // Size dashboard: MODIFY-ONLY tools. No creation (add_text, add_button, generate_*).
             // AI must modify existing elements, not create new ones.
-            return ALL_TOOLS.filter(t => ['execute_dynamic_action', 'analyze_scene', 'update_element_text', 'update_element_property'].includes(t.name));
+            return ALL_TOOLS.filter(t => ['execute_dynamic_action', 'analyze_scene', 'update_element_text', 'update_element_property', 'undo_ai_action'].includes(t.name));
 
         case 'canvas-editor':
             // Full access

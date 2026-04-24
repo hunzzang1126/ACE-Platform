@@ -32,8 +32,8 @@ describe('agentTools', () => {
             }
         });
 
-        it('has exactly 9 tools (7 original + 2 update tools)', () => {
-            expect(ALL_TOOLS.length).toBe(9);
+        it('has exactly 10 tools (7 original + 2 update + 1 undo)', () => {
+            expect(ALL_TOOLS.length).toBe(10);
         });
 
         it('includes execute_dynamic_action as primary tool', () => {
@@ -246,6 +246,13 @@ describe('agentTools', () => {
             expect(names).toContain('add_button');
             expect(names).toContain('generate_full_design');
             expect(names).toContain('update_element_text');
+            expect(names).toContain('undo_ai_action');
+        });
+
+        it('undo_ai_action is available on size-dashboard', () => {
+            const tools = getToolsForPage('size-dashboard');
+            const names = tools.map(t => t.name);
+            expect(names).toContain('undo_ai_action');
         });
     });
 });

@@ -218,6 +218,20 @@ export async function executeToolCall(
                 return { success: true, message: result };
             }
 
+            // ── Undo AI Action ───────────────────────
+            case 'undo_ai_action': {
+                try {
+                    const { popSnapshot, canUndo } = await import('./aiUndoStack');
+                    if (!canUndo()) {
+                        return { success: false, message: 'No AI actions to undo. The undo stack is empty.' };
+                    }
+                    const label = popSnapshot();
+                    return { success: true, message: `Undone: ${label ?? 'last AI action'}. Design restored to previous state.` };
+                } catch (err) {
+                    return { success: false, message: `Undo failed: ${err}` };
+                }
+            }
+
             // ── Update Element Text (engine + store) ─────
             case 'update_element_text': {
                 const elementName = (params.element_name as string || '').toLowerCase();

@@ -58,6 +58,14 @@ export class AiService {
         const systemPrompt = buildContextSystemPrompt(ctx);
         const enrichedMessage = enrichMessageWithContext(userMessage, ctx);
 
+        // ★ P2-11: Save undo snapshot before AI modifies anything
+        if (ctx.page === 'canvas-editor') {
+            try {
+                const { pushSnapshot } = await import('./aiUndoStack');
+                pushSnapshot(`Before: "${userMessage.slice(0, 50)}"`);
+            } catch { /* non-critical */ }
+        }
+
         const scanSummary = ctx.elementCount > 0 ? `${ctx.pageLabel}: ${ctx.elementCount} elements on ${ctx.canvasSize?.w}x${ctx.canvasSize?.h}px canvas` : `${ctx.pageLabel}: empty canvas`;
         progress.onCanvasScan(scanSummary);
         await nextFrame(); await sleep(300);
