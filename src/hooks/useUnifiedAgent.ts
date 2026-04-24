@@ -290,7 +290,26 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
                 // No engine (e.g. dashboard) — tell user to navigate to editor
                 return 'I need a canvas to create designs. Please open a creative set in the editor first, then I can design for you.';
             }
-            return await runGenerateFlow(pendingDesignPrompt) || 'Design generated.';
+            const genResult = await runGenerateFlow(pendingDesignPrompt) || 'Design generated.';
+
+            // ★ Auto-resize: if creative set has multiple variants, run resize orchestrator
+            try {
+                const cs = useDesignStore.getState().creativeSet;
+                if (cs && cs.variants.length > 1) {
+                    narrate('Applying smart sizing to all variants...');
+                    addCard('resize', 'Smart sizing all variants', 'running');
+                    const { orchestrateResize } = await import('@/ai/services/resizeOrchestrator');
+                    const resizeResult = await orchestrateResize(cs, (p) => {
+                        updateCard('resize', 'running', p.message);
+                    });
+                    updateCard('resize', 'done', resizeResult.message);
+                    narrate(resizeResult.message);
+                }
+            } catch (resizeErr) {
+                console.warn('[Agent] Auto-resize failed (non-blocking):', resizeErr);
+            }
+
+            return genResult;
         }
         const reply = serviceRef.current.getLastReply();
         if (hadError) throw new Error(hadError);
