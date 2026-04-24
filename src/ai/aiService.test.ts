@@ -166,5 +166,39 @@ describe('★ v692: Error-aware auto-retry with context', () => {
     it('3-tier model routing: planner → executor', () => {
         expect(aiSrc).toContain("role = round <= 1 ? 'planner' : 'executor'");
     });
+
+    it('post-round verification summarizes failed tools', () => {
+        expect(aiSrc).toContain('ROUND ${rounds} VERIFICATION');
+        expect(aiSrc).toContain('failedTools.length > 0');
+    });
+
+    it('verification message is injected as tool_result for AI self-correction', () => {
+        expect(aiSrc).toContain("tool_use_id: 'verify'");
+        expect(aiSrc).toContain('Fix these issues in the next round');
+    });
+});
+
+// ══════════════════════════════════════════════════
+// v692: Context expansion — variant summaries
+// ══════════════════════════════════════════════════
+
+describe('★ v692: Project-wide context expansion', () => {
+    const ctxSrc = readFileSync(resolve(__dirname, './smartContextBuilder.ts'), 'utf-8');
+
+    it('SmartContext includes variantSummaries field', () => {
+        expect(ctxSrc).toContain('variantSummaries');
+    });
+
+    it('builds variantSummaries from all creativeSet variants', () => {
+        expect(ctxSrc).toContain('creativeSet.variants.map(v =>');
+    });
+
+    it('variant summary includes isMaster flag', () => {
+        expect(ctxSrc).toContain('v.id === creativeSet.masterVariantId');
+    });
+
+    it('renders All Variants section in prompt', () => {
+        expect(ctxSrc).toContain('All Variants (project-wide)');
+    });
 });
 

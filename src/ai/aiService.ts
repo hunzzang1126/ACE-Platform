@@ -143,6 +143,13 @@ export class AiService {
                     }
                 }
                 allToolRecords.push(...toolRecords);
+                // ★ Post-round verification: summarize success/failure for AI self-correction
+                const failedTools = toolRecords.filter(r => !r.result.success);
+                if (failedTools.length > 0) {
+                    const verifySummary = `[ROUND ${rounds} VERIFICATION] ${toolRecords.length - failedTools.length}/${toolRecords.length} tools succeeded. Failed: ${failedTools.map(f => `${f.name}: ${f.result.message.slice(0, 60)}`).join('; ')}. Fix these issues in the next round.`;
+                    toolResults.push({ type: 'tool_result', tool_use_id: 'verify', content: verifySummary, is_error: true });
+                    progress.onToken(verifySummary.slice(0, 80) + '... ');
+                }
                 messages.push({ role: 'user', content: toolResults });
                 const roundText = textBlocks.map(b => b.text).filter(Boolean).join('\n');
                 if (roundText) this.context.addMessage({ role: 'assistant', content: roundText, timestamp: Date.now(), toolCalls: toolRecords });

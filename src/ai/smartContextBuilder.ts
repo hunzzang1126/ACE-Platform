@@ -36,6 +36,8 @@ export interface SmartContext {
     creativeSet?: { name: string; variantCount: number; masterSize: string; sizes: string[] };
     activeVariant?: { size: string; width: number; height: number; aspectCategory: AspectCategory; isMaster: boolean; elementCount: number };
     elements?: ElementSummary[];
+    /** All variants summary (project-wide awareness) */
+    variantSummaries?: { size: string; elementCount: number; isMaster: boolean }[];
     brand?: BrandProfile;
     generatedPalette?: BrandPalette;
     recentActions?: string[];
@@ -64,6 +66,13 @@ export function buildSmartContext(
         ctx.elements = active.elements.map(el => summarizeElement(el));
         ctx.brand = detectBrand(active.elements);
     }
+
+    // ★ Project-wide: summarize ALL variants so AI has full picture
+    ctx.variantSummaries = creativeSet.variants.map(v => ({
+        size: `${v.preset.width}×${v.preset.height}`,
+        elementCount: v.elements.length,
+        isMaster: v.id === creativeSet.masterVariantId,
+    }));
 
     if (creativeSet.brand?.generatedPalette) ctx.generatedPalette = creativeSet.brand.generatedPalette;
 
@@ -101,6 +110,13 @@ export function contextToPromptSection(ctx: SmartContext): string {
         lines.push('\n### Detected Brand Colors');
         lines.push(`- Background: ${ctx.brand.backgroundColor}`, `- Primary: ${ctx.brand.primaryColor}`, `- Secondary: ${ctx.brand.secondaryColor}`, `- Text: ${ctx.brand.textColor}`, `- Font: ${ctx.brand.fontFamily}`);
         lines.push('*(Use these colors for consistency when adding new elements)*');
+    }
+    if (ctx.variantSummaries && ctx.variantSummaries.length > 1) {
+        lines.push('\n### All Variants (project-wide)');
+        for (const v of ctx.variantSummaries) {
+            const tag = v.isMaster ? ' [MASTER]' : '';
+            lines.push(`- ${v.size}${tag}: ${v.elementCount} elements`);
+        }
     }
     if (ctx.recentActions && ctx.recentActions.length > 0) {
         lines.push('\n### Recent User Actions');
