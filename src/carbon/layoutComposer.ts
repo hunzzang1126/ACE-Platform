@@ -20,6 +20,7 @@ import { getAspectCategory } from '@/schema/layoutRoles';
 import { hexR, hexG, hexB, hexLuminance, darkenHex, lightenHex } from './colorHelpers';
 import { getLayoutRules } from './layoutRules';
 import type { ElementRule, LayoutVariant } from './layoutRules';
+import { buildDecorations } from './decorationEngine';
 
 // ── Public Types ─────────────────────────────────
 
@@ -276,6 +277,10 @@ export function buildDesignElements(
             });
         }
     }
+
+    // ── Decoration elements (accent lines, borders, dots) ──
+    const decos = buildDecorations(variant, elements, palette.accent, canvasW, canvasH);
+    elements.push(...decos);
 
     return { elements, variant };
 }

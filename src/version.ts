@@ -4,4 +4,4 @@
 // ★ RULE: Increment BUILD number before every `git push`.
 // Format: v{major}.{minor}.{patch}.{build}
 
-export const APP_VERSION = 'v0.0.0.682';
+export const APP_VERSION = 'v0.0.0.683';
