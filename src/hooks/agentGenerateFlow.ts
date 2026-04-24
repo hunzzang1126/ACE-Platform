@@ -92,6 +92,28 @@ export async function executeGenerateFlow(
     cb.updateCard('finalize', 'done', `${rendered} elements · Design complete`);
     cb.narrate(`Design finalized with ${rendered} elements. Style: ${guide.name}, Layout: Carbon Design System.`);
 
+    // ── Phase 6.5: Vision QA (optional — non-blocking) ──
+    try {
+        const { useDesignStore } = await resilientImport(() => import('@/stores/designStore'));
+        const cs = useDesignStore.getState().creativeSet;
+        const masterVariant = cs?.variants.find(v => v.id === cs.masterVariantId);
+        if (masterVariant && masterVariant.elements.length > 0) {
+            cb.addCard('vision-qa', 'Running design quality check', 'running');
+            const { runVisionSelfCheck } = await resilientImport(() => import('@/ai/visionSelfCheck'));
+            const qaResult = await runVisionSelfCheck(masterVariant, { maxLoops: 1 });
+            const errorCount = qaResult.issues.filter(i => i.severity === 'error').length;
+            const warnCount = qaResult.issues.filter(i => i.severity === 'warning').length;
+            if (qaResult.passed) {
+                cb.updateCard('vision-qa', 'done', `Quality check passed${warnCount > 0 ? ` (${warnCount} minor warnings)` : ''}`);
+            } else {
+                cb.updateCard('vision-qa', 'error', `${errorCount} issue(s) found`, {
+                    expandedDetail: qaResult.issues.map(i => `[${i.severity}] ${i.description}`).join('\n'),
+                });
+                cb.narrate(`Vision QA found ${errorCount} issue(s). Review the design for potential improvements.`);
+            }
+        }
+    } catch { /* vision QA failure is non-blocking */ }
+
     // ── Phase 7: Save to AI Memory ──
     // Records this design in Supabase ai_memory for cross-session learning
     try {
