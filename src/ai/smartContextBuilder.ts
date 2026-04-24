@@ -126,6 +126,20 @@ export function contextToPromptSection(ctx: SmartContext): string {
     const mem = getCachedMemory();
     if (mem) { const memSection = memoryToPromptSection(mem); if (memSection) lines.push(memSection); }
 
+    // ★ Inject learned skills (user-promoted dynamic actions)
+    try {
+        const { loadLearnedSkills } = require('./skillRegistry');
+        const learned = loadLearnedSkills();
+        if (learned.length > 0) {
+            lines.push('', '## Learned Skills (user-promoted patterns)');
+            for (const s of learned) {
+                lines.push(`- **${s.name}**: ${s.description} (used ${s.usageCount ?? 0}x)`);
+                if (s.codePattern) lines.push(`  Pattern: \`${s.codePattern.slice(0, 80)}...\``);
+            }
+            lines.push('*Check learned skills before using Dynamic Action — a similar pattern may exist.*');
+        }
+    } catch { /* non-critical */ }
+
     if (ctx.activeVariant) {
         const brandColors = ctx.brand ? { primary: ctx.brand.primaryColor, secondary: ctx.brand.secondaryColor } : undefined;
         lines.push('', buildDesignSystemPrompt(ctx.activeVariant.width, ctx.activeVariant.height, ctx.activeVariant.aspectCategory, brandColors));
