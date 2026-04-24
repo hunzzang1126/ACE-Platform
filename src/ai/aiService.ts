@@ -111,9 +111,16 @@ export class AiService {
                     console.log(`[AI Tool] Calling: ${tc.name}`, JSON.stringify(params).slice(0, 300));
                     progress.onStepStart(i, tc.name!, params); await nextFrame();
                     const startTime = Date.now();
+                    const NO_RETRY_TOOLS = new Set(['analyze_scene', 'undo_ai_action']);
                     const overrideResult = executorOverride?.(tc.name!, params);
-                    const result: ExecutionResult = overrideResult ?? await executeToolCall(engine, tc.name!, params, this.trackedNodes);
-                    console.log(`[AI Tool] Result: ${tc.name} → ${result.success ? '✅' : '❌'} ${result.message?.slice(0, 200)}`);
+                    let result: ExecutionResult = overrideResult ?? await executeToolCall(engine, tc.name!, params, this.trackedNodes);
+                    // ★ Auto-retry once on failure (non-query tools only)
+                    if (!result.success && !NO_RETRY_TOOLS.has(tc.name!) && !overrideResult) {
+                        console.log(`[AI Tool] Retry: ${tc.name} (first attempt failed)`);
+                        await sleep(300);
+                        result = await executeToolCall(engine, tc.name!, params, this.trackedNodes);
+                    }
+                    console.log(`[AI Tool] Result: ${tc.name} → ${result.success ? 'OK' : 'FAIL'} ${result.message?.slice(0, 200)}`);
                     progress.onStepComplete(i, result); await sleep(200);
                     toolResults.push({ type: 'tool_result', tool_use_id: tc.id!, content: JSON.stringify(result), is_error: !result.success });
                     toolRecords.push({ name: tc.name!, input: params, result, durationMs: Date.now() - startTime });
