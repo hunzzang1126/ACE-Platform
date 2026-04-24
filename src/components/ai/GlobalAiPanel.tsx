@@ -161,7 +161,18 @@ export function GlobalAiPanel() {
                             if (m.role === 'thinking') return <ThinkingCard key={`thinking-${i}`} content={m.content} />;
                             if (m.role === 'image_gallery' && m.imageGallery) return <ImageGalleryCard key={`gallery-${i}`} images={m.imageGallery.images} onSelect={(url) => agent.applyGalleryImage(url, m.imageGallery!.canvasW, m.imageGallery!.canvasH)} />;
                             if (m.role === 'narration') return <div key={i} style={{ ...assistantStyle, fontSize: 11, color: '#6366F1', fontStyle: 'italic' }}>{m.content}</div>;
-                            if (m.role === 'design_complete') return <ResultPreviewCard key={`result-${i}`} summary={m.content} elementCount={m.actionCard?.id ? parseInt(m.actionCard.id, 10) : undefined} durationSec={m.phases?.[0] ? Math.round((Date.now() - m.phases[0].timestamp) / 1000) : undefined} />;
+                            if (m.role === 'design_complete') {
+                                // Find the most recent assistant message with toolCalls before this design_complete
+                                const prevAssistant = messages.slice(0, i).reverse().find(pm => pm.toolCalls && pm.toolCalls.length > 0);
+                                const lastTool = prevAssistant?.toolCalls?.[prevAssistant.toolCalls.length - 1];
+                                const lastToolName = lastTool?.name;
+                                const lastCodePattern = lastToolName === 'execute_dynamic_action' && lastTool?.input?.code
+                                    ? String(lastTool.input.code).slice(0, 200) : undefined;
+                                return <ResultPreviewCard key={`result-${i}`} summary={m.content}
+                                    elementCount={m.actionCard?.id ? parseInt(m.actionCard.id, 10) : undefined}
+                                    durationSec={m.phases?.[0] ? Math.round((Date.now() - m.phases[0].timestamp) / 1000) : undefined}
+                                    lastToolName={lastToolName} lastCodePattern={lastCodePattern} />;
+                            }
                             return <div key={i} style={assistantStyle}>{m.content}</div>;
                         })}
 

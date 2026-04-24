@@ -13,6 +13,10 @@ interface ResultPreviewCardProps {
     summary: string;
     elementCount?: number;
     durationSec?: number;
+    /** If last tool was execute_dynamic_action, pass the tool name */
+    lastToolName?: string;
+    /** The JS code pattern from the last dynamic action (for skill promotion) */
+    lastCodePattern?: string;
 }
 
 type FeedbackState = 'none' | 'liked' | 'disliked';
@@ -53,9 +57,12 @@ function FeedbackBtn({ type, active, dimmed, onClick, title }: {
     );
 }
 
-export function ResultPreviewCard({ summary, elementCount, durationSec }: ResultPreviewCardProps) {
+export function ResultPreviewCard({ summary, elementCount, durationSec, lastToolName, lastCodePattern }: ResultPreviewCardProps) {
     const { t } = useAppI18n();
     const [feedback, setFeedback] = useState<FeedbackState>('none');
+    const [skillPrompt, setSkillPrompt] = useState<'hidden' | 'asking' | 'saved'>('hidden');
+
+    const isDynamicAction = lastToolName === 'execute_dynamic_action' && !!lastCodePattern;
 
     const handleFeedback = useCallback(async (type: 'liked' | 'disliked') => {
         if (feedback !== 'none') return;
@@ -67,7 +74,24 @@ export function ResultPreviewCard({ summary, elementCount, durationSec }: Result
         } catch (err) {
             console.warn('[Feedback] Failed to save:', err);
         }
-    }, [feedback]);
+        // If liked a dynamic action, offer to save as skill
+        if (type === 'liked' && isDynamicAction) {
+            setSkillPrompt('asking');
+        }
+    }, [feedback, isDynamicAction]);
+
+    const handleSaveSkill = useCallback(async () => {
+        if (!lastCodePattern) return;
+        try {
+            const { promoteToSkill } = await import('@/ai/skillRegistry');
+            const name = summary.length > 40 ? summary.slice(0, 40) + '...' : summary;
+            await promoteToSkill(name, summary, 'User-promoted dynamic action', [summary.slice(0, 60)], lastCodePattern);
+            setSkillPrompt('saved');
+            console.info('[Feedback] Dynamic action promoted to learned skill');
+        } catch (err) {
+            console.warn('[Feedback] Skill promotion failed:', err);
+        }
+    }, [summary, lastCodePattern]);
 
     return (
         <div style={{
@@ -126,15 +150,47 @@ export function ResultPreviewCard({ summary, elementCount, durationSec }: Result
             </div>
 
             {/* Feedback confirmation */}
-            {feedback !== 'none' && (
+            {feedback !== 'none' && skillPrompt !== 'asking' && (
                 <div style={{
                     marginTop: 6, fontSize: 10, color: '#94a3b8',
                     fontStyle: 'italic', textAlign: 'right',
                 }}>
-                    {feedback === 'liked'
+                    {skillPrompt === 'saved'
+                        ? (t('ai.skillSaved') || 'Saved as a reusable skill for future use.')
+                        : feedback === 'liked'
                         ? (t('ai.feedbackThanks') || 'Thanks! This improves future designs.')
                         : (t('ai.feedbackNoted') || 'Noted. We will improve next time.')
                     }
+                </div>
+            )}
+
+            {/* Skill promotion prompt */}
+            {skillPrompt === 'asking' && (
+                <div style={{
+                    marginTop: 8, padding: '8px 10px',
+                    background: 'rgba(99,102,241,0.06)',
+                    border: '1px solid rgba(99,102,241,0.15)',
+                    borderRadius: 8, fontSize: 11,
+                }}>
+                    <div style={{ color: '#334155', marginBottom: 6 }}>
+                        {t('ai.saveAsSkill') || 'Save this action as a reusable skill?'}
+                    </div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                        <button onClick={handleSaveSkill} style={{
+                            fontSize: 10, padding: '3px 10px', borderRadius: 4,
+                            background: 'linear-gradient(135deg, #6366F1, #2DD4BF)',
+                            color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600,
+                        }}>
+                            {t('common.save') || 'Save'}
+                        </button>
+                        <button onClick={() => setSkillPrompt('hidden')} style={{
+                            fontSize: 10, padding: '3px 10px', borderRadius: 4,
+                            background: 'rgba(0,0,0,0.04)', color: '#64748b',
+                            border: '1px solid rgba(0,0,0,0.08)', cursor: 'pointer',
+                        }}>
+                            {t('common.skip') || 'Skip'}
+                        </button>
+                    </div>
                 </div>
             )}
         </div>
