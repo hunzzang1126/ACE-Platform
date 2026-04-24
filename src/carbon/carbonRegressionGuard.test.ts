@@ -522,3 +522,76 @@ describe('★ P0-1: Content order', () => {
     });
 });
 
+// ─────────────────────────────────────────────────
+// 14. Text-on-Image Overlay (P0-4)
+// ─────────────────────────────────────────────────
+
+describe('★ P0-4: Text-on-image overlay', () => {
+    it('overlay exists when hasBgImage=true', () => {
+        const { elements } = buildDesignElements(FULL_CONTENT, PALETTE, 1080, 1080, true, 'centered');
+        const overlay = elements.find(el => el.name === 'text_overlay');
+        expect(overlay).toBeDefined();
+        expect(overlay!.type).toBe('rect');
+    });
+
+    it('no overlay when hasBgImage=false', () => {
+        const { elements } = buildDesignElements(FULL_CONTENT, PALETTE, 1080, 1080, false, 'centered');
+        const overlay = elements.find(el => el.name === 'text_overlay');
+        expect(overlay).toBeUndefined();
+    });
+
+    it('overlay has semi-transparent dark fill (a < 1)', () => {
+        const { elements } = buildDesignElements(FULL_CONTENT, PALETTE, 300, 250, true);
+        const overlay = elements.find(el => el.name === 'text_overlay')!;
+        expect(overlay.a).toBeGreaterThan(0);
+        expect(overlay.a).toBeLessThan(1);
+        expect(overlay.r).toBe(0); // dark
+        expect(overlay.g).toBe(0);
+        expect(overlay.b).toBe(0);
+    });
+
+    it('overlay covers all text elements', () => {
+        const { elements } = buildDesignElements(FULL_CONTENT, PALETTE, 1080, 1080, true, 'centered');
+        const overlay = elements.find(el => el.name === 'text_overlay')!;
+        const textEls = elements.filter(el => el.type === 'text');
+        for (const t of textEls) {
+            expect(overlay.x!, `overlay doesn't cover ${t.name} left`).toBeLessThanOrEqual(t.x!);
+            expect(overlay.y!, `overlay doesn't cover ${t.name} top`).toBeLessThanOrEqual(t.y!);
+            expect((overlay.x ?? 0) + (overlay.w ?? 0)).toBeGreaterThanOrEqual((t.x ?? 0) + (t.w ?? 0) - 2);
+            expect((overlay.y ?? 0) + (overlay.h ?? 0)).toBeGreaterThanOrEqual((t.y ?? 0) + (t.h ?? 0) - 2);
+        }
+    });
+
+    it('overlay is first element (behind all content)', () => {
+        const { elements } = buildDesignElements(FULL_CONTENT, PALETTE, 1080, 1080, true, 'centered');
+        expect(elements[0]!.name).toBe('text_overlay');
+    });
+
+    it('overlay stays within canvas bounds', () => {
+        for (const [w, h] of AD_SIZES) {
+            const { elements } = buildDesignElements(FULL_CONTENT, PALETTE, w, h, true);
+            const overlay = elements.find(el => el.name === 'text_overlay');
+            if (overlay) {
+                expect(overlay.x).toBeGreaterThanOrEqual(0);
+                expect(overlay.y).toBeGreaterThanOrEqual(0);
+                expect((overlay.x ?? 0) + (overlay.w ?? 0)).toBeLessThanOrEqual(w + 1);
+                expect((overlay.y ?? 0) + (overlay.h ?? 0)).toBeLessThanOrEqual(h + 1);
+            }
+        }
+    });
+
+    it('overlay has rounded corners', () => {
+        const { elements } = buildDesignElements(FULL_CONTENT, PALETTE, 1080, 1080, true);
+        const overlay = elements.find(el => el.name === 'text_overlay')!;
+        expect(overlay.radius).toBeGreaterThan(0);
+    });
+
+    it('text is white when bg image present (readability)', () => {
+        const { elements } = buildDesignElements(FULL_CONTENT, PALETTE, 300, 250, true);
+        const texts = elements.filter(el => el.type === 'text');
+        for (const t of texts) {
+            expect(t.color_hex).toBe('#FFFFFF');
+        }
+    });
+});
+

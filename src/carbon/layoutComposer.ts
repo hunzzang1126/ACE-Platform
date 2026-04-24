@@ -247,6 +247,36 @@ export function buildDesignElements(
         });
     }
 
+    // ── Text-on-image overlay (P0-4: readability guarantee) ──
+    // When bg image is present, insert a semi-transparent dark scrim
+    // behind all text elements to ensure readability.
+    if (hasBgImage) {
+        // Calculate content bounding box
+        const textEls = elements.filter(el => el.type === 'text' || el.name === 'cta_button');
+        if (textEls.length > 0) {
+            const padding = Math.round(canvasMin * 0.04);
+            const contentTop = Math.min(...textEls.map(el => (el.y ?? 0))) - padding;
+            const contentBot = Math.max(...textEls.map(el => (el.y ?? 0) + (el.h ?? 0))) + padding;
+            const contentLeft = Math.min(...textEls.map(el => (el.x ?? 0))) - padding;
+            const contentRight = Math.max(...textEls.map(el => (el.x ?? 0) + (el.w ?? 0))) + padding;
+
+            // Clamp to canvas bounds
+            const oX = Math.max(0, contentLeft);
+            const oY = Math.max(0, contentTop);
+            const oW = Math.min(canvasW, contentRight) - oX;
+            const oH = Math.min(canvasH, contentBot) - oY;
+
+            // Insert overlay at position 0 (behind all content, in front of bg image)
+            elements.splice(0, 0, {
+                name: 'text_overlay',
+                type: 'rect' as any,
+                x: oX, y: oY, w: oW, h: oH,
+                r: 0, g: 0, b: 0, a: 0.45,
+                radius: Math.round(canvasMin * 0.02),
+            });
+        }
+    }
+
     return { elements, variant };
 }
 
