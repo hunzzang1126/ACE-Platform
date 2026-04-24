@@ -64,6 +64,11 @@ let cachedMemory: AiMemory | null = null;
 
 export async function refreshMemoryCache(): Promise<void> {
     try { cachedMemory = await loadMemory(); } catch { /* ok */ }
+    // ★ Sync learned skills from cloud (fire-and-forget)
+    try {
+        const { syncLearnedSkillsFromCloud } = await import('@/ai/skillRegistry');
+        syncLearnedSkillsFromCloud().catch(() => {});
+    } catch { /* non-critical */ }
 }
 export function getCachedMemory(): AiMemory | null { return cachedMemory; }
 
