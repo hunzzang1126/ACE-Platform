@@ -30,6 +30,8 @@ export interface UploadEntry {
     createdAt: string;
     /** MIME type */
     mimeType?: string;
+    /** AI-analyzed metadata (populated async after upload) */
+    analysis?: import('@/ai/services/assetAnalyzer').AssetAnalysis;
 }
 
 export interface UploadState {
@@ -37,6 +39,8 @@ export interface UploadState {
     addUpload: (entry: UploadEntry) => void;
     removeUpload: (id: string) => void;
     clearAll: () => void;
+    /** Update analysis result for a specific upload */
+    updateAnalysis: (id: string, analysis: import('@/ai/services/assetAnalyzer').AssetAnalysis) => void;
 }
 
 const MAX_UPLOADS = 100;
@@ -60,6 +64,10 @@ export const useUploadStore = create<UploadState>()(
             })),
 
             clearAll: () => set({ uploads: [] }),
+
+            updateAnalysis: (id, analysis) => set((state) => ({
+                uploads: state.uploads.map(u => u.id === id ? { ...u, analysis } : u),
+            })),
         }),
         {
             name: 'ace-upload-library',
@@ -102,7 +110,26 @@ export async function saveToUploadLibrary(
         createdAt: new Date().toISOString(),
     });
 
+    // ★ Background asset analysis (non-blocking)
+    if (dataUrl.startsWith('data:image/')) {
+        analyzeUploadedAsset(id, dataUrl, name, width, height).catch(() => {/* non-critical */});
+    }
+
     return assetUrl;
+}
+
+/** Fire-and-forget: run AI analysis on uploaded image */
+async function analyzeUploadedAsset(
+    id: string, dataUrl: string, fileName: string, width: number, height: number,
+): Promise<void> {
+    try {
+        const { analyzeAsset } = await import('@/ai/services/assetAnalyzer');
+        const analysis = await analyzeAsset(dataUrl, fileName, width, height);
+        useUploadStore.getState().updateAnalysis(id, analysis);
+        console.info(`[uploadStore] Asset analyzed: ${fileName} → ${analysis.type} (${analysis.suggestedRole})`);
+    } catch (err) {
+        console.warn('[uploadStore] Asset analysis failed:', err);
+    }
 }
 
 /**
