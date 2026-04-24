@@ -66,6 +66,7 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
     const [input, setInput] = useState('');
     const engineRef = useRef<any>(null);
     const serviceRef = useRef<AiService | null>(null);
+    const streamBuf = useRef('');
     const location = useLocation();
     const { recordAIUsage, canUseAI } = usePlanLimits();
 
@@ -261,11 +262,26 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
                 }
             },
             onReflection: () => updateCard('reflection', 'done'),
-            onToken: () => {},
+            onToken: (token: string) => {
+                // ★ Streaming narration: accumulate tokens, emit at sentence boundaries
+                streamBuf.current += token;
+                const buf = streamBuf.current;
+                // Emit when we hit a sentence boundary (. ! ? or newline) with at least 20 chars
+                const boundary = buf.length >= 20 && /[.!?\n]$/.test(buf.trim());
+                if (boundary) {
+                    narrate(buf.trim());
+                    streamBuf.current = '';
+                }
+            },
             onComplete: () => {},
             onError: (err: string) => { hadError = err; },
         }, dashboardOverride);
 
+        // ★ Flush any remaining streamed tokens
+        if (streamBuf.current.trim()) {
+            narrate(streamBuf.current.trim());
+            streamBuf.current = '';
+        }
         hideCursor();
 
         if (pendingDesignPrompt && !hadError) {
