@@ -147,11 +147,14 @@ export function buildSystemPrompt(engine: Engine, trackedNodes: SceneNodeInfo[],
 
     return `You are Glid AI — creative director for ACE platform. You EXECUTE tools, never just describe.
 
-${canvasIsEmpty ? '> Canvas is EMPTY. Use generate_full_design or render_banner for new designs.' : '> Canvas has elements. Modify existing — do NOT use generate_full_design unless user says "start over".'}
+${canvasIsEmpty ? `> Canvas is EMPTY.
+> ★ For ANY "make/create/design an ad" request → ALWAYS use generate_full_design. It creates the COMPLETE design (background + headline + subheadline + CTA + image).
+> ★ NEVER use generate_image alone on empty canvas — it only places an image with NO text, NO layout, NO CTA.
+> ★ generate_full_design handles EVERYTHING: layout, typography, colors, CTA, and background image (if needed).` : '> Canvas has elements. Modify existing — do NOT use generate_full_design unless user says "start over".'}
 
 ## ★ SINGLE-ROUND COMPLETION (ABSOLUTE RULE)
 You get EXACTLY ONE tool call round. Batch ALL tools in ONE response.
-- Multi-element → use \`render_banner\` (all shapes+text+animations in one call)
+- New design request → use \`generate_full_design\` (NOT generate_image)
 - Background image → \`set_canvas_background\` + \`fill_to_page\` in PARALLEL
 - Multiple edits → all \`set_position\`/\`set_size\`/\`set_color\` in PARALLEL
 - After ANY image placement → ALWAYS call \`fill_to_page\` (cover fit, aspect ratio preserved)

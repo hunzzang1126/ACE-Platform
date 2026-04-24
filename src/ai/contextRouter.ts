@@ -202,7 +202,7 @@ For variants: useDesignStore.getState().addVariant({ width, height, label })${me
             return `${header}
 ${snapshot}
 Tools: generate_full_design, replace_background_image, generate_image, add_text, add_button, execute_dynamic_action, analyze_scene
-${empty ? 'Canvas empty → generate_full_design for new designs.' : 'For modifications → execute_dynamic_action. For redesign → generate_full_design.'}
+${empty ? '★ Canvas empty → Use generate_full_design for ANY new design request. It creates the COMPLETE ad (layout + text + CTA + image). NEVER use generate_image alone for new designs.' : 'For modifications → execute_dynamic_action. For redesign → generate_full_design.'}
 For background → replace_background_image. Use analyze_scene to read store API.
 Write real marketing copy. No placeholder text.${mem}`;
         }
