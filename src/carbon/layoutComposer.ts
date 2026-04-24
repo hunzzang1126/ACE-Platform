@@ -263,7 +263,18 @@ function buildTextElement(
     const typeStyle = resolveTypeStyle(rule.typeStyle, canvasMin);
 
     // ★ Ad Impact Scaling: Carbon web font × adScale = ad-ready font size
-    const fontSize = Math.max(10, Math.round(typeStyle.fontSize * rule.adScale));
+    let fontSize = Math.max(10, Math.round(typeStyle.fontSize * rule.adScale));
+
+    // ★ Height-aware typography: clamp font size so text doesn't overflow canvas height.
+    // Budget = fraction of canvasH this element may occupy (single line max).
+    // Hierarchy preserved: headline gets largest budget → largest font.
+    const heightBudget: Record<string, number> = {
+        headline: 0.30, subheadline: 0.15, tag_text: 0.08, cta_label: 0.10,
+    };
+    const budget = heightBudget[name] ?? 0.20;
+    const maxFontFromHeight = Math.floor(canvasH * budget / typeStyle.lineHeight);
+    fontSize = Math.min(fontSize, Math.max(8, maxFontFromHeight));
+
     const w = columns(rule.cols, canvasW);
     const lineHeight = typeStyle.lineHeight;
 

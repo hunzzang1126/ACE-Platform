@@ -292,7 +292,7 @@ describe('Carbon Layout Composer', () => {
             const content: DesignContent = {
                 headline: 'H', subheadline: 'S', tag: 'T',
             };
-            const { elements } = buildDesignElements(content, palette, 1080, 1080, false);
+            const { elements } = buildDesignElements(content, palette, 1080, 1080, false, 'centered');
             const h = elements.find(el => el.name === 'headline')!;
             const s = elements.find(el => el.name === 'subheadline')!;
             const t = elements.find(el => el.name === 'tag_text')!;

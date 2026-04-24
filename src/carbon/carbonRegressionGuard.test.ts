@@ -439,3 +439,86 @@ describe('★ REGRESSION: Contrast and visual guards', () => {
         expect(headline!.color_hex).toBe('#FFFFFF');
     });
 });
+
+// ─────────────────────────────────────────────────
+// 11. Height-Aware Typography Scale
+// ─────────────────────────────────────────────────
+
+describe('★ P0-2: Height-aware typography', () => {
+    it('728x90 headline font is smaller than 1080x1080 headline', () => {
+        const { elements: small } = buildDesignElements(MINIMAL_CONTENT, PALETTE, 728, 90, false);
+        const { elements: big } = buildDesignElements(MINIMAL_CONTENT, PALETTE, 1080, 1080, false);
+        const smallH = small.find(el => el.name === 'headline')!.font_size!;
+        const bigH = big.find(el => el.name === 'headline')!.font_size!;
+        expect(bigH).toBeGreaterThan(smallH);
+    });
+
+    it('headline fontSize is capped by canvas height (30% budget)', () => {
+        for (const [w, h] of AD_SIZES) {
+            const { elements } = buildDesignElements(MINIMAL_CONTENT, PALETTE, w, h, false);
+            const headline = elements.find(el => el.name === 'headline')!;
+            // fontSize should not exceed ~30% of canvasH / lineHeight
+            const maxReasonable = Math.floor(h * 0.30 / 1.2) + 1; // ~lineHeight 1.2 + 1px rounding
+            expect(headline.font_size, `${w}x${h} headline fontSize too large`).toBeLessThanOrEqual(maxReasonable);
+        }
+    });
+
+    it('subheadline never exceeds 20% of canvas height (single line)', () => {
+        for (const [w, h] of AD_SIZES) {
+            const content = { headline: 'H', subheadline: 'S' };
+            const { elements } = buildDesignElements(content, PALETTE, w, h, false);
+            const sub = elements.find(el => el.name === 'subheadline');
+            if (sub) {
+                expect(sub.font_size!, `${w}x${h} sub fontSize`).toBeLessThanOrEqual(h * 0.20);
+            }
+        }
+    });
+});
+
+// ─────────────────────────────────────────────────
+// 12. Vertical Bias Positioning
+// ─────────────────────────────────────────────────
+
+describe('★ P0-1: Vertical bias positioning', () => {
+    it('top-heavy places headline in upper 40% of canvas', () => {
+        const { elements } = buildDesignElements(FULL_CONTENT, PALETTE, 1080, 1080, false, 'top-heavy');
+        const headline = elements.find(el => el.name === 'headline')!;
+        expect(headline.y).toBeLessThan(1080 * 0.40);
+    });
+
+    it('bottom-stack places headline in lower 60% of canvas', () => {
+        const { elements } = buildDesignElements(FULL_CONTENT, PALETTE, 1080, 1080, false, 'bottom-stack');
+        const headline = elements.find(el => el.name === 'headline')!;
+        expect(headline.y).toBeGreaterThan(1080 * 0.30);
+    });
+
+    it('centered places headline near the golden ratio (~38%)', () => {
+        const { elements } = buildDesignElements(MINIMAL_CONTENT, PALETTE, 1080, 1080, false, 'centered');
+        const headline = elements.find(el => el.name === 'headline')!;
+        expect(headline.y).toBeGreaterThan(1080 * 0.15);
+        expect(headline.y).toBeLessThan(1080 * 0.55);
+    });
+});
+
+// ─────────────────────────────────────────────────
+// 13. Content Order Variations
+// ─────────────────────────────────────────────────
+
+describe('★ P0-1: Content order', () => {
+    it('bold-statement places headline before tag (headline-first order)', () => {
+        const { elements } = buildDesignElements(FULL_CONTENT, PALETTE, 1080, 1080, false, 'bold-statement');
+        const headline = elements.find(el => el.name === 'headline')!;
+        const tag = elements.find(el => el.name === 'tag_text');
+        if (tag) {
+            expect(headline.y).toBeLessThan(tag.y!);
+        }
+    });
+
+    it('centered (standard order) places tag before headline', () => {
+        const { elements } = buildDesignElements(FULL_CONTENT, PALETTE, 1080, 1080, false, 'centered');
+        const headline = elements.find(el => el.name === 'headline')!;
+        const tag = elements.find(el => el.name === 'tag_text')!;
+        expect(tag.y).toBeLessThan(headline.y!);
+    });
+});
+
