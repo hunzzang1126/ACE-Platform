@@ -85,4 +85,33 @@ describe('autoDesignService — callTemplateContent', () => {
         expect(result.headline).toBe('Get Started Today');
         expect(result.cta).toBe(''); // No forced CTA fallback
     });
+
+    it('★ REGRESSION: should sanitize Korean junk CTA "버튼"', async () => {
+        vi.mocked(callAnthropicApi).mockResolvedValue({
+            content: [{ type: 'text', text: '{"headline": "아이폰 17 — 혁신의 시작", "cta": "버튼", "subheadline": "", "tag": ""}' }],
+        });
+        const result = await callTemplateContent('아이폰 17 광고', 300, 250, 'modern', new AbortController().signal, 'Korean');
+        expect(result.headline).toBe('아이폰 17 — 혁신의 시작');
+        // "버튼" is a Korean UI term, not a CTA → must be sanitized to ""
+        expect(result.cta).toBe('');
+    });
+
+    it('★ REGRESSION: should sanitize Korean junk subheadline "텍스트"', async () => {
+        vi.mocked(callAnthropicApi).mockResolvedValue({
+            content: [{ type: 'text', text: '{"headline": "Summer Sale", "cta": "Shop Now", "subheadline": "텍스트", "tag": "태그"}' }],
+        });
+        const result = await callTemplateContent('summer sale', 300, 250, 'modern', new AbortController().signal);
+        expect(result.subheadline).toBe(''); // "텍스트" is junk
+        expect(result.tag).toBe(''); // "태그" is junk
+    });
+
+    it('should NOT apply title case to Korean headlines', async () => {
+        vi.mocked(callAnthropicApi).mockResolvedValue({
+            content: [{ type: 'text', text: '{"headline": "혁신의 새로운 기준", "cta": "지금 주문하기", "subheadline": "", "tag": ""}' }],
+        });
+        const result = await callTemplateContent('아이폰 광고', 300, 250, 'modern', new AbortController().signal, 'Korean');
+        // Korean text should remain as-is (no Title Case transformation)
+        expect(result.headline).toBe('혁신의 새로운 기준');
+        expect(result.cta).toBe('지금 주문하기');
+    });
 });

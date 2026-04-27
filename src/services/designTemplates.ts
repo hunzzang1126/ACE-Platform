@@ -36,11 +36,12 @@ export function buildContentPrompt(userPrompt: string, canvasW: number, canvasH:
     const headlineLimit = isWide ? '3-5 words, single line' : isTall ? '2-4 words per line, 2-3 lines' : '2-5 words per line, 1-2 lines';
     const subLimit = isSmall ? 'empty string (canvas too small)' : '1-2 sentences, max 15 words total';
 
-    return `You are a world-class creative director. Generate copy for a ${canvasW}x${canvasH}px design.
+    return `You are a world-class creative director writing HIGH-IMPACT advertising copy.
+Generate persuasive, professional ad copy for a ${canvasW}x${canvasH}px design.
 
 Brief: "${userPrompt}"
 Template: ${templateName}
-Language: ${language} (if prompt is in a different language, use THAT language)
+Language: ${language} (if prompt is in a different language, use THAT language for ALL fields)
 
 Return EXACTLY this JSON. Set any field to "" if it does NOT fit the design intent:
 {
@@ -50,27 +51,28 @@ Return EXACTLY this JSON. Set any field to "" if it does NOT fit the design inte
   "tag": "..."
 }
 
-DECISION RULES — YOU DECIDE what fields are needed:
-- headline: ALWAYS required. ${headlineLimit}. Title Case. Bold, punchy, memorable.
-- subheadline: Include ONLY if there's supporting info (date, location, description).
-  If the prompt mentions a date/time → put it here (e.g. "5월 15일 오후 3시").
-  If the prompt mentions a location → include it.
+COPYWRITING RULES:
+- headline: ALWAYS required. ${headlineLimit}. Must be COMPELLING advertising copy.
+  NOT just the product name — add a benefit, emotion, or hook.
+  GOOD: "iPhone 17 — 혁신의 새로운 기준", "Experience the Future", "미래를 만나다"
+  BAD: "iPhone 17", "아이폰 17", "제품 소개" (these are labels, not headlines)
+- subheadline: Supporting detail — features, benefits, dates, locations. ${subLimit}.
   If headline is self-explanatory or canvas is small → set to "".
-- cta: Include ONLY for commercial/advertising designs (shop, buy, sign up, book, register).
-  Events, announcements, informational posters → NO CTA (set to "").
-  Educational, community, internal notices → NO CTA.
-  If unsure → NO CTA. CTA is the exception, not the rule.
-- tag: Short label ONLY if a natural category fits ("NEW", "SALE", "D-DAY"). Otherwise "".
+- cta: A REAL call-to-action verb phrase for commercial/advertising designs.
+  GOOD examples: "지금 주문하기", "자세히 보기", "Shop Now", "Get Yours", "Pre-Order Today"
+  BAD: "버튼", "button", "click", "CTA", "클릭" — these are UI terms, NOT ad copy.
+  Events/announcements/informational → NO CTA (set to "").
+- tag: Short badge ONLY if natural ("NEW", "SALE", "D-DAY", "한정판"). Otherwise "".
 
 EXTRACT FROM PROMPT:
-- Dates (5월 15일, May 15, 2026-05-15) → subheadline
+- Dates (5월 15일, May 15) → subheadline
 - Locations → subheadline  
-- Times (오후 3시, 3:00 PM) → subheadline
 - Prices/Discounts → tag or subheadline
 
-PROHIBITIONS:
-- NEVER output font names, field names, CSS, placeholder text
-- NEVER add CTA for non-commercial designs
-- ALL text must be real, human-readable copy in the prompt's language
-- Return ONLY JSON. No explanation.`;
+ABSOLUTE PROHIBITIONS:
+- NEVER output font names, field names, CSS, placeholder text, or UI terminology
+- NEVER use "버튼", "button", "텍스트", "헤드라인" as actual copy
+- NEVER just echo the product name as the headline — you MUST add a creative hook
+- ALL text must be real, persuasive, human-readable advertising copy
+- Return ONLY valid JSON. No markdown, no explanation.`;
 }

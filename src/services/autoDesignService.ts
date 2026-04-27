@@ -87,19 +87,25 @@ function extractUserText(prompt: string): Partial<GeneratedContent> {
 }
 
 function sanitizeContent(c: GeneratedContent): GeneratedContent {
-    const JUNK = /^(inter|roboto|arial|helvetica|text|subtext|subheadline|headline|cta|button|click here|lorem|font|label|tag)$/i;
-    const FONT_NAMES = /^(inter|roboto|montserrat|poppins|arial|helvetica|georgia|verdana|garamond|lato|opensans|raleway|playfair|outfit|nunito)$/i;
+    // ★ Junk detection: English + Korean UI terms that AI sometimes outputs as "copy"
+    const JUNK = /^(inter|roboto|arial|helvetica|text|subtext|subheadline|headline|cta|button|click here|lorem|font|label|tag|버튼|텍스트|서브헤드라인|헤드라인|라벨|태그|클릭|제목|부제|부제목)$/i;
+    const FONT_NAMES = /^(inter|roboto|montserrat|poppins|arial|helvetica|georgia|verdana|garamond|lato|opensans|raleway|playfair|outfit|nunito|space grotesk)$/i;
     const toTitleCase = (s: string) => s.replace(/\w\S*/g, (t) => t.charAt(0).toUpperCase() + t.slice(1).toLowerCase());
 
     let headline = c.headline?.trim() || 'Get Started Today';
     if (JUNK.test(headline)) headline = 'Get Started Today';
-    if (headline === headline.toLowerCase() && headline.length > 0) headline = toTitleCase(headline);
+    // Only apply title case to Latin-script text (not Korean/CJK)
+    if (headline === headline.toLowerCase() && headline.length > 0 && /^[\x00-\x7F]+$/.test(headline)) {
+        headline = toTitleCase(headline);
+    }
 
     // ★ CTA is OPTIONAL — AI decides if it's needed.
     // Only sanitize junk; do NOT force a fallback.
     let cta = c.cta?.trim() || '';
     if (FONT_NAMES.test(cta) || JUNK.test(cta)) cta = '';
-    if (cta && cta === cta.toLowerCase() && cta.length > 0) cta = toTitleCase(cta);
+    if (cta && cta === cta.toLowerCase() && cta.length > 0 && /^[\x00-\x7F]+$/.test(cta)) {
+        cta = toTitleCase(cta);
+    }
 
     let subheadline = c.subheadline?.trim() || '';
     if (JUNK.test(subheadline)) subheadline = '';
