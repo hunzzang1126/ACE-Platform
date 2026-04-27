@@ -198,4 +198,75 @@ describe('Tool Parameter Validator', () => {
             expect(result.valid).toBe(true);
         });
     });
+
+    describe('add_button', () => {
+        it('passes valid button params', () => {
+            const result = validateToolParams('add_button', {
+                text: 'Shop Now', bgColor: '#6366F1',
+            });
+            expect(result.valid).toBe(true);
+        });
+        it('provides default text when missing', () => {
+            const result = validateToolParams('add_button', {});
+            expect(result.valid).toBe(true);
+            expect(result.sanitized.text).toBe('Shop Now');
+        });
+        it('normalizes label to text', () => {
+            const result = validateToolParams('add_button', { label: 'Buy Now' });
+            expect(result.valid).toBe(true);
+            expect(result.sanitized.text).toBe('Buy Now');
+        });
+        it('rejects invalid bgColor', () => {
+            const result = validateToolParams('add_button', {
+                text: 'CTA', bgColor: 'not-hex',
+            });
+            expect(result.valid).toBe(false);
+            expect(result.errors[0]).toContain('Invalid hex color');
+        });
+        it('rejects invalid textColor', () => {
+            const result = validateToolParams('add_button', {
+                text: 'CTA', textColor: 'rainbow',
+            });
+            expect(result.valid).toBe(false);
+            expect(result.errors[0]).toContain('Invalid hex color');
+        });
+        it('auto-fixes bgColor without #', () => {
+            const result = validateToolParams('add_button', {
+                text: 'CTA', bgColor: '6366F1',
+            });
+            expect(result.valid).toBe(true);
+            expect(result.sanitized.bgColor).toBe('#6366F1');
+        });
+    });
+
+    describe('generate_full_design', () => {
+        it('passes valid prompt', () => {
+            const result = validateToolParams('generate_full_design', {
+                prompt: 'Modern tech banner with gradient',
+            });
+            expect(result.valid).toBe(true);
+        });
+        it('rejects short prompt', () => {
+            const result = validateToolParams('generate_full_design', { prompt: 'hi' });
+            expect(result.valid).toBe(false);
+        });
+        it('rejects missing prompt', () => {
+            const result = validateToolParams('generate_full_design', {});
+            expect(result.valid).toBe(false);
+        });
+    });
+
+    describe('add_text edge cases', () => {
+        it('rejects missing both content and text', () => {
+            const result = validateToolParams('add_text', { color: '#FFF' });
+            expect(result.valid).toBe(false);
+            expect(result.errors[0]).toContain('content');
+        });
+        it('rejects invalid color', () => {
+            const result = validateToolParams('add_text', {
+                content: 'Hello', color: 'not-a-hex',
+            });
+            expect(result.valid).toBe(false);
+        });
+    });
 });
