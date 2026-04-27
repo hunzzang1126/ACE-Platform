@@ -6,6 +6,19 @@
 // document.cookie, etc.) and enforces a timeout.
 // ─────────────────────────────────────────────────
 
+// ── Safety Limits ────────────────────────────────
+
+const MAX_CODE_LENGTH = 5000;
+const INFINITE_LOOP_PATTERN = /while\s*\(\s*true\s*\)|for\s*\(\s*;\s*;\s*\)/;
+const SLOW_THRESHOLD_MS = 2000;
+
+function logExecutionTime(startMs: number): void {
+    const elapsed = performance.now() - startMs;
+    if (elapsed > SLOW_THRESHOLD_MS) {
+        console.warn(`[Sandbox] Slow execution: ${elapsed.toFixed(0)}ms`);
+    }
+}
+
 // ── Blocked Patterns ─────────────────────────────
 
 const BLOCKED_PATTERNS: Array<{ pattern: RegExp; reason: string }> = [
@@ -68,6 +81,24 @@ export async function executeSandboxed(
     context: SandboxContext,
     timeoutMs = 5000,
 ): Promise<SandboxResult> {
+    // ★ Step 0: Code size limit — prevent token abuse
+    if (code.length > MAX_CODE_LENGTH) {
+        return {
+            success: false,
+            message: `Code too long (${code.length} chars, max ${MAX_CODE_LENGTH}). Break into smaller steps.`,
+            error: 'CODE_TOO_LONG',
+        };
+    }
+
+    // ★ Step 0.5: Infinite loop detection
+    if (INFINITE_LOOP_PATTERN.test(code)) {
+        return {
+            success: false,
+            message: 'Infinite loop pattern detected (while(true) or for(;;)). Use bounded loops instead.',
+            blocked: { pattern: 'while(true)/for(;;)', reason: 'Infinite loop' },
+        };
+    }
+
     // ★ Step 1: Static analysis — check for blocked patterns
     const violation = scanForViolations(code);
     if (violation) {
@@ -79,6 +110,7 @@ export async function executeSandboxed(
     }
 
     // ★ Step 2: Execute with timeout
+    const execStart = performance.now();
     return new Promise<SandboxResult>((resolve) => {
         const timer = setTimeout(() => {
             resolve({ success: false, message: `Execution timed out after ${timeoutMs}ms`, error: 'TIMEOUT' });
@@ -99,13 +131,21 @@ export async function executeSandboxed(
             // Handle async results
             if (result instanceof Promise) {
                 result
-                    .then(() => resolve({ success: true, message: 'Dynamic action executed successfully' }))
-                    .catch((err: Error) => resolve({ success: false, message: `Runtime error: ${err.message}`, error: err.message }));
+                    .then(() => {
+                        logExecutionTime(execStart);
+                        resolve({ success: true, message: 'Dynamic action executed successfully' });
+                    })
+                    .catch((err: Error) => {
+                        logExecutionTime(execStart);
+                        resolve({ success: false, message: `Runtime error: ${err.message}`, error: err.message });
+                    });
             } else {
+                logExecutionTime(execStart);
                 resolve({ success: true, message: 'Dynamic action executed successfully' });
             }
         } catch (err) {
             clearTimeout(timer);
+            logExecutionTime(execStart);
             const message = err instanceof Error ? err.message : String(err);
             resolve({ success: false, message: `Runtime error: ${message}`, error: message });
         }

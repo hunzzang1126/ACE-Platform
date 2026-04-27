@@ -13,6 +13,7 @@ import { isAiAvailable } from '@/config/apiKeys';
 import { getOpenRouterUrl } from '@/services/openRouterClient';
 import type { AiConfig, LiveProgress, ToolExecutorOverride, ClaudeContentBlock, ClaudeMessage, ClaudeResponse } from './aiServiceTypes';
 import { loadConfig, saveConfig, sleep, nextFrame, humanizeToolStep } from './aiServiceTypes';
+import { getCanvasElementCount, getCanvasElementNames, saveInteractionMemory } from './aiServiceHelpers';
 
 // Re-export for backward compat
 export type { AiConfig, LiveProgress, ToolExecutorOverride };
@@ -80,7 +81,7 @@ export class AiService {
 
         try { await this.agenticLoop(engine, systemPrompt, enrichedMessage, progress, ctx.page, executorOverride, ctx.canvasScreenshot); }
         catch (err) { progress.onError(`AI Error: ${err}`); }
-        this.saveInteractionMemory(userMessage).catch(() => {});
+        saveInteractionMemory(userMessage, this.getLastReply()).catch(() => {});
     }
 
     private async agenticLoop(engine: Engine, systemPrompt: string, enrichedUserMessage: string, progress: LiveProgress, page: import('./contextRouter').PageContext, executorOverride?: ToolExecutorOverride, canvasScreenshot?: string): Promise<void> {
@@ -89,7 +90,7 @@ export class AiService {
         let rounds = 0, finished = false;
         const allToolRecords: ToolCallRecord[] = [];
         // ★ Hallucination Guard: track pre-execution element count
-        const preElementCount = this.getCanvasElementCount(engine);
+        const preElementCount = getCanvasElementCount(engine);
         await nextFrame();
 
         while (!finished && rounds < this.config.maxToolRounds) {
@@ -101,7 +102,22 @@ export class AiService {
             const toolBlocks = response.content.filter(b => b.type === 'tool_use');
 
             if (response.stop_reason === 'tool_use' && toolBlocks.length > 0) {
-                progress.onPlan(toolBlocks.map(tc => humanizeToolStep(tc.name!, (tc.input ?? {}) as Record<string, unknown>)));
+                // ★ Planner Phase: Round 1 shows plan preview before execution
+                if (rounds === 1 && textBlocks.length > 0) {
+                    try {
+                        const { extractPlan, formatPlanForDisplay } = await import('./plannerPhase');
+                        const planText = textBlocks.map(b => b.text).filter(Boolean).join('\n');
+                        const plan = extractPlan(planText, toolBlocks);
+                        if (plan.steps.length > 0) {
+                            progress.onThinking(planText.slice(0, 120));
+                            await sleep(400);
+                            progress.onPlan(formatPlanForDisplay(plan));
+                            await sleep(800); // Let user read the plan
+                        }
+                    } catch { /* non-critical */ }
+                } else {
+                    progress.onPlan(toolBlocks.map(tc => humanizeToolStep(tc.name!, (tc.input ?? {}) as Record<string, unknown>)));
+                }
                 await sleep(400);
                 messages.push({ role: 'assistant', content: response.content });
 
@@ -159,8 +175,8 @@ export class AiService {
                     const { verifyToolResults, buildVerificationMessage } = await import('./hallucinationGuard');
                     const verification = verifyToolResults(
                         toolRecords,
-                        () => this.getCanvasElementCount(engine),
-                        () => this.getCanvasElementNames(engine),
+                        () => getCanvasElementCount(engine),
+                        () => getCanvasElementNames(engine),
                         preElementCount,
                     );
                     if (!verification.verified) {
@@ -177,6 +193,31 @@ export class AiService {
                 const roundText = textBlocks.map(b => b.text).filter(Boolean).join('\n');
                 if (roundText) this.context.addMessage({ role: 'assistant', content: roundText, timestamp: Date.now(), toolCalls: toolRecords });
             } else {
+                // ★ Vision QA Loop: verify design quality after generation
+                if (allToolRecords.length > 0 && rounds < this.config.maxToolRounds) {
+                    try {
+                        const { shouldRunQA, runVisionQA } = await import('./visionQALoop');
+                        if (shouldRunQA(allToolRecords)) {
+                            const cs = this._designContext.creativeSet;
+                            const master = cs?.variants?.find((v: { id: string }) => v.id === cs.masterVariantId) ?? cs?.variants?.[0];
+                            if (master) {
+                                progress.onThinking('Verifying design quality...');
+                                await sleep(300);
+                                const qa = await runVisionQA(master.width, master.height);
+                                if (qa.screenshotCaptured && qa.correctionPrompt) {
+                                    progress.onToken(`Quality: ${qa.score}/100. Fixing ${qa.issues.length} issues...`);
+                                    messages.push({ role: 'assistant', content: response.content });
+                                    messages.push({ role: 'user', content: qa.correctionPrompt });
+                                    finished = false;
+                                    continue; // Run one more correction round
+                                } else if (qa.screenshotCaptured && qa.score >= 0) {
+                                    progress.onToken(`Design quality: ${qa.score}/100`);
+                                }
+                            }
+                        }
+                    } catch { /* non-critical */ }
+                }
+
                 finished = true;
                 const content = textBlocks.map(b => b.text).filter(Boolean).join('\n');
                 progress.onReflection(content); await sleep(300);
@@ -346,36 +387,4 @@ export class AiService {
         return { id: responseId, type: 'message', role: 'assistant', content, model, stop_reason: (toolCallMap.size > 0 ? 'tool_use' : 'end_turn') as ClaudeResponse['stop_reason'], usage: { input_tokens: inputTokens, output_tokens: outputTokens } };
     }
 
-    private async saveInteractionMemory(userMessage: string): Promise<void> {
-        try {
-            const { saveAiMemory, extractFacts } = await import('@/services/aiMemoryService');
-            const facts = extractFacts(userMessage, this.getLastReply());
-            if (Object.keys(facts).length > 0) {
-                await saveAiMemory(facts);
-                console.info('[AiMemory] Chat facts saved:', Object.keys(facts));
-            } else {
-                console.info('[AiMemory] No extractable facts from this message');
-            }
-        } catch (err) {
-            console.warn('[AiMemory] Chat memory save failed:', err);
-        }
-    }
-
-    // ── Hallucination Guard helpers ──────────────────
-
-    private getCanvasElementCount(engine: Engine): number {
-        try {
-            if (!engine?.get_all_nodes) return 0;
-            const nodes = JSON.parse(engine.get_all_nodes());
-            return Array.isArray(nodes) ? nodes.length : 0;
-        } catch { return 0; }
-    }
-
-    private getCanvasElementNames(engine: Engine): string[] {
-        try {
-            if (!engine?.get_all_nodes) return [];
-            const nodes = JSON.parse(engine.get_all_nodes()) as Array<{ name?: string }>;
-            return nodes.map(n => n.name ?? '').filter(Boolean);
-        } catch { return []; }
-    }
 }

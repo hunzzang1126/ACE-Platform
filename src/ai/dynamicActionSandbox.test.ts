@@ -103,6 +103,48 @@ describe('dynamicActionSandbox', () => {
             );
             expect(result.success).toBe(true);
         });
+
+        it('should reject code exceeding max length', async () => {
+            const longCode = 'const x = 1;\n'.repeat(500); // ~6500 chars
+            const result = await executeSandboxed(longCode, mockContext);
+            expect(result.success).toBe(false);
+            expect(result.message).toContain('too long');
+            expect(result.error).toBe('CODE_TOO_LONG');
+        });
+
+        it('should detect while(true) infinite loop', async () => {
+            const result = await executeSandboxed('while(true) { break; }', mockContext);
+            expect(result.success).toBe(false);
+            expect(result.message).toContain('Infinite loop');
+        });
+
+        it('should detect for(;;) infinite loop', async () => {
+            const result = await executeSandboxed('for(;;) { break; }', mockContext);
+            expect(result.success).toBe(false);
+            expect(result.message).toContain('Infinite loop');
+        });
+
+        it('should detect while( true ) with spaces', async () => {
+            const result = await executeSandboxed('while( true ) {}', mockContext);
+            expect(result.success).toBe(false);
+            expect(result.message).toContain('Infinite loop');
+        });
+
+        it('should allow bounded loops', async () => {
+            const result = await executeSandboxed(
+                'for (let i = 0; i < 10; i++) { /* ok */ }',
+                mockContext,
+            );
+            expect(result.success).toBe(true);
+        });
+
+        it('should allow while with condition', async () => {
+            const result = await executeSandboxed(
+                'let i = 0; while(i < 5) { i++; }',
+                mockContext,
+            );
+            expect(result.success).toBe(true);
+        });
     });
 
     describe('getBlockedPatternList', () => {

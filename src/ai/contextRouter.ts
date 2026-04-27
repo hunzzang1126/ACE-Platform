@@ -213,12 +213,18 @@ ${smartSection}`;
 
         case 'canvas-editor': {
             const empty = ctx.elementCount === 0;
+            // ★ Planning instruction: AI explains plan before executing tools
+            let planningLine = '';
+            try {
+                const { PLANNING_INSTRUCTION } = require('./plannerPhase');
+                planningLine = `\n${PLANNING_INSTRUCTION}`;
+            } catch { /* non-critical */ }
             return `${header}
 ${snapshot}
 Tools: generate_full_design, replace_background_image, generate_image, add_text, add_button, execute_dynamic_action, analyze_scene, undo_ai_action
 ${empty ? '★ Canvas empty → Use generate_full_design for ANY new design request. It creates the COMPLETE ad (layout + text + CTA + image). NEVER use generate_image alone for new designs.' : 'For modifications → execute_dynamic_action. For redesign → generate_full_design.'}
 For background → replace_background_image. Use analyze_scene to read store API.
-Write real marketing copy. No placeholder text.
+Write real marketing copy. No placeholder text.${planningLine}
 ${smartSection}`;
         }
     }

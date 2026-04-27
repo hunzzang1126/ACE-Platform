@@ -284,9 +284,14 @@ describe('★ REGRESSION GUARD: AI Memory is saved after design generation', () 
         expect(src).toContain("import('@/services/aiMemoryService')");
     });
 
-    it('aiService.ts calls saveInteractionMemory after chat', () => {
+    it('aiService.ts imports saveInteractionMemory', () => {
         const src = readFileSync(resolve(__dirname, '../ai/aiService.ts'), 'utf-8');
         expect(src).toContain('saveInteractionMemory');
+        expect(src).toContain("from './aiServiceHelpers'");
+    });
+
+    it('aiServiceHelpers.ts contains extractFacts and saveAiMemory', () => {
+        const src = readFileSync(resolve(__dirname, '../ai/aiServiceHelpers.ts'), 'utf-8');
         expect(src).toContain('extractFacts');
         expect(src).toContain('saveAiMemory');
     });
