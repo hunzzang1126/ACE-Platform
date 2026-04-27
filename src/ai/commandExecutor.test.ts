@@ -8,6 +8,16 @@ vi.mock('@/services/imageGenClient', () => ({
     generateImage: vi.fn(),
 }));
 
+vi.mock('@/services/imageGenHelpers', () => ({
+    snapToFluxResolution: vi.fn().mockImplementation((w: number, h: number) => {
+        // Simulate Flux resolution snapping
+        if (w > h * 3) return { width: 1280, height: 480 };
+        if (h > w * 2) return { width: 512, height: 1024 };
+        if (Math.abs(w - h) < 100) return { width: 1024, height: 1024 };
+        return { width: 1024, height: 768 };
+    }),
+}));
+
 vi.mock('./executors/designExecutor', () => ({
     executeDesignCommand: vi.fn().mockResolvedValue(null),
 }));
@@ -101,8 +111,9 @@ describe('commandExecutor', () => {
                 'generate_image', { prompt: 'blue background image' }, [],
             );
 
+            // ★ Now uses Flux-snapped resolution (728x90 → 1280x480)
             expect(generateImage).toHaveBeenCalledWith(
-                expect.objectContaining({ width: 728, height: 90 }),
+                expect.objectContaining({ width: 1280, height: 480 }),
             );
         });
 

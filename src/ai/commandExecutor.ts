@@ -114,12 +114,15 @@ export async function executeToolCall(
                 const style = str('style', 'photography') as 'realistic' | 'illustration' | 'abstract' | 'minimal' | 'photography';
                 const canvasW = engine?.canvas_width?.() ?? 300;
                 const canvasH = engine?.canvas_height?.() ?? 250;
+                // ★ Snap to Flux-optimal resolution for best quality
+                const { snapToFluxResolution } = await import('@/services/imageGenHelpers');
+                const fluxSize = snapToFluxResolution(canvasW, canvasH);
                 let result: ImageGenResult;
                 try {
                     result = await generateImage({
                         prompt: `${prompt}. No text, no logos, no watermarks. Professional quality.`,
-                        width: canvasW,
-                        height: canvasH,
+                        width: fluxSize.width,
+                        height: fluxSize.height,
                         model: 'flux',
                         style,
                         negativePrompt: 'text, logos, watermark, low quality, blurry',

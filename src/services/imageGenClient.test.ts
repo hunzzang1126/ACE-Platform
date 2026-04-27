@@ -13,6 +13,7 @@ vi.mock('@/config/apiKeys', () => ({
 vi.mock('@/services/openRouterClient', () => ({
     getOpenRouterUrl: () => 'https://openrouter.ai/api/v1/chat/completions',
     getOpenRouterHeaders: () => ({ 'Content-Type': 'application/json', 'Authorization': 'Bearer test-key' }),
+    getProxyHeaders: () => Promise.resolve({ 'Content-Type': 'application/json', 'Authorization': 'Bearer test-key' }),
 }));
 
 vi.mock('@/services/modelRouter', () => ({

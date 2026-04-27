@@ -94,17 +94,36 @@ export function extractImageUrl(response: Record<string, unknown>): string | nul
 
 /**
  * Resize image data URL to exact target dimensions (object-fit: cover).
+ * ★ Handles external URLs by fetching them first to avoid CORS issues.
  */
 export async function resizeImageToTarget(imageUrl: string, targetW: number, targetH: number): Promise<string> {
+    // ★ External URLs: fetch → blob → data URL first (avoids CORS issues with canvas)
+    let srcUrl = imageUrl;
+    if (imageUrl.startsWith('http')) {
+        try {
+            const res = await fetch(imageUrl);
+            const blob = await res.blob();
+            srcUrl = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result as string);
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+        } catch (err) {
+            console.warn('[ImageGen] Failed to fetch external image for resize, using original URL:', err);
+            return imageUrl;
+        }
+    }
+
     return new Promise((resolve) => {
         const img = new Image();
         img.crossOrigin = 'anonymous';
         img.onload = () => {
-            if (img.naturalWidth === targetW && img.naturalHeight === targetH) { resolve(imageUrl); return; }
+            if (img.naturalWidth === targetW && img.naturalHeight === targetH) { resolve(srcUrl); return; }
             const canvas = document.createElement('canvas');
             canvas.width = targetW; canvas.height = targetH;
             const ctx = canvas.getContext('2d');
-            if (!ctx) { resolve(imageUrl); return; }
+            if (!ctx) { resolve(srcUrl); return; }
             const srcAspect = img.naturalWidth / img.naturalHeight;
             const dstAspect = targetW / targetH;
             let sx = 0, sy = 0, sw = img.naturalWidth, sh = img.naturalHeight;
@@ -113,8 +132,8 @@ export async function resizeImageToTarget(imageUrl: string, targetW: number, tar
             ctx.drawImage(img, sx, sy, sw, sh, 0, 0, targetW, targetH);
             resolve(canvas.toDataURL('image/png'));
         };
-        img.onerror = () => { resolve(imageUrl); };
-        img.src = imageUrl;
+        img.onerror = () => { resolve(srcUrl); };
+        img.src = srcUrl;
     });
 }
 

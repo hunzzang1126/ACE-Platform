@@ -5,7 +5,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { isAiAvailable } from '@/config/apiKeys';
-import { getOpenRouterUrl, getOpenRouterHeaders } from '@/services/openRouterClient';
+import { getOpenRouterUrl, getProxyHeaders } from '@/services/openRouterClient';
 import { getModelId, type AceModelRole } from '@/services/modelRouter';
 import { extractImageUrl, resizeImageToTarget, generateFallbackImage, buildEnhancedPrompt, snapToFluxResolution } from './imageGenHelpers';
 
@@ -72,11 +72,12 @@ async function callImageGenApi(
 
     const body: Record<string, unknown> = { model: modelId, messages: [{ role: 'user', content: promptWithSize }] };
     const url = getOpenRouterUrl();
-    const headers = getOpenRouterHeaders();
+    // ★ Use async proxy headers — sends JWT in production (not raw API key)
+    const headers = await getProxyHeaders();
 
     console.log(`[ImageGen] Calling ${modelId} — "${enhancedPrompt.slice(0, 80)}..."`);
 
-    const TIMEOUT_MS = 30_000;
+    const TIMEOUT_MS = 60_000; // Image gen can take 30-45s
     const timeoutController = new AbortController();
     const timeoutId = setTimeout(() => { console.warn(`[ImageGen] ${modelId} timed out`); timeoutController.abort(); }, TIMEOUT_MS);
     const combinedSignal = signal ? AbortSignal.any([signal, timeoutController.signal]) : timeoutController.signal;
