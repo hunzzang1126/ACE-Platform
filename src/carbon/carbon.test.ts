@@ -289,6 +289,40 @@ describe('Carbon Layout Composer', () => {
                 expect((el.y ?? 0) + (el.h ?? 0)).toBeLessThanOrEqual(252); // 2px tolerance
             }
         });
+
+        it('★ REGRESSION: Korean CJK headline does not overlap subheadline', () => {
+            // Korean chars are full-width (~1.0em), old code used 0.55em → 50% height underestimate
+            const content: DesignContent = {
+                headline: 'Galaxy의 새로운 차원',
+                subheadline: '최첨단 기술의 만남',
+                cta: '지금 사전예약',
+            };
+            const { elements } = buildDesignElements(content, palette, 300, 250, true, 'centered');
+            const headline = elements.find(el => el.name === 'headline')!;
+            const subheadline = elements.find(el => el.name === 'subheadline');
+            expect(headline).toBeDefined();
+            if (subheadline) {
+                const headlineBottom = (headline.y ?? 0) + (headline.h ?? 0);
+                const subheadlineTop = subheadline.y ?? 0;
+                expect(subheadlineTop).toBeGreaterThanOrEqual(headlineBottom);
+            }
+        });
+
+        it('★ REGRESSION: mixed Korean+Latin text height estimation is accurate', () => {
+            // "Galaxy의 새로운 차원" = mixed CJK+Latin, needs weighted average width
+            const content: DesignContent = {
+                headline: 'Galaxy의 새로운 차원을 만나보세요',
+                subheadline: '혁신적인 디자인',
+                cta: '자세히 보기',
+                tag: 'NEW',
+            };
+            const { elements } = buildDesignElements(content, palette, 300, 250, true, 'centered');
+            // All elements must fit within canvas
+            for (const el of elements) {
+                if (el.name === 'background' || el.name === 'text_overlay') continue;
+                expect((el.y ?? 0) + (el.h ?? 0)).toBeLessThanOrEqual(252);
+            }
+        });
     });
 
     describe('elements stay within canvas', () => {

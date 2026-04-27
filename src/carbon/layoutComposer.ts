@@ -333,10 +333,20 @@ function buildTextElement(
     const w = columns(rule.cols, canvasW);
     const lineHeight = typeStyle.lineHeight;
 
-    // Estimate height — uppercase-aware char width factor
-    // Latin uppercase ~0.7em, lowercase ~0.55em, average mixed ~0.62
-    const uppercaseRatio = content.split('').filter(c => c >= 'A' && c <= 'Z').length / Math.max(1, content.length);
-    const avgCharWidth = 0.55 + uppercaseRatio * 0.15; // 0.55 (all lower) → 0.70 (all upper)
+    // ★ CJK-aware height estimation
+    // Korean/Chinese/Japanese characters are FULL-WIDTH (~1.0em per char)
+    // Latin uppercase ~0.7em, lowercase ~0.55em
+    // Without this, Korean headlines like "Galaxy의 새로운 차원" get height underestimated by 50%+,
+    // causing all subsequent elements to overlap.
+    const chars = content.split('');
+    const totalChars = Math.max(1, chars.length);
+    // eslint-disable-next-line no-control-regex
+    const cjkCount = chars.filter(c => /[\u3000-\u9FFF\uAC00-\uD7AF\uF900-\uFAFF]/.test(c)).length;
+    const upperCount = chars.filter(c => c >= 'A' && c <= 'Z').length;
+    const cjkRatio = cjkCount / totalChars;
+    const uppercaseRatio = upperCount / totalChars;
+    // Weighted average: CJK=1.0em, Latin upper=0.70em, Latin lower=0.55em
+    const avgCharWidth = cjkRatio * 1.0 + (1 - cjkRatio) * (0.55 + uppercaseRatio * 0.15);
     const charsPerLine = Math.max(1, Math.floor(w / (fontSize * avgCharWidth)));
     // ★ Word-aware line estimation: split by words, not just char count
     const words = content.split(/\s+/);
@@ -350,7 +360,9 @@ function buildTextElement(
         }
     }
     const lines = Math.min(rule.maxLines ?? 10, estimatedLines);
-    const h = Math.round(fontSize * lineHeight * lines + fontSize * 0.3); // padding = 30% of fontSize
+    // ★ Extra padding for CJK (descenders/ascenders are taller)
+    const cjkPadding = cjkRatio > 0.2 ? fontSize * 0.15 : 0;
+    const h = Math.round(fontSize * lineHeight * lines + fontSize * 0.3 + cjkPadding);
 
     let x: number;
     if (rule.align === 'center') x = centeredX(rule.cols, canvasW);
