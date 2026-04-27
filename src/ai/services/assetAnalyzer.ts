@@ -114,26 +114,11 @@ export async function analyzeAsset(
     const aspectRatio = detectAspectRatio(width, height);
     const hasTransparency = checkTransparency(dataUrl);
 
-    // Try Vision API analysis
-    try {
-        const apiKey = getAnthropicKey();
-
-        if (!apiKey) {
-            // No API key -- return basic analysis from filename/dimensions
-            return fallbackAnalysis(fileName, width, height, hasTransparency, aspectRatio);
-        }
-
-        const analysis = await analyzeWithClaude(dataUrl);
-
-        return {
-            ...analysis,
-            hasTransparency,
-            aspectRatio,
-        };
-    } catch (err) {
-        console.warn('[AssetAnalyzer] Vision API failed, using fallback:', err);
-        return fallbackAnalysis(fileName, width, height, hasTransparency, aspectRatio);
-    }
+    // ★ SECURITY: Direct Anthropic API calls from client-side are prohibited (acerule.md).
+    // The API key is either missing or expired, causing 401 errors that pollute console.
+    // Until a server proxy is set up (Task 6-1), always use fallback analysis.
+    // This is non-blocking — fallback provides type/role/quality from filename heuristics.
+    return fallbackAnalysis(fileName, width, height, hasTransparency, aspectRatio);
 }
 
 // ── Claude Vision ──

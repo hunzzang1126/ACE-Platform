@@ -308,7 +308,20 @@ async function buildAndRender(
     // re-sync that wipes elements that only exist on the canvas engine.
     try {
         const { syncElementsToStore } = await resilientImport(() => import('./agentFlowStoreSync'));
-        syncElementsToStore(allElements, canvasW, canvasH, {
+
+        // ★ Include background image in sync — it's added separately (line 258-268)
+        // and not in allElements, so store sync would miss it → canvas wipes it.
+        const elementsToSync = [...allElements];
+        if (bgResult.hasImage && bgResult.url) {
+            elementsToSync.unshift({
+                name: 'ai_background',
+                type: 'image' as any,
+                x: 0, y: 0, w: canvasW, h: canvasH,
+                src: bgResult.url,
+            });
+        }
+
+        syncElementsToStore(elementsToSync, canvasW, canvasH, {
             gradientStart: guide.colors.gradientStart,
             gradientEnd: guide.colors.gradientEnd,
             typography: guide.typography,

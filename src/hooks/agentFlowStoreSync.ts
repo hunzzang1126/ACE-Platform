@@ -55,7 +55,21 @@ export function syncElementsToStore(
                 lineHeight: el.line_height ?? 1.2,
                 letterSpacing: el.letter_spacing ?? 0,
                 autoShrink: false,
-                zIndex: 0, // will be set later
+                zIndex: 0,
+            };
+        }
+
+        // ★ Image elements (AI background, scanned images)
+        if (el.type === 'image' || (el as any).src) {
+            return {
+                ...base,
+                type: 'image' as const,
+                src: (el as any).src ?? '',
+                naturalWidth: el.w ?? canvasW,
+                naturalHeight: el.h ?? canvasH,
+                fit: 'cover' as const,
+                role: el.name?.includes('background') ? 'background' : 'decoration',
+                zIndex: 0,
             };
         }
 
@@ -73,6 +87,7 @@ export function syncElementsToStore(
             } : {}),
             strokeWidth: 0,
             borderRadius: el.radius ?? 0,
+            opacity: el.a ?? 1,
             zIndex: 0,
         };
     });

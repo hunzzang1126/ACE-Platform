@@ -292,7 +292,7 @@ export function buildDesignElements(
                 name: 'text_overlay',
                 type: 'rect' as any,
                 x: oX, y: oY, w: oW, h: oH,
-                r: 0, g: 0, b: 0, a: 0.45,
+                r: 0, g: 0, b: 0, a: 0.35,
                 radius: Math.round(canvasMin * 0.02),
             });
         }

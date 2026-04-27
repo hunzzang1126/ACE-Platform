@@ -24,7 +24,8 @@ export function renderElement(engine: FlowEngine, el: any, canvasW: number, cach
         cacheGradientData(el.name ?? '', el.gradient_start_hex, el.gradient_end_hex, el.gradient_angle ?? 135);
         if (nodeId != null) cacheGradientData(`engine-${nodeId}`, el.gradient_start_hex, el.gradient_end_hex, el.gradient_angle ?? 135);
         return nodeId;
-    } else if (el.type === 'rounded_rect') {
+    } else if (el.type === 'rounded_rect' || (el.radius && el.radius > 0)) {
+        // ★ Route any rect with radius > 0 to rounded_rect (e.g., text_overlay, cta_button)
         return engine.add_rounded_rect(el.x ?? 0, el.y ?? 0, el.w ?? 100, el.h ?? 50, el.r ?? 0.5, el.g ?? 0.5, el.b ?? 0.5, el.a ?? 1, el.radius ?? 8, el.name);
     } else if (el.type === 'ellipse') {
         return engine.add_ellipse?.((el.x ?? 0) + (el.w ?? 50) / 2, (el.y ?? 0) + (el.h ?? 50) / 2, (el.w ?? 50) / 2, (el.h ?? 50) / 2, el.r ?? 0.5, el.g ?? 0.5, el.b ?? 0.5, el.a ?? 1) ?? null;
