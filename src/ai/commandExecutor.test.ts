@@ -206,12 +206,12 @@ describe('commandExecutor', () => {
     // ── generate_full_design ──
 
     describe('generate_full_design', () => {
-        it('should fail — handled by agent orchestrator', async () => {
+        it('should fail with invalid params', async () => {
             const result = await executeToolCall(
                 makeEngine(), 'generate_full_design', {}, [],
             );
             expect(result.success).toBe(false);
-            expect(result.message).toContain('agent orchestrator');
+            expect(result.message).toContain('prompt');
         });
     });
 

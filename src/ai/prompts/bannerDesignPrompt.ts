@@ -36,36 +36,15 @@ COLOR PALETTE (Light — clean, professional):
 // ── Golden Rules ──
 
 const GOLDEN_RULES = `
-LAYOUT GOLDEN RULES (violating these = ugly design):
-- Logo: ALWAYS visible. Top-right or top-left corner. 10-15% of ad space.
-- Headline: Largest text element. Center of visual weight. Max 2-3 lines.
-- CTA: Contrasting color (accent). Bottom or right. Min 44×44px (touch target).
-- Padding: Min 8px from canvas edges (IAB safe zone). 
-- Max 5 elements per banner — fewer = cleaner.
-- Background image: Full bleed or 60%+ coverage. If text over image, use semi-transparent overlay (#000000 40-60% opacity).
-- Visual hierarchy: Background → Image → Headline → Subhead → CTA → Logo → Legal.
-- Element spacing: Use consistent gaps (8px, 12px, or 16px).
+LAYOUT RULES: Logo visible (top corner, 10-15%). Headline = largest text (max 3 lines). CTA = contrasting color (min 44x44px). 8px safe zone from edges. Max 5 elements. Image bg: use overlay for text readability.
 `;
 
 const COPYWRITING_RULES = `
-COPYWRITING (concise text = better ads):
-- Headline: 2-5 words MAX. Punchy, direct. "Save 50% Today", "Try Free", "New Arrivals"
-- Subhead: 1 short sentence, ≤12 words. "The best deals of the season"
-- CTA text: 1-3 words. "Shop Now", "Get Started", "Learn More", "Sign Up"
-- Legal: ≤1 line, 8-10px. "Terms apply. Limited time."
-- NEVER use lorem ipsum or placeholder text
-- NEVER exceed 2 sentences total across all text elements
-- Power words: "Free", "New", "Save", "Exclusive", "Limited", "Now"
+COPY: Headline 2-5 words. Subhead ≤12 words. CTA 1-3 words. No lorem ipsum. Power words: Free, New, Save, Now.
 `;
 
 const TYPOGRAPHY_SYSTEM = `
-TYPOGRAPHY (Golden Ratio 1.618 based):
-- Font: Inter (UI), or brand font if specified
-- Weight: Headline 700, Subhead 600, Body 400, CTA 700
-- Line height: Headline 1.1-1.2, Body 1.4-1.5, CTA 1.0
-- Letter spacing: Headline -0.5px (tight), Body 0, UPPERCASE labels +1px
-- Text alignment: Center for stack layouts, Left for split layouts
-- NEVER pixel-set font sizes outside the per-size typography scale
+TYPO: Inter default. Headline 700/1.1, Subhead 600/1.3, CTA 700/1.0. Tight headline tracking (-0.5px). Center for stack, left for split.
 `;
 
 // ── Public API ──

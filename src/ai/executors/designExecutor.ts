@@ -10,6 +10,7 @@ import { useAnimPresetStore } from '@/hooks/useAnimationPresets';
 import { v4 as uuid } from 'uuid';
 import type { DashboardExecResult } from '../dashboardExecutor';
 import { handleAddText, handleAddShape, handleAddButton, handleSetAnimation } from './designElementCreators';
+import { scanForViolations } from '../dynamicActionSandbox';
 
 // ── Executor ──
 
@@ -113,6 +114,13 @@ export function executeDesignTool(
             const description = params.description as string || 'Custom action';
             const code = params.code as string;
             if (!code) return { success: false, message: 'code is required.' };
+
+            // ★ Sandbox Guard: block dangerous patterns before execution
+            const violation = scanForViolations(code);
+            if (violation) {
+                return { success: false, message: `Blocked: ${violation.reason}. Rewrite without ${violation.pattern}.` };
+            }
+
             const stateSnapshot = JSON.stringify(useDesignStore.getState().creativeSet);
             const startTime = performance.now();
             try {
@@ -126,7 +134,7 @@ export function executeDesignTool(
                     try { useDesignStore.setState({ creativeSet: JSON.parse(stateSnapshot) }); } catch { /* */ }
                     return { success: false, message: `${description}: ${resultStr}` };
                 }
-                return { success: true, message: `${description}: ${resultStr}` };
+                return { success: true, message: `${description}: ${resultStr} (${elapsed}ms)` };
             } catch (err) {
                 try { useDesignStore.setState({ creativeSet: JSON.parse(stateSnapshot) }); } catch { /* */ }
                 const errMsg = err instanceof Error ? `${err.message} (${err.stack?.split('\n').slice(0, 2).join(' | ')})` : String(err);

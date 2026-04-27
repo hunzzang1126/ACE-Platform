@@ -88,6 +88,8 @@ export class AiService {
         const tools = toClaudeTools(getToolsForPage(page));
         let rounds = 0, finished = false;
         const allToolRecords: ToolCallRecord[] = [];
+        // ★ Hallucination Guard: track pre-execution element count
+        const preElementCount = this.getCanvasElementCount(engine);
         await nextFrame();
 
         while (!finished && rounds < this.config.maxToolRounds) {
@@ -151,6 +153,27 @@ export class AiService {
                     progress.onToken(verifySummary.slice(0, 80) + '... ');
                 }
                 messages.push({ role: 'user', content: toolResults });
+
+                // ★ Hallucination Guard: verify claimed creations match canvas
+                try {
+                    const { verifyToolResults, buildVerificationMessage } = await import('./hallucinationGuard');
+                    const verification = verifyToolResults(
+                        toolRecords,
+                        () => this.getCanvasElementCount(engine),
+                        () => this.getCanvasElementNames(engine),
+                        preElementCount,
+                    );
+                    if (!verification.verified) {
+                        const guardMsg = buildVerificationMessage(verification);
+                        if (guardMsg) {
+                            console.warn(`[AI] ${guardMsg}`);
+                            progress.onToken(verification.summary.slice(0, 80) + ' ');
+                            // Inject as user message so AI can self-correct in next round
+                            messages.push({ role: 'user', content: guardMsg });
+                        }
+                    }
+                } catch { /* non-critical */ }
+
                 const roundText = textBlocks.map(b => b.text).filter(Boolean).join('\n');
                 if (roundText) this.context.addMessage({ role: 'assistant', content: roundText, timestamp: Date.now(), toolCalls: toolRecords });
             } else {
@@ -192,6 +215,14 @@ export class AiService {
     }
 
     private async callClaude(systemPrompt: string, messages: ClaudeMessage[], tools: ReturnType<typeof toClaudeTools>, progress: LiveProgress, round = 1): Promise<ClaudeResponse | null> {
+        // ★ Circuit Breaker: block calls when API is consistently failing
+        const { getAiCircuitBreaker, getCircuitOpenMessage } = await import('./circuitBreaker');
+        const breaker = getAiCircuitBreaker();
+        if (!breaker.canCall()) {
+            progress.onError(getCircuitOpenMessage());
+            return null;
+        }
+
         const { useAuthStore } = await import('@/stores/authStore');
         const { PLAN_LIMITS } = await import('@/schema/planTypes');
         const { getModelForRole } = await import('@/services/modelRouter');
@@ -242,7 +273,11 @@ export class AiService {
             const { getProxyHeaders } = await import('@/services/openRouterClient');
             const headers = await getProxyHeaders();
             const resp = await fetch(apiUrl, { method: 'POST', headers, body: JSON.stringify(body) });
-            if (resp.ok) return await this.parseSSEStream(resp, model, progress);
+            if (resp.ok) {
+                breaker.recordSuccess();
+                return await this.parseSSEStream(resp, model, progress);
+            }
+            breaker.recordFailure();
             if (resp.status === 429 && attempt < 2) { progress.onThinking('Rate limited. Retrying in 10s...'); await sleep(10000); continue; }
             // ★ Retry on 400/401 with fresh JWT — expired tokens or stale requests
             if ((resp.status === 400 || resp.status === 401) && attempt < 2) {
@@ -324,5 +359,23 @@ export class AiService {
         } catch (err) {
             console.warn('[AiMemory] Chat memory save failed:', err);
         }
+    }
+
+    // ── Hallucination Guard helpers ──────────────────
+
+    private getCanvasElementCount(engine: Engine): number {
+        try {
+            if (!engine?.get_all_nodes) return 0;
+            const nodes = JSON.parse(engine.get_all_nodes());
+            return Array.isArray(nodes) ? nodes.length : 0;
+        } catch { return 0; }
+    }
+
+    private getCanvasElementNames(engine: Engine): string[] {
+        try {
+            if (!engine?.get_all_nodes) return [];
+            const nodes = JSON.parse(engine.get_all_nodes()) as Array<{ name?: string }>;
+            return nodes.map(n => n.name ?? '').filter(Boolean);
+        } catch { return []; }
     }
 }

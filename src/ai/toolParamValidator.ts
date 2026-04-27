@@ -38,6 +38,15 @@ function clampNumber(value: unknown, min: number, max: number, fallback: number)
 type ToolValidator = (params: Record<string, unknown>) => ValidationResult;
 
 const validators: Record<string, ToolValidator> = {
+    generate_full_design: (params) => {
+        const errors: string[] = [];
+        const sanitized = { ...params };
+        if (!params.prompt || (typeof params.prompt === 'string' && params.prompt.trim().length < 3)) {
+            errors.push('prompt must be at least 3 characters');
+        }
+        return { valid: errors.length === 0, errors, sanitized };
+    },
+
     generate_image: (params) => {
         const errors: string[] = [];
         const sanitized = { ...params };
@@ -122,16 +131,21 @@ const validators: Record<string, ToolValidator> = {
     add_text: (params) => {
         const errors: string[] = [];
         const sanitized = { ...params };
-        if (!params.text || typeof params.text !== 'string') {
-            errors.push('text is required');
+        // Tool schema uses 'content', validate both for robustness
+        if (!params.content && !params.text) {
+            errors.push('content is required');
+        }
+        // Normalize: if 'text' given but not 'content', copy
+        if (!params.content && params.text) {
+            sanitized.content = params.text;
         }
         if (params.color) {
             const fixed = sanitizeHex(params.color);
             if (fixed) sanitized.color = fixed;
             else errors.push(`Invalid hex color: "${params.color}"`);
         }
-        if (params.font_size !== undefined) {
-            sanitized.font_size = clampNumber(params.font_size, 6, 999, 24);
+        if (params.fontSize !== undefined) {
+            sanitized.fontSize = clampNumber(params.fontSize, 6, 999, 24);
         }
         return { valid: errors.length === 0, errors, sanitized };
     },
@@ -139,13 +153,24 @@ const validators: Record<string, ToolValidator> = {
     add_button: (params) => {
         const errors: string[] = [];
         const sanitized = { ...params };
-        if (!params.label || typeof params.label !== 'string') {
-            errors.push('label is required');
+        // Tool schema uses 'text', validate both for robustness
+        if (!params.text && !params.label) {
+            // Buttons can have default text, so this is a soft check
+            sanitized.text = sanitized.text || 'Shop Now';
         }
-        if (params.background_color) {
-            const fixed = sanitizeHex(params.background_color);
-            if (fixed) sanitized.background_color = fixed;
-            else errors.push(`Invalid hex color: "${params.background_color}"`);
+        // Normalize: if 'label' given but not 'text', copy
+        if (!params.text && params.label) {
+            sanitized.text = params.label;
+        }
+        if (params.bgColor) {
+            const fixed = sanitizeHex(params.bgColor);
+            if (fixed) sanitized.bgColor = fixed;
+            else errors.push(`Invalid hex color: "${params.bgColor}"`);
+        }
+        if (params.textColor) {
+            const fixed = sanitizeHex(params.textColor);
+            if (fixed) sanitized.textColor = fixed;
+            else errors.push(`Invalid hex color: "${params.textColor}"`);
         }
         return { valid: errors.length === 0, errors, sanitized };
     },

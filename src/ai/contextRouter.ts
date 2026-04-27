@@ -253,8 +253,7 @@ export function buildContext(pathname: string, memory?: string): ContextInfo {
             // that run without DOM, so we guard with typeof document check.
             // eslint-disable-next-line @typescript-eslint/no-require-imports
             const { captureCanvas } = require('@/services/visionService') as { captureCanvas: (opts?: any) => string | null };
-            // 512px max — keeps vision tokens low (~85 tokens for a small image)
-            const base64 = captureCanvas({ maxDimension: 512, format: 'image/jpeg', quality: 0.7 });
+            // 384px max, JPEG 50% — keeps vision tokens low (~60 tokens)\n            const base64 = captureCanvas({ maxDimension: 384, format: 'image/jpeg', quality: 0.5 });
             if (base64 && base64.length > 100) {
                 canvasScreenshot = base64;
                 console.info(`[Context] Canvas screenshot captured: ${Math.round(base64.length / 1024)}KB`);

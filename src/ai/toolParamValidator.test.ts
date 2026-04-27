@@ -154,29 +154,37 @@ describe('Tool Parameter Validator', () => {
     });
 
     describe('add_text', () => {
-        it('passes valid params', () => {
+        it('passes valid params with content field', () => {
             const result = validateToolParams('add_text', {
-                text: 'Hello',
+                content: 'Hello',
                 color: '#FFFFFF',
-                font_size: 24,
+                fontSize: 24,
             });
             expect(result.valid).toBe(true);
         });
-        it('auto-fixes hex without #', () => {
+        it('normalizes text to content', () => {
             const result = validateToolParams('add_text', {
                 text: 'Hello',
+                color: '#FFFFFF',
+            });
+            expect(result.valid).toBe(true);
+            expect(result.sanitized.content).toBe('Hello');
+        });
+        it('auto-fixes hex without #', () => {
+            const result = validateToolParams('add_text', {
+                content: 'Hello',
                 color: 'FF0000',
             });
             expect(result.valid).toBe(true);
             expect(result.sanitized.color).toBe('#FF0000');
         });
-        it('clamps font_size', () => {
+        it('clamps fontSize', () => {
             const result = validateToolParams('add_text', {
-                text: 'Hello',
-                font_size: 2, // too small
+                content: 'Hello',
+                fontSize: 2, // too small
             });
             expect(result.valid).toBe(true);
-            expect(result.sanitized.font_size).toBe(6); // clamped to min
+            expect(result.sanitized.fontSize).toBe(6); // clamped to min
         });
     });
 

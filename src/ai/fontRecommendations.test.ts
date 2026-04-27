@@ -166,8 +166,8 @@ describe('smartContextBuilder font injection', () => {
         expect(src).toContain("import { getFontContextForAI } from './fontRecommendations'");
     });
 
-    it('injects font guidance into context', () => {
-        expect(src).toContain('Font Guidance');
-        expect(src).toContain('getFontContextForAI()');
+    it('has lazy-load comment for font guidance (not injected every turn)', () => {
+        // Font guidance moved to analyze_scene result only (saves ~200 tokens/turn)
+        expect(src).toContain('Font guidance: lazy-loaded');
     });
 });

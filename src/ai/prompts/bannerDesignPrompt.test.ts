@@ -84,11 +84,11 @@ describe('buildDesignSystemPrompt', () => {
         expect(prompt).toContain('#0F172A');
     });
 
-    it('includes golden rules and typography', () => {
+    it('includes layout rules and typography', () => {
         const prompt = buildDesignSystemPrompt(300, 250, 'landscape');
-        expect(prompt).toContain('GOLDEN RULES');
-        expect(prompt).toContain('TYPOGRAPHY');
-        expect(prompt).toContain('COPYWRITING');
+        expect(prompt).toContain('LAYOUT RULES');
+        expect(prompt).toContain('TYPO');
+        expect(prompt).toContain('COPY');
     });
 });
 

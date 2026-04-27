@@ -142,31 +142,14 @@ export function contextToPromptSection(ctx: SmartContext): string {
     const mem = getCachedMemory();
     if (mem) { const memSection = memoryToPromptSection(mem); if (memSection) lines.push(memSection); }
 
-    // ★ Inject learned skills (user-promoted dynamic actions)
-    try {
-        const { loadLearnedSkills } = require('./skillRegistry');
-        const learned = loadLearnedSkills();
-        if (learned.length > 0) {
-            lines.push('', '## Learned Skills (user-promoted patterns)');
-            for (const s of learned) {
-                lines.push(`- **${s.name}**: ${s.description} (used ${s.usageCount ?? 0}x)`);
-                if (s.codePattern) lines.push(`  Pattern: \`${s.codePattern.slice(0, 80)}...\``);
-            }
-            lines.push('*Check learned skills before using Dynamic Action — a similar pattern may exist.*');
-        }
-    } catch { /* non-critical */ }
+    // ★ Learned skills: lazy-loaded via analyze_scene only (not every turn)
+    // Saves ~800 tokens per turn
 
     if (ctx.activeVariant) {
         const brandColors = ctx.brand ? { primary: ctx.brand.primaryColor, secondary: ctx.brand.secondaryColor } : undefined;
         lines.push('', buildDesignSystemPrompt(ctx.activeVariant.width, ctx.activeVariant.height, ctx.activeVariant.aspectCategory, brandColors));
         if (ctx.generatedPalette) { lines.push('', paletteToPromptSection(ctx.generatedPalette)); }
-        const fontCtx = getFontContextForAI();
-        const brandFont = ctx.brand?.fontFamily || '';
-        const smartRecs = matchFontsFromText(brandFont, 5);
-        lines.push('', '## Font Guidance', fontCtx);
-        if (smartRecs.length > 0) {
-            lines.push(`Fonts that complement current design: ${smartRecs.join(', ')}`);
-        }
+        // ★ Font guidance: lazy-loaded via analyze_scene only (saves ~200 tokens/turn)
     }
 
     return lines.join('\n');
