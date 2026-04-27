@@ -275,15 +275,14 @@ describe('★ REGRESSION: CTA button', () => {
         expect(label!.color_hex).toBe('#FFFFFF');
     });
 
-    it('CTA button uses accent color', () => {
+    it('CTA button uses accent color as gradient start', () => {
         const { elements } = buildDesignElements(
             { headline: 'H', cta: 'Buy' }, PALETTE, 300, 250, false,
         );
         const btn = elements.find(el => el.name === 'cta_button');
-        // accent is #e94560 → hexR/G/B returns 0-1 range
-        expect(btn!.r).toBeCloseTo(233 / 255, 2);
-        expect(btn!.g).toBeCloseTo(69 / 255, 2);
-        expect(btn!.b).toBeCloseTo(96 / 255, 2);
+        // ★ CTA now uses gradient (accent → gradientEnd) for premium look
+        expect(btn!.gradient_start_hex).toBe(PALETTE.accent);
+        expect(btn!.gradient_end_hex).toBe(PALETTE.gradientEnd);
     });
 
     it('CTA button has rounded corners (radius > 0)', () => {

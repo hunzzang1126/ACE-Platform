@@ -278,9 +278,8 @@ async function buildAndRender(
 
     if (bgResult.hasImage && bgResult.url) {
         try {
-            const bgNodeId = await engine.add_image(0, 0, bgResult.url, canvasW, canvasH, 'ai_background');
-            // ★ Ensure background image fills entire canvas (cover mode)
-            try { engine.fill_to_page?.(bgNodeId); } catch { /* ok */ }
+            // ★ 'fill' mode stretches image to exactly match canvas — no gaps at edges
+            const bgNodeId = await engine.add_image(0, 0, bgResult.url, canvasW, canvasH, 'ai_background', undefined, undefined, undefined, 'fill');
             // ★ Send to back so content renders on top
             try { engine.send_to_back?.(bgNodeId); } catch { /* ok */ }
             cb.narrate('Background image placed on canvas.');

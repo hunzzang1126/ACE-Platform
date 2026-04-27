@@ -245,12 +245,19 @@ export function buildDesignElements(
         ctaY = Math.min(ctaY, canvasH - ctaH);
         ctaY = Math.max(ctaY, 0);
 
+        // ★ Premium CTA: gradient button with shadow for visual impact
         elements.push({
             name: 'cta_button',
             type: 'rounded_rect' as any,
             x: ctaX, y: ctaY, w: ctaW, h: ctaH,
-            r: hexR(palette.accent), g: hexG(palette.accent), b: hexB(palette.accent), a: 1,
+            gradient_start_hex: palette.accent,
+            gradient_end_hex: palette.gradientEnd,
+            gradient_angle: 135,
             radius: ctaRadius,
+            shadow_blur: Math.round(canvasMin * 0.015),
+            shadow_offset_x: 0,
+            shadow_offset_y: Math.round(canvasMin * 0.005),
+            shadow_opacity: 0.35,
         });
 
         elements.push({
