@@ -284,7 +284,11 @@ export function useUnifiedAgent({ navigate, selectedRole }: UseUnifiedAgentOptio
         }
         hideCursor();
 
-        if (pendingDesignPrompt && !hadError) {
+        // ★ Design pipeline: pendingDesignPrompt takes priority over max-round errors.
+        // The 'Reached maximum tool rounds' error is expected when generate_full_design
+        // is the only tool called — it's intercepted (not executed), and the guard
+        // detects 0 new elements. The actual design creation happens HERE, not in the loop.
+        if (pendingDesignPrompt) {
             const engine = engineRef.current?.current ?? engineRef.current;
             if (!engine) {
                 // No engine (e.g. dashboard) — tell user to navigate to editor

@@ -63,7 +63,7 @@ describe('visionQALoop', () => {
     describe('shouldRunQA', () => {
         it('should return true when design tools succeeded', () => {
             const records = [
-                { name: 'generate_full_design', result: { success: true } },
+                { name: 'add_text', result: { success: true } },
             ];
             expect(shouldRunQA(records)).toBe(true);
         });
@@ -84,7 +84,7 @@ describe('visionQALoop', () => {
 
         it('should return false when design tool failed', () => {
             const records = [
-                { name: 'generate_full_design', result: { success: false } },
+                { name: 'add_text', result: { success: false } },
             ];
             expect(shouldRunQA(records)).toBe(false);
         });
@@ -95,11 +95,18 @@ describe('visionQALoop', () => {
     });
 
     describe('DESIGN_TOOLS', () => {
-        it('should include all creation tools', () => {
-            expect(DESIGN_TOOLS.has('generate_full_design')).toBe(true);
+        it('should include direct creation tools', () => {
             expect(DESIGN_TOOLS.has('add_text')).toBe(true);
             expect(DESIGN_TOOLS.has('add_button')).toBe(true);
             expect(DESIGN_TOOLS.has('replace_background_image')).toBe(true);
+            expect(DESIGN_TOOLS.has('generate_image')).toBe(true);
+        });
+
+        it('★ REGRESSION: should NOT include generate_full_design', () => {
+            // generate_full_design is intercepted by the orchestrator — it does NOT
+            // directly create elements. Including it caused 3-round failures
+            // because the guard detected 0 elements after a 'successful' call.
+            expect(DESIGN_TOOLS.has('generate_full_design')).toBe(false);
         });
 
         it('should not include analysis tools', () => {

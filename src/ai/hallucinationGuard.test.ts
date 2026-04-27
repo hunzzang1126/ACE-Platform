@@ -39,22 +39,18 @@ describe('hallucinationGuard', () => {
             expect(result.missingElements).toContain('CTA Button');
         });
 
-        it('should handle generate_full_design with parsed element count', () => {
+        it('★ REGRESSION: should skip verification for generate_full_design (orchestrator-intercepted)', () => {
+            // generate_full_design is intercepted by dashboardOverride — it returns
+            // success but creates 0 elements. The guard must NOT trigger verification
+            // for this tool, or it will burn all 3 rounds trying to fix a "mismatch".
+            // The real dashboardOverride message is: "[GENERATE_FULL_DESIGN] Launching pipeline..."
             const records = [
-                makeRecord('generate_full_design', true, 'Rendered 5 elements on canvas'),
+                makeRecord('generate_full_design', true, '[GENERATE_FULL_DESIGN] Launching pipeline for: "iPhone 17 ad"'),
             ];
-            const result = verifyToolResults(records, () => 5, () => ['A', 'B', 'C', 'D', 'E'], 0);
+            const result = verifyToolResults(records, () => 0, () => [], 0);
+            // Should skip verification entirely (not in CREATION_TOOLS + no CREATION_KEYWORDS match)
             expect(result.verified).toBe(true);
-            expect(result.expectedCount).toBe(5);
-        });
-
-        it('should fail when generate_full_design claims more than exist', () => {
-            const records = [
-                makeRecord('generate_full_design', true, 'Rendered 6 elements on canvas'),
-            ];
-            // Only 2 elements exist — way below 60% threshold
-            const result = verifyToolResults(records, () => 2, () => ['A', 'B'], 0);
-            expect(result.verified).toBe(false);
+            expect(result.summary).toContain('No creation tools');
         });
 
         it('should skip failed tool calls', () => {
@@ -66,11 +62,20 @@ describe('hallucinationGuard', () => {
         });
 
         it('should be lenient with 60% threshold for decorations', () => {
+            // 3 add_text calls with 2 actually on canvas (66% > 60%)
             const records = [
-                makeRecord('generate_full_design', true, 'Created 10 elements'),
+                makeRecord('add_text', true, 'Text added', { name: 'headline' }),
+                makeRecord('add_text', true, 'Text added', { name: 'subline' }),
+                makeRecord('add_text', true, 'Text added', { name: 'cta_label' }),
             ];
-            // 7 out of 10 = 70% > 60% threshold
-            const result = verifyToolResults(records, () => 7, () => Array(7).fill('el'), 0);
+            // preCount=0, expected=3, actual=2 → 66% ≥ 60%
+            // All named elements present in canvas (no missing names triggers)
+            const result = verifyToolResults(
+                records,
+                () => 2,
+                () => ['headline', 'subline', 'cta_label'],
+                0,
+            );
             expect(result.verified).toBe(true);
         });
     });

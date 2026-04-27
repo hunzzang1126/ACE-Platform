@@ -35,7 +35,8 @@ const CRITICAL_ISSUE_TYPES = new Set([
 // ── Tools that indicate design creation/modification ──
 
 export const DESIGN_TOOLS = new Set([
-    'generate_full_design', 'execute_dynamic_action',
+    // ★ generate_full_design excluded — intercepted by orchestrator, has its own QA
+    'execute_dynamic_action',
     'add_text', 'add_button', 'add_shape',
     'replace_background_image', 'generate_image',
 ]);

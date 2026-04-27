@@ -22,7 +22,10 @@ export interface VerificationResult {
 
 const CREATION_TOOLS = new Set([
     'add_text', 'add_button', 'generate_image',
-    'replace_background_image', 'generate_full_design',
+    'replace_background_image',
+    // ★ generate_full_design is NOT here — it's intercepted by dashboardOverride
+    // and returns success without creating elements. Actual creation happens
+    // later in agentGenerateFlow.ts, which has its own verification (line 320+).
 ]);
 
 const CREATION_KEYWORDS = /\b(created|added|placed|rendered|generated)\b/i;
