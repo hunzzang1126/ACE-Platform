@@ -75,11 +75,23 @@ export function syncElementsToStore(
 
         // Shape / rect / gradient
         const isGradient = !!(el.gradient_start_hex && el.gradient_end_hex);
+
+        // ★ FIX: Convert float RGB (0-1 range) to hex.
+        // CTA buttons from Carbon use { r: 0.39, g: 0.40, b: 0.95 } — NOT gradient_start_hex.
+        // Without this, ALL non-gradient shapes get fill='#333333' and CTA turns black.
+        let shapeFill = '#333333';
+        if (isGradient) {
+            shapeFill = el.gradient_start_hex!;
+        } else if (el.r !== undefined && el.g !== undefined && el.b !== undefined) {
+            const toHex = (f: number) => Math.round(Math.min(1, Math.max(0, f)) * 255).toString(16).padStart(2, '0');
+            shapeFill = `#${toHex(el.r)}${toHex(el.g)}${toHex(el.b)}`;
+        }
+
         return {
             ...base,
             type: 'shape' as const,
             shapeType: 'rectangle' as const,
-            fill: isGradient ? el.gradient_start_hex! : '#333333',
+            fill: shapeFill,
             ...(isGradient ? {
                 gradientStart: el.gradient_start_hex,
                 gradientEnd: el.gradient_end_hex,
