@@ -27,8 +27,29 @@ export async function executeGenerateFlow(
     await pause(400);
 
     let canvasW = 300, canvasH = 250;
-    try { const dims = engine.get_canvas_size?.(); if (dims) { canvasW = dims.width ?? 300; canvasH = dims.height ?? 250; } } catch { /* ok */ }
+    try {
+        const dims = engine.get_canvas_size?.();
+        if (dims) { canvasW = dims.width ?? 300; canvasH = dims.height ?? 250; }
+    } catch { /* ok */ }
 
+    // ★ Also read from designStore as fallback — engine may report stale size
+    try {
+        const { useDesignStore } = await resilientImport(() => import('@/stores/designStore'));
+        const cs = useDesignStore.getState().creativeSet;
+        const master = cs?.variants.find(v => v.id === cs?.masterVariantId);
+        if (master?.preset) {
+            const storeW = master.preset.width;
+            const storeH = master.preset.height;
+            // Prefer store dimensions if engine returned default (300x250)
+            if (canvasW === 300 && canvasH === 250 && storeW > 0 && storeH > 0) {
+                console.warn(`[Pipeline] Engine returned default 300x250, using store: ${storeW}x${storeH}`);
+                canvasW = storeW;
+                canvasH = storeH;
+            }
+        }
+    } catch { /* ok */ }
+
+    console.log(`[Pipeline] Canvas size: ${canvasW}x${canvasH}`);
     // ── Phase 1.5: Brand Cloud Scan ──
     const brand = await scanBrandCloud(prompt, cb);
     await pause(300);
@@ -257,7 +278,11 @@ async function buildAndRender(
 
     if (bgResult.hasImage && bgResult.url) {
         try {
-            await engine.add_image(0, 0, bgResult.url, canvasW, canvasH, 'ai_background');
+            const bgNodeId = await engine.add_image(0, 0, bgResult.url, canvasW, canvasH, 'ai_background');
+            // ★ Ensure background image fills entire canvas (cover mode)
+            try { engine.fill_to_page?.(bgNodeId); } catch { /* ok */ }
+            // ★ Send to back so content renders on top
+            try { engine.send_to_back?.(bgNodeId); } catch { /* ok */ }
             cb.narrate('Background image placed on canvas.');
             // ★ Register AI image in Upload Library for persistence + reuse
             try {

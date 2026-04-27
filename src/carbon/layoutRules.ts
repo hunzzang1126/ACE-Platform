@@ -155,12 +155,30 @@ const VARIANTS: LayoutVariant[] = [
     'minimal-center', 'bold-statement', 'editorial', 'compact-bar',
 ];
 
-/** Get a specific layout variant, or random if not specified. */
+/** ★ Variant history — prevents consecutive duplicate layouts.
+ * Tracks last 3 variants used. Random selection excludes recent ones. */
+const _recentVariants: LayoutVariant[] = [];
+const MAX_HISTORY = 3;
+
+/** Get a specific layout variant, or random-without-repeat if not specified. */
 export function getLayoutRules(
     category: AspectCategory,
     variant?: LayoutVariant,
 ): { rules: LayoutRuleSet; variant: LayoutVariant } {
-    const picked = variant ?? VARIANTS[Math.floor(Math.random() * VARIANTS.length)]!;
+    let picked: LayoutVariant;
+    if (variant) {
+        picked = variant;
+    } else {
+        // Filter out recently used variants to ensure diversity
+        const available = VARIANTS.filter(v => !_recentVariants.includes(v));
+        const pool = available.length > 0 ? available : VARIANTS;
+        picked = pool[Math.floor(Math.random() * pool.length)]!;
+    }
+    // Track history
+    _recentVariants.push(picked);
+    if (_recentVariants.length > MAX_HISTORY) _recentVariants.shift();
+
+    console.log(`[Layout] Variant: ${picked} (recent: [${_recentVariants.join(', ')}])`);
     return { rules: VARIANT_MAP[category][picked], variant: picked };
 }
 
