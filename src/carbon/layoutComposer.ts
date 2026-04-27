@@ -198,13 +198,33 @@ export function buildDesignElements(
         startY = Math.max(spacing(3, canvasMin), Math.round((canvasH - totalContentH) / 2));
     }
 
-    // ── Place content elements ──
+    // ── Place content elements (with overlap guard) ──
     let cursorY = startY;
     for (const item of contentBlock) {
         cursorY += item.gapBefore;
         item.element.y = cursorY;
         elements.push(item.element);
         cursorY += item.element.h ?? 0;
+    }
+
+    // ★ OVERLAP GUARD: If content elements overlap, shift them apart.
+    // This catches cases where height estimation underestimates actual rendered height.
+    for (let i = 1; i < elements.length; i++) {
+        const prev = elements[i - 1]!;
+        const curr = elements[i]!;
+        // Only check text elements (skip background, overlays)
+        if (!prev.content && !prev.name?.includes('text') && prev.name !== 'headline' && prev.name !== 'subheadline' && prev.name !== 'tag_text') continue;
+        if (!curr.content && !curr.name?.includes('text') && curr.name !== 'headline' && curr.name !== 'subheadline' && curr.name !== 'tag_text') continue;
+        const prevBottom = (prev.y ?? 0) + (prev.h ?? 0);
+        const currTop = curr.y ?? 0;
+        if (currTop < prevBottom) {
+            const shift = prevBottom - currTop + Math.round(canvasMin * 0.01); // 1% min gap
+            curr.y = (curr.y ?? 0) + shift;
+            // Cascade shift to all subsequent elements
+            for (let j = i + 1; j < elements.length; j++) {
+                elements[j]!.y = (elements[j]!.y ?? 0) + shift;
+            }
+        }
     }
 
     // ── CTA Button (optional) ──
@@ -304,7 +324,7 @@ function buildTextElement(
     // Budget = fraction of canvasH this element may occupy (single line max).
     // Hierarchy preserved: headline gets largest budget → largest font.
     const heightBudget: Record<string, number> = {
-        headline: 0.30, subheadline: 0.15, tag_text: 0.08, cta_label: 0.10,
+        headline: 0.25, subheadline: 0.12, tag_text: 0.08, cta_label: 0.10,
     };
     const budget = heightBudget[name] ?? 0.20;
     const maxFontFromHeight = Math.floor(canvasH * budget / typeStyle.lineHeight);
@@ -313,9 +333,23 @@ function buildTextElement(
     const w = columns(rule.cols, canvasW);
     const lineHeight = typeStyle.lineHeight;
 
-    // Estimate height — 0.6 avg char width factor for mixed-case Latin text
-    const charsPerLine = Math.max(1, Math.floor(w / (fontSize * 0.6)));
-    const lines = Math.min(rule.maxLines ?? 10, Math.max(1, Math.ceil(content.length / charsPerLine)));
+    // Estimate height — uppercase-aware char width factor
+    // Latin uppercase ~0.7em, lowercase ~0.55em, average mixed ~0.62
+    const uppercaseRatio = content.split('').filter(c => c >= 'A' && c <= 'Z').length / Math.max(1, content.length);
+    const avgCharWidth = 0.55 + uppercaseRatio * 0.15; // 0.55 (all lower) → 0.70 (all upper)
+    const charsPerLine = Math.max(1, Math.floor(w / (fontSize * avgCharWidth)));
+    // ★ Word-aware line estimation: split by words, not just char count
+    const words = content.split(/\s+/);
+    let estimatedLines = 1, lineCharCount = 0;
+    for (const word of words) {
+        if (lineCharCount + word.length > charsPerLine && lineCharCount > 0) {
+            estimatedLines++;
+            lineCharCount = word.length;
+        } else {
+            lineCharCount += (lineCharCount > 0 ? 1 : 0) + word.length;
+        }
+    }
+    const lines = Math.min(rule.maxLines ?? 10, estimatedLines);
     const h = Math.round(fontSize * lineHeight * lines + fontSize * 0.3); // padding = 30% of fontSize
 
     let x: number;

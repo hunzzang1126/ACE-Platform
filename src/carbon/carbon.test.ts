@@ -261,6 +261,34 @@ describe('Carbon Layout Composer', () => {
                 }
             }
         });
+
+        it('★ REGRESSION: headline + subheadline do not overlap on 300x250', () => {
+            const content: DesignContent = {
+                headline: 'Premium Lifestyle Redefined',
+                subheadline: 'Experience luxury like never before',
+                cta: 'Shop Now',
+            };
+            const { elements } = buildDesignElements(content, palette, 300, 250, true, 'centered');
+            const headline = elements.find(el => el.name === 'headline')!;
+            const subheadline = elements.find(el => el.name === 'subheadline')!;
+            expect(headline).toBeDefined();
+            expect(subheadline).toBeDefined();
+            const headlineBottom = (headline.y ?? 0) + (headline.h ?? 0);
+            const subheadlineTop = subheadline.y ?? 0;
+            expect(subheadlineTop).toBeGreaterThanOrEqual(headlineBottom);
+        });
+
+        it('★ REGRESSION: long headline does not overflow 300x250 canvas', () => {
+            const content: DesignContent = {
+                headline: 'Exclusive Premium Collection Launch',
+                subheadline: 'Limited time only',
+                cta: 'Buy Now',
+            };
+            const { elements } = buildDesignElements(content, palette, 300, 250, false, 'centered');
+            for (const el of elements) {
+                expect((el.y ?? 0) + (el.h ?? 0)).toBeLessThanOrEqual(252); // 2px tolerance
+            }
+        });
     });
 
     describe('elements stay within canvas', () => {
