@@ -127,9 +127,13 @@ export function createCreatorMethods(ctx: ShimContext) {
                 const imgOptions = isDataUrl ? {} : { crossOrigin: 'anonymous' as const };
                 const img = await FabricImage.fromURL(src, imgOptions);
 
+                // ★ ACTUAL image pixel dimensions (from Fabric's decoded image)
+                const actualImgW = img.width ?? 0;
+                const actualImgH = img.height ?? 0;
+
                 // ★ SVG viewBox dimension resolution
-                let resolvedNatW = (storedNatW && storedNatW > 0) ? storedNatW : (img.width ?? 0);
-                let resolvedNatH = (storedNatH && storedNatH > 0) ? storedNatH : (img.height ?? 0);
+                let resolvedNatW = (storedNatW && storedNatW > 0) ? storedNatW : actualImgW;
+                let resolvedNatH = (storedNatH && storedNatH > 0) ? storedNatH : actualImgH;
 
                 if (isSvg && (resolvedNatW === 0 || resolvedNatH === 0)) {
                     try {
@@ -156,12 +160,16 @@ export function createCreatorMethods(ctx: ShimContext) {
 
                 let scaleX: number, scaleY: number;
                 if (w != null && h != null) {
-                    // ★ REGRESSION GUARD: Preserve aspect ratio unless fit='fill'.
-                    // 'cover' (default): uniform scale to cover target area — NO distortion.
-                    // 'fill': stretch independently — matches what Fabric saved.
+                    // ★ ROOT CAUSE FIX (v707): When fit='fill', ALWAYS use actual image
+                    // pixel dimensions (img.width), NOT storedNatW. The store saves
+                    // el.w (=canvasW=1080) as naturalWidth, but the actual image is
+                    // 1024px → scale = 1080/1080 = 1.0 → image shows at 1024px → GAP!
+                    // Using actual img.width: scale = 1080/1024 = 1.055 → 1024*1.055 = 1080 → FILL!
                     if (fit === 'fill') {
-                        scaleX = w / Math.max(natW, 1);
-                        scaleY = h / Math.max(natH, 1);
+                        const fillNatW = actualImgW > 0 ? actualImgW : natW;
+                        const fillNatH = actualImgH > 0 ? actualImgH : natH;
+                        scaleX = w / Math.max(fillNatW, 1);
+                        scaleY = h / Math.max(fillNatH, 1);
                     } else {
                         // Uniform scale (cover mode) — preserve aspect ratio
                         const uniformScale = Math.max(w / Math.max(natW, 1), h / Math.max(natH, 1));

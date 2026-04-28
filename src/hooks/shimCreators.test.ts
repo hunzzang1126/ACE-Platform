@@ -87,10 +87,11 @@ describe('shimCreators — add_image scaling modes', () => {
         expect(src).toContain("const uniformScale = Math.max(w / Math.max(natW, 1), h / Math.max(natH, 1))");
     });
 
-    it("supports fill mode (independent scaleX/Y)", () => {
+    it("supports fill mode (independent scaleX/Y using actual image dimensions)", () => {
         expect(src).toContain("fit === 'fill'");
-        expect(src).toContain('scaleX = w / Math.max(natW, 1)');
-        expect(src).toContain('scaleY = h / Math.max(natH, 1)');
+        // v707 ROOT CAUSE FIX: fill mode uses actualImgW (fillNatW), not storedNatW (natW)
+        expect(src).toContain('scaleX = w / Math.max(fillNatW, 1)');
+        expect(src).toContain('scaleY = h / Math.max(fillNatH, 1)');
     });
 
     it('falls back to artboard-relative sizing when no dimensions given', () => {

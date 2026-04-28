@@ -278,3 +278,82 @@ describe('★ REGRESSION: agentFlowTypes — FlowEngine interface (v704)', () =>
         expect(typesSrc).toContain('set_size?: (id: number, w: number, h: number) => void');
     });
 });
+
+// ══════════════════════════════════════════════════
+// Fix 7: shimCreators — fit='fill' must use ACTUAL image dimensions (v707)
+// ══════════════════════════════════════════════════
+describe('★ REGRESSION: shimCreators — fill mode uses actual image size (v707)', () => {
+    const creatorSrc = fs.readFileSync(
+        path.resolve(__dirname, '../hooks/shimCreators.ts'), 'utf-8'
+    );
+
+    it('★ ROOT CAUSE: fill mode must use actualImgW, NOT storedNatW/natW', () => {
+        // storedNatW can be the TARGET size (1080) instead of actual image size (1024).
+        // If fill uses storedNatW: scale = 1080/1080 = 1.0 → image at 1024px → GAP!
+        // Must use actualImgW: scale = 1080/1024 = 1.055 → image at 1080px → FILL!
+        expect(creatorSrc).toContain('const fillNatW = actualImgW > 0 ? actualImgW : natW;');
+        expect(creatorSrc).toContain('const fillNatH = actualImgH > 0 ? actualImgH : natH;');
+    });
+
+    it('should capture actual image dimensions separately from storedNatW', () => {
+        expect(creatorSrc).toContain('const actualImgW = img.width ?? 0;');
+        expect(creatorSrc).toContain('const actualImgH = img.height ?? 0;');
+    });
+
+    it('fill mode should use fillNatW/fillNatH for scale calculation', () => {
+        expect(creatorSrc).toContain('scaleX = w / Math.max(fillNatW, 1)');
+        expect(creatorSrc).toContain('scaleY = h / Math.max(fillNatH, 1)');
+    });
+
+    it('cover mode should still use natW/natH (storedNatW fallback is OK)', () => {
+        // Cover mode doesn't have this bug because uniform scale covers regardless
+        expect(creatorSrc).toContain('Math.max(w / Math.max(natW, 1), h / Math.max(natH, 1))');
+    });
+
+    // ── Simulate the exact bug scenario ──
+    it('★ ROOT CAUSE MATH: storedNatW=1080 + fill → scale=1.0 → GAP (OLD BUG)', () => {
+        // This is the EXACT bug: store saves canvasW (1080) as naturalWidth.
+        // Image is actually 1024px. Old code used storedNatW(1080) for scale.
+        const actualImgW = 1024, actualImgH = 768;
+        const storedNatW = 1080, storedNatH = 1080; // BUG: el.w was stored as naturalWidth
+        const targetW = 1080, targetH = 1080;
+
+        // OLD (broken): uses storedNatW
+        const oldScaleX = targetW / storedNatW; // 1080/1080 = 1.0
+        const oldScaleY = targetH / storedNatH; // 1080/1080 = 1.0
+        const oldDisplayW = Math.round(actualImgW * oldScaleX); // 1024 * 1.0 = 1024
+        expect(oldDisplayW).toBeLessThan(1080); // ← THIS IS THE BUG: 56px gap!
+
+        // NEW (fixed): uses actualImgW
+        const newScaleX = targetW / actualImgW; // 1080/1024 = 1.0547
+        const newScaleY = targetH / actualImgH; // 1080/768 = 1.4063
+        const newDisplayW = Math.round(actualImgW * newScaleX); // 1024 * 1.055 = 1080
+        const newDisplayH = Math.round(actualImgH * newScaleY); // 768 * 1.406 = 1080
+        expect(newDisplayW).toBe(1080); // ← FIXED: exact fill
+        expect(newDisplayH).toBe(1080); // ← FIXED: exact fill
+    });
+
+    it('★ ROOT CAUSE MATH: 1920x1080 image with storedNatW=300 → old scale breaks', () => {
+        const actualImgW = 1920, actualImgH = 1080;
+        const storedNatW = 300, storedNatH = 250; // Wrong stored value
+        const targetW = 300, targetH = 250;
+
+        // NEW: uses actualImgW → correct
+        const scaleX = targetW / actualImgW; // 300/1920 = 0.156
+        const scaleY = targetH / actualImgH; // 250/1080 = 0.231
+        expect(Math.round(actualImgW * scaleX)).toBe(300);
+        expect(Math.round(actualImgH * scaleY)).toBe(250);
+    });
+
+    it('when actualImgW is 0 (SVG without dimensions), falls back to natW', () => {
+        // Edge case: SVG with viewBox but no img.width
+        const actualImgW = 0;
+        const natW = 200; // fallback from SVG parse
+        const targetW = 1080;
+        const fillNatW = actualImgW > 0 ? actualImgW : natW;
+        expect(fillNatW).toBe(200); // Uses natW as fallback
+        const scale = targetW / fillNatW;
+        expect(Math.round(200 * scale)).toBe(1080);
+    });
+});
+
