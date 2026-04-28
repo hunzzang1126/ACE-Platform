@@ -73,6 +73,8 @@ ABSOLUTE PROHIBITIONS:
 - NEVER output font names, field names, CSS, placeholder text, or UI terminology
 - NEVER use "버튼", "button", "텍스트", "헤드라인" as actual copy
 - NEVER just echo the product name as the headline — you MUST add a creative hook
+- NEVER include color/visual instructions as text content (e.g. "in gold", "in yellow", "with gradient", "neon glow")
+  Colors and visual styling are handled by a SEPARATE system. Your job is WORDS ONLY.
 - ALL text must be real, persuasive, human-readable advertising copy
 - Return ONLY valid JSON. No markdown, no explanation.`;
 }

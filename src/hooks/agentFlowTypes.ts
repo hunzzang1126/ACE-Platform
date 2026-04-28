@@ -27,6 +27,8 @@ export interface FlowEngine {
     add_text: (x: number, y: number, content: string, fontSize: number, fontFamily: string, fontWeight: string, r: number, g: number, b: number, a: number, w: number, textAlign?: string, name?: string, lineHeight?: number, letterSpacing?: number) => number | null;
     add_image: (x: number, y: number, src: string, w: number, h: number, name?: string) => Promise<number | null>;
     set_shadow?: (id: number, ox: number, oy: number, blur: number, r: number, g: number, b: number, a: number) => void;
+    set_position?: (id: number, x: number, y: number) => void;
+    set_size?: (id: number, w: number, h: number) => void;
     send_to_back?: (id: number) => void;
     delete_node?: (id: number) => void;
     reorder_by_z_index?: () => void;

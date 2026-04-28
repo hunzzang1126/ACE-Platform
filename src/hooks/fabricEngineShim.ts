@@ -320,10 +320,12 @@ export function createEngineShim(
             const newW = w >= 0 ? w : curW;
             const newH = h >= 0 ? h : curH;
             if (obj.type === 'image') {
+                // ★ FILL mode: independent scaleX/scaleY to exactly match target dimensions.
+                // Previous code used Math.min (contain mode) which left gaps when
+                // image aspect ratio didn't match target. Background images MUST fill.
                 const natW = (obj as any).width ?? newW;
                 const natH = (obj as any).height ?? newH;
-                const scale = Math.min(newW / Math.max(natW, 1), newH / Math.max(natH, 1));
-                obj.set({ scaleX: scale, scaleY: scale });
+                obj.set({ scaleX: newW / Math.max(natW, 1), scaleY: newH / Math.max(natH, 1) });
             } else {
                 obj.set({ width: newW, height: newH, scaleX: 1, scaleY: 1 });
             }

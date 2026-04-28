@@ -278,10 +278,17 @@ async function buildAndRender(
 
     if (bgResult.hasImage && bgResult.url) {
         try {
-            // ★ 'fill' mode stretches image to exactly match canvas — no gaps at edges
-            const bgNodeId = await engine.add_image(0, 0, bgResult.url, canvasW, canvasH, 'ai_background', undefined, undefined, undefined, 'fill');
-            // ★ Send to back so content renders on top
-            try { engine.send_to_back?.(bgNodeId); } catch { /* ok */ }
+            // ★ Place image then force-stretch to exact canvas dimensions.
+            // We can't rely on 'fit' parameter alone because Fabric's natural
+            // dimensions may differ from expected (e.g., retina scaling, SVG viewBox).
+            const bgNodeId = await engine.add_image(0, 0, bgResult.url, canvasW, canvasH, 'ai_background');
+            if (bgNodeId != null) {
+                // Force exact canvas fill regardless of natural image dimensions
+                try { engine.set_position?.(bgNodeId, 0, 0); } catch { /* ok */ }
+                try { engine.set_size?.(bgNodeId, canvasW, canvasH); } catch { /* ok */ }
+                try { engine.send_to_back?.(bgNodeId); } catch { /* ok */ }
+                console.log(`[Pipeline] BG image ${bgNodeId} forced to ${canvasW}x${canvasH}`);
+            }
             cb.narrate('Background image placed on canvas.');
             // ★ Register AI image in Upload Library for persistence + reuse
             try {

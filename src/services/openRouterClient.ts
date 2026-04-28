@@ -304,37 +304,58 @@ export async function callOpenRouterApi(
 ): Promise<unknown> {
     const converted = convertAnthropicToOpenRouter(body);
     const url = getOpenRouterUrl();
-    const headers = await getProxyHeaders();
-
-    // In proxy mode (production), key check is server-side
     const isProxyMode = url.includes('/functions/v1/ai-proxy');
     if (!isProxyMode && !getOpenRouterKey()) {
         throw new Error('OpenRouter API key is not configured. Set VITE_OPENROUTER_API_KEY in .env');
     }
 
-    console.log(`[OpenRouter] → ${url} model=${converted.model}, tools=${(converted.tools as unknown[])?.length ?? 0}${isProxyMode ? ' (proxy)' : ''}`);
+    // ★ Retry logic: up to 2 retries for transient 400/429/5xx errors.
+    // First request often fails due to edge function cold start + stale JWT.
+    const MAX_RETRIES = 2;
+    let lastError: Error | null = null;
 
-    const res = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(converted),
-        signal,
-    });
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        if (attempt > 0) {
+            const delay = Math.min(1000 * Math.pow(2, attempt - 1), 4000);
+            console.warn(`[OpenRouter] Retry ${attempt}/${MAX_RETRIES} after ${delay}ms...`);
+            await new Promise(r => setTimeout(r, delay));
+        }
 
-    if (!res.ok) {
+        // ★ Fresh headers on each attempt (JWT may have been refreshed)
+        const headers = await getProxyHeaders();
+        console.log(`[OpenRouter] → ${url} model=${converted.model}, tools=${(converted.tools as unknown[])?.length ?? 0}${isProxyMode ? ' (proxy)' : ''} attempt=${attempt + 1}`);
+
+        const res = await fetch(url, {
+            method: 'POST', headers, body: JSON.stringify(converted), signal,
+        });
+
+        if (res.ok) {
+            const responseData = await res.json() as Record<string, unknown>;
+            return convertResponseToAnthropic(responseData);
+        }
+
         const errText = await res.text();
-        console.error(`[OpenRouter] ${res.status} error:`, errText);
+        console.error(`[OpenRouter] ${res.status} error (attempt ${attempt + 1}):`, errText);
+
+        // Non-retryable errors: 401 (auth), 402 (billing)
         if (res.status === 401) {
-            throw new Error(isProxyMode ? `Auth failed (401): ${errText}` : 'OpenRouter API key invalid (401). Check VITE_OPENROUTER_API_KEY.');
+            throw new Error(isProxyMode ? `Auth failed (401): ${errText}` : 'OpenRouter API key invalid (401).');
         }
         if (res.status === 402) {
             throw new Error('OpenRouter: Insufficient credits. Add credits at openrouter.ai.');
         }
+
+        // Retryable: 400 (often transient parse/cold-start), 429 (rate limit), 5xx (server)
+        if (res.status === 400 || res.status === 429 || res.status >= 500) {
+            lastError = new Error(`OpenRouter API error (${res.status}): ${errText.slice(0, 300)}`);
+            continue; // retry
+        }
+
+        // Other errors: don't retry
         throw new Error(`OpenRouter API error (${res.status}): ${errText.slice(0, 300)}`);
     }
 
-    const responseData = await res.json() as Record<string, unknown>;
-    return convertResponseToAnthropic(responseData);
+    throw lastError ?? new Error('OpenRouter API call failed after retries.');
 }
 
 // ── Convenience: Role-Based Call ──
