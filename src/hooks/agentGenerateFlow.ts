@@ -166,7 +166,7 @@ async function generateBgImage(
 
         const bgResult = await generateBackgroundImage(enhancedBgPrompt, canvasW, canvasH, [guide.colors.accent, guide.colors.background, guide.colors.gradientEnd], abort.signal);
         if (bgResult.success && bgResult.imageUrl) {
-            cb.updateCard('bg-image', 'done', bgResult.isFallback ? 'Gradient fallback' : `Image generated (${needsRealism ? 'hyper-realistic' : 'standard'})`, { expandedDetail: bgResult.isFallback ? 'API not available — using gradient fallback.' : `Generated ${canvasW}x${canvasH} background via ${bgResult.model}` });
+            cb.updateCard('bg-image', 'done', bgResult.isFallback ? 'Gradient fallback' : `Image generated (${needsRealism ? 'hyper-realistic' : 'standard'})`, { expandedDetail: bgResult.isFallback ? `Fallback: ${bgResult.message}` : `Generated ${canvasW}x${canvasH} background via ${bgResult.model}` });
             return { hasImage: true, url: bgResult.imageUrl };
         } else {
             cb.updateCard('bg-image', 'error', bgResult.message || 'Generation failed');

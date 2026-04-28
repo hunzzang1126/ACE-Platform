@@ -92,7 +92,7 @@ describe('imageGenClient', () => {
                 const result = await generateImage({ prompt: 'test', width: 300, height: 250 });
                 expect(result.success).toBe(true);
                 expect(result.isFallback).toBe(true);
-                expect(result.message).toContain('fallback');
+                expect(result.message).toContain('Image API failed');
             } finally {
                 globalThis.fetch = originalFetch;
             }
@@ -180,6 +180,17 @@ describe('imageGenClient', () => {
 
         it('should NOT retry on 401/402 auth errors', () => {
             expect(src).toContain('res.status === 401 || res.status === 402');
+        });
+
+        it('★ ROOT CAUSE: request body MUST include modalities for Gemini image models (v709)', () => {
+            // Without modalities: ["image", "text"], Gemini returns text-only → no image → fallback!
+            expect(src).toContain("modalities: ['image', 'text']");
+        });
+
+        it('★ REGRESSION: fallback message must include actual error (v709)', () => {
+            // Old code: "Image API failed, using gradient fallback" (useless)
+            // New code: "Image API failed: <actual error>" (debuggable)
+            expect(src).toContain('errMsg.slice(0, 200)');
         });
     });
 });

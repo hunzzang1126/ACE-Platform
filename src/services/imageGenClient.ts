@@ -50,8 +50,9 @@ export async function generateImage(
         return await callImageGenApi(request, model, signal);
     } catch (err) {
         console.warn(`[ImageGen] ${model} failed — using gradient fallback:`, err);
+        const errMsg = err instanceof Error ? err.message : String(err);
         const fallback = generateFallbackImage(request);
-        fallback.message = `Image API failed, using gradient fallback`;
+        fallback.message = `Image API failed: ${errMsg.slice(0, 200)}`;
         return fallback;
     }
 }
@@ -70,7 +71,14 @@ async function callImageGenApi(
     const enhancedPrompt = buildEnhancedPrompt(request);
     const promptWithSize = `${enhancedPrompt}. Image dimensions: ${request.width}x${request.height} pixels, aspect ratio ${(request.width / request.height).toFixed(2)}.`;
 
-    const body: Record<string, unknown> = { model: modelId, messages: [{ role: 'user', content: promptWithSize }] };
+    // ★ ROOT CAUSE FIX (v709): Gemini image models REQUIRE modalities: ["image", "text"]
+    // Without this, the model returns text-only responses → extractImageUrl returns null → fallback!
+    // See: https://openrouter.ai/docs — Gemini image gen requires explicit modality declaration.
+    const body: Record<string, unknown> = {
+        model: modelId,
+        messages: [{ role: 'user', content: promptWithSize }],
+        modalities: ['image', 'text'],
+    };
     const url = getOpenRouterUrl();
 
     // ★ Retry logic matching callOpenRouterApi — cold starts cause first-request failures
