@@ -61,14 +61,18 @@ export function syncElementsToStore(
 
         // ★ Image elements (AI background, scanned images)
         if (el.type === 'image' || (el as any).src) {
+            const isBg = el.name?.includes('background');
             return {
                 ...base,
                 type: 'image' as const,
                 src: (el as any).src ?? '',
                 naturalWidth: el.w ?? canvasW,
                 naturalHeight: el.h ?? canvasH,
-                fit: 'cover' as const,
-                role: el.name?.includes('background') ? 'background' : 'decoration',
+                // ★ Background images MUST use 'fill' (independent scaleX/scaleY)
+                // to exactly match canvas dimensions. 'cover' uses uniform scaling
+                // which shrinks the image when aspect ratios don't match.
+                fit: (isBg ? 'fill' : 'cover') as 'fill' | 'cover',
+                role: isBg ? 'background' : 'decoration',
                 zIndex: 0,
             };
         }
