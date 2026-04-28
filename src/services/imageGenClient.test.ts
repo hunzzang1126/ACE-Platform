@@ -107,4 +107,80 @@ describe('imageGenClient', () => {
             expect(result).toBeDefined();
         });
     });
+
+    // ── Retry Logic (v708) ──
+    describe('★ REGRESSION: image gen retry on transient failures (v708)', () => {
+        it('should retry on 500 and succeed on 2nd attempt', async () => {
+            let callCount = 0;
+            const originalFetch = globalThis.fetch;
+            globalThis.fetch = vi.fn(async () => {
+                callCount++;
+                if (callCount === 1) {
+                    return { ok: false, status: 500, text: async () => 'cold start' } as Response;
+                }
+                return {
+                    ok: true,
+                    json: async () => ({ choices: [{ message: { content: [{ image_url: { url: 'data:image/png;base64,img' } }] } }] }),
+                } as any;
+            }) as any;
+
+            try {
+                const result = await generateImage({ prompt: 'test', width: 300, height: 250, model: 'flux' });
+                expect(result.success).toBe(true);
+                expect(result.isFallback).toBe(false);
+                expect(callCount).toBeGreaterThanOrEqual(2);
+            } finally {
+                globalThis.fetch = originalFetch;
+            }
+        });
+
+        it('should fall back to gradient after all retries exhausted', async () => {
+            const originalFetch = globalThis.fetch;
+            globalThis.fetch = vi.fn(async () => ({
+                ok: false, status: 500, text: async () => 'persistent error',
+            })) as any;
+
+            try {
+                const result = await generateImage({ prompt: 'test', width: 300, height: 250, model: 'flux' });
+                // Should gracefully fall back (generateImage catches and returns fallback)
+                expect(result.isFallback).toBe(true);
+            } finally {
+                globalThis.fetch = originalFetch;
+            }
+        });
+    });
+
+    // ── Source code guards ──
+    describe('★ REGRESSION: imageGenClient source guards (v708)', () => {
+        const fs = require('fs');
+        const path = require('path');
+        const src = fs.readFileSync(path.resolve(__dirname, './imageGenClient.ts'), 'utf-8');
+
+        it('callImageGenApi should have retry loop with MAX_RETRIES', () => {
+            expect(src).toContain('MAX_RETRIES');
+            expect(src).toMatch(/MAX_RETRIES\s*=\s*2/);
+        });
+
+        it('should use fresh headers on each retry attempt', () => {
+            expect(src).toContain('Fresh headers on each attempt');
+            expect(src).toContain('await getProxyHeaders()');
+        });
+
+        it('should have 90s timeout (not 60s) for image generation', () => {
+            expect(src).toContain('TIMEOUT_MS = 90_000');
+        });
+
+        it('should retry on empty image response (extractImageUrl returns null)', () => {
+            expect(src).toContain('Retry on empty image response');
+        });
+
+        it('should retry on timeout (AbortError)', () => {
+            expect(src).toContain("err.name === 'AbortError'");
+        });
+
+        it('should NOT retry on 401/402 auth errors', () => {
+            expect(src).toContain('res.status === 401 || res.status === 402');
+        });
+    });
 });
+
