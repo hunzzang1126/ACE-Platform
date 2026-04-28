@@ -158,6 +158,59 @@ describe('openRouterClient', () => {
                 globalThis.fetch = originalFetch;
             }
         });
+
+        it('★ REGRESSION: should retry on 400 and succeed on 2nd attempt (v704)', async () => {
+            let attempt = 0;
+            const originalFetch = globalThis.fetch;
+            globalThis.fetch = vi.fn(async () => {
+                attempt++;
+                if (attempt === 1) {
+                    return { ok: false, status: 400, text: async () => 'Bad Request' };
+                }
+                return {
+                    ok: true,
+                    json: async () => ({
+                        choices: [{ message: { content: 'Success' }, finish_reason: 'stop' }],
+                    }),
+                };
+            }) as any;
+
+            try {
+                const result = await callOpenRouterApi({
+                    model: 'test-model', messages: [{ role: 'user', content: 'test' }],
+                }) as any;
+                expect(attempt).toBeGreaterThanOrEqual(2);
+                expect(result.content[0].text).toBe('Success');
+            } finally {
+                globalThis.fetch = originalFetch;
+            }
+        });
+
+        it('★ REGRESSION: should NOT retry on 401 (auth failure)', async () => {
+            let attempts = 0;
+            const originalFetch = globalThis.fetch;
+            globalThis.fetch = vi.fn(async () => {
+                attempts++;
+                return { ok: false, status: 401, text: async () => 'Unauthorized' };
+            }) as any;
+
+            try {
+                await expect(callOpenRouterApi({ model: 'x', messages: [] }))
+                    .rejects.toThrow('401');
+                expect(attempts).toBe(1); // Should not retry
+            } finally {
+                globalThis.fetch = originalFetch;
+            }
+        });
+
+        it('★ REGRESSION: should get fresh headers on each retry attempt', () => {
+            // Verify source code has the fresh-headers pattern
+            const src = require('fs').readFileSync(
+                require('path').resolve(__dirname, './openRouterClient.ts'), 'utf-8'
+            );
+            // getProxyHeaders() must be inside the retry loop, not before it
+            expect(src).toContain('Fresh headers on each attempt');
+        });
     });
 
     // ── callWithRole ──

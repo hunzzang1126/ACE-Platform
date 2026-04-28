@@ -149,4 +149,30 @@ describe('agentFlowStoreSync', () => {
         expect(els[0].zIndex).toBe(0);
         expect(els[1].zIndex).toBe(1);
     });
+
+    it('★ REGRESSION: background images should use fit:fill (v705 — shrink prevention)', () => {
+        // Before v705: background images were stored with fit:'cover' which caused
+        // the store→canvas restore cycle to shrink them using uniform scaling.
+        const elements: RenderElement[] = [
+            { name: 'ai_background', type: 'image' as any, x: 0, y: 0, w: 1080, h: 1080, src: 'https://example.com/bg.jpg' } as any,
+        ];
+
+        syncElementsToStore(elements, 1080, 1080, palette);
+        const els = extractElements(mockSetState);
+        expect(els[0].type).toBe('image');
+        expect(els[0].fit).toBe('fill'); // NOT 'cover'
+        expect(els[0].role).toBe('background');
+    });
+
+    it('★ REGRESSION: non-background images should use fit:cover (preserve aspect ratio)', () => {
+        const elements: RenderElement[] = [
+            { name: 'product_shot', type: 'image' as any, x: 100, y: 50, w: 200, h: 200, src: 'https://example.com/product.jpg' } as any,
+        ];
+
+        syncElementsToStore(elements, 1080, 1080, palette);
+        const els = extractElements(mockSetState);
+        expect(els[0].type).toBe('image');
+        expect(els[0].fit).toBe('cover'); // non-bg images keep cover
+        expect(els[0].role).toBe('decoration');
+    });
 });
