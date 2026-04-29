@@ -18,19 +18,22 @@ interface DecorationSet {
     topBorder: boolean;      // Thin accent bar at canvas top
     bottomBorder: boolean;   // Thin accent bar at canvas bottom
     cornerDot: boolean;      // Small decorative circle in corner
+    gradientOrb: boolean;    // Soft gradient circle as decorative element
+    infoBar: boolean;        // Bottom info strip (e.g. "Free Shipping · 30-Day Returns")
+    logoPlaceholder: boolean; // Small logo area in corner
 }
 
 const DECORATION_MAP: Record<LayoutVariant, DecorationSet> = {
-    'centered':        { accentLine: true,  tagUnderline: false, topBorder: false, bottomBorder: false, cornerDot: false },
-    'left-hero':       { accentLine: true,  tagUnderline: true,  topBorder: false, bottomBorder: false, cornerDot: false },
-    'offset-right':    { accentLine: true,  tagUnderline: true,  topBorder: false, bottomBorder: false, cornerDot: false },
-    'top-heavy':       { accentLine: false, tagUnderline: false, topBorder: true,  bottomBorder: false, cornerDot: false },
-    'bottom-stack':    { accentLine: false, tagUnderline: false, topBorder: false, bottomBorder: true,  cornerDot: false },
-    'split-left':      { accentLine: true,  tagUnderline: false, topBorder: false, bottomBorder: false, cornerDot: true },
-    'minimal-center':  { accentLine: false, tagUnderline: false, topBorder: false, bottomBorder: false, cornerDot: false },
-    'bold-statement':  { accentLine: false, tagUnderline: false, topBorder: true,  bottomBorder: true,  cornerDot: false },
-    'editorial':       { accentLine: true,  tagUnderline: true,  topBorder: false, bottomBorder: false, cornerDot: false },
-    'compact-bar':     { accentLine: false, tagUnderline: false, topBorder: false, bottomBorder: false, cornerDot: false },
+    'centered':        { accentLine: true,  tagUnderline: false, topBorder: false, bottomBorder: false, cornerDot: false, gradientOrb: true,  infoBar: false, logoPlaceholder: true },
+    'left-hero':       { accentLine: true,  tagUnderline: true,  topBorder: false, bottomBorder: false, cornerDot: false, gradientOrb: false, infoBar: false, logoPlaceholder: true },
+    'offset-right':    { accentLine: true,  tagUnderline: true,  topBorder: false, bottomBorder: false, cornerDot: false, gradientOrb: false, infoBar: false, logoPlaceholder: true },
+    'top-heavy':       { accentLine: false, tagUnderline: false, topBorder: true,  bottomBorder: false, cornerDot: false, gradientOrb: true,  infoBar: true,  logoPlaceholder: false },
+    'bottom-stack':    { accentLine: false, tagUnderline: false, topBorder: false, bottomBorder: true,  cornerDot: false, gradientOrb: false, infoBar: false, logoPlaceholder: true },
+    'split-left':      { accentLine: true,  tagUnderline: false, topBorder: false, bottomBorder: false, cornerDot: true,  gradientOrb: false, infoBar: false, logoPlaceholder: true },
+    'minimal-center':  { accentLine: false, tagUnderline: false, topBorder: false, bottomBorder: false, cornerDot: false, gradientOrb: false, infoBar: false, logoPlaceholder: true },
+    'bold-statement':  { accentLine: false, tagUnderline: false, topBorder: true,  bottomBorder: true,  cornerDot: false, gradientOrb: false, infoBar: false, logoPlaceholder: false },
+    'editorial':       { accentLine: true,  tagUnderline: true,  topBorder: false, bottomBorder: false, cornerDot: false, gradientOrb: true,  infoBar: true,  logoPlaceholder: false },
+    'compact-bar':     { accentLine: false, tagUnderline: false, topBorder: false, bottomBorder: false, cornerDot: false, gradientOrb: false, infoBar: false, logoPlaceholder: false },
 };
 
 // ── Public API ───────────────────────────────────
@@ -147,6 +150,47 @@ export function buildDecorations(
         });
     }
 
+    // ── Gradient Orb (soft decorative circle) ──
+    if (rules.gradientOrb) {
+        const orbSize = Math.round(canvasMin * 0.25);
+        // Position in a corner opposite the content
+        const orbX = canvasW - orbSize * 0.6;
+        const orbY = -orbSize * 0.3;
+        decorations.push({
+            name: 'deco_gradient_orb',
+            type: 'ellipse' as any,
+            x: orbX, y: orbY, w: orbSize, h: orbSize,
+            r: r * 0.8, g: g * 0.8, b: b * 0.8, a: 0.15,
+        });
+    }
+
+    // ── Logo Placeholder (small branded area) ──
+    if (rules.logoPlaceholder) {
+        const logoW = Math.round(canvasMin * 0.12);
+        const logoH = Math.round(canvasMin * 0.04);
+        const logoMargin = Math.round(canvasMin * 0.04);
+        decorations.push({
+            name: 'logo_area',
+            type: 'rect' as any,
+            x: logoMargin, y: logoMargin,
+            w: logoW, h: logoH,
+            r: 1, g: 1, b: 1, a: 0.15,
+            radius: Math.round(logoH / 4),
+        });
+    }
+
+    // ── Info Bar (bottom strip) ──
+    if (rules.infoBar) {
+        const barH = Math.round(canvasMin * 0.05);
+        const barY = canvasH - barH;
+        decorations.push({
+            name: 'info_bar',
+            type: 'rect' as any,
+            x: 0, y: barY, w: canvasW, h: barH,
+            r: 0, g: 0, b: 0, a: 0.30,
+        });
+    }
+
     return decorations;
 }
 
@@ -155,7 +199,8 @@ export function hasDecorations(variant: LayoutVariant): boolean {
     const rules = DECORATION_MAP[variant];
     if (!rules) return false;
     return rules.accentLine || rules.tagUnderline || rules.topBorder
-        || rules.bottomBorder || rules.cornerDot;
+        || rules.bottomBorder || rules.cornerDot || rules.gradientOrb
+        || rules.infoBar || rules.logoPlaceholder;
 }
 
 /** Get the decoration configuration for a variant */

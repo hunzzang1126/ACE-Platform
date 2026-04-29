@@ -30,12 +30,14 @@ describe('Decoration Engine', () => {
             expect(accentLine!.type).toBe('rect');
         });
 
-        it('minimal-center produces zero decorations', () => {
+        it('minimal-center produces only logo_area decoration (no traditional decos)', () => {
             const { elements } = buildDesignElements(CONTENT, PALETTE, 1080, 1080, false, 'minimal-center');
             const decos = elements.filter(el =>
                 ['accent_line', 'tag_underline', 'top_accent_bar', 'bottom_accent_bar', 'corner_accent'].includes(el.name ?? '')
             );
             expect(decos).toHaveLength(0);
+            // But logo_area should exist
+            expect(elements.find(el => el.name === 'logo_area')).toBeDefined();
         });
 
         it('left-hero has accent_line + tag_underline', () => {
@@ -111,8 +113,8 @@ describe('Decoration Engine', () => {
             expect(hasDecorations('bold-statement')).toBe(true);
         });
 
-        it('returns false for minimal-center', () => {
-            expect(hasDecorations('minimal-center')).toBe(false);
+        it('returns true for minimal-center (has logoPlaceholder)', () => {
+            expect(hasDecorations('minimal-center')).toBe(true);
         });
 
         it('returns false for compact-bar', () => {

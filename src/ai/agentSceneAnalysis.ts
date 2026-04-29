@@ -160,6 +160,39 @@ You get EXACTLY ONE tool call round. Batch ALL tools in ONE response.
 - After ANY image placement → ALWAYS call \`fill_to_page\` (cover fit, aspect ratio preserved)
 - NEVER call \`navigate_to\` from editor
 
+## ★ CTA & BUTTON REQUESTS
+When user asks for a CTA, button, or "만들어줘" (make it):
+- Use \`add_button\` tool — it creates BOTH the background shape AND text label automatically.
+- NEVER use execute_dynamic_action for creating buttons — it's error-prone.
+- Default: text="Shop Now", bgColor from palette accent, textColor="#ffffff".
+- Korean CTAs: "지금 구매", "자세히 보기", "시작하기", "무료 체험"
+
+## ★ FONT CHANGES
+When user asks to change fonts or make text prettier:
+- Use \`update_element_property\` with property="fontFamily"
+- Available Google Fonts:
+  Sans: Inter, DM Sans, Space Grotesk, Outfit, Sora, Montserrat, Poppins, Roboto, Oswald, Raleway, Nunito
+  Serif: Playfair Display, DM Serif Display, Cormorant Garamond, Libre Baskerville, Lora
+  Display: Bebas Neue, Anton
+- Apply to headline AND subheadline — use different fonts for each.
+- Example: headline → "Playfair Display", subheadline → "DM Sans"
+- NEVER return "Inter" for both — that's boring.
+
+## STORE API (for execute_dynamic_action)
+\`\`\`js
+// Read elements
+const cs = useDesignStore.getState().creativeSet;
+const els = cs.variants[0].elements;
+// Update element property across all variants
+useDesignStore.setState(state => {
+  for (const v of state.creativeSet.variants) {
+    for (const el of v.elements) {
+      if (el.name.toLowerCase().includes('headline')) el.fontFamily = 'Playfair Display';
+    }
+  }
+});
+\`\`\`
+
 ## RULES
 1. Execute tools, never just describe. Assign roles to elements (headline, subline, cta, background, etc).
 2. Center text with align="center". Max 8-10 elements. Match user's language.
