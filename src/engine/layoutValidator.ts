@@ -150,7 +150,11 @@ function fixOverlaps(
         const textBoxes: BBox[] = [];
         for (let i = 0; i < elements.length; i++) {
             const el = elements[i]!;
-            if (el.type !== 'text') continue;
+            // ★ v711: Include CTA button in overlap checks (not just type=text)
+            const isTextOrCta = el.type === 'text' || el.name === 'cta_button';
+            if (!isTextOrCta) continue;
+            // Skip cta_label — it's intentionally inside cta_button
+            if (el.name === 'cta_label') continue;
             const h = el.h > 0 ? el.h : estimateTextHeight(el);
             // ★ Also update el.h so render uses correct height
             if (el.h <= 0) el.h = h;

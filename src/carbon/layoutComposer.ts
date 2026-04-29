@@ -22,6 +22,7 @@ import { getLayoutRules } from './layoutRules';
 import type { ElementRule, LayoutVariant } from './layoutRules';
 import { buildDecorations } from './decorationEngine';
 import { pickOverlayStyle, buildOverlayElements } from './overlayStyles';
+import { fixAllOverlaps } from './overlapGuard';
 
 // ── Public Types ─────────────────────────────────
 
@@ -199,33 +200,13 @@ export function buildDesignElements(
         startY = Math.max(spacing(3, canvasMin), Math.round((canvasH - totalContentH) / 2));
     }
 
-    // ── Place content elements (with overlap guard) ──
+    // ── Place content elements (cursor-based stacking) ──
     let cursorY = startY;
     for (const item of contentBlock) {
         cursorY += item.gapBefore;
         item.element.y = cursorY;
         elements.push(item.element);
         cursorY += item.element.h ?? 0;
-    }
-
-    // ★ OVERLAP GUARD: If content elements overlap, shift them apart.
-    // This catches cases where height estimation underestimates actual rendered height.
-    for (let i = 1; i < elements.length; i++) {
-        const prev = elements[i - 1]!;
-        const curr = elements[i]!;
-        // Only check text elements (skip background, overlays)
-        if (!prev.content && !prev.name?.includes('text') && prev.name !== 'headline' && prev.name !== 'subheadline' && prev.name !== 'tag_text') continue;
-        if (!curr.content && !curr.name?.includes('text') && curr.name !== 'headline' && curr.name !== 'subheadline' && curr.name !== 'tag_text') continue;
-        const prevBottom = (prev.y ?? 0) + (prev.h ?? 0);
-        const currTop = curr.y ?? 0;
-        if (currTop < prevBottom) {
-            const shift = prevBottom - currTop + Math.round(canvasMin * 0.01); // 1% min gap
-            curr.y = (curr.y ?? 0) + shift;
-            // Cascade shift to all subsequent elements
-            for (let j = i + 1; j < elements.length; j++) {
-                elements[j]!.y = (elements[j]!.y ?? 0) + shift;
-            }
-        }
     }
 
     // ── CTA Button (optional) ──
@@ -275,6 +256,10 @@ export function buildDesignElements(
             line_height: ctaType.lineHeight,
         });
     }
+
+    // ★ OVERLAP GUARD (v711): Runs AFTER CTA placement.
+    // Checks ALL text/CTA pairs (not just adjacent) to guarantee zero overlap.
+    fixAllOverlaps(elements, canvasH, canvasMin);
 
     // ── Text-on-image overlay (P0-4: readability guarantee) ──
     // ★ v710: Variant-aware overlay system — prevents every design looking the same.
