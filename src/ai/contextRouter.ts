@@ -224,7 +224,8 @@ ${snapshot}
 Tools: generate_full_design, replace_background_image, generate_image, add_text, add_button, execute_dynamic_action, analyze_scene, undo_ai_action
 ${empty ? '★ Canvas empty → Use generate_full_design for ANY new design request. It creates the COMPLETE ad (layout + text + CTA + image). NEVER use generate_image alone for new designs.' : 'For modifications → execute_dynamic_action. For redesign → generate_full_design.'}
 For background → replace_background_image. Use analyze_scene to read store API.
-Write real marketing copy. No placeholder text.${planningLine}
+Write real marketing copy. No placeholder text.
+★ CONTENT RULE: NEVER overwrite existing text elements unless the user EXPLICITLY asks to "change", "replace", or "translate" that specific text. When user says "fill" or "add elements", ADD new elements — do NOT modify existing ones. Preserve all existing content.${planningLine}
 ${smartSection}`;
         }
     }

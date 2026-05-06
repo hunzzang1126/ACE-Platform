@@ -252,12 +252,69 @@ describe('commandExecutor', () => {
             vi.mocked(executeDesignCommand).mockRejectedValueOnce(new Error('Boom'));
 
             const result = await executeToolCall(
-                makeEngine(), 'add_text',
-                { text: 'test' }, [],
+                makeEngine(), 'execute_dynamic_action',
+                { description: 'test', code: 'throw new Error("Boom")' }, [],
             );
 
             expect(result.success).toBe(false);
-            expect(result.message).toContain('Error executing');
+            expect(result.message).toContain('Error');
+        });
+    });
+
+    // ── add_text engine-first routing ──
+
+    describe('add_text', () => {
+        it('should use engine.add_text when available', async () => {
+            const addTextMock = vi.fn().mockReturnValue(42);
+            const engine = makeEngine({
+                add_text: addTextMock,
+            });
+
+            const result = await executeToolCall(
+                engine, 'add_text',
+                { content: 'Hello World', fontSize: 24, color: '#ff0000' }, [],
+            );
+
+            expect(result.success).toBe(true);
+            expect(addTextMock).toHaveBeenCalled();
+            expect(result.nodeId).toBe(42);
+        });
+
+        it('should fall back to store when engine has no add_text', async () => {
+            vi.mocked(executeDesignCommand).mockResolvedValueOnce({
+                success: true, message: 'Text added from store',
+            });
+
+            const result = await executeToolCall(
+                makeEngine(), 'add_text',
+                { content: 'Hello' }, [],
+            );
+
+            // Engine doesn't have add_text → fallback to store
+            expect(result.success).toBe(true);
+            expect(result.message).toContain('Text added from store');
+        });
+    });
+
+    // ── add_button engine-first routing ──
+
+    describe('add_button', () => {
+        it('should use engine when add_text and add_rounded_rect available', async () => {
+            const addTextMock = vi.fn().mockReturnValue(10);
+            const addRrMock = vi.fn().mockReturnValue(9);
+            const engine = makeEngine({
+                add_text: addTextMock,
+                add_rounded_rect: addRrMock,
+            });
+
+            const result = await executeToolCall(
+                engine, 'add_button',
+                { text: 'Buy Now', bgColor: '#00ff00' }, [],
+            );
+
+            expect(result.success).toBe(true);
+            expect(addRrMock).toHaveBeenCalled();
+            expect(addTextMock).toHaveBeenCalled();
         });
     });
 });

@@ -13,6 +13,7 @@ import type { ImageGenResult } from '@/services/imageGenClient';
 import { analyzeScene } from './executorCompound';
 import { executeDesignCommand } from './executors/designExecutor';
 import { validateToolParams } from './toolParamValidator';
+import { executeAddTextOnCanvas, executeAddButtonOnCanvas } from './canvasToolExecutors';
 
 // Re-export types for consumers
 export type { ExecutionResult } from './executorHelpers';
@@ -368,9 +369,14 @@ export async function executeToolCall(
                 return storeResult ?? { success: false, message: `No element matching "${params.element_name}" found.` };
             }
 
+            // ── Add Text (engine-first) ──────────────────
+            case 'add_text': return executeAddTextOnCanvas(engine, p);
+
+            // ── Add Button (engine-first) ────────────────
+            case 'add_button': return executeAddButtonOnCanvas(engine, p);
+
             // ── Design Store Commands ────────────────
-            // add_text, add_button, execute_dynamic_action
-            // + any remaining store-based commands
+            // execute_dynamic_action + any remaining store-based commands
             default: {
                 const designResult = await executeDesignCommand(toolName, params);
                 if (designResult !== null) return designResult;
