@@ -31,20 +31,22 @@ interface Props {
     externalPlaying?: boolean;
 }
 
-const BASE_PREVIEW_WIDTH = 280;
-const BASE_PREVIEW_HEIGHT = 360;
+const BASE_AREA = 70000; // reference visual area (px²) at zoom=1
 const TIMELINE_DURATION = 5;
 const GRID_GAP = 32;
-const GRID_COLS = 3;
+const CARD_CHROME_H = 60; // header (~32) + footer (~28)
 const ZOOM_KEY = 'ace-size-dash-zoom';
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 2.0;
 const ZOOM_DEFAULT = 1.0;
 
-function getPreviewScale(w: number, h: number, zoom: number) {
-    const maxW = BASE_PREVIEW_WIDTH * zoom;
-    const maxH = BASE_PREVIEW_HEIGHT * zoom;
-    return Math.min(maxW / w, maxH / h, 1 * zoom);
+/** Area-proportional sizing — wider canvases appear wider, taller appear taller */
+function getCardDisplaySize(w: number, h: number, zoom: number): { dw: number; dh: number; scale: number } {
+    const refArea = BASE_AREA * zoom * zoom;
+    const aspect = w / h;
+    const dh = Math.round(Math.sqrt(refArea / aspect));
+    const dw = Math.round(dh * aspect);
+    return { dw, dh, scale: dw / w };
 }
 
 export function BannerPreviewGrid({ variants, visibleIds, externalPlaying }: Props) {
@@ -83,15 +85,28 @@ export function BannerPreviewGrid({ variants, visibleIds, externalPlaying }: Pro
     const [draggingId, setDraggingId] = useState<string | null>(null);
     const dragCooldownRef = useRef(false);
 
+    // ★ v726: Flow layout — positions based on ACTUAL card dimensions.
+    // Cards flow left→right, wrap to next row. No overlap at any zoom.
+    const flowPositions = useMemo(() => {
+        const positions: Record<string, { x: number; y: number }> = {};
+        const maxRowW = typeof window !== 'undefined' ? Math.max(window.innerWidth - 360, 600) : 1200;
+        let x = 0, y = 0, rowH = 0;
+        for (const v of visibleVariants) {
+            const { dw, dh } = getCardDisplaySize(v.preset.width, v.preset.height, zoom);
+            const totalH = dh + CARD_CHROME_H;
+            if (x > 0 && x + dw > maxRowW) {
+                x = 0; y += rowH + GRID_GAP; rowH = 0;
+            }
+            positions[v.id] = { x, y };
+            rowH = Math.max(rowH, totalH);
+            x += dw + GRID_GAP;
+        }
+        return positions;
+    }, [visibleVariants, zoom]);
     const autoGridPos = useCallback((idx: number): { x: number; y: number } => {
-        const col = idx % GRID_COLS;
-        const row = Math.floor(idx / GRID_COLS);
-        // ★ Use uniform slot size = BASE dimensions * zoom + padding
-        // This guarantees no overlap regardless of card aspect ratio
-        const colWidth = Math.round(BASE_PREVIEW_WIDTH * zoom) + GRID_GAP + 40;
-        const rowHeight = Math.round(BASE_PREVIEW_HEIGHT * zoom) + 100 + GRID_GAP;
-        return { x: col * colWidth, y: row * rowHeight };
-    }, [zoom]);
+        const v = visibleVariants[idx];
+        return (v && flowPositions[v.id]) ?? { x: 0, y: 0 };
+    }, [visibleVariants, flowPositions]);
 
     // ── Drag handlers ──
     const handleCardDragStart = useCallback((e: React.MouseEvent, variantId: string, currentPos: { x: number; y: number }) => {
@@ -151,14 +166,15 @@ export function BannerPreviewGrid({ variants, visibleIds, externalPlaying }: Pro
     const [resolvedImageUrls, setResolvedImageUrls] = useState<Record<string, string>>({});
     const visibleVariants = useMemo(() => variants.filter(v => visibleIds.has(v.id)), [variants, visibleIds]);
 
-    const canvasHeight = useMemo(() => {
-        let maxY = 0;
+    const { canvasHeight, canvasWidth } = useMemo(() => {
+        let maxY = 0, maxX = 0;
         visibleVariants.forEach((v, idx) => {
             const pos = cardPositions[v.id] ?? autoGridPos(idx);
-            const scaledH = Math.round(v.preset.height * getPreviewScale(v.preset.width, v.preset.height, zoom));
-            maxY = Math.max(maxY, pos.y + scaledH + 100);
+            const { dw, dh } = getCardDisplaySize(v.preset.width, v.preset.height, zoom);
+            maxX = Math.max(maxX, pos.x + dw + GRID_GAP);
+            maxY = Math.max(maxY, pos.y + dh + CARD_CHROME_H + GRID_GAP);
         });
-        return maxY;
+        return { canvasHeight: maxY, canvasWidth: maxX };
     }, [visibleVariants, cardPositions, autoGridPos, zoom]);
 
     // Restore video blobs
@@ -278,13 +294,11 @@ export function BannerPreviewGrid({ variants, visibleIds, externalPlaying }: Pro
                 {!hasAnyAnimation && (<span className="banner-no-anim-hint">{t('size.addAnimNote')}</span>)}
             </div>
 
-            <div className="banner-grid" ref={gridContainerRef} style={{ position: 'relative', minHeight: Math.max(600, canvasHeight + 40), overflow: 'visible' }}>
+            <div className="banner-grid" ref={gridContainerRef} style={{ position: 'relative', minHeight: Math.max(600, canvasHeight + 40), minWidth: canvasWidth }}>
                 <PlugCanvas variants={visibleVariants} cardRefs={cardRefs} containerRef={gridContainerRef} />
                 {visibleVariants.map((variant, idx) => {
                     const { width, height } = variant.preset;
-                    const scale = getPreviewScale(width, height, zoom);
-                    const previewW = Math.round(width * scale);
-                    const previewH = Math.round(height * scale);
+                    const { dw: previewW, dh: previewH, scale } = getCardDisplaySize(width, height, zoom);
                     const pos = cardPositions[variant.id] ?? autoGridPos(idx);
 
                     return (

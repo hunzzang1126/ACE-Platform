@@ -22,8 +22,7 @@
 
 .cs-main {
     flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
+    overflow: auto;
     padding: 24px;
     background: var(--bg-surface);
     min-width: 0;
@@ -331,6 +330,8 @@
     flex-direction: column;
     gap: 16px;
     flex: 1;
+    overflow: auto;
+    scroll-behavior: smooth;
 }
 
 .banner-grid-toolbar {
@@ -484,7 +485,6 @@
 .banner-grid {
     position: relative;
     min-height: 600px;
-    overflow: visible;
 }
 
 .banner-grid-empty {
