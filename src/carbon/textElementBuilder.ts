@@ -100,17 +100,23 @@ export function buildTextElement(
         finalColor = `rgba(${r},${g},${b},${opacity})`;
     }
 
+    // ★ v717 P2: Tag text → UPPERCASE for premium editorial feel
+    const displayContent = name === 'tag_text' ? content.toUpperCase() : content;
+
     // ★ v713: Headline gets tighter letter-spacing for impact
+    // ★ v717: Tag gets wide tracking (2.0) for editorial look
     const letterSpacing = name === 'headline'
         ? (typeStyle.letterSpacing ?? -0.5)
-        : (name === 'subheadline' ? 0.2 : typeStyle.letterSpacing);
+        : name === 'tag_text'
+            ? 2.0
+            : (name === 'subheadline' ? 0.3 : typeStyle.letterSpacing);
 
     return {
         name,
         type: 'text' as any,
         x, y: 0,
         w, h,
-        content,
+        content: displayContent,
         font_size: fontSize,
         font_weight: String(rule.fontWeight ?? typeStyle.fontWeight),
         font_family: name === 'headline'

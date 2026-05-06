@@ -15,10 +15,22 @@ export function renderElement(engine: FlowEngine, el: any, canvasW: number, cach
     };
 
     if (el.type === 'text') {
-        const [tr, tg, tb] = el.color_hex ? hexToRgb(el.color_hex) : [1, 1, 1];
+        // ★ v717: Parse rgba() for text hierarchy opacity (subheadline uses <1.0 alpha)
+        let tr = 1, tg = 1, tb = 1, ta = 1;
+        if (el.color_hex) {
+            const rgbaMatch = el.color_hex.match(/^rgba?\((\d+),(\d+),(\d+)(?:,([\d.]+))?\)$/);
+            if (rgbaMatch) {
+                tr = parseInt(rgbaMatch[1]) / 255;
+                tg = parseInt(rgbaMatch[2]) / 255;
+                tb = parseInt(rgbaMatch[3]) / 255;
+                ta = rgbaMatch[4] != null ? parseFloat(rgbaMatch[4]) : 1;
+            } else {
+                [tr, tg, tb] = hexToRgb(el.color_hex);
+            }
+        }
         const fontFamily = el.font_family || guide?.typography?.primaryFont || 'Inter';
         const fullFont = `${fontFamily}, system-ui, sans-serif`;
-        return engine.add_text(el.x ?? 0, el.y ?? 0, el.content || 'Text', el.font_size ?? 18, fullFont, el.font_weight ?? '700', tr, tg, tb, 1.0, (el.w && el.w > 0) ? el.w : canvasW * 0.85, el.text_align ?? 'center', el.name, el.line_height, el.letter_spacing);
+        return engine.add_text(el.x ?? 0, el.y ?? 0, el.content || 'Text', el.font_size ?? 18, fullFont, el.font_weight ?? '700', tr, tg, tb, ta, (el.w && el.w > 0) ? el.w : canvasW * 0.85, el.text_align ?? 'center', el.name, el.line_height, el.letter_spacing);
     } else if (el.gradient_start_hex && el.gradient_end_hex) {
         const nodeId = engine.add_gradient_rect(el.x ?? 0, el.y ?? 0, el.w ?? 100, el.h ?? 100, el.gradient_start_hex, el.gradient_end_hex, el.gradient_angle ?? 135, el.radius ?? 0, el.name);
         cacheGradientData(el.name ?? '', el.gradient_start_hex, el.gradient_end_hex, el.gradient_angle ?? 135);

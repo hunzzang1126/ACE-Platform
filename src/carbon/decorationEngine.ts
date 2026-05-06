@@ -71,18 +71,16 @@ export function buildDecorations(
             const lineY = Math.round(
                 (headline.y! + headline.h!) * 0.5 + nextEl.y! * 0.5
             );
-            const lineW = Math.round(canvasMin * 0.12);
-            const lineH = Math.max(2, Math.round(canvasMin * 0.006));
+            // ★ v717 P3: Subtler accent line — wider but thinner, lower opacity for elegance
+            const lineW = Math.round(canvasMin * 0.18);
+            const lineH = Math.max(1, Math.round(canvasMin * 0.003));
 
             let lineX: number;
             if (headline.x! < canvasW * 0.3) {
-                // Left-aligned: line starts at headline x
                 lineX = headline.x!;
             } else if (headline.x! > canvasW * 0.5) {
-                // Right-aligned: line ends at headline right edge
                 lineX = headline.x! + headline.w! - lineW;
             } else {
-                // Centered
                 lineX = Math.round((canvasW - lineW) / 2);
             }
 
@@ -90,7 +88,7 @@ export function buildDecorations(
                 name: 'accent_line',
                 type: 'rect' as any,
                 x: lineX, y: lineY, w: lineW, h: lineH,
-                r, g, b, a: 0.8,
+                r, g, b, a: 0.35,
             });
         }
     }
@@ -150,34 +148,32 @@ export function buildDecorations(
         });
     }
 
-    // ── Gradient Orb (soft decorative circle) ──
+    // ── Gradient Orb Mesh (2 soft orbs for ambient glow) ──
+    // ★ v717 P3: Dual-orb creates a mesh gradient effect — much richer than single orb
     if (rules.gradientOrb) {
-        const orbSize = Math.round(canvasMin * 0.25);
-        // Position in a corner opposite the content
-        const orbX = canvasW - orbSize * 0.6;
-        const orbY = -orbSize * 0.3;
+        const orbSize = Math.round(canvasMin * 0.45);
+        // Orb 1: top-right (accent color, larger)
         decorations.push({
             name: 'deco_gradient_orb',
             type: 'ellipse' as any,
-            x: orbX, y: orbY, w: orbSize, h: orbSize,
-            r: r * 0.8, g: g * 0.8, b: b * 0.8, a: 0.15,
+            x: canvasW - orbSize * 0.5, y: -orbSize * 0.35,
+            w: orbSize, h: orbSize,
+            r: r * 0.7, g: g * 0.7, b: b * 0.7, a: 0.12,
+        });
+        // Orb 2: bottom-left (shifted hue, smaller)
+        const orb2Size = Math.round(canvasMin * 0.35);
+        decorations.push({
+            name: 'deco_gradient_orb_2',
+            type: 'ellipse' as any,
+            x: -orb2Size * 0.3, y: canvasH - orb2Size * 0.65,
+            w: orb2Size, h: orb2Size,
+            r: r * 0.5, g: g * 0.9, b: b * 1.0, a: 0.10,
         });
     }
 
-    // ── Logo Placeholder (small branded area) ──
-    if (rules.logoPlaceholder) {
-        const logoW = Math.round(canvasMin * 0.12);
-        const logoH = Math.round(canvasMin * 0.04);
-        const logoMargin = Math.round(canvasMin * 0.04);
-        decorations.push({
-            name: 'logo_area',
-            type: 'rect' as any,
-            x: logoMargin, y: logoMargin,
-            w: logoW, h: logoH,
-            r: 1, g: 1, b: 1, a: 0.15,
-            radius: Math.round(logoH / 4),
-        });
-    }
+    // ── Logo Placeholder — REMOVED in v717 P3 ──
+    // Was rendering an empty transparent rect that confused users.
+    // Actual brand logo is placed by agentGenerateFlow.ts when brandLogoUrl exists.
 
     // ── Info Bar (bottom strip) ──
     if (rules.infoBar) {
