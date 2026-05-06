@@ -7,6 +7,7 @@
 
 import { useState, useCallback, useRef } from 'react';
 import { useBrandKitStore, type AssetCategory } from '@/stores/brandKitStore';
+import { BrandTypographyTab } from './BrandTypographyTab';
 import './BrandCloudSection.css';
 
 type CloudTab = 'assets' | 'palette' | 'typography' | 'guidelines';
@@ -245,27 +246,8 @@ export function BrandCloudSection() {
                     )}
 
                     {/* ═══ TYPOGRAPHY TAB ═══ */}
-                    {tab === 'typography' && (
-                        <div className="brand-cloud__typo">
-                            <p className="brand-cloud__section-desc">Set preferred fonts for each text role. The AI will use these when generating designs.</p>
-                            {(['heading', 'body', 'cta'] as const).map(role => (
-                                <div key={role} className="brand-cloud__typo-row">
-                                    <div className="brand-cloud__typo-label">{role}</div>
-                                    <input
-                                        className="brand-cloud__input brand-cloud__input--wide"
-                                        value={kit.typography[role].family}
-                                        onChange={e => updateTypography(kit.id, { [role]: { ...kit.typography[role], family: e.target.value } })}
-                                        placeholder="Font family..."
-                                    />
-                                    <div
-                                        className="brand-cloud__typo-preview"
-                                        style={{ fontFamily: kit.typography[role].family || 'Inter' }}
-                                    >
-                                        The quick brown fox
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+                    {tab === 'typography' && kit && (
+                        <BrandTypographyTab kit={kit} onUpdateTypography={updateTypography} />
                     )}
 
                     {/* ═══ GUIDELINES TAB ═══ */}
