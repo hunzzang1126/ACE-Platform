@@ -67,7 +67,25 @@ export async function scanBrandCloud(
             cb.updateCard('brand-scan', 'done', `${kit.name}: ${summary}`, {
                 expandedDetail: [...usedParts, ...skippedParts, '', result.context].filter(Boolean).join('\n'),
             });
-            cb.narrate(`Brand kit "${kit.name}" — ${summary}.`);
+
+            // ★ v725: Conversational narration — tell user WHAT was found, not just counts
+            const narrateParts: string[] = [];
+            if (selection.logo) {
+                narrateParts.push(`Found logo "${selection.logo.name}" in Brand Cloud — using it in the design.`);
+            }
+            if (selection.background) {
+                narrateParts.push(`Found background "${selection.background.asset.name}" — applying as canvas background.`);
+            }
+            for (const p of selection.productImages) {
+                narrateParts.push(`Found product image "${p.asset.name}" — placing on canvas.`);
+            }
+            if (narrateParts.length === 0 && activeAssets.length > 0) {
+                narrateParts.push(`Scanned Brand Cloud "${kit.name}" — no matching assets for this design.`);
+            }
+            if (selection.needsGeneratedBackground && !selection.background) {
+                narrateParts.push('No brand background found — AI will generate one.');
+            }
+            cb.narrate(narrateParts.join('\n'));
         } catch (selErr) {
             console.warn('[BrandScan] Asset selector failed, falling back to legacy:', selErr);
             // Fallback to legacy logo detection
@@ -77,7 +95,11 @@ export async function scanBrandCloud(
                 result.logoUrl = logo.src; result.logoW = logo.width; result.logoH = logo.height;
             }
             cb.updateCard('brand-scan', 'done', `${kit.name}: ${activeAssets.length} asset(s)`, { expandedDetail: result.context });
-            cb.narrate(`Brand kit "${kit.name}" loaded.`);
+            if (logoAssets.length > 0) {
+                cb.narrate(`Found logo "${logoAssets[0]!.name}" in Brand Cloud — using it in the design.`);
+            } else {
+                cb.narrate(`Scanned Brand Cloud "${kit.name}" — ${activeAssets.length} asset(s) found.`);
+            }
         }
 
         try {
