@@ -68,18 +68,18 @@ export function BannerPreviewGrid({ variants, visibleIds, externalPlaying }: Pro
         const clamped = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, val));
         setZoom(clamped);
         localStorage.setItem(ZOOM_KEY, String(clamped));
+        // ★ v728: Reset to auto-layout on zoom — absolute positions are invalid at different zoom
+        setCardPositions({});
     }, []);
 
     // ── Card positions (free-form layout) ──
+    // ★ v728: Start empty — flow layout handles positioning.
+    // Saved positions from old sessions used fixed-grid coords and cause overlap.
+    // Positions only populate after user drags a card in this session.
     const storedPositionsRaw = useDesignStore(s => s.creativeSet?.cardPositions);
-    const [cardPositions, setCardPositions] = useState<Record<string, { x: number; y: number }>>(storedPositionsRaw ?? {});
-    const prevStoredRef = useRef(storedPositionsRaw);
-    useEffect(() => {
-        if (storedPositionsRaw !== prevStoredRef.current) {
-            prevStoredRef.current = storedPositionsRaw;
-            setCardPositions(storedPositionsRaw ?? {});
-        }
-    }, [storedPositionsRaw]);
+    const [cardPositions, setCardPositions] = useState<Record<string, { x: number; y: number }>>({});
+    // ★ v728: storedPositionsRaw is kept for drag-save, but NOT synced back into state.
+    // The flow layout is the source of truth for positioning.
 
     const draggingRef = useRef<{ variantId: string; startMouse: { x: number; y: number }; startPos: { x: number; y: number }; hasMoved: boolean; } | null>(null);
     const [draggingId, setDraggingId] = useState<string | null>(null);
