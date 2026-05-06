@@ -46,10 +46,11 @@ function sq(overrides: Partial<Record<'headline' | 'subline' | 'cta' | 'tag', Pa
     return {
         // ★ adScale values are HIGH because Carbon type styles are designed for web UI (16px body),
         // not display ads where text must dominate the canvas. 1080px ad ≠ 1080px web page.
-        headline: { typeStyle: 'display03', cols: 14, align: 'center', gapStep: 6, maxLines: 3, fontWeight: 700, textAlign: 'center', adScale: 1.8, ...overrides.headline },
-        subline:  { typeStyle: 'heading04', cols: 13, align: 'center', gapStep: 7, textAlign: 'center', adScale: 2.0, ...overrides.subline },
-        cta:      { typeStyle: 'heading03', cols: 10, align: 'center', gapStep: 8, fontWeight: 600, textAlign: 'center', adScale: 1.8, ...overrides.cta },
-        tag:      { typeStyle: 'label02', cols: 10, align: 'center', gapStep: 5, textAlign: 'center', adScale: 1.8, ...overrides.tag },
+        // ★ v718: gapStep reduced from 6/7/8 to 4/4/5 — web spacing was far too wide for ads.
+        headline: { typeStyle: 'display03', cols: 14, align: 'center', gapStep: 4, maxLines: 3, fontWeight: 700, textAlign: 'center', adScale: 1.8, ...overrides.headline },
+        subline:  { typeStyle: 'heading04', cols: 13, align: 'center', gapStep: 4, textAlign: 'center', adScale: 2.0, ...overrides.subline },
+        cta:      { typeStyle: 'heading03', cols: 10, align: 'center', gapStep: 5, fontWeight: 600, textAlign: 'center', adScale: 1.8, ...overrides.cta },
+        tag:      { typeStyle: 'label02', cols: 10, align: 'center', gapStep: 3, textAlign: 'center', adScale: 1.8, ...overrides.tag },
         ctaHeightFactor: overrides.ctaHeightFactor ?? 0.07,
         verticalBias: overrides.verticalBias,
         contentOrder: overrides.contentOrder,
@@ -58,10 +59,11 @@ function sq(overrides: Partial<Record<'headline' | 'subline' | 'cta' | 'tag', Pa
 
 function ls(overrides: Partial<Record<'headline' | 'subline' | 'cta' | 'tag', Partial<ElementRule>>> & Partial<Omit<LayoutRuleSet, 'headline' | 'subline' | 'cta' | 'tag'>>): LayoutRuleSet {
     return {
-        headline: { typeStyle: 'expressiveHeading06', cols: 14, align: 'center', gapStep: 6, maxLines: 2, fontWeight: 700, textAlign: 'center', adScale: 1.5, ...overrides.headline },
-        subline:  { typeStyle: 'heading04', cols: 12, align: 'center', gapStep: 7, textAlign: 'center', adScale: 1.3, ...overrides.subline },
-        cta:      { typeStyle: 'productiveHeading03', cols: 8, align: 'center', gapStep: 8, fontWeight: 600, textAlign: 'center', adScale: 1.3, ...overrides.cta },
-        tag:      { typeStyle: 'label02', cols: 10, align: 'center', gapStep: 4, textAlign: 'center', adScale: 1.4, ...overrides.tag },
+        // ★ v718: gapStep reduced — tighter spacing for landscape ads
+        headline: { typeStyle: 'expressiveHeading06', cols: 14, align: 'center', gapStep: 4, maxLines: 2, fontWeight: 700, textAlign: 'center', adScale: 1.5, ...overrides.headline },
+        subline:  { typeStyle: 'heading04', cols: 12, align: 'center', gapStep: 4, textAlign: 'center', adScale: 1.3, ...overrides.subline },
+        cta:      { typeStyle: 'productiveHeading03', cols: 8, align: 'center', gapStep: 5, fontWeight: 600, textAlign: 'center', adScale: 1.3, ...overrides.cta },
+        tag:      { typeStyle: 'label02', cols: 10, align: 'center', gapStep: 3, textAlign: 'center', adScale: 1.4, ...overrides.tag },
         ctaHeightFactor: overrides.ctaHeightFactor ?? 0.07,
         verticalBias: overrides.verticalBias,
         contentOrder: overrides.contentOrder,
@@ -70,10 +72,11 @@ function ls(overrides: Partial<Record<'headline' | 'subline' | 'cta' | 'tag', Pa
 
 function pt(overrides: Partial<Record<'headline' | 'subline' | 'cta' | 'tag', Partial<ElementRule>>> & Partial<Omit<LayoutRuleSet, 'headline' | 'subline' | 'cta' | 'tag'>>): LayoutRuleSet {
     return {
-        headline: { typeStyle: 'display01', cols: 14, align: 'center', gapStep: 6, maxLines: 4, fontWeight: 700, textAlign: 'center', adScale: 1.5, ...overrides.headline },
-        subline:  { typeStyle: 'heading04', cols: 13, align: 'center', gapStep: 8, textAlign: 'center', adScale: 1.3, ...overrides.subline },
-        cta:      { typeStyle: 'productiveHeading03', cols: 12, align: 'center', gapStep: 9, fontWeight: 600, textAlign: 'center', adScale: 1.3, ...overrides.cta },
-        tag:      { typeStyle: 'label02', cols: 12, align: 'center', gapStep: 5, textAlign: 'center', adScale: 1.5, ...overrides.tag },
+        // ★ v718: gapStep reduced — tighter spacing for portrait ads
+        headline: { typeStyle: 'display01', cols: 14, align: 'center', gapStep: 4, maxLines: 4, fontWeight: 700, textAlign: 'center', adScale: 1.5, ...overrides.headline },
+        subline:  { typeStyle: 'heading04', cols: 13, align: 'center', gapStep: 5, textAlign: 'center', adScale: 1.3, ...overrides.subline },
+        cta:      { typeStyle: 'productiveHeading03', cols: 12, align: 'center', gapStep: 5, fontWeight: 600, textAlign: 'center', adScale: 1.3, ...overrides.cta },
+        tag:      { typeStyle: 'label02', cols: 12, align: 'center', gapStep: 3, textAlign: 'center', adScale: 1.5, ...overrides.tag },
         ctaHeightFactor: overrides.ctaHeightFactor ?? 0.06,
         verticalBias: overrides.verticalBias,
         contentOrder: overrides.contentOrder,

@@ -562,16 +562,17 @@ describe('★ P0-4: Text-on-image overlay', () => {
         expect(overlay.a).toBeLessThan(1);
     });
 
-    it('v713 gradient-scrim overlay covers lower portion of canvas', () => {
-        // v713: gradient-scrim starts at 30% canvas height — covers bottom text area.
-        // Text readability at top is handled by text shadows, not overlay coverage.
+    it('v718 gradient-scrim overlay covers lower portion of canvas', () => {
+        // v718: gradient-scrim starts at 50% canvas height — image stays vivid on top half.
         const { elements } = buildDesignElements(FULL_CONTENT, PALETTE, 1080, 1080, true, 'centered');
         const overlay = elements.find(el => el.name === 'text_overlay')!;
         expect(overlay).toBeDefined();
         // Overlay should span full width
         expect(overlay.w).toBe(1080);
-        // Overlay should start below 50% mark (gradient approach)
-        expect(overlay.y).toBeLessThan(1080 * 0.5);
+        // Overlay should start at or below 50% mark
+        expect(overlay.y).toBeLessThanOrEqual(1080 * 0.5);
+        // Overlay height should cover bottom half
+        expect(overlay.h).toBe(1080 - overlay.y!);
     });
 
     it('overlay is first element (behind all content)', () => {

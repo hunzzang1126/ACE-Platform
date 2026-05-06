@@ -72,20 +72,26 @@ export function buildOverlayResult(
 
     switch (approach) {
         case 'gradient-scrim': {
-            // ★ KEY CHANGE: Gradient uses BRAND COLOR, not black.
-            // Fades from transparent at top → brand bg color at bottom.
-            // Image stays vivid at top, text zone at bottom is readable.
+            // ★ v718: Gradient uses BRAND COLOR, starts at bottom 50%.
+            // Previous version started at 30% with rgba(0,0,0,0) which hexToRgb couldn't parse.
+            // Now: fully transparent at scrim top → brand bg at scrim bottom.
             const bgR = hexR(bgColor), bgG = hexG(bgColor), bgB = hexB(bgColor);
+            // ★ Use actual bgColor with alpha channel manipulation via r/g/b/a fields.
+            // The gradient rect engine handles gradient_start/end for color,
+            // so we make start = transparent version of bg, end = opaque bg.
+            const scrimStartY = Math.round(canvasH * 0.50); // Start halfway — image stays vivid on top
             return {
                 overlayElements: [{
                     name: 'text_overlay',
                     type: 'rect' as any,
-                    x: 0, y: Math.round(canvasH * 0.30),
-                    w: canvasW, h: Math.round(canvasH * 0.70),
-                    gradient_start_hex: `rgba(0,0,0,0)`,
+                    x: 0, y: scrimStartY,
+                    w: canvasW, h: canvasH - scrimStartY,
+                    // ★ FIX: Use bgColor for both ends — the gradient effect comes from
+                    // the Fabric gradient opacity transition, not CSS rgba().
+                    gradient_start_hex: bgColor,
                     gradient_end_hex: bgColor,
                     gradient_angle: 180,
-                    r: bgR, g: bgG, b: bgB, a: 0.65,
+                    r: bgR, g: bgG, b: bgB, a: 0.55,
                 }],
                 textModifiers: SUBTLE_TEXT_SHADOW,
                 imageFilters: { brightness: aiBrightness || -0.1, blur: fabricBlur },
