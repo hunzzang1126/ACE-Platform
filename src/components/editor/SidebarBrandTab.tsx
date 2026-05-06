@@ -12,6 +12,7 @@ import { useBrandKitStore, type AssetCategory, type AssetFormat } from '@/stores
 import type { CanvasEngineActions } from '@/hooks/canvasTypes';
 import { resolveAsset, isAssetRef } from '@/services/assetService';
 import { sidebarBrandStyles as S } from './sidebarBrandStyles';
+import { FontPicker } from './FontPicker';
 
 interface Props {
     actions?: CanvasEngineActions | null;
@@ -307,14 +308,14 @@ export function SidebarBrandTab({ actions }: Props) {
                         {(['heading', 'body', 'cta'] as const).map(role => (
                             <div key={role} style={S.fontRow}>
                                 <span style={S.fontLabel}>{role}</span>
-                                <input
-                                    style={S.fontInput}
+                                <FontPicker
                                     value={kit.typography[role].family}
-                                    onChange={e => updateTypography(kit.id, { [role]: { ...kit.typography[role], family: e.target.value } })}
-                                    placeholder="Font family..."
+                                    onChange={family => updateTypography(kit.id, { [role]: { ...kit.typography[role], family } })}
                                 />
                                 <div style={{ ...S.fontPreview, fontFamily: kit.typography[role].family }}>
-                                    The quick brown fox
+                                    {kit.typography[role].family
+                                        ? (role === 'heading' ? 'The quick brown fox' : role === 'cta' ? 'Shop Now' : 'The quick brown fox jumps over the lazy dog')
+                                        : 'Select a font above'}
                                 </div>
                             </div>
                         ))}
