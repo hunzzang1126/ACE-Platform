@@ -50,8 +50,11 @@ export async function executeGenerateFlow(
     } catch { /* ok */ }
 
     console.log(`[Pipeline] Canvas size: ${canvasW}x${canvasH}`);
-    // ── Phase 1.5: Brand Cloud Scan ──
-    const brand = await scanBrandCloud(prompt, cb);
+
+    const abort = new AbortController();
+
+    // ── Phase 1.5: Brand Cloud Scan (★ v719: now includes hybrid asset selection) ──
+    const brand = await scanBrandCloud(prompt, canvasW, canvasH, cb, abort.signal);
     await pause(300);
 
     // ── Phase 2: AI Copywriting (stepper: Planning) ──
@@ -60,7 +63,6 @@ export async function executeGenerateFlow(
     cb.addCard('content', 'Generating creative copy', 'running');
     await pause(400);
 
-    const abort = new AbortController();
     const { callTemplateContent } = await resilientImport(() => import('@/services/autoDesignService'));
     const { loadUserPrefs } = await resilientImport(() => import('@/stores/userPrefs'));
     const preferredLang = loadUserPrefs().preferredLanguage;
@@ -95,13 +97,24 @@ export async function executeGenerateFlow(
     cb.narrate(colorReasoning || `Color palette: ${guide.name}`);
     await pause(400);
 
-    // ── Phase 4.5: Background Image ──
-    const bgResult = await generateBgImage(finalNeedsImage, backgroundImagePrompt, prompt, canvasW, canvasH, guide, abort, cb);
+    // ── Phase 4.5: Background Image (★ v719: 3-tier decision) ──
+    let bgResult: { hasImage: boolean; url: string | null };
+    if (brand.selectedAssets?.background) {
+        // Tier 1: Brand asset background (relevance verified by Code+AI)
+        bgResult = { hasImage: true, url: brand.selectedAssets.background.asset.src };
+        cb.narrate(`Using brand background: ${brand.selectedAssets.background.reasoning}`);
+        cb.addCard('bg-image', 'Brand background', 'done', {
+            expandedDetail: `Brand asset: "${brand.selectedAssets.background.asset.name}"\n${brand.selectedAssets.background.reasoning}`,
+        });
+    } else {
+        // Tier 2/3: AI generation or gradient
+        bgResult = await generateBgImage(finalNeedsImage, backgroundImagePrompt, prompt, canvasW, canvasH, guide, abort, cb);
+    }
     await pause(300);
 
     // ── Phase 4: Carbon Layout + Render (stepper: Executing) ──
     cb.setPhase?.('executing');
-    const rendered = await buildAndRender(prompt, guide, content, canvasW, canvasH, bgResult, brand.logoUrl, brand.logoW, brand.logoH, engine, abort, cb, designStrategy, aiLayoutVariant);
+    const rendered = await buildAndRender(prompt, guide, content, canvasW, canvasH, bgResult, brand.logoUrl, brand.logoW, brand.logoH, engine, abort, cb, designStrategy, aiLayoutVariant, brand.selectedAssets);
 
     // ── Phase 6: Finalize (stepper: Finishing) ──
     // ★ Vision QA removed — deterministic quality (recolor + contrast + layout validation)
@@ -186,6 +199,7 @@ async function buildAndRender(
     engine: FlowEngine, abort: AbortController, cb: AgentFlowCallbacks,
     designStrategy?: any,
     aiLayoutVariant?: string | null,
+    selectedAssets?: import('@/carbon/brandAssetSelector').AssetSelection | null,
 ): Promise<number> {
     cb.narrate('Building the layout with Carbon Design System...');
     cb.addCard('build', 'Carbon layout engine', 'running');
@@ -320,17 +334,10 @@ async function buildAndRender(
     }
     cb.hideCursor();
 
-    // ── Brand Logo ──
-    if (brandLogoUrl) {
-        try {
-            const maxLogoSize = Math.round(Math.min(canvasW, canvasH) * 0.15);
-            const logoAspect = brandLogoW > 0 && brandLogoH > 0 ? brandLogoW / brandLogoH : 1;
-            const [logoPlaceW, logoPlaceH] = logoAspect >= 1 ? [maxLogoSize, Math.round(maxLogoSize / logoAspect)] : [Math.round(maxLogoSize * logoAspect), maxLogoSize];
-            const logoPad = Math.round(Math.min(canvasW, canvasH) * 0.04);
-            await engine.add_image(canvasW - logoPlaceW - logoPad, canvasH - logoPlaceH - logoPad, brandLogoUrl, logoPlaceW, logoPlaceH, 'brand_logo');
-            cb.narrate('Brand logo placed on canvas.');
-        } catch (err) { console.warn('[UnifiedAgent] Failed to place logo:', err); }
-    }
+    // ── Brand Assets (logo + product images) ──
+    const { placeBrandAssets } = await resilientImport(() => import('./agentFlowRender'));
+    const brandPlaced = await placeBrandAssets(engine, canvasW, canvasH, brandLogoUrl, brandLogoW, brandLogoH, selectedAssets, cb);
+    rendered += brandPlaced;
 
     try { engine.reorder_by_z_index?.(); } catch { /* ok */ }
     try { engine.render_all?.(); } catch { /* ok */ }

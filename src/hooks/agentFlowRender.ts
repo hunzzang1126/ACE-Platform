@@ -69,3 +69,60 @@ export async function runVisionQA(engine: FlowEngine, canvasW: number, canvasH: 
         cb.narrate(`Design placed with ${rendered} elements using ${guide.name}.\nCanvas: ${canvasW}x${canvasH}px`);
     }
 }
+
+/** Place brand logo and product images on the canvas. Returns count of rendered product images. */
+export async function placeBrandAssets(
+    engine: FlowEngine,
+    canvasW: number,
+    canvasH: number,
+    logoUrl: string | null,
+    logoW: number,
+    logoH: number,
+    selectedAssets: import('@/carbon/brandAssetSelector').AssetSelection | null | undefined,
+    cb: AgentFlowCallbacks,
+): Promise<number> {
+    let placed = 0;
+
+    // ── Brand Logo ──
+    if (logoUrl) {
+        try {
+            const canvasMin = Math.min(canvasW, canvasH);
+            const maxLogoSize = Math.round(canvasMin * 0.15);
+            const logoAspect = logoW > 0 && logoH > 0 ? logoW / logoH : 1;
+            const [logoPlaceW, logoPlaceH] = logoAspect >= 1
+                ? [maxLogoSize, Math.round(maxLogoSize / logoAspect)]
+                : [Math.round(maxLogoSize * logoAspect), maxLogoSize];
+            const logoPad = Math.round(canvasMin * 0.04);
+            await engine.add_image(canvasW - logoPlaceW - logoPad, canvasH - logoPlaceH - logoPad, logoUrl, logoPlaceW, logoPlaceH, 'brand_logo');
+            cb.narrate('Brand logo placed on canvas.');
+        } catch (err) { console.warn('[Pipeline] Failed to place logo:', err); }
+    }
+
+    // ── Brand Product Images (★ v719) ──
+    if (selectedAssets?.productImages.length) {
+        for (const { asset, reasoning, placementHint } of selectedAssets.productImages) {
+            try {
+                const canvasMin = Math.min(canvasW, canvasH);
+                const productSize = Math.round(canvasMin * 0.35);
+                const productAspect = asset.width > 0 && asset.height > 0 ? asset.width / asset.height : 1;
+                const [pw, ph] = productAspect >= 1
+                    ? [productSize, Math.round(productSize / productAspect)]
+                    : [Math.round(productSize * productAspect), productSize];
+                const pad = Math.round(canvasMin * 0.04);
+
+                let px: number, py: number;
+                const place = placementHint ?? asset.metadata?.suggestedPlacement ?? 'center';
+                if (place === 'top-right') { px = canvasW - pw - pad; py = pad; }
+                else if (place === 'bottom-left') { px = pad; py = canvasH - ph - pad; }
+                else if (place === 'bottom-right') { px = canvasW - pw - pad; py = canvasH - ph - pad; }
+                else { px = Math.round((canvasW - pw) / 2); py = Math.round((canvasH - ph) / 2); }
+
+                await engine.add_image(px, py, asset.src, pw, ph, `brand_product_${asset.name}`);
+                placed++;
+                cb.narrate(`Product image placed: ${reasoning}`);
+            } catch (err) { console.warn('[Pipeline] Failed to place product image:', err); }
+        }
+    }
+
+    return placed;
+}

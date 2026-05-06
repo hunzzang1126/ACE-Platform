@@ -6,6 +6,7 @@
 
 import type { AgentFlowCallbacks } from './agentFlowTypes';
 import { resilientImport } from '@/utils/resilientImport';
+import type { AssetSelection } from '@/carbon/brandAssetSelector';
 
 export interface BrandScanResult {
     context: string;
@@ -16,11 +17,19 @@ export interface BrandScanResult {
     logoW: number;
     logoH: number;
     visionBlocks: any[];
+    /** ★ v719: Hybrid selector result (Code + AI) */
+    selectedAssets: AssetSelection | null;
 }
 
-export async function scanBrandCloud(prompt: string, cb: AgentFlowCallbacks): Promise<BrandScanResult> {
+export async function scanBrandCloud(
+    prompt: string,
+    canvasW: number,
+    canvasH: number,
+    cb: AgentFlowCallbacks,
+    signal?: AbortSignal,
+): Promise<BrandScanResult> {
     cb.addCard('brand-scan', 'Scanning Brand Cloud', 'running');
-    const result: BrandScanResult = { context: '', paletteHint: '', fontHint: '', assetHint: '', logoUrl: null, logoW: 0, logoH: 0, visionBlocks: [] };
+    const result: BrandScanResult = { context: '', paletteHint: '', fontHint: '', assetHint: '', logoUrl: null, logoW: 0, logoH: 0, visionBlocks: [], selectedAssets: null };
 
     try {
         const { useBrandKitStore } = await resilientImport(() => import('@/stores/brandKitStore'));
@@ -31,37 +40,51 @@ export async function scanBrandCloud(prompt: string, cb: AgentFlowCallbacks): Pr
         result.fontHint = `Brand fonts: heading="${kit.typography.heading.family}", body="${kit.typography.body.family}", CTA="${kit.typography.cta.family}"`;
 
         const activeAssets = kit.assets.filter(a => !a.deletedAt);
-        const logoAssets = activeAssets.filter(a => a.category === 'logo');
-        if (logoAssets.length > 0) {
-            const brandNameLower = (kit.guidelines?.name || kit.name || '').toLowerCase();
-            const brandTaglineLower = (kit.guidelines?.tagline || '').toLowerCase();
-            const pl = prompt.toLowerCase();
-            if (pl.includes(brandNameLower) || (brandTaglineLower && pl.includes(brandTaglineLower)) || pl.includes('logo') || pl.includes('brand') || pl.includes('로고') || pl.includes('브랜드')) {
+
+        // ★ v719: Hybrid brand asset selection (Code Layer + AI Layer)
+        try {
+            const { selectBrandAssets } = await resilientImport(() => import('@/carbon/brandAssetSelector'));
+            const selection = await selectBrandAssets(prompt, activeAssets, result.context, canvasW, canvasH, signal);
+            result.selectedAssets = selection;
+
+            // Logo decided by selector (replaces legacy keyword matching)
+            if (selection.logo) {
+                result.logoUrl = selection.logo.src;
+                result.logoW = selection.logo.width;
+                result.logoH = selection.logo.height;
+            }
+
+            // Build UI summary
+            const usedParts: string[] = [];
+            const skippedParts: string[] = [];
+            if (selection.logo) usedParts.push(`Logo: ${selection.logo.name}`);
+            if (selection.background) usedParts.push(`BG: ${selection.background.reasoning}`);
+            for (const p of selection.productImages) usedParts.push(`Product: ${p.reasoning}`);
+            if (selection.needsGeneratedBackground) usedParts.push('BG: AI will generate');
+            for (const s of selection.skippedAssets) skippedParts.push(`Skip: ${s.asset.name} (${s.reasoning})`);
+
+            const summary = `${usedParts.length} selected, ${skippedParts.length} skipped`;
+            cb.updateCard('brand-scan', 'done', `${kit.name}: ${summary}`, {
+                expandedDetail: [...usedParts, ...skippedParts, '', result.context].filter(Boolean).join('\n'),
+            });
+            cb.narrate(`Brand kit "${kit.name}" — ${summary}.`);
+        } catch (selErr) {
+            console.warn('[BrandScan] Asset selector failed, falling back to legacy:', selErr);
+            // Fallback to legacy logo detection
+            const logoAssets = activeAssets.filter(a => a.category === 'logo');
+            if (logoAssets.length > 0) {
                 const logo = logoAssets[0]!;
                 result.logoUrl = logo.src; result.logoW = logo.width; result.logoH = logo.height;
             }
+            cb.updateCard('brand-scan', 'done', `${kit.name}: ${activeAssets.length} asset(s)`, { expandedDetail: result.context });
+            cb.narrate(`Brand kit "${kit.name}" loaded.`);
         }
-
-        const promptLower = prompt.toLowerCase();
-        const matchedAssets = activeAssets.filter(a => a.tags.some(t => promptLower.includes(t.toLowerCase())) || promptLower.includes(a.name.toLowerCase()) || promptLower.includes(a.category));
-        if (matchedAssets.length > 0 || logoAssets.length > 0) {
-            const allRelevant = [...new Set([...logoAssets, ...matchedAssets])];
-            result.assetHint = `Brand assets: ${allRelevant.map(a => `"${a.name}" (${a.category}, ${a.width}x${a.height})`).join(', ')}`;
-        }
-
-        const g = kit.guidelines;
-        result.context = [`Brand: ${g.name || kit.name}`, g.tagline ? `Tagline: "${g.tagline}"` : '', g.voiceTone ? `Voice: ${g.voiceTone}` : '', g.ctaPhrases.length > 0 ? `CTA phrases: ${g.ctaPhrases.join(', ')}` : '', result.paletteHint, result.fontHint, result.assetHint].filter(Boolean).join('\n');
 
         try {
             const { buildBrandVisionBlocks } = await resilientImport(() => import('@/services/brandContextBuilder'));
             result.visionBlocks = buildBrandVisionBlocks(kit);
             if (result.visionBlocks.length > 0) cb.narrate(`AI can now visually see ${Math.floor(result.visionBlocks.length / 2)} brand asset(s).`);
         } catch { /* optional */ }
-
-        const logoNote = logoAssets.length > 0 ? ` (${logoAssets.length} logo)` : '';
-        const assetNote = matchedAssets.length > 0 ? `${matchedAssets.length} matching asset(s)${logoNote}` : `${activeAssets.length} asset(s)${logoNote}`;
-        cb.updateCard('brand-scan', 'done', `${kit.name}: ${assetNote}`, { expandedDetail: result.context });
-        cb.narrate(`Brand kit "${kit.name}" loaded — ${assetNote}.`);
     } catch {
         cb.updateCard('brand-scan', 'done', 'Brand Cloud scan skipped');
     }
