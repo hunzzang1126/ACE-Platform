@@ -31,6 +31,12 @@ export function buildTextElement(
     const heightBudget: Record<string, number> = {
         headline: 0.25, subheadline: 0.12, tag_text: 0.08, cta_label: 0.10,
     };
+    // ★ v715: CJK headlines need smaller budget — chars are taller + more line wrapping
+    // eslint-disable-next-line no-control-regex
+    const quickCjkCheck = /[\u3000-\u9FFF\uAC00-\uD7AF\uF900-\uFAFF]/.test(content);
+    if (quickCjkCheck && name === 'headline') {
+        heightBudget.headline = 0.18; // Tighter budget for CJK headlines
+    }
     const budget = heightBudget[name] ?? 0.20;
     const maxFontFromHeight = Math.floor(canvasH * budget / typeStyle.lineHeight);
     fontSize = Math.min(fontSize, Math.max(8, maxFontFromHeight));
@@ -46,21 +52,33 @@ export function buildTextElement(
     const upperCount = chars.filter(c => c >= 'A' && c <= 'Z').length;
     const cjkRatio = cjkCount / totalChars;
     const uppercaseRatio = upperCount / totalChars;
-    const avgCharWidth = cjkRatio * 1.0 + (1 - cjkRatio) * (0.55 + uppercaseRatio * 0.15);
+    // ★ v715: CJK chars are wider than 1em in most fonts — measured ~1.1em average
+    const avgCharWidth = cjkRatio * 1.1 + (1 - cjkRatio) * (0.55 + uppercaseRatio * 0.15);
     const charsPerLine = Math.max(1, Math.floor(w / (fontSize * avgCharWidth)));
-    // ★ Word-aware line estimation
-    const words = content.split(/\s+/);
-    let estimatedLines = 1, lineCharCount = 0;
-    for (const word of words) {
-        if (lineCharCount + word.length > charsPerLine && lineCharCount > 0) {
-            estimatedLines++;
-            lineCharCount = word.length;
-        } else {
-            lineCharCount += (lineCharCount > 0 ? 1 : 0) + word.length;
+
+    // ★ v715: CJK-heavy text wraps per CHARACTER in Fabric.js (no word boundaries).
+    // Word-based estimation fails for Korean/Chinese/Japanese.
+    let estimatedLines: number;
+    if (cjkRatio > 0.4) {
+        // Pure character-based: total chars ÷ chars per line
+        estimatedLines = Math.ceil(totalChars / charsPerLine);
+    } else {
+        // Word-aware line estimation (Latin/mixed text)
+        const words = content.split(/\s+/);
+        estimatedLines = 1;
+        let lineCharCount = 0;
+        for (const word of words) {
+            if (lineCharCount + word.length > charsPerLine && lineCharCount > 0) {
+                estimatedLines++;
+                lineCharCount = word.length;
+            } else {
+                lineCharCount += (lineCharCount > 0 ? 1 : 0) + word.length;
+            }
         }
     }
     const lines = Math.min(rule.maxLines ?? 10, estimatedLines);
-    const cjkPadding = cjkRatio > 0.2 ? fontSize * 0.15 : 0;
+    // ★ v715: CJK needs more vertical padding (descenders + line spacing variance)
+    const cjkPadding = cjkRatio > 0.2 ? fontSize * 0.3 * lines : 0;
     const h = Math.round(fontSize * lineHeight * lines + fontSize * 0.3 + cjkPadding);
 
     let x: number;
