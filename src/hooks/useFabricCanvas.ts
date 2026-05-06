@@ -28,6 +28,7 @@ import type { TextEffectType } from '@/schema/elements.types';
 import { nextId, nextColor, rgbToHex, isArtboard, fabricToEngineNode, patchAceProps, GLID_CUSTOM_PROPS } from './fabricHelpers';
 import { createEngineShim } from './fabricEngineShim';
 import { setupCanvasEvents } from './fabricCanvasEvents';
+import { useFabricKeyboard } from './fabricKeyboard';
 
 export function useFabricCanvas(width: number, height: number, _addDemoShapes = false): UseCanvasEngineResult {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -356,19 +357,12 @@ export function useFabricCanvas(width: number, height: number, _addDemoShapes = 
     // ── Pen tool ──
     useEffect(() => { const fc = fabricRef.current; if (!fc || status !== 'ready') return; if (activeTool === 'pen') { fc.isDrawingMode = true; fc.freeDrawingBrush = new PencilBrush(fc); fc.freeDrawingBrush.color = '#333333'; fc.freeDrawingBrush.width = 2; } else { fc.isDrawingMode = false; } fc.renderAll(); }, [activeTool, status]);
 
-    // ── Keyboard shortcuts ──
-    useEffect(() => {
-        const handler = (e: KeyboardEvent) => {
-            const tag = (e.target as HTMLElement)?.tagName;
-            if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return;
-            if ((e.metaKey || e.ctrlKey) && e.key === '0') { e.preventDefault(); const fc = fabricRef.current; if (fc) { const c = containerRef.current; const cw = c?.clientWidth ?? 1200; const ch = c?.clientHeight ?? 700; const fit = Math.min(cw / width * 0.85, ch / height * 0.85, 1); const vpt = fc.viewportTransform!; vpt[0] = fit; vpt[3] = fit; vpt[4] = (cw - width * fit) / 2; vpt[5] = (ch - height * fit) / 2; fc.setViewportTransform(vpt); fc.renderAll(); } return; }
-            if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return; }
-            if ((e.metaKey || e.ctrlKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) { e.preventDefault(); redo(); return; }
-            if (!e.metaKey && !e.ctrlKey && !e.altKey) { switch (e.key.toLowerCase()) { case 'v': setTool('select'); break; case 's': setTool('shape'); break; case 't': setTool('text'); break; case 'p': setTool('pen'); break; case 'h': setTool('hand'); break; case 'z': setTool('zoom'); break; case 'd': setTool('eyedropper'); break; } }
-        };
-        window.addEventListener('keydown', handler);
-        return () => window.removeEventListener('keydown', handler);
-    }, [undo, redo, setTool, width, height]);
+    // ── Keyboard shortcuts (extracted to fabricKeyboard.ts) ──
+    useFabricKeyboard({
+        fabricRef, containerRef, width, height,
+        undo, redo, deleteSelected, duplicateSelected,
+        setTool, syncState, pushUndo,
+    });
 
     const retryInit = useCallback(() => { if (fabricRef.current) { fabricRef.current.dispose(); fabricRef.current = null; } setStatus('loading'); setErrorMsg(''); }, []);
     const onMouseDown = useCallback((_e: React.MouseEvent) => { }, []);

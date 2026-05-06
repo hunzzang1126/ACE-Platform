@@ -110,6 +110,31 @@ export function setupCanvasEvents({
     });
     fc.on('object:removed', () => { resyncZIndices(); pushUndo('Remove element'); syncState(); });
 
+    // ── Alt+Drag = Duplicate (Figma/Photoshop standard) ──
+    fc.on('mouse:down', (opt) => {
+        const e = opt.e as MouseEvent;
+        if (!e.altKey || e.button !== 0) return;
+        const target = opt.target;
+        if (!target || isArtboard(target)) return;
+
+        // Clone the object and place it at the same position.
+        // The user's drag will move the CLONE, leaving original in place.
+        target.clone().then((cloned: FabricObject) => {
+            // Give original a new position (it stays) — actually we want
+            // the clone to be the one that's dragged. So:
+            // 1. Add clone at same position
+            // 2. Make clone the active (dragged) object
+            const id = nextId();
+            (cloned as any).__glidId = id;
+            (cloned as any).__glidZIndex = fc.getObjects().filter(o => !isArtboard(o) && !(o as any).__aceGuide).length;
+            patchAceProps(cloned);
+            fc.add(cloned);
+            fc.setActiveObject(cloned);
+            fc.renderAll();
+            syncState();
+        });
+    });
+
     // ── Deselect on background click ──
     fc.on('mouse:down', (opt) => {
         const e = opt.e as MouseEvent;
