@@ -14,6 +14,7 @@ import { getOpenRouterUrl } from '@/services/openRouterClient';
 import type { AiConfig, LiveProgress, ToolExecutorOverride, ClaudeContentBlock, ClaudeMessage, ClaudeResponse } from './aiServiceTypes';
 import { loadConfig, saveConfig, sleep, nextFrame, humanizeToolStep } from './aiServiceTypes';
 import { getCanvasElementCount, getCanvasElementNames, saveInteractionMemory } from './aiServiceHelpers';
+import { parseSSEStream, parseNonStreamingResponse } from './aiResponseParsers';
 
 // Re-export for backward compat
 export type { AiConfig, LiveProgress, ToolExecutorOverride };
@@ -309,82 +310,54 @@ export class AiService {
         const openAiTools = tools.length > 0 ? tools.map(t => ({ type: 'function' as const, function: { name: t.name, description: t.description, parameters: t.input_schema } })) : undefined;
         const body: Record<string, unknown> = { model, max_tokens: routedModel.maxTokens || 4096, messages: openAiMessages, tools: openAiTools, stream: true };
 
-        // ★ Import getProxyHeaders dynamically to get JWT in production / direct key in dev
+        // ★ v715: 3-attempt strategy:
+        //   Attempt 0: streaming (fast UX)
+        //   Attempt 1: fresh JWT + streaming
+        //   Attempt 2: fresh JWT + NON-streaming (fallback for SSE+tools 400 bugs)
         for (let attempt = 0; attempt <= 2; attempt++) {
             const { getProxyHeaders } = await import('@/services/openRouterClient');
             const headers = await getProxyHeaders();
-            const resp = await fetch(apiUrl, { method: 'POST', headers, body: JSON.stringify(body) });
+
+            // ★ v715: On last attempt, disable streaming as fallback
+            const useStream = attempt < 2;
+            const reqBody = { ...body, stream: useStream };
+
+            const resp = await fetch(apiUrl, { method: 'POST', headers, body: JSON.stringify(reqBody) });
             if (resp.ok) {
                 breaker.recordSuccess();
-                return await this.parseSSEStream(resp, model, progress);
+                if (useStream) {
+                    return await parseSSEStream(resp, model, progress);
+                }
+                // ★ Non-streaming fallback: parse JSON response directly
+                return parseNonStreamingResponse(await resp.json(), model);
             }
             breaker.recordFailure();
+
+            // ★ v715: Read error body BEFORE retry to log the actual OpenRouter error
+            const errorText = await resp.text();
+            let errorMessage = `API Error ${resp.status}`;
+            try { const errJson = JSON.parse(errorText); errorMessage = errJson?.error?.message || errorMessage; } catch { /* raw text */ }
+            console.error(`[AiService] ${resp.status} (attempt ${attempt + 1}/3): ${errorMessage.slice(0, 200)}`);
+
             if (resp.status === 429 && attempt < 2) { progress.onThinking('Rate limited. Retrying in 10s...'); await sleep(10000); continue; }
-            // ★ Retry on 400/401 with fresh JWT — expired tokens or stale requests
+
             if ((resp.status === 400 || resp.status === 401) && attempt < 2) {
-                console.warn(`[AiService] ${resp.status} from API — refreshing session and retrying (attempt ${attempt + 1})`);
+                // ★ v715: Refresh JWT + on attempt 2 will fall back to non-streaming
                 try {
                     const { getSupabase } = await import('@/services/supabaseClient');
                     const sb = getSupabase();
                     if (sb) await sb.auth.refreshSession();
                 } catch { /* ignore refresh failure */ }
-                progress.onThinking('Retrying request...');
+                progress.onThinking(attempt === 0 ? 'Retrying request...' : 'Retrying without streaming...');
                 await sleep(1000);
                 continue;
             }
-            const errorText = await resp.text();
-            console.error(`[AiService] API Error ${resp.status}:`, errorText.slice(0, 300));
-            try { const errJson = JSON.parse(errorText); progress.onError(errJson?.error?.message || `API Error ${resp.status}`); } catch { progress.onError(`API Error ${resp.status}: ${errorText.substring(0, 200)}`); }
+
+            progress.onError(errorMessage);
             return null;
         }
         progress.onError('Request failed after retries. Please try again.');
         return null;
-    }
-
-    private async parseSSEStream(resp: Response, model: string, progress: LiveProgress): Promise<ClaudeResponse | null> {
-        const reader = resp.body?.getReader();
-        if (!reader) { progress.onError('Streaming not supported'); return null; }
-        const decoder = new TextDecoder();
-        let sseBuffer = '', fullText = '', responseId = '', inputTokens = 0, outputTokens = 0;
-        const toolCallMap = new Map<number, { id: string; name: string; args: string }>();
-
-        try {
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                sseBuffer += decoder.decode(value, { stream: true });
-                const lines = sseBuffer.split('\n');
-                sseBuffer = lines.pop() ?? '';
-                for (const line of lines) {
-                    const trimmed = line.trim();
-                    if (!trimmed || !trimmed.startsWith('data: ') || trimmed === 'data: [DONE]') continue;
-                    try {
-                        const chunk = JSON.parse(trimmed.slice(6)) as any;
-                        if (chunk.id) responseId = chunk.id;
-                        if (chunk.usage) { inputTokens = chunk.usage.prompt_tokens ?? inputTokens; outputTokens = chunk.usage.completion_tokens ?? outputTokens; }
-                        const delta = chunk.choices?.[0]?.delta;
-                        if (!delta) continue;
-                        if (delta.content) { fullText += delta.content; progress.onToken(delta.content); }
-                        if (delta.tool_calls) {
-                            for (const tc of delta.tool_calls) {
-                                const idx = tc.index ?? 0;
-                                if (!toolCallMap.has(idx)) toolCallMap.set(idx, { id: tc.id ?? '', name: '', args: '' });
-                                const entry = toolCallMap.get(idx)!;
-                                if (tc.id) entry.id = tc.id;
-                                if (tc.function?.name) entry.name += tc.function.name;
-                                if (tc.function?.arguments) entry.args += tc.function.arguments;
-                            }
-                        }
-                    } catch { /* skip malformed SSE chunks */ }
-                }
-            }
-        } finally { reader.releaseLock(); }
-
-        const content: ClaudeContentBlock[] = [];
-        if (fullText) content.push({ type: 'text', text: fullText });
-        for (const [, tc] of toolCallMap) { try { content.push({ type: 'tool_use', id: tc.id, name: tc.name, input: JSON.parse(tc.args || '{}') }); } catch { /* */ } }
-
-        return { id: responseId, type: 'message', role: 'assistant', content, model, stop_reason: (toolCallMap.size > 0 ? 'tool_use' : 'end_turn') as ClaudeResponse['stop_reason'], usage: { input_tokens: inputTokens, output_tokens: outputTokens } };
     }
 
 }

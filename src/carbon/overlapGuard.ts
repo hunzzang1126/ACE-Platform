@@ -45,7 +45,7 @@ export function fixAllOverlaps(
     canvasMin: number,
 ): void {
     const MAX_PASSES = 5;
-    const MIN_GAP = Math.max(4, Math.round(canvasMin * 0.008)); // ~0.8% of min dimension
+    const MIN_GAP = Math.max(8, Math.round(canvasMin * 0.02)); // ~2% of min dimension
 
     for (let pass = 0; pass < MAX_PASSES; pass++) {
         // Collect content elements with their indices

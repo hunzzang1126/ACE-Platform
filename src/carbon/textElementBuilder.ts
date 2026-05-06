@@ -79,7 +79,11 @@ export function buildTextElement(
     const lines = Math.min(rule.maxLines ?? 10, estimatedLines);
     // ★ v715: CJK needs more vertical padding (descenders + line spacing variance)
     const cjkPadding = cjkRatio > 0.2 ? fontSize * 0.3 * lines : 0;
-    const h = Math.round(fontSize * lineHeight * lines + fontSize * 0.3 + cjkPadding);
+    // ★ v715: Universal safety margin — Fabric.js renders text taller than our estimation.
+    // 20% margin ensures the overlap guard always sees heights >= actual render height.
+    // Without this, overlapGuard.ts thinks "no overlap" while the screen shows overlap.
+    const rawH = fontSize * lineHeight * lines + fontSize * 0.3 + cjkPadding;
+    const h = Math.round(rawH * 1.2);
 
     let x: number;
     if (rule.align === 'center') x = centeredX(rule.cols, canvasW);
