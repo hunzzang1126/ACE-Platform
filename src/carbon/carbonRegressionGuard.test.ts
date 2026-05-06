@@ -317,11 +317,14 @@ describe('★ REGRESSION: Background generation', () => {
         expect(elements.find(el => el.name === 'background')).toBeUndefined();
     });
 
-    it('text is white when hasBgImage=true', () => {
+    it('text is white-based when hasBgImage=true (v713: sub may have opacity)', () => {
         const { elements } = buildDesignElements(FULL_CONTENT, PALETTE, 300, 250, true);
         const texts = elements.filter(el => el.type === 'text');
         for (const t of texts) {
-            expect(t.color_hex).toBe('#FFFFFF');
+            // v713: headline = #FFFFFF, subheadline = rgba(255,255,255,0.75)
+            const color = t.color_hex ?? '';
+            const isWhiteBased = color === '#FFFFFF' || color.startsWith('rgba(255,255,255,');
+            expect(isWhiteBased, `${t.name} has non-white color: ${color}`).toBe(true);
         }
     });
 });
@@ -559,17 +562,16 @@ describe('★ P0-4: Text-on-image overlay', () => {
         expect(overlay.a).toBeLessThan(1);
     });
 
-    it('scrim/side-panel overlay covers all text elements', () => {
-        // Use 'centered' which produces a 'scrim' that wraps content bounds
+    it('v713 gradient-scrim overlay covers lower portion of canvas', () => {
+        // v713: gradient-scrim starts at 30% canvas height — covers bottom text area.
+        // Text readability at top is handled by text shadows, not overlay coverage.
         const { elements } = buildDesignElements(FULL_CONTENT, PALETTE, 1080, 1080, true, 'centered');
         const overlay = elements.find(el => el.name === 'text_overlay')!;
-        const textEls = elements.filter(el => el.type === 'text');
-        for (const t of textEls) {
-            expect(overlay.x!, `overlay doesn't cover ${t.name} left`).toBeLessThanOrEqual(t.x!);
-            expect(overlay.y!, `overlay doesn't cover ${t.name} top`).toBeLessThanOrEqual(t.y!);
-            expect((overlay.x ?? 0) + (overlay.w ?? 0)).toBeGreaterThanOrEqual((t.x ?? 0) + (t.w ?? 0) - 2);
-            expect((overlay.y ?? 0) + (overlay.h ?? 0)).toBeGreaterThanOrEqual((t.y ?? 0) + (t.h ?? 0) - 2);
-        }
+        expect(overlay).toBeDefined();
+        // Overlay should span full width
+        expect(overlay.w).toBe(1080);
+        // Overlay should start below 50% mark (gradient approach)
+        expect(overlay.y).toBeLessThan(1080 * 0.5);
     });
 
     it('overlay is first element (behind all content)', () => {
@@ -592,18 +594,20 @@ describe('★ P0-4: Text-on-image overlay', () => {
         }
     });
 
-    it('scrim overlay has rounded corners', () => {
-        // Use 'centered' which produces a 'scrim' with rounded corners
+    it('v713 overlay uses brand color gradient (not pure black)', () => {
+        // v713: gradient-scrim uses background color, NOT pure black
         const { elements } = buildDesignElements(FULL_CONTENT, PALETTE, 1080, 1080, true, 'centered');
         const overlay = elements.find(el => el.name === 'text_overlay')!;
-        expect(overlay.radius).toBeGreaterThan(0);
+        expect(overlay.gradient_end_hex).toBe(PALETTE.background);
     });
 
-    it('text is white when bg image present (readability)', () => {
+    it('text is white-based when bg image present (v713 readability)', () => {
         const { elements } = buildDesignElements(FULL_CONTENT, PALETTE, 300, 250, true);
         const texts = elements.filter(el => el.type === 'text');
         for (const t of texts) {
-            expect(t.color_hex).toBe('#FFFFFF');
+            const color = t.color_hex ?? '';
+            const isWhiteBased = color === '#FFFFFF' || color.startsWith('rgba(255,255,255,');
+            expect(isWhiteBased).toBe(true);
         }
     });
 });

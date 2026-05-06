@@ -16,6 +16,7 @@ import {
 import { createAnimationMethods } from './shimAnimation';
 import { createTextEffectMethods } from './shimTextEffects';
 import { createCreatorMethods } from './shimCreators';
+import { createFilterMethods } from './shimFilters';
 import type { ShimContext } from './shimTypes';
 
 /**
@@ -39,6 +40,7 @@ export function createEngineShim(
         ...createCreatorMethods(ctx),
         ...createTextEffectMethods(ctx),
         ...createAnimationMethods(fc, userObjects),
+        ...createFilterMethods(ctx),
 
         // ── Query ────────────────────────────────────────
         // ★ _findById: internal — used by restoreImage to set __glidPersistSrc
@@ -373,12 +375,9 @@ export function createEngineShim(
             if (obj) { obj.set({ shadow: undefined }); fc.renderAll(); }
         },
 
-        // ── Stubs ────────────────────────────────────────
-        set_blend_mode: () => { },
-        set_brightness: () => { },
-        set_contrast: () => { },
-        set_saturation: () => { },
-        set_hue_rotate: () => { },
+        // ── Filters: provided by shimFilters.ts ─────────
+        // set_blend_mode, set_brightness, set_contrast, set_saturation,
+        // set_hue_rotate, set_blur → all from createFilterMethods(ctx)
         add_keyframe: () => { },
         clear_node_keyframes: () => { },
 

@@ -2,6 +2,9 @@
 // designStyleGuides.ts — AI-Driven Color Intelligence
 // ─────────────────────────────────────────────────
 // Colors are NO LONGER hardcoded palettes.
+// ★ v713: AI is now a Creative Director — determines design STRATEGY
+// (overlay approach, image filters, CTA style, text hierarchy)
+// alongside the color palette.
 // AI determines the brand-appropriate color palette
 // based on prompt context (brand + industry + mood).
 //
@@ -12,6 +15,8 @@
 // ─────────────────────────────────────────────────
 
 import { callAnthropicApi, DEFAULT_CLAUDE_MODEL } from '@/services/anthropicClient';
+import { parseDesignStrategy, DEFAULT_STRATEGY } from '@/carbon/designStrategy';
+import type { DesignStrategy } from '@/carbon/designStrategy';
 
 // ── Types ────────────────────────────────────────
 
@@ -114,7 +119,7 @@ const DEFAULT_PALETTE: DesignStyleGuide = {
 // ── AI Color Palette Generation ──────────────────
 
 const COLOR_SYSTEM_PROMPT = `You are a world-class brand color expert and creative director.
-Given a user's design prompt, determine the PERFECT color palette and typography.
+Given a user's design prompt, determine the PERFECT color palette, typography, and VISUAL STRATEGY.
 
 RULES:
 1. If the prompt mentions a KNOWN BRAND (Nike, Coca-Cola, Apple, Google, etc.), use that brand's signature colors.
@@ -139,7 +144,21 @@ RULES:
    - NEVER return "Inter" for both — that's boring and generic
 7. Set needsBackgroundImage to true if the prompt describes a physical scene, product, or person. Set to false for abstract/digital concepts. This is a HINT — code may override your decision.
    If true, write a short backgroundImagePrompt describing the ideal photo. When people/professions are mentioned, describe the person (appearance, pose, clothing, environment).
-8. Return ONLY the JSON object, nothing else.`;
+8. DESIGN STRATEGY — You are the Creative Director. Decide HOW the design should look:
+   a. overlayApproach: How to make text readable over background images. Options:
+      - "gradient-scrim": Subtle gradient from transparent to background color (NOT black!). Best for hero images.
+      - "text-shadow-only": No overlay rectangle. Text gets strong shadows. Best when image must stay vivid.
+      - "color-tint": Semi-transparent brand color wash. Gives brand cohesion.
+      - "full-dim": Full canvas darkening. Only for moody/cinematic themes.
+      - "none": No treatment. Only when background is already dark/simple.
+   b. imageFilters: { brightness: -0.3 to 0, blur: 0 to 3 }
+      - If product/person is the hero → brightness: -0.1, blur: 0 (keep sharp!)
+      - If image is decorative/atmospheric → brightness: -0.2, blur: 1-2
+   c. ctaStyle: "pill" (default), "outlined" (elegant), "solid" (bold), "text-arrow" (minimal), "rounded-square" (professional)
+   d. textHierarchy: { headlineOpacity: 1.0, subheadlineOpacity: 0.65-0.85, tagIsAccent: true/false }
+      - tagIsAccent=true: tag text uses accent color (premium feel)
+      - subheadlineOpacity < 1.0: creates visual depth between headline and sub
+9. Return ONLY the JSON object, nothing else.`;
 
 interface AiColorResponse {
     name: string;
@@ -158,6 +177,11 @@ interface AiColorResponse {
     reasoning: string;
     needsBackgroundImage: boolean;
     backgroundImagePrompt: string;
+    // ★ v713: Design strategy fields
+    overlayApproach?: string;
+    imageFilters?: { brightness?: number; blur?: number };
+    ctaStyle?: string;
+    textHierarchy?: { headlineOpacity?: number; subheadlineOpacity?: number; tagIsAccent?: boolean };
 }
 
 /**
@@ -167,11 +191,11 @@ interface AiColorResponse {
 export async function generateColorPalette(
     prompt: string,
     signal: AbortSignal,
-): Promise<{ palette: DesignStyleGuide; reasoning: string; needsBackgroundImage: boolean; backgroundImagePrompt: string }> {
+): Promise<{ palette: DesignStyleGuide; reasoning: string; needsBackgroundImage: boolean; backgroundImagePrompt: string; designStrategy: DesignStrategy }> {
     try {
         const body = {
             model: DEFAULT_CLAUDE_MODEL,
-            max_tokens: 512,
+            max_tokens: 800,
             temperature: 0.4,
             system: COLOR_SYSTEM_PROMPT,
             messages: [{
@@ -195,7 +219,11 @@ Return a JSON object with these exact keys:
   "radius": number (corner radius 0-12),
   "reasoning": "1 sentence explaining why these colors",
   "needsBackgroundImage": true/false,
-  "backgroundImagePrompt": "if needsBackgroundImage is true, a short image-gen prompt (e.g. 'dark athletic field at night, dramatic lighting, moody sports atmosphere'). If false, empty string."
+  "backgroundImagePrompt": "if needsBackgroundImage is true, a short image-gen prompt. If false, empty string.",
+  "overlayApproach": "gradient-scrim"|"text-shadow-only"|"color-tint"|"full-dim"|"none",
+  "imageFilters": { "brightness": -0.15, "blur": 0 },
+  "ctaStyle": "pill"|"outlined"|"solid"|"text-arrow"|"rounded-square",
+  "textHierarchy": { "headlineOpacity": 1.0, "subheadlineOpacity": 0.75, "tagIsAccent": true }
 }`,
             }],
         };
@@ -243,10 +271,19 @@ Return a JSON object with these exact keys:
             radius: parsed.radius ?? 6,
         };
 
-        return { palette, reasoning: parsed.reasoning || '', needsBackgroundImage: !!parsed.needsBackgroundImage, backgroundImagePrompt: parsed.backgroundImagePrompt || '' };
+        // ★ v713: Parse design strategy from AI response
+        const designStrategy = parseDesignStrategy({
+            overlayApproach: parsed.overlayApproach,
+            imageFilters: parsed.imageFilters,
+            ctaStyle: parsed.ctaStyle,
+            textHierarchy: parsed.textHierarchy,
+        });
+        console.log(`[ColorPalette] Design strategy: overlay=${designStrategy.overlayApproach}, cta=${designStrategy.ctaStyle}`);
+
+        return { palette, reasoning: parsed.reasoning || '', needsBackgroundImage: !!parsed.needsBackgroundImage, backgroundImagePrompt: parsed.backgroundImagePrompt || '', designStrategy };
     } catch (err) {
         console.warn('[ColorPalette] AI generation failed, using default:', err);
-        return { palette: { ...DEFAULT_PALETTE }, reasoning: 'Using default palette (AI unavailable)', needsBackgroundImage: false, backgroundImagePrompt: '' };
+        return { palette: { ...DEFAULT_PALETTE }, reasoning: 'Using default palette (AI unavailable)', needsBackgroundImage: false, backgroundImagePrompt: '', designStrategy: { ...DEFAULT_STRATEGY } };
     }
 }
 

@@ -33,4 +33,10 @@ export interface FlowEngine {
     delete_node?: (id: number) => void;
     reorder_by_z_index?: () => void;
     render_all?: () => void;
+    // ★ v713: CSS-equivalent filters
+    set_brightness?: (id: number, value: number) => void;
+    set_blur?: (id: number, value: number) => void;
+    set_contrast?: (id: number, value: number) => void;
+    set_saturation?: (id: number, value: number) => void;
+    set_blend_mode?: (id: number, mode: string) => void;
 }

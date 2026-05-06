@@ -21,8 +21,11 @@ import { hexR, hexG, hexB, hexLuminance, darkenHex, lightenHex } from './colorHe
 import { getLayoutRules } from './layoutRules';
 import type { ElementRule, LayoutVariant } from './layoutRules';
 import { buildDecorations } from './decorationEngine';
-import { pickOverlayStyle, buildOverlayElements } from './overlayStyles';
+import { buildOverlayResult } from './overlayStyles';
 import { fixAllOverlaps } from './overlapGuard';
+import type { DesignStrategy } from './designStrategy';
+import { DEFAULT_STRATEGY } from './designStrategy';
+import { buildTextElement } from './textElementBuilder';
 
 // ── Public Types ─────────────────────────────────
 
@@ -55,7 +58,9 @@ export function buildDesignElements(
     canvasH: number,
     hasBgImage: boolean,
     layoutVariant?: LayoutVariant,
+    designStrategy?: DesignStrategy,
 ): BuildResult {
+    const strategy = designStrategy ?? DEFAULT_STRATEGY;
     const category = getAspectCategory(canvasW, canvasH);
     const { rules, variant } = getLayoutRules(category, layoutVariant);
     const canvasMin = Math.min(canvasW, canvasH);
@@ -121,13 +126,16 @@ export function buildDesignElements(
 
     const addTag = () => {
         if (!content.tag) return;
+        // ★ v713: Tag uses accent color if strategy says so
+        const tagColor = (strategy.textHierarchy.tagIsAccent && !hasBgImage)
+            ? palette.accent : textColor;
         const el = buildTextElement('tag_text', content.tag, rules.tag,
-            canvasW, canvasH, canvasMin, textColor, palette);
+            canvasW, canvasH, canvasMin, tagColor, palette, strategy);
         contentBlock.push({ element: el, gapBefore: contentBlock.length > 0 ? spacing(rules.tag.gapStep, canvasMin) : 0 });
     };
     const addHeadline = () => {
         const headlineEl = buildTextElement('headline', content.headline, rules.headline,
-            canvasW, canvasH, canvasMin, textColor, palette);
+            canvasW, canvasH, canvasMin, textColor, palette, strategy);
         contentBlock.push({
             element: headlineEl,
             gapBefore: contentBlock.length > 0 ? spacing(rules.tag.gapStep, canvasMin) : 0,
@@ -136,7 +144,7 @@ export function buildDesignElements(
     const addSubheadline = () => {
         if (!content.subheadline) return;
         const subEl = buildTextElement('subheadline', content.subheadline, rules.subline,
-            canvasW, canvasH, canvasMin, textColor, palette);
+            canvasW, canvasH, canvasMin, textColor, palette, strategy);
         contentBlock.push({ element: subEl, gapBefore: spacing(rules.subline.gapStep, canvasMin) });
     };
 
@@ -261,27 +269,36 @@ export function buildDesignElements(
     // Checks ALL text/CTA pairs (not just adjacent) to guarantee zero overlap.
     fixAllOverlaps(elements, canvasH, canvasMin);
 
-    // ── Text-on-image overlay (P0-4: readability guarantee) ──
-    // ★ v710: Variant-aware overlay system — prevents every design looking the same.
-    // Each layout variant gets a distinct overlay style for visual diversity.
+    // ── Text-on-image overlay (v713: Premium overlay system) ──
+    // ★ Uses AI-chosen DesignStrategy instead of monotonous black rects.
     if (hasBgImage) {
-        const textEls = elements.filter(el => el.type === 'text' || el.name === 'cta_button');
-        if (textEls.length > 0) {
-            const padding = Math.round(canvasMin * 0.04);
-            const contentTop = Math.min(...textEls.map(el => (el.y ?? 0))) - padding;
-            const contentBot = Math.max(...textEls.map(el => (el.y ?? 0) + (el.h ?? 0))) + padding;
-            const contentLeft = Math.min(...textEls.map(el => (el.x ?? 0))) - padding;
-            const contentRight = Math.max(...textEls.map(el => (el.x ?? 0) + (el.w ?? 0))) + padding;
+        const { overlayApproach, imageFilters: aiFilters } = strategy;
+        const overlay = buildOverlayResult(
+            overlayApproach, canvasW, canvasH,
+            palette.background, palette.accent,
+            aiFilters.brightness, aiFilters.blur,
+        );
 
-            const oX = Math.max(0, contentLeft);
-            const oY = Math.max(0, contentTop);
-            const oW = Math.min(canvasW, contentRight) - oX;
-            const oH = Math.min(canvasH, contentBot) - oY;
-
-            const overlayStyle = pickOverlayStyle(variant);
-            const overlayEls = buildOverlayElements(overlayStyle, oX, oY, oW, oH, canvasW, canvasH, canvasMin, palette.accent);
-            elements.splice(0, 0, ...overlayEls);
+        // Insert overlay elements at the beginning (after background)
+        if (overlay.overlayElements.length > 0) {
+            elements.splice(0, 0, ...overlay.overlayElements);
         }
+
+        // ★ Apply text shadows from overlay strategy to ALL text elements
+        if (overlay.textModifiers.shadowBlur > 0) {
+            for (const el of elements) {
+                if (el.type === 'text') {
+                    el.shadow_blur = overlay.textModifiers.shadowBlur;
+                    el.shadow_offset_x = 0;
+                    el.shadow_offset_y = overlay.textModifiers.shadowOffsetY;
+                    el.shadow_opacity = overlay.textModifiers.shadowOpacity;
+                }
+            }
+        }
+
+        // ★ Store image filter hints for the render pipeline to apply
+        // These get applied to the background image node in agentGenerateFlow.ts
+        (elements as any).__imageFilters = overlay.imageFilters;
     }
 
     // ── Decoration elements (accent lines, borders, dots) ──
@@ -291,85 +308,4 @@ export function buildDesignElements(
     return { elements, variant };
 }
 
-// ── Internal Helpers ─────────────────────────────
-
-function buildTextElement(
-    name: string,
-    content: string,
-    rule: ElementRule,
-    canvasW: number, canvasH: number, canvasMin: number,
-    textColor: string,
-    palette: DesignPalette,
-): RenderElement {
-    const typeStyle = resolveTypeStyle(rule.typeStyle, canvasMin);
-
-    // ★ Ad Impact Scaling: Carbon web font × adScale = ad-ready font size
-    let fontSize = Math.max(10, Math.round(typeStyle.fontSize * rule.adScale));
-
-    // ★ Height-aware typography: clamp font size so text doesn't overflow canvas height.
-    // Budget = fraction of canvasH this element may occupy (single line max).
-    // Hierarchy preserved: headline gets largest budget → largest font.
-    const heightBudget: Record<string, number> = {
-        headline: 0.25, subheadline: 0.12, tag_text: 0.08, cta_label: 0.10,
-    };
-    const budget = heightBudget[name] ?? 0.20;
-    const maxFontFromHeight = Math.floor(canvasH * budget / typeStyle.lineHeight);
-    fontSize = Math.min(fontSize, Math.max(8, maxFontFromHeight));
-
-    const w = columns(rule.cols, canvasW);
-    const lineHeight = typeStyle.lineHeight;
-
-    // ★ CJK-aware height estimation
-    // Korean/Chinese/Japanese characters are FULL-WIDTH (~1.0em per char)
-    // Latin uppercase ~0.7em, lowercase ~0.55em
-    // Without this, Korean headlines like "Galaxy의 새로운 차원" get height underestimated by 50%+,
-    // causing all subsequent elements to overlap.
-    const chars = content.split('');
-    const totalChars = Math.max(1, chars.length);
-    // eslint-disable-next-line no-control-regex
-    const cjkCount = chars.filter(c => /[\u3000-\u9FFF\uAC00-\uD7AF\uF900-\uFAFF]/.test(c)).length;
-    const upperCount = chars.filter(c => c >= 'A' && c <= 'Z').length;
-    const cjkRatio = cjkCount / totalChars;
-    const uppercaseRatio = upperCount / totalChars;
-    // Weighted average: CJK=1.0em, Latin upper=0.70em, Latin lower=0.55em
-    const avgCharWidth = cjkRatio * 1.0 + (1 - cjkRatio) * (0.55 + uppercaseRatio * 0.15);
-    const charsPerLine = Math.max(1, Math.floor(w / (fontSize * avgCharWidth)));
-    // ★ Word-aware line estimation: split by words, not just char count
-    const words = content.split(/\s+/);
-    let estimatedLines = 1, lineCharCount = 0;
-    for (const word of words) {
-        if (lineCharCount + word.length > charsPerLine && lineCharCount > 0) {
-            estimatedLines++;
-            lineCharCount = word.length;
-        } else {
-            lineCharCount += (lineCharCount > 0 ? 1 : 0) + word.length;
-        }
-    }
-    const lines = Math.min(rule.maxLines ?? 10, estimatedLines);
-    // ★ Extra padding for CJK (descenders/ascenders are taller)
-    const cjkPadding = cjkRatio > 0.2 ? fontSize * 0.15 : 0;
-    const h = Math.round(fontSize * lineHeight * lines + fontSize * 0.3 + cjkPadding);
-
-    let x: number;
-    if (rule.align === 'center') x = centeredX(rule.cols, canvasW);
-    else if (rule.align === 'right') x = canvasW - w - getMargin(canvasW);
-    else x = getMargin(canvasW);
-
-    return {
-        name,
-        type: 'text' as any,
-        x, y: 0,
-        w, h,
-        content,
-        font_size: fontSize,
-        font_weight: String(rule.fontWeight ?? typeStyle.fontWeight),
-        font_family: name === 'headline'
-            ? palette.typography.primaryFont
-            : palette.typography.secondaryFont,
-        color_hex: textColor,
-        text_align: rule.textAlign ?? 'center',
-        line_height: lineHeight,
-        letter_spacing: typeStyle.letterSpacing,
-    };
-}
-
+// ★ buildTextElement → extracted to textElementBuilder.ts

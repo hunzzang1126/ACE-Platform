@@ -367,12 +367,16 @@ describe('Carbon Layout Composer', () => {
     });
 
     describe('photo background → white text', () => {
-        it('sets text to white on photo bg', () => {
+        it('sets text to white-based color on photo bg (v713: sub may have opacity)', () => {
             const content: DesignContent = { headline: 'H', subheadline: 'S' };
             const { elements } = buildDesignElements(content, palette, 1080, 1080, true);
             const texts = elements.filter(el => el.type === 'text');
             for (const t of texts) {
-                expect(t.color_hex).toBe('#FFFFFF');
+                // v713: headline = #FFFFFF, subheadline = rgba(255,255,255,0.75)
+                // Both are "white-based" — just different opacities for hierarchy.
+                const color = t.color_hex ?? '';
+                const isWhite = color === '#FFFFFF' || color.startsWith('rgba(255,255,255,');
+                expect(isWhite).toBe(true);
             }
         });
     });
