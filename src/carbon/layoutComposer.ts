@@ -118,9 +118,12 @@ export function buildDesignElements(
         }
     }
 
-    // ── Build content block (measure all heights first) ──
-    // We build all text elements first, then CENTER the block vertically.
-    const contentBlock: { element: RenderElement; gapBefore: number }[] = [];
+    // ── Build content block (measure all heights first, gaps later) ──
+    // ★ v718: NO FIXED GAPS — gaps are computed dynamically after all heights are known.
+    // Previous approach used fixed Carbon spacing steps (gapStep 4-8 = 16-48px)
+    // regardless of content height → huge gaps with short text, overflow with long text.
+    // New approach: flexbox-style "space-evenly" gap distribution.
+    const contentBlock: { element: RenderElement }[] = [];
 
     // ── Content ordering (controlled by layout variant) ──
     const order = rules.contentOrder ?? 'standard';
@@ -132,21 +135,18 @@ export function buildDesignElements(
             ? palette.accent : textColor;
         const el = buildTextElement('tag_text', content.tag, rules.tag,
             canvasW, canvasH, canvasMin, tagColor, palette, strategy);
-        contentBlock.push({ element: el, gapBefore: contentBlock.length > 0 ? spacing(rules.tag.gapStep, canvasMin) : 0 });
+        contentBlock.push({ element: el });
     };
     const addHeadline = () => {
         const headlineEl = buildTextElement('headline', content.headline, rules.headline,
             canvasW, canvasH, canvasMin, textColor, palette, strategy);
-        contentBlock.push({
-            element: headlineEl,
-            gapBefore: contentBlock.length > 0 ? spacing(rules.tag.gapStep, canvasMin) : 0,
-        });
+        contentBlock.push({ element: headlineEl });
     };
     const addSubheadline = () => {
         if (!content.subheadline) return;
         const subEl = buildTextElement('subheadline', content.subheadline, rules.subline,
             canvasW, canvasH, canvasMin, textColor, palette, strategy);
-        contentBlock.push({ element: subEl, gapBefore: spacing(rules.subline.gapStep, canvasMin) });
+        contentBlock.push({ element: subEl });
     };
 
     // Execute in order
@@ -154,15 +154,8 @@ export function buildDesignElements(
     else if (order === 'tag-last') { addHeadline(); addSubheadline(); addTag(); }
     else { addTag(); addHeadline(); addSubheadline(); }
 
-    // ── Calculate total content height ──
-    let totalContentH = 0;
-    for (const item of contentBlock) {
-        totalContentH += item.gapBefore + (item.element.h ?? 0);
-    }
-
     // ── CTA dimensions (calculated early for vertical layout) ──
     let ctaH = 0;
-    let ctaGap = 0;
     if (content.cta) {
         const ctaType = resolveTypeStyle(rules.cta.typeStyle, canvasMin);
         const ctaFontSize = Math.max(10, Math.round(ctaType.fontSize * rules.cta.adScale));
@@ -170,9 +163,25 @@ export function buildDesignElements(
             Math.round(canvasMin * rules.ctaHeightFactor),
             Math.round(ctaFontSize * 2.5),
         );
-        ctaGap = spacing(rules.cta.gapStep, canvasMin);
-        totalContentH += ctaGap + ctaH;
     }
+
+    // ── Dynamic Gap Calculation ──
+    // ★ v718: Like CSS flexbox "space-evenly" — gaps adapt to actual content height.
+    // 1. Sum all element heights (no gaps yet)
+    const totalElementH = contentBlock.reduce((sum, item) => sum + (item.element.h ?? 0), 0) + ctaH;
+    // 2. Available vertical space (85% of canvas = safe zone with margin)
+    const usableH = canvasH * 0.85;
+    const remainingSpace = Math.max(0, usableH - totalElementH);
+    // 3. Number of gaps = number of items (including CTA if present)
+    const numItems = contentBlock.length + (content.cta ? 1 : 0);
+    const numGaps = Math.max(1, numItems - 1);
+    // 4. Distribute remaining space as gaps — with min/max constraints
+    const minGap = Math.max(4, Math.round(canvasMin * 0.01)); // min 1% of canvasMin
+    const maxGap = Math.round(canvasMin * 0.04); // max 4% of canvasMin
+    const dynamicGap = Math.max(minGap, Math.min(maxGap, Math.round(remainingSpace / (numGaps + 2))));
+    // +2 accounts for top/bottom margins so content doesn't touch edges
+
+    let totalContentH = totalElementH + dynamicGap * numGaps + (content.cta ? dynamicGap : 0);
 
     // ── Vertical positioning (controlled by verticalBias) ──
     const bias = rules.verticalBias ?? 'center';
@@ -180,17 +189,15 @@ export function buildDesignElements(
     if (isUltraWide) {
         startY = Math.round((canvasH - totalContentH) / 2);
     } else if (bias === 'top') {
-        // Top-heavy: content starts at ~15% from top
-        const topTarget = Math.round(canvasH * 0.12);
+        const topTarget = Math.round(canvasH * 0.10);
         startY = Math.max(spacing(3, canvasMin), topTarget);
     } else if (bias === 'bottom') {
-        // Bottom-stack: content ends at ~85% from top
         const bottomTarget = Math.round(canvasH * 0.85 - totalContentH);
         startY = Math.max(spacing(3, canvasMin), bottomTarget);
     } else {
         // Center with slight upward bias (golden ratio ~38% from top)
         const goldenTop = Math.round(canvasH * 0.38 - totalContentH / 2);
-        const minTop = spacing(5, canvasMin); // minimum top margin
+        const minTop = Math.max(spacing(3, canvasMin), Math.round(canvasMin * 0.03));
         startY = Math.max(minTop, goldenTop);
     }
 
@@ -202,20 +209,19 @@ export function buildDesignElements(
         for (const item of contentBlock) {
             item.element.h = Math.round((item.element.h ?? 0) * compressionRatio);
             item.element.font_size = Math.max(8, Math.round((item.element.font_size ?? 16) * compressionRatio));
-            item.gapBefore = Math.round(item.gapBefore * compressionRatio);
         }
         ctaH = Math.round(ctaH * compressionRatio);
-        ctaGap = Math.round(ctaGap * compressionRatio);
         startY = Math.max(spacing(3, canvasMin), Math.round((canvasH - totalContentH) / 2));
     }
+    const actualGap = Math.round(dynamicGap * compressionRatio);
 
-    // ── Place content elements (cursor-based stacking) ──
+    // ── Place content elements (cursor-based stacking with dynamic gaps) ──
     let cursorY = startY;
-    for (const item of contentBlock) {
-        cursorY += item.gapBefore;
-        item.element.y = cursorY;
-        elements.push(item.element);
-        cursorY += item.element.h ?? 0;
+    for (let i = 0; i < contentBlock.length; i++) {
+        if (i > 0) cursorY += actualGap; // dynamic gap between elements
+        contentBlock[i]!.element.y = cursorY;
+        elements.push(contentBlock[i]!.element);
+        cursorY += contentBlock[i]!.element.h ?? 0;
     }
 
     // ── CTA Button (optional) — v714: strategy-driven style ──
@@ -230,7 +236,7 @@ export function buildDesignElements(
         else if (ctaRule.align === 'right') ctaX = canvasW - ctaW - getMargin(canvasW);
         else ctaX = getMargin(canvasW);
 
-        let ctaY = cursorY + ctaGap;
+        let ctaY = cursorY + actualGap;
         ctaY = Math.min(ctaY, canvasH - ctaH);
         ctaY = Math.max(ctaY, 0);
 

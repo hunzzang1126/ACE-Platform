@@ -499,10 +499,11 @@ describe('★ P0-1: Vertical bias positioning', () => {
         expect(headline.y).toBeLessThan(1080 * 0.40);
     });
 
-    it('bottom-stack places headline in lower 60% of canvas', () => {
+    it('bottom-stack places headline in lower portion of canvas', () => {
+        // v718: dynamic gaps make content more compact, so headline starts a bit higher
         const { elements } = buildDesignElements(FULL_CONTENT, PALETTE, 1080, 1080, false, 'bottom-stack');
         const headline = elements.find(el => el.name === 'headline')!;
-        expect(headline.y).toBeGreaterThan(1080 * 0.25);
+        expect(headline.y).toBeGreaterThan(1080 * 0.20);
     });
 
     it('centered places headline near the golden ratio (~38%)', () => {
