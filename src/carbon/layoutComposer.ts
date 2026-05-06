@@ -26,6 +26,7 @@ import { fixAllOverlaps } from './overlapGuard';
 import type { DesignStrategy } from './designStrategy';
 import { DEFAULT_STRATEGY } from './designStrategy';
 import { buildTextElement } from './textElementBuilder';
+import { buildCtaElements } from './ctaStyleBuilder';
 
 // ── Public Types ─────────────────────────────────
 
@@ -217,13 +218,12 @@ export function buildDesignElements(
         cursorY += item.element.h ?? 0;
     }
 
-    // ── CTA Button (optional) ──
+    // ── CTA Button (optional) — v714: strategy-driven style ──
     if (content.cta) {
         const ctaRule = rules.cta;
         const ctaType = resolveTypeStyle(ctaRule.typeStyle, canvasMin);
         const ctaFontSize = Math.max(10, Math.round(ctaType.fontSize * ctaRule.adScale));
         const ctaW = columns(ctaRule.cols, canvasW);
-        const ctaRadius = Math.round(ctaH / 2);
 
         let ctaX: number;
         if (ctaRule.align === 'center') ctaX = centeredX(ctaRule.cols, canvasW);
@@ -231,38 +231,22 @@ export function buildDesignElements(
         else ctaX = getMargin(canvasW);
 
         let ctaY = cursorY + ctaGap;
-        // Safety clamp
         ctaY = Math.min(ctaY, canvasH - ctaH);
         ctaY = Math.max(ctaY, 0);
 
-        // ★ Premium CTA: gradient button with shadow for visual impact
-        elements.push({
-            name: 'cta_button',
-            type: 'rounded_rect' as any,
+        // ★ v714: AI-chosen CTA style (pill, outlined, solid, text-arrow, rounded-square)
+        const ctaElements = buildCtaElements(strategy.ctaStyle, {
+            text: content.cta,
             x: ctaX, y: ctaY, w: ctaW, h: ctaH,
-            gradient_start_hex: palette.accent,
-            gradient_end_hex: palette.gradientEnd,
-            gradient_angle: 135,
-            radius: ctaRadius,
-            shadow_blur: Math.round(canvasMin * 0.015),
-            shadow_offset_x: 0,
-            shadow_offset_y: Math.round(canvasMin * 0.005),
-            shadow_opacity: 0.35,
+            fontSize: ctaFontSize,
+            fontWeight: String(ctaRule.fontWeight ?? 600),
+            fontFamily: palette.typography.primaryFont,
+            lineHeight: ctaType.lineHeight,
+            accentColor: palette.accent,
+            gradientEndColor: palette.gradientEnd,
+            canvasMin,
         });
-
-        elements.push({
-            name: 'cta_label',
-            type: 'text' as any,
-            x: ctaX, y: ctaY,
-            w: ctaW, h: ctaH,
-            content: content.cta,
-            font_size: ctaFontSize,
-            font_weight: String(ctaRule.fontWeight ?? 600),
-            font_family: palette.typography.primaryFont,
-            color_hex: '#FFFFFF',
-            text_align: 'center',
-            line_height: ctaType.lineHeight,
-        });
+        elements.push(...ctaElements);
     }
 
     // ★ OVERLAP GUARD (v711): Runs AFTER CTA placement.

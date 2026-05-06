@@ -158,7 +158,19 @@ RULES:
    d. textHierarchy: { headlineOpacity: 1.0, subheadlineOpacity: 0.65-0.85, tagIsAccent: true/false }
       - tagIsAccent=true: tag text uses accent color (premium feel)
       - subheadlineOpacity < 1.0: creates visual depth between headline and sub
-9. Return ONLY the JSON object, nothing else.`;
+9. Return ONLY the JSON object, nothing else.
+10. layoutVariant: Choose the layout that best fits the content and mood. Options:
+   - "centered": Classic center-aligned. Universal default.
+   - "left-hero": Left-aligned text, room for image on right.
+   - "bold-statement": Oversized headline, dramatic impact.
+   - "editorial": Magazine-style left-aligned, elegant spacing.
+   - "minimal-center": Clean, minimalist, refined.
+   - "offset-right": Right-aligned, unconventional.
+   - "top-heavy": Content pushed to top, breathing room below.
+   - "bottom-stack": Content stacked at bottom, image-first.
+   - "split-left": Narrow left column, structural.
+   - "compact-bar": Horizontal bar layout (only for very wide canvases).
+   Choose based on content volume and mood — NOT randomly.`;
 
 interface AiColorResponse {
     name: string;
@@ -182,6 +194,8 @@ interface AiColorResponse {
     imageFilters?: { brightness?: number; blur?: number };
     ctaStyle?: string;
     textHierarchy?: { headlineOpacity?: number; subheadlineOpacity?: number; tagIsAccent?: boolean };
+    // ★ v714: AI layout variant selection
+    layoutVariant?: string;
 }
 
 /**
@@ -191,7 +205,7 @@ interface AiColorResponse {
 export async function generateColorPalette(
     prompt: string,
     signal: AbortSignal,
-): Promise<{ palette: DesignStyleGuide; reasoning: string; needsBackgroundImage: boolean; backgroundImagePrompt: string; designStrategy: DesignStrategy }> {
+): Promise<{ palette: DesignStyleGuide; reasoning: string; needsBackgroundImage: boolean; backgroundImagePrompt: string; designStrategy: DesignStrategy; layoutVariant: string | null }> {
     try {
         const body = {
             model: DEFAULT_CLAUDE_MODEL,
@@ -223,7 +237,8 @@ Return a JSON object with these exact keys:
   "overlayApproach": "gradient-scrim"|"text-shadow-only"|"color-tint"|"full-dim"|"none",
   "imageFilters": { "brightness": -0.15, "blur": 0 },
   "ctaStyle": "pill"|"outlined"|"solid"|"text-arrow"|"rounded-square",
-  "textHierarchy": { "headlineOpacity": 1.0, "subheadlineOpacity": 0.75, "tagIsAccent": true }
+  "textHierarchy": { "headlineOpacity": 1.0, "subheadlineOpacity": 0.75, "tagIsAccent": true },
+  "layoutVariant": "centered"|"left-hero"|"bold-statement"|"editorial"|"minimal-center"|"offset-right"|"top-heavy"|"bottom-stack"|"split-left"|"compact-bar"
 }`,
             }],
         };
@@ -278,12 +293,16 @@ Return a JSON object with these exact keys:
             ctaStyle: parsed.ctaStyle,
             textHierarchy: parsed.textHierarchy,
         });
-        console.log(`[ColorPalette] Design strategy: overlay=${designStrategy.overlayApproach}, cta=${designStrategy.ctaStyle}`);
+        console.log(`[ColorPalette] Design strategy: overlay=${designStrategy.overlayApproach}, cta=${designStrategy.ctaStyle}, layout=${parsed.layoutVariant ?? 'auto'}`);
 
-        return { palette, reasoning: parsed.reasoning || '', needsBackgroundImage: !!parsed.needsBackgroundImage, backgroundImagePrompt: parsed.backgroundImagePrompt || '', designStrategy };
+        // ★ v714: Validate AI-chosen layout variant
+        const VALID_VARIANTS = ['centered', 'left-hero', 'offset-right', 'top-heavy', 'bottom-stack', 'split-left', 'minimal-center', 'bold-statement', 'editorial', 'compact-bar'];
+        const aiVariant = parsed.layoutVariant && VALID_VARIANTS.includes(parsed.layoutVariant) ? parsed.layoutVariant : null;
+
+        return { palette, reasoning: parsed.reasoning || '', needsBackgroundImage: !!parsed.needsBackgroundImage, backgroundImagePrompt: parsed.backgroundImagePrompt || '', designStrategy, layoutVariant: aiVariant };
     } catch (err) {
         console.warn('[ColorPalette] AI generation failed, using default:', err);
-        return { palette: { ...DEFAULT_PALETTE }, reasoning: 'Using default palette (AI unavailable)', needsBackgroundImage: false, backgroundImagePrompt: '', designStrategy: { ...DEFAULT_STRATEGY } };
+        return { palette: { ...DEFAULT_PALETTE }, reasoning: 'Using default palette (AI unavailable)', needsBackgroundImage: false, backgroundImagePrompt: '', designStrategy: { ...DEFAULT_STRATEGY }, layoutVariant: null };
     }
 }
 

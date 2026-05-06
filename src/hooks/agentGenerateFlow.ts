@@ -79,7 +79,7 @@ export async function executeGenerateFlow(
 
     const { generateColorPalette } = await resilientImport(() => import('@/services/designStyleGuides'));
     const colorPrompt = brand.paletteHint ? `${prompt}\n\n[BRAND PALETTE]\n${brand.paletteHint}\nPrefer these brand colors when they fit the mood.` : prompt;
-    const { palette: guide, reasoning: colorReasoning, needsBackgroundImage: aiNeedsImage, backgroundImagePrompt, designStrategy } = await generateColorPalette(colorPrompt, abort.signal);
+    const { palette: guide, reasoning: colorReasoning, needsBackgroundImage: aiNeedsImage, backgroundImagePrompt, designStrategy, layoutVariant: aiLayoutVariant } = await generateColorPalette(colorPrompt, abort.signal);
 
     // ★ Code-first image decision: deterministic for 80% of cases, AI only for ambiguous.
     const { decideBackgroundImage } = await resilientImport(() => import('@/services/backgroundImageDecider'));
@@ -90,7 +90,7 @@ export async function executeGenerateFlow(
 
     cb.updateCard('palette', 'done', guide.name, {
         reasoning: colorReasoning,
-        expandedDetail: [`Background: ${guide.colors.gradientStart} -> ${guide.colors.gradientEnd}`, `Accent: ${guide.colors.accent}`, `Text: ${guide.colors.foreground}`, `Font: ${guide.typography.primaryFont} / ${guide.typography.secondaryFont}`, `Overlay: ${designStrategy.overlayApproach} | CTA: ${designStrategy.ctaStyle}`, finalNeedsImage ? `Background Image: YES (${imageSource})` : `Background Image: NO (${imageSource})`].join('\n'),
+        expandedDetail: [`Background: ${guide.colors.gradientStart} -> ${guide.colors.gradientEnd}`, `Accent: ${guide.colors.accent}`, `Text: ${guide.colors.foreground}`, `Font: ${guide.typography.primaryFont} / ${guide.typography.secondaryFont}`, `Overlay: ${designStrategy.overlayApproach} | CTA: ${designStrategy.ctaStyle}`, `Layout: ${aiLayoutVariant ?? 'auto'}`, finalNeedsImage ? `Background Image: YES (${imageSource})` : `Background Image: NO (${imageSource})`].join('\n'),
     });
     cb.narrate(colorReasoning || `Color palette: ${guide.name}`);
     await pause(400);
@@ -101,7 +101,7 @@ export async function executeGenerateFlow(
 
     // ── Phase 4: Carbon Layout + Render (stepper: Executing) ──
     cb.setPhase?.('executing');
-    const rendered = await buildAndRender(prompt, guide, content, canvasW, canvasH, bgResult, brand.logoUrl, brand.logoW, brand.logoH, engine, abort, cb, designStrategy);
+    const rendered = await buildAndRender(prompt, guide, content, canvasW, canvasH, bgResult, brand.logoUrl, brand.logoW, brand.logoH, engine, abort, cb, designStrategy, aiLayoutVariant);
 
     // ── Phase 6: Finalize (stepper: Finishing) ──
     // ★ Vision QA removed — deterministic quality (recolor + contrast + layout validation)
@@ -185,6 +185,7 @@ async function buildAndRender(
     brandLogoUrl: string | null, brandLogoW: number, brandLogoH: number,
     engine: FlowEngine, abort: AbortController, cb: AgentFlowCallbacks,
     designStrategy?: any,
+    aiLayoutVariant?: string | null,
 ): Promise<number> {
     cb.narrate('Building the layout with Carbon Design System...');
     cb.addCard('build', 'Carbon layout engine', 'running');
@@ -213,7 +214,7 @@ async function buildAndRender(
             },
             canvasW, canvasH,
             bgResult.hasImage && !!bgResult.url,
-            undefined, // layoutVariant — let Carbon choose
+            aiLayoutVariant ?? undefined, // ★ v714: AI-chosen variant (falls back to random if null)
             designStrategy, // ★ v713: pass AI's design strategy
         );
         allElements = result.elements;
