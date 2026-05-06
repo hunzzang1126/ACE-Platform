@@ -85,6 +85,9 @@ export function BannerPreviewGrid({ variants, visibleIds, externalPlaying }: Pro
     const [draggingId, setDraggingId] = useState<string | null>(null);
     const dragCooldownRef = useRef(false);
 
+    // ★ Must be declared BEFORE flowPositions (useMemo runs synchronously → TDZ)
+    const visibleVariants = useMemo(() => variants.filter(v => visibleIds.has(v.id)), [variants, visibleIds]);
+
     // ★ v726: Flow layout — positions based on ACTUAL card dimensions.
     // Cards flow left→right, wrap to next row. No overlap at any zoom.
     const flowPositions = useMemo(() => {
@@ -164,7 +167,6 @@ export function BannerPreviewGrid({ variants, visibleIds, externalPlaying }: Pro
     // ── Video + image URL resolution ──
     const [videoUrls, setVideoUrls] = useState<Record<string, string>>({});
     const [resolvedImageUrls, setResolvedImageUrls] = useState<Record<string, string>>({});
-    const visibleVariants = useMemo(() => variants.filter(v => visibleIds.has(v.id)), [variants, visibleIds]);
 
     const { canvasHeight, canvasWidth } = useMemo(() => {
         let maxY = 0, maxX = 0;
