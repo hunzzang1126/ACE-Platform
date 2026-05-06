@@ -166,12 +166,19 @@ export class AiService {
                 const failedTools = toolRecords.filter(r => !r.result.success);
                 if (failedTools.length > 0) {
                     const verifySummary = `[ROUND ${rounds} VERIFICATION] ${toolRecords.length - failedTools.length}/${toolRecords.length} tools succeeded. Failed: ${failedTools.map(f => `${f.name}: ${f.result.message.slice(0, 60)}`).join('; ')}. Fix these issues in the next round.`;
-                    toolResults.push({ type: 'tool_result', tool_use_id: 'verify', content: verifySummary, is_error: true });
+                    // ★ FIX: Append verification to last real tool_result instead of creating
+                    // a fake tool_result with id='verify' — OpenRouter rejects tool_call_ids
+                    // that don't match any tool_call in the previous assistant message.
+                    if (toolResults.length > 0) {
+                        const lastResult = toolResults[toolResults.length - 1]!;
+                        lastResult.content = `${lastResult.content}\n\n${verifySummary}`;
+                        lastResult.is_error = true;
+                    }
                     progress.onToken(verifySummary.slice(0, 80) + '... ');
                 }
-                messages.push({ role: 'user', content: toolResults });
 
                 // ★ Hallucination Guard: verify claimed creations match canvas
+                // Append guard message to last tool_result to avoid consecutive user messages.
                 try {
                     const { verifyToolResults, buildVerificationMessage } = await import('./hallucinationGuard');
                     const verification = verifyToolResults(
@@ -185,11 +192,17 @@ export class AiService {
                         if (guardMsg) {
                             console.warn(`[AI] ${guardMsg}`);
                             progress.onToken(verification.summary.slice(0, 80) + ' ');
-                            // Inject as user message so AI can self-correct in next round
-                            messages.push({ role: 'user', content: guardMsg });
+                            // ★ FIX: Append to last tool result instead of separate user message
+                            // Separate user messages after tool results → OpenRouter 400
+                            if (toolResults.length > 0) {
+                                const lastResult = toolResults[toolResults.length - 1]!;
+                                lastResult.content = `${lastResult.content}\n\n${guardMsg}`;
+                            }
                         }
                     }
                 } catch { /* non-critical */ }
+
+                messages.push({ role: 'user', content: toolResults });
 
                 const roundText = textBlocks.map(b => b.text).filter(Boolean).join('\n');
                 if (roundText) this.context.addMessage({ role: 'assistant', content: roundText, timestamp: Date.now(), toolCalls: toolRecords });

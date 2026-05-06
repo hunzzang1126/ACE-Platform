@@ -86,6 +86,16 @@ export async function placeBrandAssets(
     // ── Brand Logo ──
     if (logoUrl) {
         try {
+            // ★ Resolve storage:// and idb:// refs to renderable data URLs
+            let resolvedLogoUrl = logoUrl;
+            try {
+                const { resolveAsset, isAssetRef } = await resilientImport(() => import('@/services/assetService'));
+                if (isAssetRef(logoUrl)) {
+                    resolvedLogoUrl = await resolveAsset(logoUrl);
+                    console.log(`[Pipeline] Logo resolved: ${logoUrl.slice(0, 30)}... → data URL (${Math.round(resolvedLogoUrl.length / 1024)}KB)`);
+                }
+            } catch { /* continue with original URL */ }
+
             const canvasMin = Math.min(canvasW, canvasH);
             const maxLogoSize = Math.round(canvasMin * 0.15);
             const logoAspect = logoW > 0 && logoH > 0 ? logoW / logoH : 1;
@@ -93,7 +103,7 @@ export async function placeBrandAssets(
                 ? [maxLogoSize, Math.round(maxLogoSize / logoAspect)]
                 : [Math.round(maxLogoSize * logoAspect), maxLogoSize];
             const logoPad = Math.round(canvasMin * 0.04);
-            await engine.add_image(canvasW - logoPlaceW - logoPad, canvasH - logoPlaceH - logoPad, logoUrl, logoPlaceW, logoPlaceH, 'brand_logo');
+            await engine.add_image(canvasW - logoPlaceW - logoPad, canvasH - logoPlaceH - logoPad, resolvedLogoUrl, logoPlaceW, logoPlaceH, 'brand_logo');
             cb.narrate('Brand logo placed on canvas.');
         } catch (err) { console.warn('[Pipeline] Failed to place logo:', err); }
     }
@@ -102,6 +112,15 @@ export async function placeBrandAssets(
     if (selectedAssets?.productImages.length) {
         for (const { asset, reasoning, placementHint } of selectedAssets.productImages) {
             try {
+                // ★ Resolve storage:// and idb:// refs
+                let resolvedSrc = asset.src;
+                try {
+                    const { resolveAsset, isAssetRef } = await resilientImport(() => import('@/services/assetService'));
+                    if (isAssetRef(asset.src)) {
+                        resolvedSrc = await resolveAsset(asset.src);
+                    }
+                } catch { /* continue with original */ }
+
                 const canvasMin = Math.min(canvasW, canvasH);
                 const productSize = Math.round(canvasMin * 0.35);
                 const productAspect = asset.width > 0 && asset.height > 0 ? asset.width / asset.height : 1;
@@ -117,7 +136,7 @@ export async function placeBrandAssets(
                 else if (place === 'bottom-right') { px = canvasW - pw - pad; py = canvasH - ph - pad; }
                 else { px = Math.round((canvasW - pw) / 2); py = Math.round((canvasH - ph) / 2); }
 
-                await engine.add_image(px, py, asset.src, pw, ph, `brand_product_${asset.name}`);
+                await engine.add_image(px, py, resolvedSrc, pw, ph, `brand_product_${asset.name}`);
                 placed++;
                 cb.narrate(`Product image placed: ${reasoning}`);
             } catch (err) { console.warn('[Pipeline] Failed to place product image:', err); }

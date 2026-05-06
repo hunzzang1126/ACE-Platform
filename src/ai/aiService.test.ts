@@ -172,9 +172,12 @@ describe('★ v692: Error-aware auto-retry with context', () => {
         expect(aiSrc).toContain('failedTools.length > 0');
     });
 
-    it('verification message is injected as tool_result for AI self-correction', () => {
-        expect(aiSrc).toContain("tool_use_id: 'verify'");
+    it('verification message is appended to last tool_result (not as fake tool_use_id)', () => {
+        // ★ v725: Changed from fake tool_use_id='verify' to appending to last real tool_result
+        // Old pattern caused OpenRouter 400 errors due to unmatched tool_call_id
+        expect(aiSrc).not.toContain("tool_use_id: 'verify'");
         expect(aiSrc).toContain('Fix these issues in the next round');
+        expect(aiSrc).toContain('lastResult.content = `${lastResult.content}');
     });
 });
 
