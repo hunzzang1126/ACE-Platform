@@ -1,8 +1,4 @@
-// ─────────────────────────────────────────────────
-// AI Service v2 — Eval-First Agentic Loop
-// ─────────────────────────────────────────────────
-// Types + Config + Helpers → aiServiceTypes.ts
-// ─────────────────────────────────────────────────
+// AI Service v2 — Agentic Loop. Types → aiServiceTypes.ts
 
 import { AgentContext, type AgentMessage, type ToolCallRecord, type SceneNodeInfo } from './agentContext';
 import { getToolsForPage } from './agentTools';
@@ -55,8 +51,7 @@ export class AiService {
         if (!isAiAvailable()) { progress.onError('AI is not available. Check your configuration.'); return; }
         this.context.addMessage({ role: 'user', content: userMessage, timestamp: Date.now() });
 
-        // ★ Refresh AI memory before building context (memory → system prompt)
-        try {
+        try { // Refresh AI memory
             const { refreshMemoryCache } = await import('./smartContextHelpers');
             await refreshMemoryCache();
         } catch { /* non-critical */ }
@@ -66,8 +61,7 @@ export class AiService {
         const systemPrompt = buildContextSystemPrompt(ctx);
         const enrichedMessage = enrichMessageWithContext(userMessage, ctx);
 
-        // ★ P2-11: Save undo snapshot before AI modifies anything
-        if (ctx.page === 'canvas-editor') {
+        if (ctx.page === 'canvas-editor') { // Save undo snapshot
             try {
                 const { pushSnapshot } = await import('./aiUndoStack');
                 pushSnapshot(`Before: "${userMessage.slice(0, 50)}"`);
@@ -90,7 +84,6 @@ export class AiService {
         const tools = toClaudeTools(getToolsForPage(page));
         let rounds = 0, finished = false;
         const allToolRecords: ToolCallRecord[] = [];
-        // ★ Hallucination Guard: track pre-execution element count
         const preElementCount = getCanvasElementCount(engine);
         await nextFrame();
 
@@ -124,27 +117,33 @@ export class AiService {
 
                 const toolResults: ClaudeContentBlock[] = [];
                 const toolRecords: ToolCallRecord[] = [];
-                // ★ v730: If generate_full_design is in this batch, run it FIRST and skip the rest.
-                // The actual design creation happens AFTER the agentic loop (in useUnifiedAgent),
-                // so any update_element_text/add_text in the same round will hit an empty canvas.
+                // ★ v731: generate_full_design → skip all other tools (design created post-loop)
                 const hasDesignGen = toolBlocks.some(tc => tc.name === 'generate_full_design');
-                const effectiveTools = hasDesignGen
-                    ? toolBlocks.filter(tc => tc.name === 'generate_full_design')
-                    : toolBlocks;
                 if (hasDesignGen && toolBlocks.length > 1) {
-                    console.warn(`[AI] generate_full_design detected with ${toolBlocks.length - 1} other tool(s) — skipping extras (design not yet created)`);
+                    console.warn(`[AI] generate_full_design detected with ${toolBlocks.length - 1} other tool(s) — will skip extras`);
                 }
-                for (let i = 0; i < effectiveTools.length; i++) {
-                    const tc = effectiveTools[i]!;
+                for (let i = 0; i < toolBlocks.length; i++) {
+                    const tc = toolBlocks[i]!;
                     const params = (tc.input ?? {}) as Record<string, unknown>;
+
+                    // ★ Skip non-design tools when generate_full_design is present
+                    if (hasDesignGen && tc.name !== 'generate_full_design') {
+                        const skipMsg = `Skipped: generate_full_design handles the complete design. This tool will run after the design is created.`;
+                        console.log(`[AI Tool] SKIP: ${tc.name} (generate_full_design takes priority)`);
+                        progress.onStepStart(i, tc.name!, params);
+                        progress.onStepComplete(i, { success: true, message: skipMsg });
+                        toolResults.push({ type: 'tool_result', tool_use_id: tc.id!, content: JSON.stringify({ success: true, message: skipMsg }) });
+                        toolRecords.push({ name: tc.name!, input: params, result: { success: true, message: skipMsg }, durationMs: 0 });
+                        continue;
+                    }
+
                     console.log(`[AI Tool] Calling: ${tc.name}`, JSON.stringify(params).slice(0, 300));
                     progress.onStepStart(i, tc.name!, params); await nextFrame();
                     const startTime = Date.now();
-                    const NO_RETRY_TOOLS = new Set(['analyze_scene', 'undo_ai_action']);
                     const overrideResult = executorOverride?.(tc.name!, params);
                     let result: ExecutionResult = overrideResult ?? await executeToolCall(engine, tc.name!, params, this.trackedNodes);
-                    // ★ Error-aware auto-retry: re-execute once, but narrate the error to the user
-                    if (!result.success && !NO_RETRY_TOOLS.has(tc.name!) && !overrideResult) {
+                    // Auto-retry once on failure
+                    if (!result.success && !new Set(['analyze_scene', 'undo_ai_action']).has(tc.name!) && !overrideResult) {
                         console.log(`[AI Tool] Retry: ${tc.name} — error: ${result.message.slice(0, 100)}`);
                         progress.onToken(`Retrying ${tc.name}... `);
                         await sleep(300);
@@ -172,6 +171,17 @@ export class AiService {
                     }
                 }
                 allToolRecords.push(...toolRecords);
+
+                // ★ v731: generate_full_design → immediately finish the agentic loop.
+                // The actual design creation happens in useUnifiedAgent AFTER this loop.
+                // Continuing would let AI call update_element_text on an empty canvas.
+                if (hasDesignGen) {
+                    messages.push({ role: 'user', content: toolResults });
+                    finished = true;
+                    console.log('[AI] generate_full_design intercepted — breaking agentic loop (design will be created post-loop)');
+                    break;
+                }
+
                 // ★ Post-round verification: summarize success/failure for AI self-correction
                 const failedTools = toolRecords.filter(r => !r.result.success);
                 if (failedTools.length > 0) {

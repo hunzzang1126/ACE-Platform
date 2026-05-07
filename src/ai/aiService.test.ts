@@ -160,7 +160,8 @@ describe('★ v692: Error-aware auto-retry with context', () => {
     it('skips retry for analyze_scene and undo tools', () => {
         expect(aiSrc).toContain("'analyze_scene'");
         expect(aiSrc).toContain("'undo_ai_action'");
-        expect(aiSrc).toContain('NO_RETRY_TOOLS.has(tc.name!)');
+        // ★ v731: inlined as Set literal
+        expect(aiSrc).toContain("analyze_scene', 'undo_ai_action'");
     });
 
     it('3-tier model routing: planner → executor', () => {
@@ -173,11 +174,49 @@ describe('★ v692: Error-aware auto-retry with context', () => {
     });
 
     it('verification message is appended to last tool_result (not as fake tool_use_id)', () => {
-        // ★ v725: Changed from fake tool_use_id='verify' to appending to last real tool_result
-        // Old pattern caused OpenRouter 400 errors due to unmatched tool_call_id
         expect(aiSrc).not.toContain("tool_use_id: 'verify'");
         expect(aiSrc).toContain('Fix these issues in the next round');
         expect(aiSrc).toContain('lastResult.content = `${lastResult.content}');
+    });
+});
+
+// ══════════════════════════════════════════════════
+// ★ v731: generate_full_design pipeline safety
+// ══════════════════════════════════════════════════
+
+describe('★ v731: generate_full_design pipeline safety', () => {
+    const aiSrc = readFileSync(resolve(__dirname, './aiService.ts'), 'utf-8');
+
+    it('★ REGRESSION: detects generate_full_design in tool batch', () => {
+        expect(aiSrc).toContain("tc.name === 'generate_full_design'");
+        expect(aiSrc).toContain('hasDesignGen');
+    });
+
+    it('★ REGRESSION: skips non-design tools with valid tool_result', () => {
+        // Must return tool_result for ALL tool_use blocks (OpenRouter requires matching IDs)
+        expect(aiSrc).toContain('tool_use_id: tc.id!');
+        expect(aiSrc).toContain('Skipped: generate_full_design handles the complete design');
+    });
+
+    it('★ REGRESSION: breaks agentic loop after generate_full_design', () => {
+        // Prevents AI from calling update_element_text on empty canvas in round 2
+        expect(aiSrc).toContain('finished = true');
+        expect(aiSrc).toContain('breaking agentic loop');
+    });
+
+    it('★ REGRESSION: hallucination guard is skipped for design gen round', () => {
+        // The break happens BEFORE hallucination guard runs
+        const breakIdx = aiSrc.indexOf('breaking agentic loop');
+        const guardIdx = aiSrc.indexOf('Hallucination Guard');
+        expect(breakIdx).toBeGreaterThan(0);
+        expect(guardIdx).toBeGreaterThan(breakIdx); // guard comes AFTER break
+    });
+
+    it('★ REGRESSION: max-rounds error cannot fire after design gen', () => {
+        // finished=true + break → while loop exits cleanly
+        const breakLine = aiSrc.indexOf("console.log('[AI] generate_full_design intercepted");
+        expect(breakLine).toBeGreaterThan(0);
+        expect(aiSrc.indexOf('break;', breakLine)).toBeGreaterThan(breakLine);
     });
 });
 
