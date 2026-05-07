@@ -97,3 +97,56 @@ describe('agentGenerateFlow — Carbon Design System integration', () => {
         expect(helpersSrc).toContain('export function recalcTextHeights');
     });
 });
+
+// ══════════════════════════════════════════════════
+// ★ v725: Brand asset resolution (idb:// → data:URL)
+// ══════════════════════════════════════════════════
+describe('★ v725: Asset resolution before canvas rendering', () => {
+    it('resolves logo idb:// references before add_image', () => {
+        expect(renderSrc).toContain('resolveAsset');
+        expect(renderSrc).toContain('resolvedLogoUrl');
+    });
+
+    it('resolves product image references via isAssetRef', () => {
+        expect(renderSrc).toContain('isAssetRef');
+        expect(renderSrc).toContain('resolvedSrc');
+    });
+
+    it('falls back to original src on resolution failure', () => {
+        // Must not crash if resolveAsset fails
+        expect(renderSrc).toContain('catch');
+    });
+});
+
+// ══════════════════════════════════════════════════
+// ★ v725: Conversational brand narration
+// ══════════════════════════════════════════════════
+describe('★ v725: Conversational brand asset narration', () => {
+    it('narrates found logo by name', () => {
+        expect(helpersSrc).toContain('Found logo');
+        expect(helpersSrc).toContain('selection.logo.name');
+    });
+
+    it('narrates found background by name', () => {
+        expect(helpersSrc).toContain('Found background');
+        expect(helpersSrc).toContain('selection.background.asset.name');
+    });
+
+    it('narrates found product images', () => {
+        expect(helpersSrc).toContain('Found product image');
+    });
+
+    it('narrates when no matching assets found', () => {
+        expect(helpersSrc).toContain('no matching assets');
+    });
+
+    it('narrates AI-generated background fallback', () => {
+        expect(helpersSrc).toContain('AI will generate one');
+    });
+
+    it('does NOT use old generic count format', () => {
+        // Old: "Brand kit "X" — 2 selected, 1 skipped."
+        expect(helpersSrc).not.toContain('cb.narrate(`Brand kit');
+    });
+});
+

@@ -57,3 +57,85 @@ describe('BannerPreviewGrid — Card header layout', () => {
         expect(src).toContain("display: 'flex', alignItems: 'center', gap: 4");
     });
 });
+
+// ══════════════════════════════════════════════════
+// ★ v727: Area-proportional sizing (replaces fixed bounding box)
+// ══════════════════════════════════════════════════
+describe('★ v727: Area-proportional card sizing', () => {
+    it('uses getCardDisplaySize instead of getPreviewScale', () => {
+        expect(src).toContain('getCardDisplaySize');
+        expect(src).not.toContain('getPreviewScale');
+    });
+
+    it('uses BASE_AREA instead of BASE_PREVIEW_WIDTH/HEIGHT', () => {
+        expect(src).toContain('BASE_AREA');
+        expect(src).not.toContain('BASE_PREVIEW_WIDTH');
+        expect(src).not.toContain('BASE_PREVIEW_HEIGHT');
+    });
+
+    it('area-proportional math: sqrt(refArea / aspect)', () => {
+        expect(src).toContain('Math.sqrt(refArea / aspect)');
+    });
+
+    it('returns display width, height, and scale', () => {
+        expect(src).toContain('dw: number; dh: number; scale: number');
+    });
+});
+
+// ══════════════════════════════════════════════════
+// ★ v727: Flow layout (replaces fixed grid)
+// ══════════════════════════════════════════════════
+describe('★ v727: Flow layout', () => {
+    it('uses flowPositions useMemo for card positioning', () => {
+        expect(src).toContain('flowPositions');
+    });
+
+    it('does NOT use GRID_COLS for fixed-column layout', () => {
+        expect(src).not.toContain('GRID_COLS');
+    });
+
+    it('wraps cards to next row when exceeding maxRowW', () => {
+        expect(src).toContain('x + dw > maxRowW');
+    });
+
+    it('tracks row height based on tallest card', () => {
+        expect(src).toContain('Math.max(rowH, totalH)');
+    });
+
+    it('canvasWidth is calculated for horizontal scroll', () => {
+        expect(src).toContain('canvasWidth');
+        expect(src).toContain('minWidth: canvasWidth');
+    });
+});
+
+// ══════════════════════════════════════════════════
+// ★ v728: TDZ fix — declaration order
+// ══════════════════════════════════════════════════
+describe('★ v728: TDZ regression guard — declaration order', () => {
+    it('★ REGRESSION: visibleVariants is declared BEFORE flowPositions', () => {
+        // useMemo runs synchronously — referencing a const before its declaration = TDZ crash
+        const visibleIdx = src.indexOf('visibleVariants = useMemo');
+        const flowIdx = src.indexOf('flowPositions = useMemo');
+        expect(visibleIdx).toBeLessThan(flowIdx);
+    });
+});
+
+// ══════════════════════════════════════════════════
+// ★ v729: Zoom resets positions
+// ══════════════════════════════════════════════════
+describe('★ v729: Zoom resets card positions', () => {
+    it('handleZoomChange resets cardPositions to {}', () => {
+        expect(src).toContain('setCardPositions({})');
+    });
+
+    it('★ REGRESSION: starts with empty positions (not stale stored coords)', () => {
+        // Initial state must be {} so flow layout is the default
+        expect(src).toContain("useState<Record<string, { x: number; y: number }>>({})");
+    });
+
+    it('does NOT sync storedPositionsRaw back into cardPositions state', () => {
+        // The old useEffect that re-synced stale positions is removed
+        expect(src).not.toContain('setCardPositions(storedPositionsRaw');
+    });
+});
+
