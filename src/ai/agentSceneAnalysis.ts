@@ -154,7 +154,8 @@ ${canvasIsEmpty ? `> Canvas is EMPTY.
 
 ## ★ SINGLE-ROUND COMPLETION (ABSOLUTE RULE)
 You get EXACTLY ONE tool call round. Batch ALL tools in ONE response.
-- New design request → use \`generate_full_design\` (NOT generate_image)
+- New design request → use \`generate_full_design\` **ALONE** (no other tools in the same call)
+- ★ generate_full_design creates the ENTIRE design. Do NOT add update_element_text, add_text, or add_button alongside it.
 - Background image → \`set_canvas_background\` + \`fill_to_page\` in PARALLEL
 - Multiple edits → all \`set_position\`/\`set_size\`/\`set_color\` in PARALLEL
 - After ANY image placement → ALWAYS call \`fill_to_page\` (cover fit, aspect ratio preserved)

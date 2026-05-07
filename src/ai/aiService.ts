@@ -124,8 +124,18 @@ export class AiService {
 
                 const toolResults: ClaudeContentBlock[] = [];
                 const toolRecords: ToolCallRecord[] = [];
-                for (let i = 0; i < toolBlocks.length; i++) {
-                    const tc = toolBlocks[i]!;
+                // ★ v730: If generate_full_design is in this batch, run it FIRST and skip the rest.
+                // The actual design creation happens AFTER the agentic loop (in useUnifiedAgent),
+                // so any update_element_text/add_text in the same round will hit an empty canvas.
+                const hasDesignGen = toolBlocks.some(tc => tc.name === 'generate_full_design');
+                const effectiveTools = hasDesignGen
+                    ? toolBlocks.filter(tc => tc.name === 'generate_full_design')
+                    : toolBlocks;
+                if (hasDesignGen && toolBlocks.length > 1) {
+                    console.warn(`[AI] generate_full_design detected with ${toolBlocks.length - 1} other tool(s) — skipping extras (design not yet created)`);
+                }
+                for (let i = 0; i < effectiveTools.length; i++) {
+                    const tc = effectiveTools[i]!;
                     const params = (tc.input ?? {}) as Record<string, unknown>;
                     console.log(`[AI Tool] Calling: ${tc.name}`, JSON.stringify(params).slice(0, 300));
                     progress.onStepStart(i, tc.name!, params); await nextFrame();
