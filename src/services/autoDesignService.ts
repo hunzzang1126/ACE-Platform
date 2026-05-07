@@ -90,12 +90,23 @@ function sanitizeContent(c: GeneratedContent): GeneratedContent {
     // ★ Junk detection: English + Korean UI terms that AI sometimes outputs as "copy"
     const JUNK = /^(inter|roboto|arial|helvetica|text|subtext|subheadline|headline|cta|button|click here|lorem|font|label|tag|버튼|텍스트|서브헤드라인|헤드라인|라벨|태그|클릭|제목|부제|부제목)$/i;
     const FONT_NAMES = /^(inter|roboto|montserrat|poppins|arial|helvetica|georgia|verdana|garamond|lato|opensans|raleway|playfair|outfit|nunito|space grotesk)$/i;
+    // ★ v732: Descriptive prefixes that AI outputs instead of real ad copy
+    // "text about discovering Mallorca" → "Discovering Mallorca"
+    const DESCRIPTIVE_PREFIX = /^(text\s+(?:about|regarding|on|for|describing)\s+|about\s+(?:the\s+)?|regarding\s+(?:the\s+)?|description\s+(?:of|about)\s+|information\s+(?:about|on)\s+|details?\s+(?:about|on)\s+|an?\s+ad\s+(?:about|for)\s+|ad\s+(?:copy\s+)?(?:about|for)\s+)/i;
     const toTitleCase = (s: string) => s.replace(/\w\S*/g, (t) => t.charAt(0).toUpperCase() + t.slice(1).toLowerCase());
 
     let headline = c.headline?.trim() || 'Get Started Today';
     if (JUNK.test(headline)) headline = 'Get Started Today';
+    // ★ v732: Strip descriptive prefixes — "text about X" → "X"
+    let wasDescriptive = false;
+    if (DESCRIPTIVE_PREFIX.test(headline)) {
+        headline = headline.replace(DESCRIPTIVE_PREFIX, '').trim();
+        if (!headline) headline = 'Get Started Today';
+        wasDescriptive = true;
+    }
     // Only apply title case to Latin-script text (not Korean/CJK)
-    if (headline === headline.toLowerCase() && headline.length > 0 && /^[\x00-\x7F]+$/.test(headline)) {
+    // ★ v732: Also title-case after prefix strip (first word is likely lowercase)
+    if ((wasDescriptive || headline === headline.toLowerCase()) && headline.length > 0 && /^[\x00-\x7F]+$/.test(headline)) {
         headline = toTitleCase(headline);
     }
 

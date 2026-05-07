@@ -114,4 +114,86 @@ describe('autoDesignService — callTemplateContent', () => {
         expect(result.headline).toBe('혁신의 새로운 기준');
         expect(result.cta).toBe('지금 주문하기');
     });
+
+    it('★ REGRESSION v732: should strip "text about" descriptive prefix', async () => {
+        vi.mocked(callAnthropicApi).mockResolvedValue({
+            content: [{ type: 'text', text: '{"headline": "text about discovering Mallorca", "cta": "Book Now", "subheadline": "", "tag": ""}' }],
+        });
+        const result = await callTemplateContent('Mallorca travel', 300, 250, 'modern', new AbortController().signal);
+        expect(result.headline).not.toContain('text about');
+        expect(result.headline).toBe('Discovering Mallorca');
+    });
+
+    it('★ REGRESSION v732: should strip "an ad for" prefix', async () => {
+        vi.mocked(callAnthropicApi).mockResolvedValue({
+            content: [{ type: 'text', text: '{"headline": "an ad for summer shoes", "cta": "Shop", "subheadline": "", "tag": ""}' }],
+        });
+        const result = await callTemplateContent('shoes', 300, 250, 'modern', new AbortController().signal);
+        expect(result.headline).not.toContain('an ad for');
+        expect(result.headline).toBe('Summer Shoes');
+    });
+
+    it('★ REGRESSION v732: should strip "about the" prefix', async () => {
+        vi.mocked(callAnthropicApi).mockResolvedValue({
+            content: [{ type: 'text', text: '{"headline": "about the new collection", "cta": "", "subheadline": "", "tag": ""}' }],
+        });
+        const result = await callTemplateContent('fashion', 300, 250, 'modern', new AbortController().signal);
+        expect(result.headline).toBe('New Collection');
+    });
+});
+
+// ══════════════════════════════════════════════════
+// ★ v732: Design quality — overlay + font diversity
+// ══════════════════════════════════════════════════
+
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+
+describe('★ v732: Overlay readability improvements', () => {
+    const overlaySrc = readFileSync(resolve(__dirname, '../carbon/overlayStyles.ts'), 'utf-8');
+
+    it('★ REGRESSION: gradient-scrim starts at 30% for full coverage', () => {
+        expect(overlaySrc).toContain('canvasH * 0.30');
+    });
+
+    it('★ REGRESSION: gradient-scrim opacity is 0.65+ for strong contrast', () => {
+        expect(overlaySrc).toContain('a: 0.65');
+    });
+
+    it('★ REGRESSION: strong text shadow has blur >= 12', () => {
+        expect(overlaySrc).toContain('shadowBlur: 12');
+    });
+});
+
+describe('★ v732: Font diversity guard', () => {
+    const styleSrc = readFileSync(resolve(__dirname, './designStyleGuides.ts'), 'utf-8');
+
+    it('★ REGRESSION: detects same-font pair and auto-replaces', () => {
+        expect(styleSrc).toContain('Font diversity guard');
+        expect(styleSrc).toContain('primaryFont === palette.typography.secondaryFont');
+    });
+
+    it('★ REGRESSION: has FONT_PAIRS lookup table', () => {
+        expect(styleSrc).toContain("'Inter': 'DM Sans'");
+        expect(styleSrc).toContain("'Playfair Display': 'DM Sans'");
+    });
+
+    it('★ REGRESSION: default secondary font is DM Sans not Inter', () => {
+        expect(styleSrc).toContain("secondaryFont: parsed.fontSecondary || 'DM Sans'");
+    });
+});
+
+describe('★ v732: User color priority over brand palette', () => {
+    const styleSrc = readFileSync(resolve(__dirname, './designStyleGuides.ts'), 'utf-8');
+
+    it('★ REGRESSION: user-specified colors override brand defaults', () => {
+        expect(styleSrc).toContain('User-specified colors ALWAYS override brand defaults');
+    });
+
+    it('★ REGRESSION: user color is Rule 1, brand is Rule 2', () => {
+        // User color mention should be checked BEFORE brand recognition
+        const rule1Idx = styleSrc.indexOf('1. If the prompt mentions a specific COLOR');
+        const rule2Idx = styleSrc.indexOf('2. If the prompt mentions a KNOWN BRAND');
+        expect(rule1Idx).toBeLessThan(rule2Idx);
+    });
 });

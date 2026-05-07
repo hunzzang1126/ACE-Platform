@@ -53,9 +53,13 @@ Return EXACTLY this JSON. Set any field to "" if it does NOT fit the design inte
 
 COPYWRITING RULES:
 - headline: ALWAYS required. ${headlineLimit}. Must be COMPELLING advertising copy.
-  NOT just the product name — add a benefit, emotion, or hook.
-  GOOD: "iPhone 17 — 혁신의 새로운 기준", "Experience the Future", "미래를 만나다"
-  BAD: "iPhone 17", "아이폰 17", "제품 소개" (these are labels, not headlines)
+  NOT a description — a HEADLINE. Think like a creative director, not a journalist.
+  GOOD: "Discover Mallorca", "Experience the Future", "미래를 만나다", "Your Next Adventure Awaits"
+  BAD: "text about discovering Mallorca" ← this is a DESCRIPTION, not a headline
+  BAD: "iPhone 17", "아이폰 17", "제품 소개" ← these are labels, not headlines
+  BAD: "About our new product" ← descriptive, not compelling
+  ★ NEVER start headline with: "text about", "about", "regarding", "a design for", "an ad for"
+  ★ Use POWER WORDS: Discover, Unlock, Transform, Experience, Elevate, Unleash, Master
 - subheadline: Supporting detail — features, benefits, dates, locations. ${subLimit}.
   If headline is self-explanatory or canvas is small → set to "".
 - cta: A REAL call-to-action verb phrase for commercial/advertising designs.

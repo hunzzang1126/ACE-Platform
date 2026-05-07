@@ -122,8 +122,8 @@ const COLOR_SYSTEM_PROMPT = `You are a world-class brand color expert and creati
 Given a user's design prompt, determine the PERFECT color palette, typography, and VISUAL STRATEGY.
 
 RULES:
-1. If the prompt mentions a KNOWN BRAND (Nike, Coca-Cola, Apple, Google, etc.), use that brand's signature colors.
-2. If the prompt mentions a specific COLOR ("red", "blue", etc.), make that the accent color with a matching palette.
+1. If the prompt mentions a specific COLOR ("red", "blue", "make it green", "파란색", etc.), that color MUST be the accent/CTA color. User-specified colors ALWAYS override brand defaults.
+2. If the prompt mentions a KNOWN BRAND (Nike, Coca-Cola, Apple, Google, etc.) AND the user did NOT specify a color, use that brand's signature colors.
 3. If no brand or color is mentioned, infer the best palette from the INDUSTRY/MOOD:
    - Finance/luxury → deep navy + gold
    - Tech/SaaS → dark bg + electric blue or cyan
@@ -281,10 +281,24 @@ Return a JSON object with these exact keys:
             typography: {
                 ...DEFAULT_PALETTE.typography,
                 primaryFont: parsed.fontPrimary || 'Inter',
-                secondaryFont: parsed.fontSecondary || 'Inter',
+                secondaryFont: parsed.fontSecondary || 'DM Sans',
             },
             radius: parsed.radius ?? 6,
         };
+
+        // ★ v732: Font diversity guard — same font for both = boring, generic look
+        if (palette.typography.primaryFont === palette.typography.secondaryFont) {
+            const FONT_PAIRS: Record<string, string> = {
+                'Inter': 'DM Sans', 'DM Sans': 'Inter', 'Poppins': 'DM Sans',
+                'Roboto': 'Space Grotesk', 'Montserrat': 'DM Sans', 'Outfit': 'Inter',
+                'Playfair Display': 'DM Sans', 'DM Serif Display': 'Inter',
+                'Bebas Neue': 'DM Sans', 'Anton': 'Inter', 'Oswald': 'DM Sans',
+                'Sora': 'Inter', 'Space Grotesk': 'DM Sans', 'Nunito': 'Space Grotesk',
+                'Raleway': 'DM Sans', 'Cormorant Garamond': 'Inter', 'Lora': 'DM Sans',
+            };
+            palette.typography.secondaryFont = FONT_PAIRS[palette.typography.primaryFont] || 'DM Sans';
+            console.log(`[ColorPalette] Font diversity guard: primary="${palette.typography.primaryFont}" → secondary="${palette.typography.secondaryFont}"`);
+        }
 
         // ★ v713: Parse design strategy from AI response
         const designStrategy = parseDesignStrategy({

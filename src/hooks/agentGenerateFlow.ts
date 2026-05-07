@@ -80,7 +80,7 @@ export async function executeGenerateFlow(
     cb.addCard('palette', 'Determining color palette', 'running');
 
     const { generateColorPalette } = await resilientImport(() => import('@/services/designStyleGuides'));
-    const colorPrompt = brand.paletteHint ? `${prompt}\n\n[BRAND PALETTE]\n${brand.paletteHint}\nPrefer these brand colors when they fit the mood.` : prompt;
+    const colorPrompt = brand.paletteHint ? `${prompt}\n\n[BRAND PALETTE — Reference Only]\n${brand.paletteHint}\nUse brand colors as a STARTING POINT, but if the user's prompt explicitly requests a different color (e.g., "blue CTA", "make it green", "파란색"), the user's color ALWAYS wins.` : prompt;
     const { palette: guide, reasoning: colorReasoning, needsBackgroundImage: aiNeedsImage, backgroundImagePrompt, designStrategy, layoutVariant: aiLayoutVariant } = await generateColorPalette(colorPrompt, abort.signal);
 
     // ★ Code-first image decision: deterministic for 80% of cases, AI only for ambiguous.

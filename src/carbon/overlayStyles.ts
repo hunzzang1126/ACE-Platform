@@ -46,8 +46,8 @@ export interface OverlayResult {
 // ── Default modifiers ────────────────────────────
 
 const NO_TEXT_MODIFIERS: TextModifiers = { shadowBlur: 0, shadowOffsetY: 0, shadowOpacity: 0 };
-const STRONG_TEXT_SHADOW: TextModifiers = { shadowBlur: 8, shadowOffsetY: 2, shadowOpacity: 0.6 };
-const SUBTLE_TEXT_SHADOW: TextModifiers = { shadowBlur: 5, shadowOffsetY: 1, shadowOpacity: 0.35 };
+const STRONG_TEXT_SHADOW: TextModifiers = { shadowBlur: 12, shadowOffsetY: 3, shadowOpacity: 0.75 };
+const SUBTLE_TEXT_SHADOW: TextModifiers = { shadowBlur: 6, shadowOffsetY: 2, shadowOpacity: 0.45 };
 const NO_FILTERS: ImageFilterHints = { brightness: 0, blur: 0 };
 
 // ── Public API ───────────────────────────────────
@@ -72,29 +72,23 @@ export function buildOverlayResult(
 
     switch (approach) {
         case 'gradient-scrim': {
-            // ★ v718: Gradient uses BRAND COLOR, starts at bottom 50%.
-            // Previous version started at 30% with rgba(0,0,0,0) which hexToRgb couldn't parse.
-            // Now: fully transparent at scrim top → brand bg at scrim bottom.
+            // ★ v718/v732: Gradient uses BRAND COLOR. Starts at 30% for better coverage.
+            // Previous v718 started at 50% — top text had NO readability protection.
             const bgR = hexR(bgColor), bgG = hexG(bgColor), bgB = hexB(bgColor);
-            // ★ Use actual bgColor with alpha channel manipulation via r/g/b/a fields.
-            // The gradient rect engine handles gradient_start/end for color,
-            // so we make start = transparent version of bg, end = opaque bg.
-            const scrimStartY = Math.round(canvasH * 0.50); // Start halfway — image stays vivid on top
+            const scrimStartY = Math.round(canvasH * 0.30); // ★ v732: 50→30% for full text coverage
             return {
                 overlayElements: [{
                     name: 'text_overlay',
                     type: 'rect' as any,
                     x: 0, y: scrimStartY,
                     w: canvasW, h: canvasH - scrimStartY,
-                    // ★ FIX: Use bgColor for both ends — the gradient effect comes from
-                    // the Fabric gradient opacity transition, not CSS rgba().
                     gradient_start_hex: bgColor,
                     gradient_end_hex: bgColor,
                     gradient_angle: 180,
-                    r: bgR, g: bgG, b: bgB, a: 0.55,
+                    r: bgR, g: bgG, b: bgB, a: 0.65, // ★ v732: 0.55→0.65 stronger contrast
                 }],
                 textModifiers: SUBTLE_TEXT_SHADOW,
-                imageFilters: { brightness: aiBrightness || -0.1, blur: fabricBlur },
+                imageFilters: { brightness: aiBrightness || -0.12, blur: fabricBlur },
             };
         }
 
