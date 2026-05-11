@@ -235,6 +235,15 @@ async function buildAndRender(
     const validation = validateLayout(allElements, canvasW, canvasH);
     allElements = validation.elements;
 
+    // ★ v735: Design polish — contrast, overflow, CTA sizing auto-fix
+    try {
+        const { polishDesign } = await resilientImport(() => import('@/services/designPolish'));
+        const bgColor = guide.colors.gradientStart ?? guide.colors.background ?? '#0B0F1A';
+        const polish = polishDesign(allElements, canvasW, canvasH, bgColor);
+        allElements = polish.elements;
+        if (polish.fixes.length > 0) cb.narrate(`Auto-fixed ${polish.fixes.length} design issue(s)`);
+    } catch { /* polish is best-effort */ }
+
     const validationNote = validation.isClean ? 'Layout validated — no issues' : `Layout validated — ${validation.fixes.length} auto-fix(es)`;
     cb.updateCard('build', 'done', `${allElements.length} elements · ${validationNote}`, {
         expandedDetail: allElements.map(el => `"${el.name}" — ${el.gradient_start_hex ? 'gradient' : el.type ?? 'rect'} at (${Math.round(el.x ?? 0)}, ${Math.round(el.y ?? 0)}) ${Math.round(el.w ?? 0)}x${Math.round(el.h ?? 0)}`).join('\n'),

@@ -1,17 +1,7 @@
 // ─────────────────────────────────────────────────
-// designStyleGuides.ts — AI-Driven Color Intelligence
-// ─────────────────────────────────────────────────
-// Colors are NO LONGER hardcoded palettes.
-// ★ v713: AI is now a Creative Director — determines design STRATEGY
-// (overlay approach, image filters, CTA style, text hierarchy)
-// alongside the color palette.
-// AI determines the brand-appropriate color palette
-// based on prompt context (brand + industry + mood).
-//
-// "Nike" → red/black/white (AI knows the brand)
-// "Coca-Cola" → red/white
-// "luxury watch" → gold/navy
-// "make it green" → green palette
+// designStyleGuides.ts — AI Creative Director
+// ★ Determines color palette, design strategy, overlay approach,
+//   CTA style, text hierarchy, and template selection.
 // ─────────────────────────────────────────────────
 
 import { callAnthropicApi, DEFAULT_CLAUDE_MODEL } from '@/services/anthropicClient';
@@ -143,7 +133,14 @@ RULES:
    - Choose fonts that feel right for the mood — trust your judgment
    - NEVER return "Inter" for both — that's boring and generic
 7. Set needsBackgroundImage to true if the prompt describes a physical scene, product, or person. Set to false for abstract/digital concepts. This is a HINT — code may override your decision.
-   If true, write a short backgroundImagePrompt describing the ideal photo. When people/professions are mentioned, describe the person (appearance, pose, clothing, environment).
+   If true, write a backgroundImagePrompt for AD-READY photography. Rules:
+   - NEVER request text, logos, or typography in the image
+   - Include: lighting direction, depth of field, color temperature
+   - Leave negative space for text: specify "negative space on [top/bottom/left/right]"
+   - For lifestyle: "shallow depth of field, bokeh background, warm natural light, editorial photography"
+   - For product: "clean studio background, professional product shot, rim lighting, commercial photography"
+   - For food: "overhead flat lay OR 45-degree angle, styled food photography, soft diffused light"
+   - For landscape/travel: "golden hour, wide angle, atmospheric perspective, negative space in sky"
 8. DESIGN STRATEGY — You are the Creative Director. Decide HOW the design should look:
    a. overlayApproach: How to make text readable over background images. Options:
       - "gradient-scrim": Subtle gradient from transparent to background color (NOT black!). Best for hero images.

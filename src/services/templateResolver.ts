@@ -75,6 +75,33 @@ export function resolveTemplateElements(
 
     // Convert DesignElement[] → RenderElement[] with scaling
     const result = elements.map(el => designToRender(el, nativeW, nativeH, canvasW, canvasH));
+
+    // ★ v735: Post-scaling safeguards for extreme aspect ratios
+    // On narrow canvases (160×600), text becomes unreadably small
+    const aspectRatio = canvasW / canvasH;
+    const isExtreme = aspectRatio < 0.4 || aspectRatio > 3.5;
+    if (isExtreme) {
+        for (const r of result) {
+            if (r.type !== 'text') continue;
+            const name = (r.name ?? '').toLowerCase();
+            // Enforce minimum font sizes by role
+            if (name.includes('headline') && !name.includes('sub')) {
+                r.font_size = Math.max(14, r.font_size ?? 14);
+            } else if (name.includes('sub')) {
+                r.font_size = Math.max(11, r.font_size ?? 11);
+            } else if (name.includes('cta') || name.includes('label')) {
+                r.font_size = Math.max(12, r.font_size ?? 12);
+            } else {
+                r.font_size = Math.max(10, r.font_size ?? 10);
+            }
+            // Ensure text fills at least 80% of narrow canvas width
+            if (r.w < canvasW * 0.7) r.w = Math.round(canvasW * 0.85);
+            // Keep x within bounds
+            if (r.x + r.w > canvasW) r.x = Math.max(0, Math.round((canvasW - r.w) / 2));
+        }
+        console.log(`[templateResolver] Extreme aspect ratio (${aspectRatio.toFixed(2)}) — applied min font/width safeguards`);
+    }
+
     for (const r of result) {
         if (r.type === 'text') {
             console.log(`[templateResolver]   text "${r.name}" fontSize=${r.font_size} pos=(${r.x},${r.y}) size=${r.w}x${r.h} align=${r.text_align}`);

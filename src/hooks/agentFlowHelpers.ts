@@ -309,11 +309,24 @@ export async function processTemplateElements(
     }
 
     // Font replacement: AI palette fonts (keep template font sizes!)
+    // ★ v735: Also apply professional typography defaults (only if template didn't specify)
     for (const el of allElements) {
         if (el.type !== 'text') continue;
         const name = (el.name ?? '').toLowerCase();
         if (name.includes('headline') && !name.includes('sub')) {
             el.font_family = guide.typography.primaryFont;
+            el.letter_spacing = el.letter_spacing ?? -0.5;  // tight tracking for headlines
+            el.line_height = el.line_height ?? 1.1;         // compact
+            el.font_weight = el.font_weight ?? '800';       // extra bold
+        } else if (name.includes('sub')) {
+            el.font_family = guide.typography.secondaryFont;
+            el.letter_spacing = el.letter_spacing ?? 0;
+            el.line_height = el.line_height ?? 1.35;        // readable spacing
+            el.font_weight = el.font_weight ?? '400';
+        } else if (name.includes('tag')) {
+            if (el.font_family) el.font_family = guide.typography.secondaryFont;
+            el.letter_spacing = el.letter_spacing ?? 2;     // wide tracking for tags
+            el.font_weight = el.font_weight ?? '600';
         } else if (el.font_family) {
             el.font_family = guide.typography.secondaryFont;
         }

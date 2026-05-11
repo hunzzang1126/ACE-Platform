@@ -38,7 +38,18 @@ export function renderElement(engine: FlowEngine, el: any, canvasW: number, cach
         return nodeId;
     } else if (el.type === 'rounded_rect' || (el.radius && el.radius > 0)) {
         // ★ Route any rect with radius > 0 to rounded_rect (e.g., text_overlay, cta_button)
-        return engine.add_rounded_rect(el.x ?? 0, el.y ?? 0, el.w ?? 100, el.h ?? 50, el.r ?? 0.5, el.g ?? 0.5, el.b ?? 0.5, el.a ?? 1, el.radius ?? 8, el.name);
+        const bgId = engine.add_rounded_rect(el.x ?? 0, el.y ?? 0, el.w ?? 100, el.h ?? 50, el.r ?? 0.5, el.g ?? 0.5, el.b ?? 0.5, el.a ?? 1, el.radius ?? 8, el.name);
+        // ★ v735: Render CTA label text inside button — previously silently dropped
+        if (el.content && bgId != null) {
+            const labelHex = el.color_hex || '#FFFFFF';
+            const [lr, lg, lb] = hexToRgb(labelHex);
+            const labelFont = el.font_family || guide?.typography?.secondaryFont || 'Inter';
+            const labelSize = el.font_size || Math.max(12, Math.round((el.h ?? 50) * 0.4));
+            // Center text vertically inside button (y offset = button_y + padding)
+            const labelY = (el.y ?? 0) + Math.round(((el.h ?? 50) - labelSize * 1.2) / 2);
+            engine.add_text(el.x ?? 0, labelY, el.content, labelSize, `${labelFont}, system-ui, sans-serif`, el.font_weight || '700', lr, lg, lb, 1.0, el.w ?? 100, 'center', `${el.name ?? 'cta'}_label`, 1.0, el.letter_spacing);
+        }
+        return bgId;
     } else if (el.type === 'ellipse') {
         return engine.add_ellipse?.((el.x ?? 0) + (el.w ?? 50) / 2, (el.y ?? 0) + (el.h ?? 50) / 2, (el.w ?? 50) / 2, (el.h ?? 50) / 2, el.r ?? 0.5, el.g ?? 0.5, el.b ?? 0.5, el.a ?? 1) ?? null;
     } else {

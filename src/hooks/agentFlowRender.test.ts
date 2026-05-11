@@ -150,3 +150,84 @@ describe('★ v725: Conversational brand asset narration', () => {
     });
 });
 
+// ══════════════════════════════════════════════════
+// ★ v735: Design Quality Improvements
+// ══════════════════════════════════════════════════
+const renderElSrc = readFileSync(resolve(__dirname, './agentFlowRender.ts'), 'utf-8');
+const resolverSrc = readFileSync(resolve(__dirname, '../services/templateResolver.ts'), 'utf-8');
+const styleSrc = readFileSync(resolve(__dirname, '../services/designStyleGuides.ts'), 'utf-8');
+
+describe('★ v735: CTA button label text rendering', () => {
+    it('renders text label inside rounded_rect CTA buttons', () => {
+        expect(renderElSrc).toContain('el.content');
+        expect(renderElSrc).toContain('_label');
+        expect(renderElSrc).toContain('labelSize');
+    });
+
+    it('auto-calculates label font size from button height', () => {
+        expect(renderElSrc).toContain('el.h ?? 50) * 0.4');
+    });
+
+    it('centers label text vertically inside button', () => {
+        expect(renderElSrc).toContain('labelY');
+    });
+});
+
+describe('★ v735: Typography sophistication defaults', () => {
+    it('applies tight letter-spacing to headlines', () => {
+        expect(helpersSrc).toContain('letter_spacing');
+        expect(helpersSrc).toContain('-0.5');
+    });
+
+    it('applies wide letter-spacing to tags', () => {
+        expect(helpersSrc).toContain("el.letter_spacing ?? 2");
+    });
+
+    it('preserves template values using ?? operator', () => {
+        expect(helpersSrc).toContain('el.letter_spacing ??');
+        expect(helpersSrc).toContain('el.line_height ??');
+    });
+});
+
+describe('★ v735: Image prompt quality enhancement', () => {
+    it('instructs AI to include negative space for text', () => {
+        expect(styleSrc).toContain('negative space');
+    });
+
+    it('instructs AI to never include text in images', () => {
+        expect(styleSrc).toContain('NEVER request text, logos, or typography');
+    });
+
+    it('includes photography-specific guidance', () => {
+        expect(styleSrc).toContain('depth of field');
+        expect(styleSrc).toContain('rim lighting');
+    });
+});
+
+describe('★ v735: Extreme aspect ratio safeguards', () => {
+    it('detects extreme aspect ratios', () => {
+        expect(resolverSrc).toContain('aspectRatio');
+        expect(resolverSrc).toContain('isExtreme');
+    });
+
+    it('enforces minimum font sizes for narrow canvases', () => {
+        expect(resolverSrc).toContain('Math.max(14');
+        expect(resolverSrc).toContain('Math.max(11');
+        expect(resolverSrc).toContain('Math.max(12');
+    });
+
+    it('ensures text fills at least 80% of narrow canvas width', () => {
+        expect(resolverSrc).toContain('canvasW * 0.85');
+    });
+});
+
+describe('★ v735: Design polish in pipeline', () => {
+    it('pipeline calls polishDesign after validation', () => {
+        expect(flowSrc).toContain('polishDesign');
+        expect(flowSrc).toContain('designPolish');
+    });
+
+    it('reports auto-fixes via narration', () => {
+        expect(flowSrc).toContain('Auto-fixed');
+    });
+});
