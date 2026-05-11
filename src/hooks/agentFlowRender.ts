@@ -78,7 +78,7 @@ export async function placeBrandAssets(
     logoUrl: string | null,
     logoW: number,
     logoH: number,
-    selectedAssets: import('@/carbon/brandAssetSelector').AssetSelection | null | undefined,
+    selectedAssets: import('@/services/brandAssetSelector').AssetSelection | null | undefined,
     cb: AgentFlowCallbacks,
 ): Promise<number> {
     let placed = 0;

@@ -150,7 +150,7 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
 describe('★ v732: Overlay readability improvements', () => {
-    const overlaySrc = readFileSync(resolve(__dirname, '../carbon/overlayStyles.ts'), 'utf-8');
+    const overlaySrc = readFileSync(resolve(__dirname, './overlayStyles.ts'), 'utf-8');
 
     it('★ REGRESSION: gradient-scrim starts at 30% for full coverage', () => {
         expect(overlaySrc).toContain('canvasH * 0.30');

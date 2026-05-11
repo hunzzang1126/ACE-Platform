@@ -15,8 +15,8 @@
 // ─────────────────────────────────────────────────
 
 import { callAnthropicApi, DEFAULT_CLAUDE_MODEL } from '@/services/anthropicClient';
-import { parseDesignStrategy, DEFAULT_STRATEGY } from '@/carbon/designStrategy';
-import type { DesignStrategy } from '@/carbon/designStrategy';
+import { parseDesignStrategy, DEFAULT_STRATEGY } from '@/services/designStrategy';
+import type { DesignStrategy } from '@/services/designStrategy';
 
 // ── Types ────────────────────────────────────────
 
@@ -159,18 +159,10 @@ RULES:
       - tagIsAccent=true: tag text uses accent color (premium feel)
       - subheadlineOpacity < 1.0: creates visual depth between headline and sub
 9. Return ONLY the JSON object, nothing else.
-10. layoutVariant: Choose the layout that best fits the content and mood. Options:
-   - "centered": Classic center-aligned. Universal default.
-   - "left-hero": Left-aligned text, room for image on right.
-   - "bold-statement": Oversized headline, dramatic impact.
-   - "editorial": Magazine-style left-aligned, elegant spacing.
-   - "minimal-center": Clean, minimalist, refined.
-   - "offset-right": Right-aligned, unconventional.
-   - "top-heavy": Content pushed to top, breathing room below.
-   - "bottom-stack": Content stacked at bottom, image-first.
-   - "split-left": Narrow left column, structural.
-   - "compact-bar": Horizontal bar layout (only for very wide canvases).
-   Choose based on content volume and mood — NOT randomly.`;
+10. templateId: You will be given a TEMPLATE CATALOG with available templates.
+   Choose the templateId that best fits the content mood, industry, and visual impact.
+   Pick based on the template's name, description, tags, and category — NOT randomly.
+   If no template catalog is provided, set templateId to null.`;
 
 interface AiColorResponse {
     name: string;
@@ -194,8 +186,8 @@ interface AiColorResponse {
     imageFilters?: { brightness?: number; blur?: number };
     ctaStyle?: string;
     textHierarchy?: { headlineOpacity?: number; subheadlineOpacity?: number; tagIsAccent?: boolean };
-    // ★ v714: AI layout variant selection
-    layoutVariant?: string;
+    // ★ v734: AI template selection from Supabase catalog
+    templateId?: string | null;
 }
 
 /**
@@ -205,7 +197,8 @@ interface AiColorResponse {
 export async function generateColorPalette(
     prompt: string,
     signal: AbortSignal,
-): Promise<{ palette: DesignStyleGuide; reasoning: string; needsBackgroundImage: boolean; backgroundImagePrompt: string; designStrategy: DesignStrategy; layoutVariant: string | null }> {
+    templateCatalog?: Array<{ id: string; name: string; description: string; tags: string[]; category: string }>,
+): Promise<{ palette: DesignStyleGuide; reasoning: string; needsBackgroundImage: boolean; backgroundImagePrompt: string; designStrategy: DesignStrategy; templateId: string | null }> {
     try {
         const body = {
             model: DEFAULT_CLAUDE_MODEL,
@@ -238,8 +231,8 @@ Return a JSON object with these exact keys:
   "imageFilters": { "brightness": -0.15, "blur": 0 },
   "ctaStyle": "pill"|"outlined"|"solid"|"text-arrow"|"rounded-square",
   "textHierarchy": { "headlineOpacity": 1.0, "subheadlineOpacity": 0.75, "tagIsAccent": true },
-  "layoutVariant": "centered"|"left-hero"|"bold-statement"|"editorial"|"minimal-center"|"offset-right"|"top-heavy"|"bottom-stack"|"split-left"|"compact-bar"
-}`,
+  "templateId": "id-from-catalog-or-null"
+}${templateCatalog && templateCatalog.length > 0 ? `\n\nTEMPLATE CATALOG (pick the best templateId):\n${templateCatalog.map(t => `- id:"${t.id}" name:"${t.name}" desc:"${t.description}" tags:[${t.tags.join(',')}] cat:${t.category}`).join('\n')}` : ''}`,
             }],
         };
 
@@ -307,16 +300,24 @@ Return a JSON object with these exact keys:
             ctaStyle: parsed.ctaStyle,
             textHierarchy: parsed.textHierarchy,
         });
-        console.log(`[ColorPalette] Design strategy: overlay=${designStrategy.overlayApproach}, cta=${designStrategy.ctaStyle}, layout=${parsed.layoutVariant ?? 'auto'}`);
+        console.log(`[ColorPalette] Design strategy: overlay=${designStrategy.overlayApproach}, cta=${designStrategy.ctaStyle}, template=${parsed.templateId ?? 'auto'}`);
 
-        // ★ v714: Validate AI-chosen layout variant
-        const VALID_VARIANTS = ['centered', 'left-hero', 'offset-right', 'top-heavy', 'bottom-stack', 'split-left', 'minimal-center', 'bold-statement', 'editorial', 'compact-bar'];
-        const aiVariant = parsed.layoutVariant && VALID_VARIANTS.includes(parsed.layoutVariant) ? parsed.layoutVariant : null;
+        // ★ v734: Validate AI-chosen template ID against catalog
+        let aiTemplateId: string | null = null;
+        if (parsed.templateId && templateCatalog) {
+            const found = templateCatalog.find(t => t.id === parsed.templateId);
+            if (found) {
+                aiTemplateId = parsed.templateId;
+                console.log(`[ColorPalette] AI selected template: "${found.name}" (${found.id})`);
+            } else {
+                console.warn(`[ColorPalette] AI returned unknown templateId: ${parsed.templateId}`);
+            }
+        }
 
-        return { palette, reasoning: parsed.reasoning || '', needsBackgroundImage: !!parsed.needsBackgroundImage, backgroundImagePrompt: parsed.backgroundImagePrompt || '', designStrategy, layoutVariant: aiVariant };
+        return { palette, reasoning: parsed.reasoning || '', needsBackgroundImage: !!parsed.needsBackgroundImage, backgroundImagePrompt: parsed.backgroundImagePrompt || '', designStrategy, templateId: aiTemplateId };
     } catch (err) {
         console.warn('[ColorPalette] AI generation failed, using default:', err);
-        return { palette: { ...DEFAULT_PALETTE }, reasoning: 'Using default palette (AI unavailable)', needsBackgroundImage: false, backgroundImagePrompt: '', designStrategy: { ...DEFAULT_STRATEGY }, layoutVariant: null };
+        return { palette: { ...DEFAULT_PALETTE }, reasoning: 'Using default palette (AI unavailable)', needsBackgroundImage: false, backgroundImagePrompt: '', designStrategy: { ...DEFAULT_STRATEGY }, templateId: null };
     }
 }
 

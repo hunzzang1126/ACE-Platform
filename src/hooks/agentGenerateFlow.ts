@@ -75,13 +75,25 @@ export async function executeGenerateFlow(
     cb.narrate(`Copy ready: "${content.headline}"`);
     await pause(400);
 
-    // ── Phase 3: Color Palette (Carbon handles layout — no template needed) ──
-    cb.narrate('Determining the perfect color palette...');
+    // ── Phase 3: Color Palette + Template Selection ──
+    cb.narrate('Determining the perfect color palette and selecting template...');
     cb.addCard('palette', 'Determining color palette', 'running');
+
+    // ★ v734: Build template catalog from Supabase store for AI selection
+    let templateCatalog: Array<{ id: string; name: string; description: string; tags: string[]; category: string }> = [];
+    try {
+        const { useTemplateStore } = await resilientImport(() => import('@/stores/templateStore'));
+        const allTemplates = useTemplateStore.getState().templates ?? [];
+        templateCatalog = allTemplates.map(t => ({
+            id: t.id, name: t.name, description: t.description,
+            tags: t.tags ?? [], category: t.category ?? 'display',
+        }));
+        console.log(`[Pipeline] Template catalog: ${templateCatalog.length} templates available for AI selection`);
+    } catch { /* fallback: empty catalog → AI won't pick, keyword matching will */ }
 
     const { generateColorPalette } = await resilientImport(() => import('@/services/designStyleGuides'));
     const colorPrompt = brand.paletteHint ? `${prompt}\n\n[BRAND PALETTE — Reference Only]\n${brand.paletteHint}\nUse brand colors as a STARTING POINT, but if the user's prompt explicitly requests a different color (e.g., "blue CTA", "make it green", "파란색"), the user's color ALWAYS wins.` : prompt;
-    const { palette: guide, reasoning: colorReasoning, needsBackgroundImage: aiNeedsImage, backgroundImagePrompt, designStrategy, layoutVariant: aiLayoutVariant } = await generateColorPalette(colorPrompt, abort.signal);
+    const { palette: guide, reasoning: colorReasoning, needsBackgroundImage: aiNeedsImage, backgroundImagePrompt, designStrategy, templateId: aiTemplateId } = await generateColorPalette(colorPrompt, abort.signal, templateCatalog);
 
     // ★ Code-first image decision: deterministic for 80% of cases, AI only for ambiguous.
     const { decideBackgroundImage } = await resilientImport(() => import('@/services/backgroundImageDecider'));
@@ -92,7 +104,7 @@ export async function executeGenerateFlow(
 
     cb.updateCard('palette', 'done', guide.name, {
         reasoning: colorReasoning,
-        expandedDetail: [`Background: ${guide.colors.gradientStart} -> ${guide.colors.gradientEnd}`, `Accent: ${guide.colors.accent}`, `Text: ${guide.colors.foreground}`, `Font: ${guide.typography.primaryFont} / ${guide.typography.secondaryFont}`, `Overlay: ${designStrategy.overlayApproach} | CTA: ${designStrategy.ctaStyle}`, `Layout: ${aiLayoutVariant ?? 'auto'}`, finalNeedsImage ? `Background Image: YES (${imageSource})` : `Background Image: NO (${imageSource})`].join('\n'),
+        expandedDetail: [`Background: ${guide.colors.gradientStart} -> ${guide.colors.gradientEnd}`, `Accent: ${guide.colors.accent}`, `Text: ${guide.colors.foreground}`, `Font: ${guide.typography.primaryFont} / ${guide.typography.secondaryFont}`, `Overlay: ${designStrategy.overlayApproach} | CTA: ${designStrategy.ctaStyle}`, `Template: ${aiTemplateId ?? 'auto'}`, finalNeedsImage ? `Background Image: YES (${imageSource})` : `Background Image: NO (${imageSource})`].join('\n'),
     });
     cb.narrate(colorReasoning || `Color palette: ${guide.name}`);
     await pause(400);
@@ -112,9 +124,9 @@ export async function executeGenerateFlow(
     }
     await pause(300);
 
-    // ── Phase 4: Carbon Layout + Render (stepper: Executing) ──
+    // ── Phase 4: Template Layout + Render (stepper: Executing) ──
     cb.setPhase?.('executing');
-    const rendered = await buildAndRender(prompt, guide, content, canvasW, canvasH, bgResult, brand.logoUrl, brand.logoW, brand.logoH, engine, abort, cb, designStrategy, aiLayoutVariant, brand.selectedAssets);
+    const rendered = await buildAndRender(prompt, guide, content, canvasW, canvasH, bgResult, brand.logoUrl, brand.logoW, brand.logoH, engine, abort, cb, designStrategy, aiTemplateId, brand.selectedAssets);
 
     // ── Phase 6: Finalize (stepper: Finishing) ──
     // ★ Vision QA removed — deterministic quality (recolor + contrast + layout validation)
@@ -198,58 +210,25 @@ async function buildAndRender(
     brandLogoUrl: string | null, brandLogoW: number, brandLogoH: number,
     engine: FlowEngine, abort: AbortController, cb: AgentFlowCallbacks,
     designStrategy?: any,
-    aiLayoutVariant?: string | null,
-    selectedAssets?: import('@/carbon/brandAssetSelector').AssetSelection | null,
+    aiTemplateId?: string | null,
+    selectedAssets?: import('@/services/brandAssetSelector').AssetSelection | null,
 ): Promise<number> {
-    cb.narrate('Building the layout with Carbon Design System...');
-    cb.addCard('build', 'Carbon layout engine', 'running');
+    cb.narrate('Building the layout from template...');
+    cb.addCard('build', 'Template layout engine', 'running');
 
     const { validateLayout } = await resilientImport(() => import('@/engine/layoutValidator'));
 
-    // ★ CARBON DESIGN SYSTEM — AI content + Carbon layout rules.
-    // Templates are NOT used for layout. Carbon tokens decide all positions.
-    // Feature flag: set to false for instant rollback to old template pipeline.
-    const USE_CARBON_LAYOUT = true;
+    // ── Template-based layout (Supabase cloud templates) ──
+    const { selectTemplate: selectTmpl, processTemplateElements } = await resilientImport(() => import('./agentFlowHelpers'));
+    const tmpl = await selectTmpl(prompt ?? '', canvasW, canvasH, [], abort, cb, aiTemplateId);
+    const { resolveTemplateElements } = await resilientImport(() => import('@/services/templateResolver'));
+    const rawElements: any[] = resolveTemplateElements(tmpl.id, canvasW, canvasH);
 
-    let allElements: any[];
+    // ★ Process: BG handling, content injection, font replacement, overlay
+    let allElements = await processTemplateElements(rawElements, content, guide, canvasW, canvasH, bgResult, designStrategy);
 
-    if (USE_CARBON_LAYOUT) {
-        // ── NEW: Carbon-powered layout ──
-        const { buildDesignElements } = await resilientImport(() => import('@/carbon/layoutComposer'));
-        const result = buildDesignElements(
-            { headline: content.headline, subheadline: content.subheadline, cta: content.cta, tag: content.tag },
-            {
-                gradientStart: guide.colors.gradientStart,
-                gradientEnd: guide.colors.gradientEnd,
-                accent: guide.colors.accent ?? guide.colors.gradientStart,
-                foreground: guide.colors.foreground ?? '#FFFFFF',
-                background: guide.colors.background ?? '#0B0F1A',
-                typography: guide.typography,
-            },
-            canvasW, canvasH,
-            bgResult.hasImage && !!bgResult.url,
-            aiLayoutVariant ?? undefined, // ★ v714: AI-chosen variant (falls back to random if null)
-            designStrategy, // ★ v713: pass AI's design strategy
-        );
-        allElements = result.elements;
-        console.log(`[Pipeline/Carbon] Built ${allElements.length} elements via Carbon (variant: ${result.variant})`);
-        cb.narrate(`Layout: Carbon Design System (${result.variant})`);
-    } else {
-        // ── OLD: Template-based layout (backup — fetch template internally) ──
-        const { selectTemplate: selectTmpl } = await resilientImport(() => import('./agentFlowHelpers'));
-        const tmpl = await selectTmpl(prompt ?? '', canvasW, canvasH, [], abort, cb);
-        const { resolveTemplateElements } = await resilientImport(() => import('@/services/templateResolver'));
-        allElements = resolveTemplateElements(tmpl.id, canvasW, canvasH);
-        const BG_NAMES = new Set(['background', 'accent_zone', 'accent_glow', 'text_overlay', 'accent_diagonal', 'bottom_border', 'bottom_accent']);
-        allElements = allElements.filter(el => el.type === 'text' || !BG_NAMES.has((el.name ?? '').toLowerCase()));
-        const { recolorTemplateElements } = await resilientImport(() => import('./agentColorRecolor'));
-        allElements = recolorTemplateElements(allElements, guide);
-        if (bgResult.hasImage && bgResult.url) {
-            for (const el of allElements) { if (el.type === 'text') el.color_hex = '#FFFFFF'; }
-        } else {
-            allElements.unshift({ name: 'background', type: 'rect' as any, x: 0, y: 0, w: canvasW, h: canvasH, gradient_start_hex: guide.colors.gradientStart, gradient_end_hex: guide.colors.gradientEnd, gradient_angle: 135 });
-        }
-    }
+    console.log(`[Pipeline/Template] Built ${allElements.length} elements from template "${tmpl.name}"`);
+    cb.narrate(`Layout: Template "${tmpl.name}"`);
 
     allElements = allElements.filter(el => { if (el.type === 'text' && (!el.content || el.content.trim() === '')) { console.log(`[Pipeline] Removing empty text: ${el.name}`); return false; } return true; });
 

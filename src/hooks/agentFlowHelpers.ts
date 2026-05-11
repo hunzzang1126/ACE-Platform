@@ -6,7 +6,7 @@
 
 import type { AgentFlowCallbacks } from './agentFlowTypes';
 import { resilientImport } from '@/utils/resilientImport';
-import type { AssetSelection } from '@/carbon/brandAssetSelector';
+import type { AssetSelection } from '@/services/brandAssetSelector';
 
 export interface BrandScanResult {
     context: string;
@@ -43,7 +43,7 @@ export async function scanBrandCloud(
 
         // ★ v719: Hybrid brand asset selection (Code Layer + AI Layer)
         try {
-            const { selectBrandAssets } = await resilientImport(() => import('@/carbon/brandAssetSelector'));
+            const { selectBrandAssets } = await resilientImport(() => import('@/services/brandAssetSelector'));
             const selection = await selectBrandAssets(prompt, activeAssets, result.context, canvasW, canvasH, signal);
             result.selectedAssets = selection;
 
@@ -113,7 +113,7 @@ export async function scanBrandCloud(
     return result;
 }
 
-export async function selectTemplate(prompt: string, canvasW: number, canvasH: number, _brandVisionBlocks: any[], _abort: AbortController, cb: AgentFlowCallbacks) {
+export async function selectTemplate(prompt: string, canvasW: number, canvasH: number, _brandVisionBlocks: any[], _abort: AbortController, cb: AgentFlowCallbacks, aiTemplateId?: string | null) {
     cb.narrate(`Selecting layout template for ${canvasW}×${canvasH}...`);
     cb.addCard('structure', 'Selecting layout template', 'running');
 
@@ -122,6 +122,22 @@ export async function selectTemplate(prompt: string, canvasW: number, canvasH: n
 
     if (allTemplates.length === 0) throw new Error('No templates available in store');
 
+    // ★ v734: AI-selected template takes priority
+    if (aiTemplateId) {
+        const aiPicked = allTemplates.find(t => t.id === aiTemplateId);
+        if (aiPicked) {
+            const template = { id: aiPicked.id, name: aiPicked.name, description: aiPicked.description ?? '' };
+            cb.updateCard('structure', 'done', template.name, {
+                reasoning: 'AI Creative Director selected this template',
+                expandedDetail: `Template: ${template.name}\nID: ${template.id}\nSelected by AI based on prompt analysis`,
+            });
+            cb.narrate(`AI selected template "${template.name}"`);
+            return template;
+        }
+        console.warn(`[selectTemplate] AI-chosen template "${aiTemplateId}" not found in store, falling back to keyword match`);
+    }
+
+    // ★ Fallback: keyword matching
     const promptLower = prompt.toLowerCase();
     const promptWords = promptLower.split(/\s+/);
 
@@ -220,4 +236,99 @@ export function autoCreateSubheadline(
         color_hex: headlineEl?.color_hex ?? '#FFFFFF', line_height: 1.3,
     });
     console.log(`[Pipeline] Auto-created subheadline: "${content.subheadline.slice(0, 40)}" at y=${subY}, h=${subH}`);
+}
+
+// ── BG element names — template backgrounds that get special treatment ──
+const BG_NAMES = new Set([
+    'background', 'accent_zone', 'accent_glow', 'text_overlay',
+    'accent_diagonal', 'bottom_border', 'bottom_accent',
+]);
+
+/**
+ * Process template elements: handle BG, inject content, replace fonts, apply overlay.
+ * Keeps template font sizes intact (Golden Template approach).
+ */
+export async function processTemplateElements(
+    elements: any[],
+    content: any,
+    guide: any,
+    canvasW: number, canvasH: number,
+    bgResult: { hasImage: boolean; url: string | null },
+    designStrategy?: any,
+): Promise<any[]> {
+    let allElements = [...elements];
+
+    if (bgResult.hasImage && bgResult.url) {
+        // Strip template BG, force white text, apply overlay
+        allElements = allElements.filter(el =>
+            el.type === 'text' || !BG_NAMES.has((el.name ?? '').toLowerCase())
+        );
+        for (const el of allElements) {
+            if (el.type === 'text') el.color_hex = '#FFFFFF';
+        }
+        try {
+            const { buildOverlayResult } = await resilientImport(() => import('@/services/overlayStyles'));
+            const overlay = buildOverlayResult(
+                designStrategy?.overlayApproach ?? 'gradient-scrim',
+                canvasW, canvasH,
+                guide.colors.background ?? '#0B0F1A',
+                guide.colors.accent ?? '#3b82f6',
+                designStrategy?.imageFilters?.brightness ?? -0.15,
+                designStrategy?.imageFilters?.blur ?? 0,
+            );
+            if (overlay.overlayElements.length > 0) allElements.unshift(...overlay.overlayElements);
+            if (overlay.textModifiers.shadowBlur > 0) {
+                for (const el of allElements) {
+                    if (el.type === 'text') {
+                        el.shadow_blur = overlay.textModifiers.shadowBlur;
+                        el.shadow_offset_x = 0;
+                        el.shadow_offset_y = overlay.textModifiers.shadowOffsetY;
+                        el.shadow_opacity = overlay.textModifiers.shadowOpacity;
+                    }
+                }
+            }
+        } catch { /* overlay is best-effort */ }
+    } else {
+        const { recolorTemplateElements } = await resilientImport(() => import('./agentColorRecolor'));
+        allElements = recolorTemplateElements(allElements, guide);
+    }
+
+    // Content injection: replace template placeholder text with AI copy
+    const contentMap: Record<string, string> = {};
+    if (content.headline) contentMap['headline'] = content.headline;
+    if (content.subheadline) contentMap['subheadline'] = content.subheadline;
+    if (content.cta) { contentMap['cta_label'] = content.cta; contentMap['cta'] = content.cta; }
+    if (content.tag) { contentMap['tag_text'] = content.tag; contentMap['tag'] = content.tag; }
+
+    for (const el of allElements) {
+        if (el.type !== 'text') continue;
+        const name = (el.name ?? '').toLowerCase();
+        for (const [key, value] of Object.entries(contentMap)) {
+            if (name.includes(key)) { el.content = value; break; }
+        }
+    }
+
+    // Font replacement: AI palette fonts (keep template font sizes!)
+    for (const el of allElements) {
+        if (el.type !== 'text') continue;
+        const name = (el.name ?? '').toLowerCase();
+        if (name.includes('headline') && !name.includes('sub')) {
+            el.font_family = guide.typography.primaryFont;
+        } else if (el.font_family) {
+            el.font_family = guide.typography.secondaryFont;
+        }
+    }
+
+    // Auto-create subheadline if template lacks one but AI generated it
+    if (content.subheadline) {
+        const hasSub = allElements.some((el: any) =>
+            el.type === 'text' && (el.name ?? '').toLowerCase().includes('sub')
+        );
+        if (!hasSub) autoCreateSubheadline(allElements, content, canvasW, canvasH);
+    }
+
+    // Recalculate text heights (AI copy may be longer than template placeholders)
+    recalcTextHeights(allElements, canvasH);
+
+    return allElements;
 }

@@ -88,29 +88,33 @@ describe('agentGenerateFlow — user preferences', () => {
 // ══════════════════════════════════════════════════
 // ★ REGRESSION: Carbon replaces templates as primary layout engine
 // ══════════════════════════════════════════════════
-describe('★ REGRESSION: Carbon primary, template only in backup path', () => {
-    it('main flow does NOT call selectTemplate directly', () => {
-        // selectTemplate is imported but only used in backup path inside buildAndRender
-        const mainFlow = src.split('async function buildAndRender')[0]!;
-        expect(mainFlow).not.toContain('selectTemplate(');
+describe('★ REGRESSION: Template-first pipeline (Carbon removed v734)', () => {
+    it('main flow uses selectTemplate inside buildAndRender', () => {
+        expect(src).toContain('selectTemplate');
+        expect(src).toContain('selectTmpl');
     });
 
-    it('backup path still uses resolveTemplateElements', () => {
+    it('uses resolveTemplateElements as primary layout source', () => {
         expect(src).toContain('resolveTemplateElements');
         expect(src).toContain('templateResolver');
     });
 
-    it('does NOT call template.build()', () => {
-        expect(src).not.toContain('template.build(');
+    it('does NOT use Carbon buildDesignElements', () => {
+        expect(src).not.toContain('buildDesignElements');
+        expect(src).not.toContain('USE_CARBON_LAYOUT');
     });
 
-    it('backup path fetches template internally (not from caller)', () => {
+    it('template elements are resolved by template ID', () => {
         expect(src).toContain('resolveTemplateElements(tmpl.id');
     });
 
-    it('Carbon path uses buildDesignElements as primary', () => {
-        expect(src).toContain('USE_CARBON_LAYOUT');
-        expect(src).toContain('buildDesignElements');
+    it('builds template catalog from Supabase store for AI selection', () => {
+        expect(src).toContain('templateCatalog');
+        expect(src).toContain('useTemplateStore');
+    });
+
+    it('passes aiTemplateId to selectTemplate', () => {
+        expect(src).toContain('aiTemplateId');
     });
 });
 
@@ -336,24 +340,29 @@ describe('agentFlowTypes — setPhase interface', () => {
 
 const helpersSrc = readFileSync(resolve(__dirname, './agentFlowHelpers.ts'), 'utf-8');
 
-describe('★ REGRESSION: Carbon Design System replaces template content substitution', () => {
-    it('uses Carbon buildDesignElements for layout (USE_CARBON_LAYOUT)', () => {
-        expect(src).toContain('USE_CARBON_LAYOUT');
-        expect(src).toContain('buildDesignElements');
-    });
-
-    it('passes all content fields to Carbon layout engine', () => {
+describe('★ REGRESSION: Template-based content injection (v734)', () => {
+    it('injects AI-generated content into template text elements', () => {
+        expect(helpersSrc).toContain('contentMap');
         expect(src).toContain('content.headline');
         expect(src).toContain('content.subheadline');
         expect(src).toContain('content.cta');
-        expect(src).toContain('content.tag');
     });
 
-    it('backup path still has resolveTemplateElements for rollback', () => {
-        expect(src).toContain('resolveTemplateElements');
+    it('replaces fonts with AI palette fonts', () => {
+        expect(helpersSrc).toContain('guide.typography.primaryFont');
+        expect(helpersSrc).toContain('guide.typography.secondaryFont');
     });
 
-    it('auto-created subheadline helper still exported (backup path)', () => {
+    it('strips template BG when AI image exists', () => {
+        expect(helpersSrc).toContain('BG_NAMES');
+        expect(helpersSrc).toContain('bgResult.hasImage');
+    });
+
+    it('keeps template BG and recolors when no AI image', () => {
+        expect(helpersSrc).toContain('recolorTemplateElements');
+    });
+
+    it('auto-created subheadline helper still exported', () => {
         expect(helpersSrc).toContain('canvasH * 0.035');
         expect(helpersSrc).toContain('Math.max(14, Math.min(32');
     });
@@ -367,5 +376,10 @@ describe('★ REGRESSION: Carbon Design System replaces template content substit
     it('recalcTextHeights auto-shrinks fonts exceeding 40% canvas', () => {
         expect(helpersSrc).toContain('canvasH * 0.4');
         expect(helpersSrc).toContain('el.font_size > 12');
+    });
+
+    it('applies overlay protection for bg-image text readability', () => {
+        expect(helpersSrc).toContain('buildOverlayResult');
+        expect(helpersSrc).toContain('overlayStyles');
     });
 });

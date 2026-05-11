@@ -62,34 +62,34 @@ describe('agentFlowHelpers — extracted helpers', () => {
     });
 });
 
-describe('agentGenerateFlow — Carbon Design System integration', () => {
-    it('★ REGRESSION: uses Carbon layout engine (USE_CARBON_LAYOUT flag)', () => {
-        expect(flowSrc).toContain('USE_CARBON_LAYOUT');
-        expect(flowSrc).toContain('buildDesignElements');
-    });
-
-    it('★ REGRESSION: imports Carbon layout composer', () => {
-        expect(flowSrc).toContain('@/carbon/layoutComposer');
-    });
-
-    it('★ REGRESSION: passes content to Carbon (headline, subheadline, cta, tag)', () => {
-        expect(flowSrc).toContain('content.headline');
-        expect(flowSrc).toContain('content.subheadline');
-        expect(flowSrc).toContain('content.cta');
-        expect(flowSrc).toContain('content.tag');
-    });
-
-    it('★ REGRESSION: passes palette to Carbon', () => {
-        expect(flowSrc).toContain('guide.colors.gradientStart');
-        expect(flowSrc).toContain('guide.colors.gradientEnd');
-        expect(flowSrc).toContain('guide.typography');
-    });
-
-    it('★ REGRESSION: has backup template path for rollback', () => {
+describe('agentGenerateFlow — Template-first pipeline (v734)', () => {
+    it('★ REGRESSION: uses template pipeline (no Carbon)', () => {
+        expect(flowSrc).not.toContain('USE_CARBON_LAYOUT');
+        expect(flowSrc).not.toContain('buildDesignElements');
         expect(flowSrc).toContain('resolveTemplateElements');
     });
 
-    it('helpers still export autoCreateSubheadline (used by backup path)', () => {
+    it('★ REGRESSION: no Carbon imports remaining', () => {
+        expect(flowSrc).not.toContain('@/carbon/');
+    });
+
+    it('★ REGRESSION: injects content into template text elements', () => {
+        expect(flowSrc).toContain('content.headline');
+        expect(flowSrc).toContain('content.subheadline');
+        expect(flowSrc).toContain('content.cta');
+        expect(helpersSrc).toContain('contentMap');
+    });
+
+    it('★ REGRESSION: passes palette to recolor', () => {
+        expect(flowSrc).toContain('guide.colors.gradientStart');
+        expect(flowSrc).toContain('guide.typography');
+    });
+
+    it('resolveTemplateElements is the primary layout source', () => {
+        expect(flowSrc).toContain('resolveTemplateElements');
+    });
+
+    it('helpers still export autoCreateSubheadline', () => {
         expect(helpersSrc).toContain('export function autoCreateSubheadline');
     });
 
