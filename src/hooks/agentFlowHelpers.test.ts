@@ -10,22 +10,22 @@ import { recalcTextHeights, autoCreateSubheadline } from './agentFlowHelpers';
 // recalcTextHeights
 // ══════════════════════════════════════════════════
 describe('recalcTextHeights', () => {
-    it('recalculates height for a short text (single line)', () => {
-        const els = [{ type: 'text', content: 'Hello', font_size: 24, w: 300, h: 0, font_weight: '400' }];
+    it('preserves template height for short text (no overflow)', () => {
+        const els = [{ type: 'text', content: 'Hello', font_size: 24, w: 300, h: 40, font_weight: '400' }];
         recalcTextHeights(els, 500);
-        // 'Hello' = 5 chars, charW = 24*0.5 = 12, charsPerLine = 300/12 = 25. 1 line.
-        // h = round(24 * 1.45 * 1 + 8) = round(42.8) = 43
-        expect(els[0].h).toBe(43);
+        // ★ v736: template height is sacred — not recalculated
+        expect(els[0].h).toBe(40); // Preserved from template
+        expect(els[0].font_size).toBe(24); // Not shrunk
     });
 
-    it('recalculates height for a long text (multi-line)', () => {
+    it('shrinks font for long text that would overflow canvas, preserves height', () => {
         const longText = 'About The Products Main Benefit For Your Business Growth';
         const els = [{ type: 'text', content: longText, font_size: 48, w: 300, h: 50, font_weight: '700' }];
         recalcTextHeights(els, 1080);
-        // Bold: charW = 48*0.65 = 31.2, charsPerLine = 300/31.2 = 9
-        // 56 chars / 9 = 7 lines → h = round(48 * 1.45 * 7 + 8) = round(495.2) = 495
-        expect(els[0].h).toBeGreaterThan(50); // Was 50 (stale), now recalculated
-        expect(els[0].h).toBeGreaterThan(200); // Multi-line text
+        // ★ v736: h is sacred. Font shrinks because estimated height > 40% of 1080 (432px)
+        expect(els[0].h).toBe(50); // Template height preserved
+        expect(els[0].font_size).toBeLessThan(48); // Font shrunk to fit
+        expect(els[0].font_size).toBeGreaterThanOrEqual(12);
     });
 
     it('auto-shrinks font if text exceeds 40% of canvas height', () => {
@@ -50,11 +50,11 @@ describe('recalcTextHeights', () => {
     it('skips non-text elements', () => {
         const els = [
             { type: 'rect', content: 'test', font_size: 24, w: 300, h: 100 },
-            { type: 'text', content: 'Hello', font_size: 24, w: 300, h: 0, font_weight: '400' },
+            { type: 'text', content: 'Hello', font_size: 24, w: 300, h: 40, font_weight: '400' },
         ];
         recalcTextHeights(els, 500);
         expect(els[0].h).toBe(100); // rect unchanged
-        expect(els[1].h).toBeGreaterThan(0); // text recalculated
+        expect(els[1].h).toBe(40);  // ★ v736: template height preserved
     });
 
     it('skips text elements with missing content/font_size/width', () => {

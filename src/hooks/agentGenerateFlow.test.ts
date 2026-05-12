@@ -348,7 +348,8 @@ describe('★ REGRESSION: Template-based content injection (v734)', () => {
         expect(src).toContain('content.cta');
     });
 
-    it('replaces fonts with AI palette fonts', () => {
+    it('uses AI fonts as fallback only when template has none', () => {
+        expect(helpersSrc).toContain('!el.font_family');
         expect(helpersSrc).toContain('guide.typography.primaryFont');
         expect(helpersSrc).toContain('guide.typography.secondaryFont');
     });
@@ -378,8 +379,9 @@ describe('★ REGRESSION: Template-based content injection (v734)', () => {
         expect(helpersSrc).toContain('el.font_size > 12');
     });
 
-    it('applies overlay protection for bg-image text readability', () => {
-        expect(helpersSrc).toContain('buildOverlayResult');
-        expect(helpersSrc).toContain('overlayStyles');
+    it('★ v736: uses text shadows instead of overlay rectangles', () => {
+        expect(helpersSrc).not.toContain('buildOverlayResult');
+        expect(helpersSrc).toContain('shadow_blur');
+        expect(helpersSrc).toContain('shadow_opacity');
     });
 });

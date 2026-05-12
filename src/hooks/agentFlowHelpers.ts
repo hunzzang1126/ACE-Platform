@@ -180,22 +180,29 @@ export async function selectTemplate(prompt: string, canvasW: number, canvasH: n
  * Also auto-shrinks fonts if any text element would exceed 40% of canvas height.
  */
 export function recalcTextHeights(elements: any[], canvasH: number): void {
+    // ★ v736: MINIMAL intervention — template positions/heights are sacred.
+    // Only shrink font-size if injected AI copy is SO long it would overflow canvas.
+    // Never touch el.h or el.y — those come from the template and must be preserved.
     for (const el of elements) {
         if (el.type !== 'text' || !el.content || !el.font_size || !el.w) continue;
         const isBold = el.font_weight && parseInt(el.font_weight) >= 600;
         const charW = el.font_size * (isBold ? 0.65 : 0.50);
         const charsPerLine = Math.max(1, Math.floor(el.w / charW));
         const lines = Math.max(1, Math.ceil(el.content.length / charsPerLine));
-        el.h = Math.round(el.font_size * 1.45 * lines + 8);
+        const estimatedH = el.font_size * 1.45 * lines + 8;
 
-        // Auto-shrink font if text would overflow canvas height
+        // Only shrink if text overflows 40% of canvas
         const maxH = canvasH * 0.4;
-        while (el.h > maxH && el.font_size > 12) {
-            el.font_size -= 2;
-            const newCharW = el.font_size * (isBold ? 0.65 : 0.50);
-            const newCPL = Math.max(1, Math.floor(el.w / newCharW));
-            const newLines = Math.max(1, Math.ceil(el.content.length / newCPL));
-            el.h = Math.round(el.font_size * 1.45 * newLines + 8);
+        if (estimatedH > maxH && el.font_size > 12) {
+            while (el.font_size > 12) {
+                el.font_size -= 2;
+                const newCharW = el.font_size * (isBold ? 0.65 : 0.50);
+                const newCPL = Math.max(1, Math.floor(el.w / newCharW));
+                const newLines = Math.max(1, Math.ceil(el.content.length / newCPL));
+                const newH = el.font_size * 1.45 * newLines + 8;
+                if (newH <= maxH) break;
+            }
+            console.log(`[recalcTextHeights] Shrunk "${el.name}" to ${el.font_size}px (content too long)`);
         }
     }
 }
@@ -259,35 +266,24 @@ export async function processTemplateElements(
     let allElements = [...elements];
 
     if (bgResult.hasImage && bgResult.url) {
-        // Strip template BG, force white text, apply overlay
+        // ★ v736: Strip template BG shapes, keep text/decoration intact
+        // NO overlay rectangles — they make ads look cheap
         allElements = allElements.filter(el =>
             el.type === 'text' || !BG_NAMES.has((el.name ?? '').toLowerCase())
         );
+        // Force white text for readability over images
         for (const el of allElements) {
             if (el.type === 'text') el.color_hex = '#FFFFFF';
         }
-        try {
-            const { buildOverlayResult } = await resilientImport(() => import('@/services/overlayStyles'));
-            const overlay = buildOverlayResult(
-                designStrategy?.overlayApproach ?? 'gradient-scrim',
-                canvasW, canvasH,
-                guide.colors.background ?? '#0B0F1A',
-                guide.colors.accent ?? '#3b82f6',
-                designStrategy?.imageFilters?.brightness ?? -0.15,
-                designStrategy?.imageFilters?.blur ?? 0,
-            );
-            if (overlay.overlayElements.length > 0) allElements.unshift(...overlay.overlayElements);
-            if (overlay.textModifiers.shadowBlur > 0) {
-                for (const el of allElements) {
-                    if (el.type === 'text') {
-                        el.shadow_blur = overlay.textModifiers.shadowBlur;
-                        el.shadow_offset_x = 0;
-                        el.shadow_offset_y = overlay.textModifiers.shadowOffsetY;
-                        el.shadow_opacity = overlay.textModifiers.shadowOpacity;
-                    }
-                }
+        // ★ Subtle text shadows only — no overlay rectangles
+        for (const el of allElements) {
+            if (el.type === 'text') {
+                el.shadow_blur = el.shadow_blur ?? 8;
+                el.shadow_offset_x = 0;
+                el.shadow_offset_y = el.shadow_offset_y ?? 2;
+                el.shadow_opacity = el.shadow_opacity ?? 0.6;
             }
-        } catch { /* overlay is best-effort */ }
+        }
     } else {
         const { recolorTemplateElements } = await resilientImport(() => import('./agentColorRecolor'));
         allElements = recolorTemplateElements(allElements, guide);
@@ -308,27 +304,32 @@ export async function processTemplateElements(
         }
     }
 
-    // Font replacement: AI palette fonts (keep template font sizes!)
-    // ★ v735: Also apply professional typography defaults (only if template didn't specify)
+    // ★ v736: Preserve template fonts — they ARE the design
+    // Only apply AI palette fonts when template element has NO font specified.
+    // Typography defaults (tracking, weight) are fallbacks only (uses ?? operator).
     for (const el of allElements) {
         if (el.type !== 'text') continue;
         const name = (el.name ?? '').toLowerCase();
+        // ★ Font fallback: template font > AI palette font > "Inter"
+        if (!el.font_family) {
+            if (name.includes('headline') && !name.includes('sub')) {
+                el.font_family = guide.typography.primaryFont;
+            } else {
+                el.font_family = guide.typography.secondaryFont;
+            }
+        }
+        // Typography defaults — only if template didn't specify
         if (name.includes('headline') && !name.includes('sub')) {
-            el.font_family = guide.typography.primaryFont;
-            el.letter_spacing = el.letter_spacing ?? -0.5;  // tight tracking for headlines
-            el.line_height = el.line_height ?? 1.1;         // compact
-            el.font_weight = el.font_weight ?? '800';       // extra bold
+            el.letter_spacing = el.letter_spacing ?? -0.5;
+            el.line_height = el.line_height ?? 1.1;
+            el.font_weight = el.font_weight ?? '800';
         } else if (name.includes('sub')) {
-            el.font_family = guide.typography.secondaryFont;
             el.letter_spacing = el.letter_spacing ?? 0;
-            el.line_height = el.line_height ?? 1.35;        // readable spacing
+            el.line_height = el.line_height ?? 1.35;
             el.font_weight = el.font_weight ?? '400';
         } else if (name.includes('tag')) {
-            if (el.font_family) el.font_family = guide.typography.secondaryFont;
-            el.letter_spacing = el.letter_spacing ?? 2;     // wide tracking for tags
+            el.letter_spacing = el.letter_spacing ?? 2;
             el.font_weight = el.font_weight ?? '600';
-        } else if (el.font_family) {
-            el.font_family = guide.typography.secondaryFont;
         }
     }
 
