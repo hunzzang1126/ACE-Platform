@@ -339,6 +339,7 @@ describe('agentFlowTypes — setPhase interface', () => {
 });
 
 const helpersSrc = readFileSync(resolve(__dirname, './agentFlowHelpers.ts'), 'utf-8');
+const textLayoutSrc = readFileSync(resolve(__dirname, './agentTextLayout.ts'), 'utf-8');
 
 describe('★ REGRESSION: Template-based content injection (v734)', () => {
     it('injects AI-generated content into template text elements', () => {
@@ -365,19 +366,19 @@ describe('★ REGRESSION: Template-based content injection (v734)', () => {
     });
 
     it('auto-created subheadline helper still exported', () => {
-        expect(helpersSrc).toContain('canvasH * 0.035');
-        expect(helpersSrc).toContain('Math.max(14, Math.min(32');
+        expect(textLayoutSrc).toContain('canvasH * 0.035');
+        expect(textLayoutSrc).toContain('Math.max(14, Math.min(32');
     });
 
     it('auto-created subheadline inherits headline x/w/textAlign (in helpers)', () => {
-        expect(helpersSrc).toContain('headlineEl?.x');
-        expect(helpersSrc).toContain('headlineEl?.w');
-        expect(helpersSrc).toContain('headlineEl?.text_align');
+        expect(textLayoutSrc).toContain('headlineEl?.x');
+        expect(textLayoutSrc).toContain('headlineEl?.w');
+        expect(textLayoutSrc).toContain('headlineEl?.text_align');
     });
 
-    it('recalcTextHeights auto-shrinks fonts exceeding 40% canvas', () => {
-        expect(helpersSrc).toContain('canvasH * 0.4');
-        expect(helpersSrc).toContain('el.font_size > 12');
+    it('recalcTextHeights auto-shrinks fonts when overflowing bounding box', () => {
+        expect(textLayoutSrc).toContain('maxAllowedH');
+        expect(textLayoutSrc).toContain('el.font_size > 12');
     });
 
     it('★ v736: uses text shadows instead of overlay rectangles', () => {

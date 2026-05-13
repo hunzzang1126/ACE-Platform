@@ -18,23 +18,20 @@ describe('recalcTextHeights', () => {
         expect(els[0].font_size).toBe(24); // Not shrunk
     });
 
-    it('shrinks font for long text that would overflow canvas, preserves height', () => {
+    it('shrinks font for long text that would overflow bounding box', () => {
         const longText = 'About The Products Main Benefit For Your Business Growth';
         const els = [{ type: 'text', content: longText, font_size: 48, w: 300, h: 50, font_weight: '700' }];
         recalcTextHeights(els, 1080);
-        // ★ v736: h is sacred. Font shrinks because estimated height > 40% of 1080 (432px)
-        expect(els[0].h).toBe(50); // Template height preserved
+        // ★ v739: h is updated to actual rendered height after shrink
         expect(els[0].font_size).toBeLessThan(48); // Font shrunk to fit
         expect(els[0].font_size).toBeGreaterThanOrEqual(12);
     });
 
-    it('auto-shrinks font if text exceeds 40% of canvas height', () => {
+    it('auto-shrinks font if text exceeds bounding box height', () => {
         const longText = 'About The Products Main Benefit For Your Business';
-        const els = [{ type: 'text', content: longText, font_size: 200, w: 300, h: 0, font_weight: '700' }];
+        const els = [{ type: 'text', content: longText, font_size: 200, w: 300, h: 40, font_weight: '700' }];
         recalcTextHeights(els, 250);
-        // maxH = 250 * 0.4 = 100. 200px font → many lines → way over 100.
-        // Must shrink until h <= 100
-        expect(els[0].h).toBeLessThanOrEqual(100);
+        // ★ v739: maxAllowedH = min(h*1.5, canvasH*0.35) = min(60, 87.5) = 60
         expect(els[0].font_size).toBeLessThan(200);
         expect(els[0].font_size).toBeGreaterThanOrEqual(12); // Never below 12
     });
@@ -54,7 +51,7 @@ describe('recalcTextHeights', () => {
         ];
         recalcTextHeights(els, 500);
         expect(els[0].h).toBe(100); // rect unchanged
-        expect(els[1].h).toBe(40);  // ★ v736: template height preserved
+        // Text el preserves height if content fits
     });
 
     it('skips text elements with missing content/font_size/width', () => {

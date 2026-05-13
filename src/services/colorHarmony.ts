@@ -66,6 +66,7 @@ function wcagRatio(fg: string, bg: string): number {
 export interface BgAnalysis {
     luminance: number;     // 0 (black) to 1 (white)
     isLight: boolean;      // luminance > 0.45
+    isColorful: boolean;   // ★ v739: high-saturation gradient with big hue difference
     warmth: 'warm' | 'cool' | 'neutral';
     dominantHue: number;   // 0-360
     saturation: number;    // 0-1
@@ -94,14 +95,22 @@ export function analyzeBackground(
 ): BgAnalysis {
     const hsl1 = hexToHSL(gradientStart);
     const hsl2 = gradientEnd ? hexToHSL(gradientEnd) : hsl1;
-    // Average the gradient endpoints
     const avgH = (hsl1.h + hsl2.h) / 2;
     const avgS = (hsl1.s + hsl2.s) / 2;
     const avgL = (hsl1.l + hsl2.l) / 2;
-    const lum = (luminance(gradientStart) + luminance(gradientEnd ?? gradientStart)) / 2;
+    const lum1 = luminance(gradientStart);
+    const lum2 = luminance(gradientEnd ?? gradientStart);
+    const avgLum = (lum1 + lum2) / 2;
+    // ★ v739: Detect colorful gradients (blue→yellow, red→green etc.)
+    // These have high saturation + big hue/luminance difference.
+    // No single text color works everywhere → force white + shadow.
+    const hueDiff = Math.min(Math.abs(hsl1.h - hsl2.h), 360 - Math.abs(hsl1.h - hsl2.h));
+    const lumDiff = Math.abs(lum1 - lum2);
+    const isColorful = avgS > 0.3 && (hueDiff > 60 || lumDiff > 0.3);
     return {
-        luminance: lum,
-        isLight: lum > 0.45,
+        luminance: avgLum,
+        isLight: avgLum > 0.45,
+        isColorful,
         warmth: classifyWarmth(avgH, avgS),
         dominantHue: avgH,
         saturation: avgS,
@@ -137,13 +146,16 @@ export function deriveHarmonyPalette(
     let subheadline: string;
     let body: string;
 
-    if (bg.isLight) {
-        // Light background → dark text hierarchy
+    // ★ v739: Colorful gradients (blue+yellow, etc.) → always white + shadow
+    if (bg.isColorful) {
+        headline = '#FFFFFF';
+        subheadline = 'rgba(255,255,255,0.85)';
+        body = 'rgba(255,255,255,0.72)';
+    } else if (bg.isLight) {
         headline = '#1A1A2E';
         subheadline = 'rgba(26,26,46,0.65)';
         body = 'rgba(26,26,46,0.55)';
     } else {
-        // Dark background → light text hierarchy
         headline = '#FFFFFF';
         subheadline = 'rgba(255,255,255,0.72)';
         body = 'rgba(255,255,255,0.55)';
@@ -163,7 +175,8 @@ export function deriveHarmonyPalette(
 
     // ── Step 5: Refine subheadline for mid-luminance backgrounds ──
     // Mid-range backgrounds (0.35-0.55) need special handling
-    if (bg.luminance > 0.35 && bg.luminance < 0.55) {
+    // ★ v739: Skip for colorful gradients (already forced white above)
+    if (!bg.isColorful && bg.luminance > 0.35 && bg.luminance < 0.55) {
         headline = bg.luminance > 0.45 ? '#1A1A2E' : '#FFFFFF';
         const subAlpha = bg.luminance > 0.45 ? '0.72' : '0.75';
         subheadline = bg.luminance > 0.45

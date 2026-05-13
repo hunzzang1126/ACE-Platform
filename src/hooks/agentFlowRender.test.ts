@@ -92,11 +92,11 @@ describe('agentGenerateFlow — Template-first pipeline (v734)', () => {
     });
 
     it('helpers still export autoCreateSubheadline', () => {
-        expect(helpersSrc).toContain('export function autoCreateSubheadline');
+        expect(helpersSrc).toContain('autoCreateSubheadline');
     });
 
     it('helpers still export recalcTextHeights', () => {
-        expect(helpersSrc).toContain('export function recalcTextHeights');
+        expect(helpersSrc).toContain('recalcTextHeights');
     });
 });
 

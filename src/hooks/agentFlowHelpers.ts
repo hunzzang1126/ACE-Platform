@@ -8,6 +8,8 @@ import type { AgentFlowCallbacks } from './agentFlowTypes';
 import { resilientImport } from '@/utils/resilientImport';
 import type { AssetSelection } from '@/services/brandAssetSelector';
 
+// ★ v739: Text layout extracted to agentTextLayout.ts — re-export for backward compat
+export { recalcTextHeights, autoCreateSubheadline } from './agentTextLayout';
 export interface BrandScanResult {
     context: string;
     paletteHint: string;
@@ -174,76 +176,7 @@ export async function selectTemplate(prompt: string, canvasW: number, canvasH: n
     return template;
 }
 
-/**
- * Recalculate text element heights after content substitution.
- * Template heights are for short placeholders — AI content is often much longer.
- * Also auto-shrinks fonts if any text element would exceed 40% of canvas height.
- */
-export function recalcTextHeights(elements: any[], canvasH: number): void {
-    // ★ v736: MINIMAL intervention — template positions/heights are sacred.
-    // Only shrink font-size if injected AI copy is SO long it would overflow canvas.
-    // Never touch el.h or el.y — those come from the template and must be preserved.
-    for (const el of elements) {
-        if (el.type !== 'text' || !el.content || !el.font_size || !el.w) continue;
-        const isBold = el.font_weight && parseInt(el.font_weight) >= 600;
-        const charW = el.font_size * (isBold ? 0.65 : 0.50);
-        const charsPerLine = Math.max(1, Math.floor(el.w / charW));
-        const lines = Math.max(1, Math.ceil(el.content.length / charsPerLine));
-        const estimatedH = el.font_size * 1.45 * lines + 8;
-
-        // Only shrink if text overflows 40% of canvas
-        const maxH = canvasH * 0.4;
-        if (estimatedH > maxH && el.font_size > 12) {
-            while (el.font_size > 12) {
-                el.font_size -= 2;
-                const newCharW = el.font_size * (isBold ? 0.65 : 0.50);
-                const newCPL = Math.max(1, Math.floor(el.w / newCharW));
-                const newLines = Math.max(1, Math.ceil(el.content.length / newCPL));
-                const newH = el.font_size * 1.45 * newLines + 8;
-                if (newH <= maxH) break;
-            }
-            console.log(`[recalcTextHeights] Shrunk "${el.name}" to ${el.font_size}px (content too long)`);
-        }
-    }
-}
-
-/**
- * Auto-create a subheadline element below the headline when the AI generates
- * a subheadline but the template has no matching element.
- */
-export function autoCreateSubheadline(
-    allElements: any[], content: any, canvasW: number, canvasH: number,
-): void {
-    const headlineEl = allElements.find((el: any) =>
-        el.type === 'text' && el.content === content.headline
-    ) ?? allElements.find((el: any) => (el.name ?? '').toLowerCase().includes('headline'));
-    const headlineY = headlineEl?.y ?? canvasH * 0.3;
-    const headlineFontSize = headlineEl?.font_size ?? Math.round(canvasH * 0.06);
-    const headlineContent = headlineEl?.content ?? content.headline ?? '';
-    const headlineW = headlineEl?.w ?? Math.round(canvasW * 0.85);
-    const isBold = headlineEl?.font_weight && parseInt(headlineEl.font_weight) >= 600;
-    const charWidth = headlineFontSize * (isBold ? 0.65 : 0.50);
-    const charsPerLine = Math.max(1, Math.floor(headlineW / charWidth));
-    const headlineLines = Math.max(1, Math.ceil(headlineContent.length / charsPerLine));
-    const estimatedHeadlineH = Math.round(headlineFontSize * 1.45 * headlineLines + 8);
-    const headlineH = Math.max(headlineEl?.h ?? 0, estimatedHeadlineH);
-    const subFontSize = Math.max(14, Math.min(32, Math.round(canvasH * 0.035)));
-    const subY = headlineY + headlineH + Math.round(canvasH * 0.02);
-    const subX = headlineEl?.x ?? Math.round(canvasW * 0.075);
-    const subW = headlineEl?.w ?? Math.round(canvasW * 0.85);
-    const subCharWidth = subFontSize * 0.50;
-    const subCharsPerLine = Math.max(1, Math.floor(subW / subCharWidth));
-    const subLines = Math.max(1, Math.ceil(content.subheadline.length / subCharsPerLine));
-    const subH = Math.round(subFontSize * 1.45 * subLines + 8);
-    allElements.push({
-        name: 'subheadline', type: 'text', content: content.subheadline,
-        x: subX, y: subY, w: subW, h: subH,
-        font_size: subFontSize, font_weight: '400',
-        text_align: headlineEl?.text_align ?? 'center',
-        color_hex: headlineEl?.color_hex ?? '#FFFFFF', line_height: 1.3,
-    });
-    console.log(`[Pipeline] Auto-created subheadline: "${content.subheadline.slice(0, 40)}" at y=${subY}, h=${subH}`);
-}
+// ★ v739: recalcTextHeights, estimateTextHeight, autoCreateSubheadline → agentTextLayout.ts
 
 // ── BG element names — template backgrounds that get special treatment ──
 const BG_NAMES = new Set([
@@ -322,6 +255,16 @@ export async function processTemplateElements(
         const { recolorTemplateElements } = await resilientImport(() => import('./agentColorRecolor'));
         allElements = recolorTemplateElements(allElements, guide);
         applyHarmonyColors(allElements, harmony);
+        // ★ v739: Colorful gradients (blue+yellow) → add shadow like BG images
+        if (bgAnalysis.isColorful) {
+            for (const el of allElements) {
+                if (el.type === 'text') {
+                    el.shadow_blur = el.shadow_blur ?? 8;
+                    el.shadow_offset_y = el.shadow_offset_y ?? 2;
+                    el.shadow_opacity = el.shadow_opacity ?? 0.5;
+                }
+            }
+        }
     }
 
     // Content injection: replace template placeholder text with AI copy

@@ -162,3 +162,43 @@ describe('deriveHarmonyPalette — CTA text readability', () => {
         expect(['#FFFFFF', '#1A1A2E']).toContain(palette.accentForeground);
     });
 });
+
+// ══════════════════════════════════════════════════
+// ★ v739: Colorful Gradient Detection
+// ══════════════════════════════════════════════════
+describe('★ v739: Colorful gradient handling (blue+yellow, red+green)', () => {
+    it('detects blue→yellow gradient as colorful', () => {
+        const bg = analyzeBackground('#4A90D9', '#FFD700');
+        expect(bg.isColorful).toBe(true);
+    });
+
+    it('detects red→green gradient as colorful', () => {
+        const bg = analyzeBackground('#FF4444', '#44FF44');
+        expect(bg.isColorful).toBe(true);
+    });
+
+    it('does NOT detect monochrome gradient as colorful', () => {
+        const bg = analyzeBackground('#1A1A2E', '#2A2A3E');
+        expect(bg.isColorful).toBe(false);
+    });
+
+    it('does NOT detect same-hue gradient as colorful', () => {
+        const bg = analyzeBackground('#1E3A5F', '#2563EB'); // Both blue
+        expect(bg.isColorful).toBe(false);
+    });
+
+    it('colorful gradient → white headline text', () => {
+        const bg = analyzeBackground('#4A90D9', '#FFD700'); // Blue→Yellow
+        const palette = deriveHarmonyPalette(bg, AI_HINT);
+        expect(palette.headline).toBe('#FFFFFF');
+        expect(palette.subheadline).toContain('rgba(255');
+    });
+
+    it('colorful gradient → method mentions colorful', () => {
+        const bg = analyzeBackground('#FF4444', '#00FF88');
+        const palette = deriveHarmonyPalette(bg, AI_HINT);
+        // Should still produce valid accent
+        const accentHSL = hexToHSL(palette.accent);
+        expect(accentHSL.s).toBeGreaterThan(0.2);
+    });
+});
