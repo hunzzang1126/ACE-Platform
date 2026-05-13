@@ -400,11 +400,13 @@ describe('★ REGRESSION: Template-based content injection (v734)', () => {
         expect(helpersSrc).toContain('shadow_opacity');
     });
 
-    it('★ v738: content injection catches all text variants (no template placeholders)', () => {
-        // Must match: sub, body, description, detail — not just 'subheadline'
+    it('★ v741: content injection uses role inference (no template placeholders)', () => {
+        // Pass 1: name-based matching
         expect(helpersSrc).toContain("name.includes('body')");
         expect(helpersSrc).toContain("name.includes('description')");
-        // Fallback: unmatched text elements get replaced too
-        expect(helpersSrc).toContain('Replacing unmatched text');
+        // Pass 2: role inference by font_size for unmatched elements
+        expect(helpersSrc).toContain('Role-inferred');
+        // Pass 3: kill remaining placeholders
+        expect(helpersSrc).toContain('Killing leaked placeholder');
     });
 });

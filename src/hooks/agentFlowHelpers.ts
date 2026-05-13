@@ -267,26 +267,76 @@ export async function processTemplateElements(
         }
     }
 
-    // Content injection: replace template placeholder text with AI copy
-    // ★ v738: Broader matching to catch all template name variants
+    // ★ v741: Content injection — ROLE INFERENCE, not just name matching.
+    // 1. Try name-based matching first (fast path)
+    // 2. For unmatched elements: infer role from font_size + y-position
+    // 3. ALL template placeholders MUST be replaced — no text leaks through
     const textEls = allElements.filter(el => el.type === 'text');
+
+    // Pass 1: Name-based matching (exact matches)
+    const injected = new Set<any>();
+    let headlineInjected = false;
+    let subInjected = false;
+    let ctaInjected = false;
+    let tagInjected = false;
+
     for (const el of textEls) {
         const name = (el.name ?? '').toLowerCase();
         if (name.includes('headline') && !name.includes('sub')) {
-            if (content.headline) el.content = content.headline;
-        } else if (name.includes('sub') || name.includes('body') || name.includes('description') || name.includes('detail')) {
-            if (content.subheadline) el.content = content.subheadline;
+            if (content.headline) { el.content = content.headline; injected.add(el); headlineInjected = true; }
+        } else if (name.includes('sub') || name.includes('body') || name.includes('description') || name.includes('detail') || name.includes('tagline')) {
+            if (content.subheadline) { el.content = content.subheadline; injected.add(el); subInjected = true; }
         } else if (name.includes('cta') || name.includes('label') || name.includes('button')) {
-            if (content.cta) el.content = content.cta;
+            if (content.cta) { el.content = content.cta; injected.add(el); ctaInjected = true; }
         } else if (name.includes('tag') || name.includes('badge') || name.includes('date')) {
-            if (content.tag) el.content = content.tag;
-        } else {
-            // ★ v738: Any unmatched text element → replace with subheadline
-            // Prevents template placeholders like "Where creativity meets technology"
-            if (content.subheadline && el.content && el.content.length > 3) {
-                console.log(`[Pipeline] Replacing unmatched text "${el.name}": "${el.content?.slice(0, 30)}" → "${content.subheadline.slice(0, 30)}"`);
+            if (content.tag) { el.content = content.tag; injected.add(el); tagInjected = true; }
+        }
+    }
+
+    // Pass 2: Role inference for UNMATCHED text elements.
+    // Sort by font_size (desc) → largest = headline, next = sub, etc.
+    const unmatched = textEls.filter(el => !injected.has(el));
+    if (unmatched.length > 0) {
+        const sorted = [...unmatched].sort((a, b) => (b.font_size ?? 0) - (a.font_size ?? 0));
+        for (const el of sorted) {
+            if (!headlineInjected && content.headline) {
+                el.content = content.headline;
+                headlineInjected = true;
+                console.log(`[Pipeline] Role-inferred headline → "${el.name}" (font=${el.font_size})`);
+            } else if (!subInjected && content.subheadline) {
                 el.content = content.subheadline;
+                subInjected = true;
+                console.log(`[Pipeline] Role-inferred subheadline → "${el.name}" (font=${el.font_size})`);
+            } else if (!tagInjected && content.tag) {
+                el.content = content.tag;
+                tagInjected = true;
+                console.log(`[Pipeline] Role-inferred tag → "${el.name}" (font=${el.font_size})`);
+            } else if (!ctaInjected && content.cta) {
+                el.content = content.cta;
+                ctaInjected = true;
+                console.log(`[Pipeline] Role-inferred CTA → "${el.name}" (font=${el.font_size})`);
+            } else if (content.subheadline && el.content && el.content.length > 3) {
+                // Extra text elements → replace with subheadline to prevent placeholders
+                el.content = content.subheadline;
+                console.log(`[Pipeline] Extra text → subheadline: "${el.name}" (font=${el.font_size})`);
             }
+        }
+    }
+
+    // Pass 3: Kill remaining template placeholders that couldn't be replaced.
+    // If a text element STILL has its original template content and wasn't injected,
+    // it's a leaked placeholder. Mark it empty — it gets filtered out later.
+    for (const el of textEls) {
+        if (injected.has(el)) continue;
+        const name = (el.name ?? '').toLowerCase();
+        // Skip elements that WERE updated in Pass 2 (check if content matches any AI content)
+        const isAiContent = el.content === content.headline || el.content === content.subheadline
+            || el.content === content.cta || el.content === content.tag;
+        if (isAiContent) continue;
+        // This is a template placeholder that survived — hide it
+        if (el.content && el.content.length > 3) {
+            console.log(`[Pipeline] Killing leaked placeholder "${el.name}": "${el.content?.slice(0, 40)}"`);
+            el.content = '';
         }
     }
 
