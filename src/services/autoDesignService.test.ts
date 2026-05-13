@@ -140,6 +140,25 @@ describe('autoDesignService — callTemplateContent', () => {
         const result = await callTemplateContent('fashion', 300, 250, 'modern', new AbortController().signal);
         expect(result.headline).toBe('New Collection');
     });
+
+    it('★ REGRESSION v737: should detect prompt leakage "like Just Do It"', async () => {
+        vi.mocked(callAnthropicApi).mockResolvedValue({
+            content: [{ type: 'text', text: '{"headline": "like \\"Just Do It\\" or similar motivational Korean text", "cta": "Shop Now", "subheadline": "", "tag": ""}' }],
+        });
+        const result = await callTemplateContent('sports ad', 300, 250, 'modern', new AbortController().signal);
+        // Prompt leakage → must be replaced with fallback
+        expect(result.headline).toBe('Get Started Today');
+        expect(result.headline).not.toContain('like');
+        expect(result.headline).not.toContain('similar');
+    });
+
+    it('★ REGRESSION v737: should detect "placeholder text" leakage', async () => {
+        vi.mocked(callAnthropicApi).mockResolvedValue({
+            content: [{ type: 'text', text: '{"headline": "Something like a compelling headline", "cta": "", "subheadline": "sample text for subheadline", "tag": ""}' }],
+        });
+        const result = await callTemplateContent('tech ad', 300, 250, 'modern', new AbortController().signal);
+        expect(result.headline).toBe('Get Started Today');
+    });
 });
 
 // ══════════════════════════════════════════════════

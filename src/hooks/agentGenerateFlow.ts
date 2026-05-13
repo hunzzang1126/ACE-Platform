@@ -10,6 +10,7 @@ import { resilientImport } from '@/utils/resilientImport';
 import { renderElement, buildElementDetail } from './agentFlowRender';
 import { scanBrandCloud, recalcTextHeights, autoCreateSubheadline } from './agentFlowHelpers';
 import { hexLuminance, averageLuminance } from './contrastHelpers';
+import { generateBgImage, selectCompositionAwareTemplate } from './agentFlowImageHelpers';
 
 /** Execute the full design generation pipeline */
 export async function executeGenerateFlow(
@@ -109,24 +110,33 @@ export async function executeGenerateFlow(
     cb.narrate(colorReasoning || `Color palette: ${guide.name}`);
     await pause(400);
 
-    // ── Phase 4.5: Background Image (★ v719: 3-tier decision) ──
+    // ── Phase 4: Background Image FIRST (★ v737: image before template) ──
+    // Must know where the subject is BEFORE picking a template layout.
     let bgResult: { hasImage: boolean; url: string | null };
     if (brand.selectedAssets?.background) {
-        // Tier 1: Brand asset background (relevance verified by Code+AI)
         bgResult = { hasImage: true, url: brand.selectedAssets.background.asset.src };
         cb.narrate(`Using brand background: ${brand.selectedAssets.background.reasoning}`);
         cb.addCard('bg-image', 'Brand background', 'done', {
             expandedDetail: `Brand asset: "${brand.selectedAssets.background.asset.name}"\n${brand.selectedAssets.background.reasoning}`,
         });
     } else {
-        // Tier 2/3: AI generation or gradient
         bgResult = await generateBgImage(finalNeedsImage, backgroundImagePrompt, prompt, canvasW, canvasH, guide, abort, cb);
     }
     await pause(300);
 
-    // ── Phase 4: Template Layout + Render (stepper: Executing) ──
+    // ── Phase 4.5: Analyze image composition (★ v737: subject avoidance) ──
+    let imageComposition: import('@/services/imageComposition').ImageComposition | null = null;
+    if (bgResult.hasImage) {
+        try {
+            const { analyzeImageComposition } = await resilientImport(() => import('@/services/imageComposition'));
+            imageComposition = analyzeImageComposition(backgroundImagePrompt ?? '', prompt);
+            cb.narrate(`Image composition: subject ${imageComposition.subjectZone}, safe text zone: ${imageComposition.safeTextZone}`);
+        } catch { /* best-effort */ }
+    }
+
+    // ── Phase 5: Template Layout + Render (stepper: Executing) ──
     cb.setPhase?.('executing');
-    const rendered = await buildAndRender(prompt, guide, content, canvasW, canvasH, bgResult, brand.logoUrl, brand.logoW, brand.logoH, engine, abort, cb, designStrategy, aiTemplateId, brand.selectedAssets);
+    const rendered = await buildAndRender(prompt, guide, content, canvasW, canvasH, bgResult, brand.logoUrl, brand.logoW, brand.logoH, engine, abort, cb, designStrategy, aiTemplateId, brand.selectedAssets, imageComposition);
 
     // ── Phase 6: Finalize (stepper: Finishing) ──
     // ★ Vision QA removed — deterministic quality (recolor + contrast + layout validation)
@@ -171,37 +181,8 @@ export async function executeGenerateFlow(
 
 const pause = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-// ★ scanBrandCloud, selectTemplate → extracted to agentFlowHelpers.ts
-
-
-async function generateBgImage(
-    needsBackgroundImage: boolean, backgroundImagePrompt: string | undefined, prompt: string,
-    canvasW: number, canvasH: number, guide: any, abort: AbortController, cb: AgentFlowCallbacks,
-): Promise<{ hasImage: boolean; url: string | null }> {
-    if (!needsBackgroundImage || !backgroundImagePrompt) return { hasImage: false, url: null };
-
-    cb.narrate('This design needs a background image. Generating...');
-    cb.addCard('bg-image', 'Generating background image', 'running', { reasoning: backgroundImagePrompt });
-
-    try {
-        const { generateBackgroundImage } = await resilientImport(() => import('@/services/imageGenClient'));
-        const promptLow = (backgroundImagePrompt + ' ' + prompt).toLowerCase();
-        const needsRealism = /(?:person|people|woman|man|girl|boy|model|portrait|photo|face|human|doctor|dentist|nurse|chef|athlete|worker|teacher|musician|artist|therapist|pharmacist|engineer|lawyer|pilot|soldier|barista|waiter|stylist|trainer|coach|의사|치과|간호사|요리사|선수|교사|운동|여자|남자|사람|사진|모델|얼굴|product|bottle|package|food|drink|car|building|hotel|resort)/.test(promptLow);
-        const enhancedBgPrompt = needsRealism ? `${backgroundImagePrompt}. Hyper-realistic, professional photography, 8K resolution, cinematic lighting, shallow depth of field, shot on Sony A7R IV.` : backgroundImagePrompt;
-
-        const bgResult = await generateBackgroundImage(enhancedBgPrompt, canvasW, canvasH, [guide.colors.accent, guide.colors.background, guide.colors.gradientEnd], abort.signal);
-        if (bgResult.success && bgResult.imageUrl) {
-            cb.updateCard('bg-image', 'done', bgResult.isFallback ? 'Gradient fallback' : `Image generated (${needsRealism ? 'hyper-realistic' : 'standard'})`, { expandedDetail: bgResult.isFallback ? `Fallback: ${bgResult.message}` : `Generated ${canvasW}x${canvasH} background via ${bgResult.model}` });
-            return { hasImage: true, url: bgResult.imageUrl };
-        } else {
-            cb.updateCard('bg-image', 'error', bgResult.message || 'Generation failed');
-        }
-    } catch (err) {
-        console.warn('[UnifiedAgent] Background image generation failed:', err);
-        cb.updateCard('bg-image', 'error', 'Generation failed — using gradient');
-    }
-    return { hasImage: false, url: null };
-}
+// ★ scanBrandCloud, selectTemplate → agentFlowHelpers.ts
+// ★ generateBgImage, selectCompositionAwareTemplate → agentFlowImageHelpers.ts
 
 async function buildAndRender(
     prompt: string,
@@ -212,6 +193,7 @@ async function buildAndRender(
     designStrategy?: any,
     aiTemplateId?: string | null,
     selectedAssets?: import('@/services/brandAssetSelector').AssetSelection | null,
+    imageComposition?: import('@/services/imageComposition').ImageComposition | null,
 ): Promise<number> {
     cb.narrate('Building the layout from template...');
     cb.addCard('build', 'Template layout engine', 'running');
@@ -220,11 +202,22 @@ async function buildAndRender(
 
     // ── Template-based layout (Supabase cloud templates) ──
     const { selectTemplate: selectTmpl, processTemplateElements } = await resilientImport(() => import('./agentFlowHelpers'));
-    const tmpl = await selectTmpl(prompt ?? '', canvasW, canvasH, [], abort, cb, aiTemplateId);
     const { resolveTemplateElements } = await resilientImport(() => import('@/services/templateResolver'));
+
+    // ★ v737: Composition-aware template selection
+    // If we have image composition info, score templates and pick best match
+    let tmpl: { id: string; name: string; description: string };
+    if (imageComposition && imageComposition.safeTextZone !== 'any' && imageComposition.confidence !== 'low') {
+        tmpl = await selectCompositionAwareTemplate(
+            prompt, canvasW, canvasH, abort, cb, aiTemplateId,
+            imageComposition, selectTmpl, resolveTemplateElements,
+        );
+    } else {
+        tmpl = await selectTmpl(prompt ?? '', canvasW, canvasH, [], abort, cb, aiTemplateId);
+    }
     const rawElements: any[] = resolveTemplateElements(tmpl.id, canvasW, canvasH);
 
-    // ★ Process: BG handling, content injection, font replacement, overlay
+    // ★ Process: BG handling, content injection, font replacement, harmony colors
     let allElements = await processTemplateElements(rawElements, content, guide, canvasW, canvasH, bgResult, designStrategy);
 
     console.log(`[Pipeline/Template] Built ${allElements.length} elements from template "${tmpl.name}"`);

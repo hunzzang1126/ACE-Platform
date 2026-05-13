@@ -91,12 +91,19 @@ function sanitizeContent(c: GeneratedContent): GeneratedContent {
     const JUNK = /^(inter|roboto|arial|helvetica|text|subtext|subheadline|headline|cta|button|click here|lorem|font|label|tag|버튼|텍스트|서브헤드라인|헤드라인|라벨|태그|클릭|제목|부제|부제목)$/i;
     const FONT_NAMES = /^(inter|roboto|montserrat|poppins|arial|helvetica|georgia|verdana|garamond|lato|opensans|raleway|playfair|outfit|nunito|space grotesk)$/i;
     // ★ v732: Descriptive prefixes that AI outputs instead of real ad copy
-    // "text about discovering Mallorca" → "Discovering Mallorca"
     const DESCRIPTIVE_PREFIX = /^(text\s+(?:about|regarding|on|for|describing)\s+|about\s+(?:the\s+)?|regarding\s+(?:the\s+)?|description\s+(?:of|about)\s+|information\s+(?:about|on)\s+|details?\s+(?:about|on)\s+|an?\s+ad\s+(?:about|for)\s+|ad\s+(?:copy\s+)?(?:about|for)\s+)/i;
+    // ★ v737: Prompt leakage — AI echoes its own instructions as copy
+    // "like 'Just Do It' or similar motivational Korean text"
+    const PROMPT_LEAKAGE = /(?:like\s+[""']|or\s+similar\s+|(?:motivational|inspirational|compelling)\s+(?:Korean|English|Chinese|Japanese)\s+text|(?:something|text)\s+(?:like|similar to)|(?:headline|tagline|slogan)\s+(?:such as|like)|placeholder\s+text|sample\s+(?:text|copy))/i;
     const toTitleCase = (s: string) => s.replace(/\w\S*/g, (t) => t.charAt(0).toUpperCase() + t.slice(1).toLowerCase());
 
     let headline = c.headline?.trim() || 'Get Started Today';
     if (JUNK.test(headline)) headline = 'Get Started Today';
+    // ★ v737: Detect prompt leakage — AI echoed instructions instead of writing copy
+    if (PROMPT_LEAKAGE.test(headline)) {
+        console.warn(`[sanitizeContent] Prompt leakage detected: "${headline}" — replacing with fallback`);
+        headline = 'Get Started Today';
+    }
     // ★ v732: Strip descriptive prefixes — "text about X" → "X"
     let wasDescriptive = false;
     if (DESCRIPTIVE_PREFIX.test(headline)) {
