@@ -384,4 +384,11 @@ describe('★ REGRESSION: Template-based content injection (v734)', () => {
         expect(helpersSrc).toContain('shadow_blur');
         expect(helpersSrc).toContain('shadow_opacity');
     });
+
+    it('★ v737: uses colorHarmony for background-aware colors (not hardcoded #FFFFFF)', () => {
+        expect(helpersSrc).toContain('analyzeBackground');
+        expect(helpersSrc).toContain('deriveHarmonyPalette');
+        expect(helpersSrc).toContain('applyHarmonyColors');
+        expect(helpersSrc).not.toContain("el.color_hex = '#FFFFFF'");
+    });
 });

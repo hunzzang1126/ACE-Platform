@@ -251,6 +251,31 @@ const BG_NAMES = new Set([
     'accent_diagonal', 'bottom_border', 'bottom_accent',
 ]);
 
+/** ★ v737: Apply harmony colors to all elements by role */
+function applyHarmonyColors(elements: any[], harmony: import('@/services/colorHarmony').HarmonyPalette): void {
+    const hexToRgb01 = (hex: string) => {
+        const c = hex.replace('#', '');
+        return { r: parseInt(c.slice(0, 2), 16) / 255, g: parseInt(c.slice(2, 4), 16) / 255, b: parseInt(c.slice(4, 6), 16) / 255 };
+    };
+    for (const el of elements) {
+        const name = (el.name ?? '').toLowerCase();
+        if (el.type === 'text') {
+            if (name.includes('headline') && !name.includes('sub')) el.color_hex = harmony.headline;
+            else if (name.includes('sub')) el.color_hex = harmony.subheadline;
+            else if (name.includes('cta') || name.includes('label')) el.color_hex = harmony.accentForeground;
+            else if (name.includes('tag')) el.color_hex = harmony.tag;
+            else el.color_hex = harmony.body;
+        } else if (name.includes('cta') || name.includes('button')) {
+            const { r, g, b } = hexToRgb01(harmony.accent);
+            el.r = r; el.g = g; el.b = b;
+        } else if (name.includes('accent') || name.includes('badge') || name.includes('tag')) {
+            const { r, g, b } = hexToRgb01(harmony.accent);
+            el.r = r; el.g = g; el.b = b; el.a = el.a ?? 0.15;
+        }
+    }
+}
+
+
 /**
  * Process template elements: handle BG, inject content, replace fonts, apply overlay.
  * Keeps template font sizes intact (Golden Template approach).
@@ -265,17 +290,25 @@ export async function processTemplateElements(
 ): Promise<any[]> {
     let allElements = [...elements];
 
+    // ★ v737: Analyze background FIRST, then determine all colors
+    const { analyzeBackground, deriveHarmonyPalette } = await resilientImport(() => import('@/services/colorHarmony'));
+    const bgStart = guide.colors.gradientStart ?? guide.colors.background ?? '#0B0F1A';
+    const bgEnd = guide.colors.gradientEnd ?? bgStart;
+    const bgAnalysis = analyzeBackground(bgStart, bgEnd);
+    const harmony = deriveHarmonyPalette(bgAnalysis, {
+        accent: guide.colors.accent ?? '#3b82f6',
+        foreground: guide.colors.foreground ?? '#FFFFFF',
+        secondary: guide.colors.secondary ?? '#CCCCCC',
+    });
+
     if (bgResult.hasImage && bgResult.url) {
-        // ★ v736: Strip template BG shapes, keep text/decoration intact
-        // NO overlay rectangles — they make ads look cheap
+        // Strip template BG shapes, keep text/decoration intact
         allElements = allElements.filter(el =>
             el.type === 'text' || !BG_NAMES.has((el.name ?? '').toLowerCase())
         );
-        // Force white text for readability over images
-        for (const el of allElements) {
-            if (el.type === 'text') el.color_hex = '#FFFFFF';
-        }
-        // ★ Subtle text shadows only — no overlay rectangles
+        // ★ v737: Apply harmony colors (NOT hardcoded #FFFFFF)
+        applyHarmonyColors(allElements, harmony);
+        // Subtle text shadows for image readability
         for (const el of allElements) {
             if (el.type === 'text') {
                 el.shadow_blur = el.shadow_blur ?? 8;
@@ -285,8 +318,10 @@ export async function processTemplateElements(
             }
         }
     } else {
+        // Gradient/solid background → recolor + harmony refinement
         const { recolorTemplateElements } = await resilientImport(() => import('./agentColorRecolor'));
         allElements = recolorTemplateElements(allElements, guide);
+        applyHarmonyColors(allElements, harmony);
     }
 
     // Content injection: replace template placeholder text with AI copy
