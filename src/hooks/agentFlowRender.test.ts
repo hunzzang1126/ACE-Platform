@@ -77,7 +77,9 @@ describe('agentGenerateFlow — Template-first pipeline (v734)', () => {
         expect(flowSrc).toContain('content.headline');
         expect(flowSrc).toContain('content.subheadline');
         expect(flowSrc).toContain('content.cta');
-        expect(helpersSrc).toContain('contentMap');
+        // ★ v738: Broader matching — checks for role keywords in element names
+        expect(helpersSrc).toContain("name.includes('headline')");
+        expect(helpersSrc).toContain("name.includes('body')");
     });
 
     it('★ REGRESSION: passes palette to recolor', () => {

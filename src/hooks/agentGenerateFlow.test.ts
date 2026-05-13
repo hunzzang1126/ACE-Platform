@@ -342,7 +342,8 @@ const helpersSrc = readFileSync(resolve(__dirname, './agentFlowHelpers.ts'), 'ut
 
 describe('★ REGRESSION: Template-based content injection (v734)', () => {
     it('injects AI-generated content into template text elements', () => {
-        expect(helpersSrc).toContain('contentMap');
+        // ★ v738: role-based matching instead of contentMap
+        expect(helpersSrc).toContain("name.includes('headline')");
         expect(src).toContain('content.headline');
         expect(src).toContain('content.subheadline');
         expect(src).toContain('content.cta');
@@ -385,10 +386,24 @@ describe('★ REGRESSION: Template-based content injection (v734)', () => {
         expect(helpersSrc).toContain('shadow_opacity');
     });
 
-    it('★ v737: uses colorHarmony for background-aware colors (not hardcoded #FFFFFF)', () => {
+    it('★ v737: uses colorHarmony for gradient backgrounds', () => {
         expect(helpersSrc).toContain('analyzeBackground');
         expect(helpersSrc).toContain('deriveHarmonyPalette');
         expect(helpersSrc).toContain('applyHarmonyColors');
-        expect(helpersSrc).not.toContain("el.color_hex = '#FFFFFF'");
+    });
+
+    it('★ v738: BG image text is always white (photos are unpredictable)', () => {
+        // When bgResult.hasImage is true, text must be white with shadow
+        expect(helpersSrc).toContain("el.color_hex = '#FFFFFF'");
+        expect(helpersSrc).toContain('shadow_blur');
+        expect(helpersSrc).toContain('shadow_opacity');
+    });
+
+    it('★ v738: content injection catches all text variants (no template placeholders)', () => {
+        // Must match: sub, body, description, detail — not just 'subheadline'
+        expect(helpersSrc).toContain("name.includes('body')");
+        expect(helpersSrc).toContain("name.includes('description')");
+        // Fallback: unmatched text elements get replaced too
+        expect(helpersSrc).toContain('Replacing unmatched text');
     });
 });

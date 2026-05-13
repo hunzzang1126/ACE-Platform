@@ -276,45 +276,45 @@ function applyHarmonyColors(elements: any[], harmony: import('@/services/colorHa
 }
 
 
-/**
- * Process template elements: handle BG, inject content, replace fonts, apply overlay.
- * Keeps template font sizes intact (Golden Template approach).
- */
+/** Process template elements: BG handling, content injection, font, colors. */
 export async function processTemplateElements(
-    elements: any[],
-    content: any,
-    guide: any,
+    elements: any[], content: any, guide: any,
     canvasW: number, canvasH: number,
     bgResult: { hasImage: boolean; url: string | null },
     designStrategy?: any,
 ): Promise<any[]> {
     let allElements = [...elements];
 
-    // ★ v737: Analyze background FIRST, then determine all colors
+    // ★ v737: Analyze background for gradient/solid path (harmony colors)
     const { analyzeBackground, deriveHarmonyPalette } = await resilientImport(() => import('@/services/colorHarmony'));
-    const bgStart = guide.colors.gradientStart ?? guide.colors.background ?? '#0B0F1A';
-    const bgEnd = guide.colors.gradientEnd ?? bgStart;
-    const bgAnalysis = analyzeBackground(bgStart, bgEnd);
-    const harmony = deriveHarmonyPalette(bgAnalysis, {
-        accent: guide.colors.accent ?? '#3b82f6',
-        foreground: guide.colors.foreground ?? '#FFFFFF',
-        secondary: guide.colors.secondary ?? '#CCCCCC',
-    });
+    const bgAnalysis = analyzeBackground(guide.colors.gradientStart ?? guide.colors.background ?? '#0B0F1A', guide.colors.gradientEnd ?? guide.colors.gradientStart ?? '#0B0F1A');
+    const harmony = deriveHarmonyPalette(bgAnalysis, { accent: guide.colors.accent ?? '#3b82f6', foreground: guide.colors.foreground ?? '#FFFFFF', secondary: guide.colors.secondary ?? '#CCCCCC' });
 
     if (bgResult.hasImage && bgResult.url) {
         // Strip template BG shapes, keep text/decoration intact
         allElements = allElements.filter(el =>
             el.type === 'text' || !BG_NAMES.has((el.name ?? '').toLowerCase())
         );
-        // ★ v737: Apply harmony colors (NOT hardcoded #FFFFFF)
-        applyHarmonyColors(allElements, harmony);
-        // Subtle text shadows for image readability
+        // ★ v738: BG images are unpredictable — ALWAYS white text with shadow
+        // Harmony colors ONLY for accent shapes/CTA, NOT for text on photos
         for (const el of allElements) {
             if (el.type === 'text') {
-                el.shadow_blur = el.shadow_blur ?? 8;
+                el.color_hex = '#FFFFFF';
+                el.shadow_blur = el.shadow_blur ?? 10;
                 el.shadow_offset_x = 0;
                 el.shadow_offset_y = el.shadow_offset_y ?? 2;
-                el.shadow_opacity = el.shadow_opacity ?? 0.6;
+                el.shadow_opacity = el.shadow_opacity ?? 0.7;
+            }
+        }
+        // Apply harmony to non-text elements only (accent shapes, CTA bg)
+        for (const el of allElements) {
+            if (el.type === 'text') continue;
+            const name = (el.name ?? '').toLowerCase();
+            if (name.includes('cta') || name.includes('button')) {
+                const c = harmony.accent.replace('#', '');
+                el.r = parseInt(c.slice(0, 2), 16) / 255;
+                el.g = parseInt(c.slice(2, 4), 16) / 255;
+                el.b = parseInt(c.slice(4, 6), 16) / 255;
             }
         }
     } else {
@@ -325,17 +325,25 @@ export async function processTemplateElements(
     }
 
     // Content injection: replace template placeholder text with AI copy
-    const contentMap: Record<string, string> = {};
-    if (content.headline) contentMap['headline'] = content.headline;
-    if (content.subheadline) contentMap['subheadline'] = content.subheadline;
-    if (content.cta) { contentMap['cta_label'] = content.cta; contentMap['cta'] = content.cta; }
-    if (content.tag) { contentMap['tag_text'] = content.tag; contentMap['tag'] = content.tag; }
-
-    for (const el of allElements) {
-        if (el.type !== 'text') continue;
+    // ★ v738: Broader matching to catch all template name variants
+    const textEls = allElements.filter(el => el.type === 'text');
+    for (const el of textEls) {
         const name = (el.name ?? '').toLowerCase();
-        for (const [key, value] of Object.entries(contentMap)) {
-            if (name.includes(key)) { el.content = value; break; }
+        if (name.includes('headline') && !name.includes('sub')) {
+            if (content.headline) el.content = content.headline;
+        } else if (name.includes('sub') || name.includes('body') || name.includes('description') || name.includes('detail')) {
+            if (content.subheadline) el.content = content.subheadline;
+        } else if (name.includes('cta') || name.includes('label') || name.includes('button')) {
+            if (content.cta) el.content = content.cta;
+        } else if (name.includes('tag') || name.includes('badge') || name.includes('date')) {
+            if (content.tag) el.content = content.tag;
+        } else {
+            // ★ v738: Any unmatched text element → replace with subheadline
+            // Prevents template placeholders like "Where creativity meets technology"
+            if (content.subheadline && el.content && el.content.length > 3) {
+                console.log(`[Pipeline] Replacing unmatched text "${el.name}": "${el.content?.slice(0, 30)}" → "${content.subheadline.slice(0, 30)}"`);
+                el.content = content.subheadline;
+            }
         }
     }
 
