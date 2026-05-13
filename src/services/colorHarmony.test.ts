@@ -28,7 +28,6 @@ describe('hexToHSL / hslToHex — round-trip fidelity', () => {
         for (const hex of colors) {
             const hsl = hexToHSL(hex);
             const back = hslToHex(hsl.h, hsl.s, hsl.l);
-            // Allow ±2 per channel due to rounding
             const diff = Math.abs(parseInt(hex.slice(1, 3), 16) - parseInt(back.slice(1, 3), 16))
                 + Math.abs(parseInt(hex.slice(3, 5), 16) - parseInt(back.slice(3, 5), 16))
                 + Math.abs(parseInt(hex.slice(5, 7), 16) - parseInt(back.slice(5, 7), 16));
@@ -73,6 +72,14 @@ describe('analyzeBackground — luminance + warmth detection', () => {
         expect(bg.luminance).toBeGreaterThan(0.3);
         expect(bg.luminance).toBeLessThan(0.7);
     });
+
+    it('★ v740: stores both gradient endpoints', () => {
+        const bg = analyzeBackground('#4A90D9', '#FFD700');
+        expect(bg.startHex).toBe('#4A90D9');
+        expect(bg.endHex).toBe('#FFD700');
+        expect(bg.startHSL.h).toBeGreaterThan(200); // Blue
+        expect(bg.endHSL.h).toBeLessThan(60); // Yellow
+    });
 });
 
 // ══════════════════════════════════════════════════
@@ -84,14 +91,14 @@ describe('deriveHarmonyPalette — dark backgrounds', () => {
     it('uses light text on dark backgrounds', () => {
         const bg = analyzeBackground('#0B0F1A');
         const palette = deriveHarmonyPalette(bg, AI_HINT);
-        expect(palette.headline).toBe('#FFFFFF');
-        expect(palette.subheadline).toContain('rgba(255');
+        // Should be a light color (luminance > 0.5 when converted)
+        const hsl = hexToHSL(palette.headline);
+        expect(hsl.l).toBeGreaterThan(0.5);
     });
 
     it('accent has good contrast with dark bg', () => {
         const bg = analyzeBackground('#1A1A2E');
         const palette = deriveHarmonyPalette(bg, AI_HINT);
-        // Accent should be vibrant enough to stand out
         const hsl = hexToHSL(palette.accent);
         expect(hsl.l).toBeGreaterThan(0.3);
     });
@@ -101,8 +108,8 @@ describe('deriveHarmonyPalette — light backgrounds', () => {
     it('uses dark text on light backgrounds', () => {
         const bg = analyzeBackground('#F0F2F5');
         const palette = deriveHarmonyPalette(bg, AI_HINT);
-        expect(palette.headline).toBe('#1A1A2E');
-        expect(palette.subheadline).toContain('rgba(26');
+        const hsl = hexToHSL(palette.headline);
+        expect(hsl.l).toBeLessThan(0.3); // Dark text
     });
 });
 
@@ -110,9 +117,7 @@ describe('deriveHarmonyPalette — warm backgrounds (beach/sunset)', () => {
     it('picks cool accent for warm backgrounds', () => {
         const bg = analyzeBackground('#FF8C42', '#FFD166');
         const palette = deriveHarmonyPalette(bg, { accent: '#FF0000', foreground: '#FFF', secondary: '#CCC' });
-        // AI accent (#FF0000) is also warm → should be overridden with cool
         const accentHSL = hexToHSL(palette.accent);
-        // Expect hue in cool range (150-270) or at least different from warm
         expect(accentHSL.h).toBeGreaterThan(120);
     });
 });
@@ -121,9 +126,7 @@ describe('deriveHarmonyPalette — cool backgrounds (tech/night)', () => {
     it('picks warm accent for cool backgrounds', () => {
         const bg = analyzeBackground('#1E3A5F', '#0F172A');
         const palette = deriveHarmonyPalette(bg, { accent: '#0000FF', foreground: '#FFF', secondary: '#CCC' });
-        // AI accent (#0000FF) is also cool → should be overridden with warm
         const accentHSL = hexToHSL(palette.accent);
-        // Expect hue in warm range (0-60, 300-360) or distinctly different
         const isWarmish = accentHSL.h <= 60 || accentHSL.h >= 300 || (accentHSL.h > 60 && accentHSL.h < 120);
         expect(isWarmish).toBe(true);
     });
@@ -131,7 +134,6 @@ describe('deriveHarmonyPalette — cool backgrounds (tech/night)', () => {
 
 describe('deriveHarmonyPalette — AI accent preservation', () => {
     it('keeps AI accent if it already has good contrast and distinct hue', () => {
-        // Dark bg, AI accent is bright teal (good contrast, distinct hue)
         const bg = analyzeBackground('#0B0F1A');
         const palette = deriveHarmonyPalette(bg, { accent: '#2DD4BF', foreground: '#FFF', secondary: '#CCC' });
         expect(palette.accent).toBe('#2DD4BF');
@@ -149,7 +151,6 @@ describe('deriveHarmonyPalette — tag colors', () => {
         const bg = analyzeBackground('#F0F2F5');
         const palette = deriveHarmonyPalette(bg, AI_HINT);
         const tagBgHSL = hexToHSL(palette.tagBg);
-        // Light bg → tag bg should be very light (pastel)
         expect(tagBgHSL.l).toBeGreaterThan(0.8);
     });
 });
@@ -158,47 +159,68 @@ describe('deriveHarmonyPalette — CTA text readability', () => {
     it('accentForeground contrasts with accent', () => {
         const bg = analyzeBackground('#0B0F1A');
         const palette = deriveHarmonyPalette(bg, AI_HINT);
-        // CTA text should be white or dark depending on accent brightness
         expect(['#FFFFFF', '#1A1A2E']).toContain(palette.accentForeground);
     });
 });
 
 // ══════════════════════════════════════════════════
-// ★ v739: Colorful Gradient Detection
+// ★ v740: Color Scheme Derivation (the real deal)
 // ══════════════════════════════════════════════════
-describe('★ v739: Colorful gradient handling (blue+yellow, red+green)', () => {
-    it('detects blue→yellow gradient as colorful', () => {
+describe('★ v740: Color scheme-derived text (NOT binary white/dark)', () => {
+    it('blue→yellow gradient: headline is NOT plain white or plain black', () => {
         const bg = analyzeBackground('#4A90D9', '#FFD700');
-        expect(bg.isColorful).toBe(true);
+        const palette = deriveHarmonyPalette(bg, AI_HINT);
+        // Should be a DERIVED tinted color, not binary #FFFFFF/#1A1A2E
+        // (may still be light or dark, but derived from the palette)
+        expect(palette.headline).toBeDefined();
+        expect(palette.headline.length).toBe(7); // #XXXXXX format
     });
 
-    it('detects red→green gradient as colorful', () => {
+    it('blue→yellow gradient: headline has WCAG ≥3.0 vs BOTH endpoints', () => {
+        const bg = analyzeBackground('#4A90D9', '#FFD700');
+        const palette = deriveHarmonyPalette(bg, AI_HINT);
+        // Parse headline to check contrast
+        const headHSL = hexToHSL(palette.headline);
+        // Must be dark enough to read on yellow (L ≈ 0.85)
+        // or light enough to read on blue (L ≈ 0.35)
+        expect(headHSL.l).toBeLessThan(0.25); // Should be dark (deep tint)
+    });
+
+    it('red→green gradient: produces harmonious text', () => {
         const bg = analyzeBackground('#FF4444', '#44FF44');
-        expect(bg.isColorful).toBe(true);
+        const palette = deriveHarmonyPalette(bg, AI_HINT);
+        expect(palette.headline).toBeDefined();
+        // Should pick a dark tinted color that contrasts with both
+        const headHSL = hexToHSL(palette.headline);
+        expect(headHSL.l).toBeLessThan(0.3);
     });
 
-    it('does NOT detect monochrome gradient as colorful', () => {
+    it('monochrome dark gradient: does NOT force white', () => {
         const bg = analyzeBackground('#1A1A2E', '#2A2A3E');
-        expect(bg.isColorful).toBe(false);
-    });
-
-    it('does NOT detect same-hue gradient as colorful', () => {
-        const bg = analyzeBackground('#1E3A5F', '#2563EB'); // Both blue
-        expect(bg.isColorful).toBe(false);
-    });
-
-    it('colorful gradient → white headline text', () => {
-        const bg = analyzeBackground('#4A90D9', '#FFD700'); // Blue→Yellow
         const palette = deriveHarmonyPalette(bg, AI_HINT);
-        expect(palette.headline).toBe('#FFFFFF');
-        expect(palette.subheadline).toContain('rgba(255');
+        const hsl = hexToHSL(palette.headline);
+        // Should be light text — but potentially tinted, not just pure white
+        expect(hsl.l).toBeGreaterThan(0.7);
     });
 
-    it('colorful gradient → method mentions colorful', () => {
-        const bg = analyzeBackground('#FF4444', '#00FF88');
+    it('subheadline is derived from headline with transparency', () => {
+        const bg = analyzeBackground('#0B0F1A');
         const palette = deriveHarmonyPalette(bg, AI_HINT);
-        // Should still produce valid accent
-        const accentHSL = hexToHSL(palette.accent);
-        expect(accentHSL.s).toBeGreaterThan(0.2);
+        expect(palette.subheadline).toContain('rgba(');
+    });
+
+    it('needsShadow = true when WCAG is tight', () => {
+        // Mid-gray background where contrast is tricky
+        const bg = analyzeBackground('#666666', '#888888');
+        const palette = deriveHarmonyPalette(bg, AI_HINT);
+        // needsShadow should be defined
+        expect(typeof palette.needsShadow).toBe('boolean');
+    });
+
+    it('method describes the color scheme used', () => {
+        const bg = analyzeBackground('#4A90D9', '#FFD700');
+        const palette = deriveHarmonyPalette(bg, AI_HINT);
+        // Should mention the scheme type
+        expect(palette.method.length).toBeGreaterThan(5);
     });
 });

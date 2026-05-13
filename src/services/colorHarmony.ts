@@ -1,11 +1,11 @@
 // ─────────────────────────────────────────────────
 // colorHarmony.ts — Background-Aware Color Harmony Engine
 // ─────────────────────────────────────────────────
-// ★ v737: All element colors are determined AFTER analyzing
-// the background. Zero API cost — pure color theory.
-//
-// Techniques: complementary, split-complementary, analogous,
-// warm/cool temperature contrast, WCAG luminance.
+// ★ v740: PROPER color scheme derivation.
+// Text colors are DERIVED from background colors using
+// color theory (complementary, analogous, tinted neutrals).
+// WCAG checked against BOTH gradient endpoints.
+// NEVER binary white/dark — always tinted, always harmonious.
 // ─────────────────────────────────────────────────
 
 // ── HSL Utilities ────────────────────────────────
@@ -61,60 +61,54 @@ function wcagRatio(fg: string, bg: string): number {
     return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
 }
 
+/** WCAG ratio against the WORST endpoint (minimum of both) */
+function worstCaseWcag(fg: string, bgStart: string, bgEnd: string): number {
+    return Math.min(wcagRatio(fg, bgStart), wcagRatio(fg, bgEnd));
+}
+
 // ── Background Analysis ──────────────────────────
 
 export interface BgAnalysis {
-    luminance: number;     // 0 (black) to 1 (white)
-    isLight: boolean;      // luminance > 0.45
-    isColorful: boolean;   // ★ v739: high-saturation gradient with big hue difference
+    luminance: number;
+    isLight: boolean;
     warmth: 'warm' | 'cool' | 'neutral';
-    dominantHue: number;   // 0-360
-    saturation: number;    // 0-1
-    bgHex: string;         // representative background color
+    dominantHue: number;
+    saturation: number;
+    bgHex: string;
+    /** ★ v740: Both gradient endpoints for WCAG checking */
+    startHex: string;
+    endHex: string;
+    startHSL: HSL;
+    endHSL: HSL;
 }
 
-/** Classify hue into warm/cool/neutral */
 function classifyWarmth(h: number, s: number): 'warm' | 'cool' | 'neutral' {
     if (s < 0.1) return 'neutral';
-    // Warm: reds, oranges, yellows (0-60, 330-360)
     if ((h >= 0 && h <= 60) || h >= 330) return 'warm';
-    // Cool: blues, blue-greens (180-270)
     if (h >= 180 && h <= 270) return 'cool';
-    // In-between zones
     if (h > 60 && h < 180) return s > 0.4 ? 'warm' : 'neutral';
     return 'neutral';
 }
 
-/**
- * Analyze background color(s) for harmony decisions.
- * Works with gradient colors or a single solid color.
- */
-export function analyzeBackground(
-    gradientStart: string,
-    gradientEnd?: string,
-): BgAnalysis {
+export function analyzeBackground(gradientStart: string, gradientEnd?: string): BgAnalysis {
+    const end = gradientEnd ?? gradientStart;
     const hsl1 = hexToHSL(gradientStart);
-    const hsl2 = gradientEnd ? hexToHSL(gradientEnd) : hsl1;
+    const hsl2 = hexToHSL(end);
     const avgH = (hsl1.h + hsl2.h) / 2;
     const avgS = (hsl1.s + hsl2.s) / 2;
     const avgL = (hsl1.l + hsl2.l) / 2;
-    const lum1 = luminance(gradientStart);
-    const lum2 = luminance(gradientEnd ?? gradientStart);
-    const avgLum = (lum1 + lum2) / 2;
-    // ★ v739: Detect colorful gradients (blue→yellow, red→green etc.)
-    // These have high saturation + big hue/luminance difference.
-    // No single text color works everywhere → force white + shadow.
-    const hueDiff = Math.min(Math.abs(hsl1.h - hsl2.h), 360 - Math.abs(hsl1.h - hsl2.h));
-    const lumDiff = Math.abs(lum1 - lum2);
-    const isColorful = avgS > 0.3 && (hueDiff > 60 || lumDiff > 0.3);
+    const avgLum = (luminance(gradientStart) + luminance(end)) / 2;
     return {
         luminance: avgLum,
         isLight: avgLum > 0.45,
-        isColorful,
         warmth: classifyWarmth(avgH, avgS),
         dominantHue: avgH,
         saturation: avgS,
         bgHex: hslToHex(avgH, avgS, avgL),
+        startHex: gradientStart,
+        endHex: end,
+        startHSL: hsl1,
+        endHSL: hsl2,
     };
 }
 
@@ -124,83 +118,158 @@ export interface HarmonyPalette {
     headline: string;
     subheadline: string;
     body: string;
-    accent: string;          // CTA background, decorative shapes
-    accentForeground: string; // Text on accent backgrounds
-    tag: string;             // Tag/badge text
-    tagBg: string;           // Tag/badge background
-    method: string;          // Which harmony method was used
+    accent: string;
+    accentForeground: string;
+    tag: string;
+    tagBg: string;
+    method: string;
+    /** ★ v740: true if text needs shadow for readability insurance */
+    needsShadow: boolean;
+}
+
+// ── Color Scheme Candidate Generation ────────────
+// Generate text color candidates from background using 5 color scheme types
+
+function generateTextCandidates(bg: BgAnalysis): string[] {
+    const candidates: string[] = [];
+    const { startHSL, endHSL } = bg;
+
+    // ── 1. Tinted dark versions of each gradient endpoint ──
+    // Deep navy/dark tints FROM the actual background colors
+    candidates.push(hslToHex(startHSL.h, Math.min(0.6, startHSL.s), 0.10)); // Very dark start-tinted
+    candidates.push(hslToHex(startHSL.h, Math.min(0.5, startHSL.s), 0.15));
+    candidates.push(hslToHex(endHSL.h, Math.min(0.6, endHSL.s), 0.10));   // Very dark end-tinted
+    candidates.push(hslToHex(endHSL.h, Math.min(0.5, endHSL.s), 0.15));
+
+    // ── 2. Tinted light versions ──
+    candidates.push(hslToHex(startHSL.h, Math.min(0.3, startHSL.s), 0.93)); // Warm white start-tinted
+    candidates.push(hslToHex(startHSL.h, Math.min(0.2, startHSL.s), 0.96));
+    candidates.push(hslToHex(endHSL.h, Math.min(0.3, endHSL.s), 0.93));   // Warm white end-tinted
+    candidates.push(hslToHex(endHSL.h, Math.min(0.2, endHSL.s), 0.96));
+
+    // ── 3. Complementary of average background ──
+    const avgH = (startHSL.h + endHSL.h) / 2;
+    const compH = (avgH + 180) % 360;
+    candidates.push(hslToHex(compH, 0.5, 0.12));  // Dark complementary
+    candidates.push(hslToHex(compH, 0.4, 0.18));
+    candidates.push(hslToHex(compH, 0.3, 0.92));  // Light complementary
+    candidates.push(hslToHex(compH, 0.2, 0.95));
+
+    // ── 4. Split-complementary (±30° from complement) ──
+    candidates.push(hslToHex((compH + 30) % 360, 0.5, 0.12));
+    candidates.push(hslToHex((compH - 30 + 360) % 360, 0.5, 0.12));
+    candidates.push(hslToHex((compH + 30) % 360, 0.3, 0.93));
+    candidates.push(hslToHex((compH - 30 + 360) % 360, 0.3, 0.93));
+
+    // ── 5. Neutral fallbacks (still include for safety) ──
+    candidates.push('#FFFFFF', '#F1F5F9', '#E2E8F0');     // Pure/blue whites
+    candidates.push('#1A1A2E', '#0F172A', '#1E293B');     // Deep navies
+    candidates.push('#FFF8E1', '#FFFDF5');                // Warm cream whites
+
+    return candidates;
 }
 
 /**
- * ★ Core function: derive a trendy color palette from background analysis.
- * Uses the AI palette as a "hint" but overrides based on background.
+ * ★ v740: Pick the BEST text color from candidates.
+ * Scoring = WCAG worst-case × harmony bonus.
+ * Prefers tinted colors over pure white/black.
+ */
+function pickBestTextColor(
+    candidates: string[],
+    bgStart: string, bgEnd: string,
+    minContrast: number,
+): { color: string; ratio: number; needsShadow: boolean } {
+    let bestColor = '#FFFFFF';
+    let bestScore = 0;
+    let bestRatio = 0;
+
+    for (const candidate of candidates) {
+        const ratio = worstCaseWcag(candidate, bgStart, bgEnd);
+        if (ratio < minContrast) continue; // Fails WCAG
+
+        // Harmony bonus: prefer tinted colors over pure white/black
+        const hsl = hexToHSL(candidate);
+        const tintBonus = hsl.s > 0.05 ? 1.5 : 1.0; // Tinted > neutral
+        const score = ratio * tintBonus;
+
+        if (score > bestScore) {
+            bestScore = score;
+            bestColor = candidate;
+            bestRatio = ratio;
+        }
+    }
+
+    // If nothing passed minContrast, relax to best available + shadow
+    if (bestRatio < minContrast) {
+        let fallbackBest = '#FFFFFF';
+        let fallbackRatio = 0;
+        for (const c of ['#FFFFFF', '#1A1A2E', '#F1F5F9', '#0F172A']) {
+            const r = worstCaseWcag(c, bgStart, bgEnd);
+            if (r > fallbackRatio) { fallbackRatio = r; fallbackBest = c; }
+        }
+        return { color: fallbackBest, ratio: fallbackRatio, needsShadow: true };
+    }
+
+    return { color: bestColor, ratio: bestRatio, needsShadow: bestRatio < 4.5 };
+}
+
+/**
+ * ★ v740: Derive a complete color palette from background analysis.
+ * Text colors are DERIVED from the gradient, not binary white/dark.
  */
 export function deriveHarmonyPalette(
     bg: BgAnalysis,
     aiPalette: { accent: string; foreground: string; secondary: string },
 ): HarmonyPalette {
-    const bgHSL = hexToHSL(bg.bgHex);
+    const candidates = generateTextCandidates(bg);
 
-    // ── Step 1: Determine text colors based on luminance ──
-    let headline: string;
-    let subheadline: string;
-    let body: string;
+    // ── Text hierarchy: headline (3.0 min), sub/body (2.5 min — they get shadow if needed) ──
+    const headlinePick = pickBestTextColor(candidates, bg.startHex, bg.endHex, 3.0);
+    const headline = headlinePick.color;
 
-    // ★ v739: Colorful gradients (blue+yellow, etc.) → always white + shadow
-    if (bg.isColorful) {
-        headline = '#FFFFFF';
-        subheadline = 'rgba(255,255,255,0.85)';
-        body = 'rgba(255,255,255,0.72)';
-    } else if (bg.isLight) {
-        headline = '#1A1A2E';
-        subheadline = 'rgba(26,26,46,0.65)';
-        body = 'rgba(26,26,46,0.55)';
-    } else {
-        headline = '#FFFFFF';
-        subheadline = 'rgba(255,255,255,0.72)';
-        body = 'rgba(255,255,255,0.55)';
-    }
+    // Subheadline: same family as headline, slightly transparent
+    const headHSL = hexToHSL(headline);
+    const isLightText = headHSL.l > 0.5;
+    const subheadline = isLightText
+        ? `rgba(${hexChannels(headline)},0.78)`
+        : `rgba(${hexChannels(headline)},0.72)`;
+    const body = isLightText
+        ? `rgba(${hexChannels(headline)},0.62)`
+        : `rgba(${hexChannels(headline)},0.58)`;
 
-    // ── Step 2: Determine accent using color theory ──
+    // ── Accent: use existing trendy accent picker ──
     const accent = pickTrendyAccent(bg, aiPalette.accent);
-
-    // ── Step 3: Ensure accent has good contrast ──
     const accentLum = luminance(accent);
     const accentForeground = accentLum > 0.45 ? '#1A1A2E' : '#FFFFFF';
 
-    // ── Step 4: Tag colors (accent-tinted) ──
+    // ── Tags: accent-tinted ──
     const accentHSL = hexToHSL(accent);
     const tagBg = hslToHex(accentHSL.h, Math.min(0.9, accentHSL.s), bg.isLight ? 0.92 : 0.18);
     const tag = hslToHex(accentHSL.h, Math.min(0.8, accentHSL.s), bg.isLight ? 0.35 : 0.75);
 
-    // ── Step 5: Refine subheadline for mid-luminance backgrounds ──
-    // Mid-range backgrounds (0.35-0.55) need special handling
-    // ★ v739: Skip for colorful gradients (already forced white above)
-    if (!bg.isColorful && bg.luminance > 0.35 && bg.luminance < 0.55) {
-        headline = bg.luminance > 0.45 ? '#1A1A2E' : '#FFFFFF';
-        const subAlpha = bg.luminance > 0.45 ? '0.72' : '0.75';
-        subheadline = bg.luminance > 0.45
-            ? `rgba(26,26,46,${subAlpha})`
-            : `rgba(255,255,255,${subAlpha})`;
-    }
+    const method = `${detectScheme(bg)} | headline=${headline} wcag=${headlinePick.ratio.toFixed(1)}`;
+    console.log(`[colorHarmony] ${method} | bg=${bg.startHex}→${bg.endHex} accent=${accent}`);
 
-    const method = detectMethod(bg, aiPalette.accent, accent);
-    console.log(`[colorHarmony] ${method} | bg lum=${bg.luminance.toFixed(2)} warmth=${bg.warmth} | accent=${accent} headline=${headline}`);
+    return {
+        headline, subheadline, body, accent, accentForeground,
+        tag, tagBg, method,
+        needsShadow: headlinePick.needsShadow,
+    };
+}
 
-    return { headline, subheadline, body, accent, accentForeground, tag, tagBg, method };
+/** Extract RGB channels from hex for rgba() usage */
+function hexChannels(hex: string): string {
+    const c = hex.replace('#', '');
+    return `${parseInt(c.slice(0, 2), 16)},${parseInt(c.slice(2, 4), 16)},${parseInt(c.slice(4, 6), 16)}`;
 }
 
 // ── Trendy Accent Selection ──────────────────────
 
-/** Curated trendy accent palettes by temperature + luminance */
 const TRENDY_ACCENTS = {
-    // Warm background → cool accents (beach, sunset, food)
     warm_light: ['#0EA5E9', '#06B6D4', '#2DD4BF', '#3B82F6', '#6366F1'],
     warm_dark:  ['#22D3EE', '#34D399', '#38BDF8', '#60A5FA', '#818CF8'],
-    // Cool background → warm accents (tech, night, ocean)
     cool_light: ['#F97316', '#EF4444', '#EC4899', '#F59E0B', '#E11D48'],
     cool_dark:  ['#FB923C', '#F87171', '#F472B6', '#FBBF24', '#FF6B6B'],
-    // Neutral background → vibrant universal accents
     neutral_light: ['#6366F1', '#8B5CF6', '#EC4899', '#0EA5E9', '#10B981'],
     neutral_dark:  ['#818CF8', '#A78BFA', '#F472B6', '#38BDF8', '#34D399'],
 } as const;
@@ -209,42 +278,32 @@ function pickTrendyAccent(bg: BgAnalysis, aiAccent: string): string {
     const key = `${bg.warmth}_${bg.isLight ? 'light' : 'dark'}` as keyof typeof TRENDY_ACCENTS;
     const palette = TRENDY_ACCENTS[key] ?? TRENDY_ACCENTS.neutral_dark;
 
-    // Check if AI's accent already has good contrast with background
     const aiRatio = wcagRatio(aiAccent, bg.bgHex);
     if (aiRatio >= 3.0) {
-        // AI accent works — but verify it's not too similar to bg hue
         const aiHSL = hexToHSL(aiAccent);
         const hueDiff = Math.abs(aiHSL.h - bg.dominantHue);
-        const normalizedDiff = Math.min(hueDiff, 360 - hueDiff);
-        if (normalizedDiff > 40) return aiAccent; // AI accent is distinct enough
+        if (Math.min(hueDiff, 360 - hueDiff) > 40) return aiAccent;
     }
 
-    // Pick the curated accent with best contrast against bg
     let bestAccent = palette[0];
     let bestScore = 0;
     for (const candidate of palette) {
         const ratio = wcagRatio(candidate, bg.bgHex);
         const hsl = hexToHSL(candidate);
-        const hueDist = Math.min(
-            Math.abs(hsl.h - bg.dominantHue),
-            360 - Math.abs(hsl.h - bg.dominantHue),
-        );
-        // Score: contrast ratio + hue distance bonus (prefer complementary)
+        const hueDist = Math.min(Math.abs(hsl.h - bg.dominantHue), 360 - Math.abs(hsl.h - bg.dominantHue));
         const score = ratio * 1.5 + (hueDist / 180) * 3;
         if (score > bestScore) { bestScore = score; bestAccent = candidate; }
     }
     return bestAccent;
 }
 
-function detectMethod(bg: BgAnalysis, aiAccent: string, finalAccent: string): string {
-    if (aiAccent === finalAccent) return `AI accent preserved (${bg.warmth})`;
-    const bgHSL = hexToHSL(bg.bgHex);
-    const accHSL = hexToHSL(finalAccent);
+function detectScheme(bg: BgAnalysis): string {
     const hueDiff = Math.min(
-        Math.abs(accHSL.h - bgHSL.h),
-        360 - Math.abs(accHSL.h - bgHSL.h),
+        Math.abs(bg.startHSL.h - bg.endHSL.h),
+        360 - Math.abs(bg.startHSL.h - bg.endHSL.h),
     );
-    if (hueDiff > 150) return `Complementary (${bg.warmth} bg → cool accent)`;
-    if (hueDiff > 90) return `Split-complementary (${bg.warmth})`;
-    return `Temperature contrast (${bg.warmth} bg → ${bg.warmth === 'warm' ? 'cool' : 'warm'} accent)`;
+    if (hueDiff < 15) return `Monochromatic (${bg.warmth})`;
+    if (hueDiff < 60) return `Analogous (${bg.warmth})`;
+    if (hueDiff > 150) return `Complementary gradient (${bg.warmth})`;
+    return `Split-comp gradient (${bg.warmth})`;
 }

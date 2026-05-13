@@ -251,12 +251,12 @@ export async function processTemplateElements(
             }
         }
     } else {
-        // Gradient/solid background → recolor + harmony refinement
+        // Gradient/solid background → recolor + harmony-derived colors
         const { recolorTemplateElements } = await resilientImport(() => import('./agentColorRecolor'));
         allElements = recolorTemplateElements(allElements, guide);
         applyHarmonyColors(allElements, harmony);
-        // ★ v739: Colorful gradients (blue+yellow) → add shadow like BG images
-        if (bgAnalysis.isColorful) {
+        // ★ v740: Shadow as WCAG insurance when harmony engine says contrast is tight
+        if (harmony.needsShadow) {
             for (const el of allElements) {
                 if (el.type === 'text') {
                     el.shadow_blur = el.shadow_blur ?? 8;
