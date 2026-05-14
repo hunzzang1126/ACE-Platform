@@ -106,7 +106,9 @@ export async function executeGenerateFlow(
 
     const { generateColorPalette } = await resilientImport(() => import('@/services/designStyleGuides'));
     const colorPrompt = brand.paletteHint ? `${prompt}\n\n[BRAND PALETTE — Reference Only]\n${brand.paletteHint}\nUse brand colors as a STARTING POINT, but if the user's prompt explicitly requests a different color (e.g., "blue CTA", "make it green", "파란색"), the user's color ALWAYS wins.` : prompt;
-    const { palette: guide, reasoning: colorReasoning, needsBackgroundImage: aiNeedsImage, backgroundImagePrompt, designStrategy, templateId: aiTemplateId } = await generateColorPalette(colorPrompt, abort.signal, templateCatalog);
+    // ★ v744: Pipe brief metadata → palette (eliminates re-analysis of mood/industry)
+    const briefHint = { mood: brief.mood, industry: brief.industry, slots: brief.slots, textDensity: brief.textDensity };
+    const { palette: guide, reasoning: colorReasoning, needsBackgroundImage: aiNeedsImage, backgroundImagePrompt, designStrategy, templateId: aiTemplateId } = await generateColorPalette(colorPrompt, abort.signal, templateCatalog, briefHint);
 
     // ★ Code-first image decision: deterministic for 80% of cases, AI only for ambiguous.
     const { decideBackgroundImage } = await resilientImport(() => import('@/services/backgroundImageDecider'));

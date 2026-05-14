@@ -3,14 +3,14 @@
 // ─────────────────────────────────────────────────
 // Types + Tool Schemas → autoDesignTypes.ts
 // Prompt Builders → autoDesignPrompts.ts
+// ★ v744: callTemplateContent, extractUserText, sanitizeContent REMOVED.
+// Content generation now uses designBrief.ts → generateDesignBrief().
 // ─────────────────────────────────────────────────
 
 import { callAnthropicApi, DEFAULT_CLAUDE_MODEL } from '@/services/anthropicClient';
 import type { CanvasElementInfo, RenderElement, RearrangePatch, FromScratchResult, AssetContextResult } from './autoDesignTypes';
 import { RENDER_BANNER_TOOL, REARRANGE_BANNER_TOOL } from './autoDesignTypes';
 import { buildFromScratchPrompt, buildAssetContextPrompt } from './autoDesignPrompts';
-import type { GeneratedContent } from '@/services/designTemplates';
-import { buildContentPrompt } from '@/services/designTemplates';
 
 // Re-export for backward compat
 export * from './autoDesignTypes';
@@ -57,120 +57,4 @@ export async function callAssetContext(
     if (!toolUse?.input) throw new Error('AI did not return layout patches. Please try again.');
     const input = toolUse.input as { patches?: RearrangePatch[]; additions?: RenderElement[] };
     return { mode: 'asset_context', patches: input.patches ?? [], additions: input.additions ?? [] };
-}
-
-// ── Template-Based Content Generation ──
-
-function extractUserText(prompt: string): Partial<GeneratedContent> {
-    const result: Partial<GeneratedContent> = {};
-    const fieldMap: [RegExp, keyof GeneratedContent][] = [
-        [/headline[은는=:\s]+["']([^"']+)["']/i, 'headline'],
-        [/headline[은는=:\s]+([^,.\n]+)/i, 'headline'],
-        [/해드라인[은는=:\s]+["']([^"']+)["']/i, 'headline'],
-        [/해드라인[은는=:\s]+([^,.\n]+)/i, 'headline'],
-        [/헤드라인[은는=:\s]+["']([^"']+)["']/i, 'headline'],
-        [/헤드라인[은는=:\s]+([^,.\n]+)/i, 'headline'],
-        [/subheadline[은는=:\s]+["']([^"']+)["']/i, 'subheadline'],
-        [/subheadline[은는=:\s]+([^,.\n]+)/i, 'subheadline'],
-        [/cta[은는=:\s]+["']([^"']+)["']/i, 'cta'],
-        [/cta[은는=:\s]+([^,.\n]+)/i, 'cta'],
-        [/tag[은는=:\s]+["']([^"']+)["']/i, 'tag'],
-    ];
-    for (const [regex, field] of fieldMap) {
-        if (result[field]) continue;
-        const m = prompt.match(regex);
-        if (m?.[1]) result[field] = m[1].trim();
-    }
-    const qm = prompt.match(/["']([^"']+)["']\s*(?:라는|이라는)?\s*(?:해드라인|헤드라인|headline)/i);
-    if (qm?.[1] && !result.headline) result.headline = qm[1].trim();
-    return result;
-}
-
-function sanitizeContent(c: GeneratedContent): GeneratedContent {
-    // ★ Junk detection: English + Korean UI terms that AI sometimes outputs as "copy"
-    const JUNK = /^(inter|roboto|arial|helvetica|text|subtext|subheadline|headline|cta|button|click here|lorem|font|label|tag|버튼|텍스트|서브헤드라인|헤드라인|라벨|태그|클릭|제목|부제|부제목)$/i;
-    const FONT_NAMES = /^(inter|roboto|montserrat|poppins|arial|helvetica|georgia|verdana|garamond|lato|opensans|raleway|playfair|outfit|nunito|space grotesk)$/i;
-    // ★ v732: Descriptive prefixes that AI outputs instead of real ad copy
-    const DESCRIPTIVE_PREFIX = /^(text\s+(?:about|regarding|on|for|describing)\s+|about\s+(?:the\s+)?|regarding\s+(?:the\s+)?|description\s+(?:of|about)\s+|information\s+(?:about|on)\s+|details?\s+(?:about|on)\s+|an?\s+ad\s+(?:about|for)\s+|ad\s+(?:copy\s+)?(?:about|for)\s+)/i;
-    // ★ v737: Prompt leakage — AI echoes its own instructions as copy
-    // "like 'Just Do It' or similar motivational Korean text"
-    const PROMPT_LEAKAGE = /(?:like\s+[""']|or\s+similar\s+|(?:motivational|inspirational|compelling)\s+(?:Korean|English|Chinese|Japanese)\s+text|(?:something|text)\s+(?:like|similar to)|(?:headline|tagline|slogan)\s+(?:such as|like)|placeholder\s+text|sample\s+(?:text|copy))/i;
-    const toTitleCase = (s: string) => s.replace(/\w\S*/g, (t) => t.charAt(0).toUpperCase() + t.slice(1).toLowerCase());
-
-    let headline = c.headline?.trim() || 'Get Started Today';
-    if (JUNK.test(headline)) headline = 'Get Started Today';
-    // ★ v737: Detect prompt leakage — AI echoed instructions instead of writing copy
-    if (PROMPT_LEAKAGE.test(headline)) {
-        console.warn(`[sanitizeContent] Prompt leakage detected: "${headline}" — replacing with fallback`);
-        headline = 'Get Started Today';
-    }
-    // ★ v732: Strip descriptive prefixes — "text about X" → "X"
-    let wasDescriptive = false;
-    if (DESCRIPTIVE_PREFIX.test(headline)) {
-        headline = headline.replace(DESCRIPTIVE_PREFIX, '').trim();
-        if (!headline) headline = 'Get Started Today';
-        wasDescriptive = true;
-    }
-    // Only apply title case to Latin-script text (not Korean/CJK)
-    // ★ v732: Also title-case after prefix strip (first word is likely lowercase)
-    if ((wasDescriptive || headline === headline.toLowerCase()) && headline.length > 0 && /^[\x00-\x7F]+$/.test(headline)) {
-        headline = toTitleCase(headline);
-    }
-
-    // ★ CTA is OPTIONAL — AI decides if it's needed.
-    // Only sanitize junk; do NOT force a fallback.
-    let cta = c.cta?.trim() || '';
-    if (FONT_NAMES.test(cta) || JUNK.test(cta)) cta = '';
-    if (cta && cta === cta.toLowerCase() && cta.length > 0 && /^[\x00-\x7F]+$/.test(cta)) {
-        cta = toTitleCase(cta);
-    }
-
-    let subheadline = c.subheadline?.trim() || '';
-    if (JUNK.test(subheadline)) subheadline = '';
-    let tag = c.tag?.trim() || '';
-    if (JUNK.test(tag)) tag = '';
-
-    return { headline, subheadline, cta, tag };
-}
-
-export async function callTemplateContent(
-    userPrompt: string, canvasW: number, canvasH: number,
-    templateName: string, signal: AbortSignal, language: string = 'English',
-): Promise<GeneratedContent> {
-    const userProvided = extractUserText(userPrompt);
-    const hasUserText = Object.keys(userProvided).length > 0;
-
-    if (userProvided.headline && userProvided.cta) {
-        return sanitizeContent({ headline: userProvided.headline, subheadline: userProvided.subheadline || '', cta: userProvided.cta, tag: userProvided.tag || '' });
-    }
-
-    let contentPrompt = buildContentPrompt(userPrompt, canvasW, canvasH, templateName, language);
-    if (hasUserText) {
-        const hints: string[] = [];
-        if (userProvided.headline) hints.push(`The user EXPLICITLY wants this headline: "${userProvided.headline}". Use it EXACTLY as-is, do NOT change or rephrase it.`);
-        if (userProvided.subheadline) hints.push(`The user EXPLICITLY wants this subheadline: "${userProvided.subheadline}". Use it EXACTLY.`);
-        if (userProvided.cta) hints.push(`The user EXPLICITLY wants this CTA: "${userProvided.cta}". Use it EXACTLY.`);
-        if (userProvided.tag) hints.push(`The user EXPLICITLY wants this tag: "${userProvided.tag}". Use it EXACTLY.`);
-        contentPrompt += `\n\nCRITICAL OVERRIDE:\n${hints.join('\n')}`;
-    }
-
-    const body = {
-        model: DEFAULT_CLAUDE_MODEL, max_tokens: 256, temperature: 0.7,
-        system: 'You are a professional copywriter. Return ONLY valid JSON.',
-        messages: [{ role: 'user' as const, content: contentPrompt }],
-    };
-
-    const data = await callAnthropicApi(body, signal) as { content: Array<{ type: string; text?: string }> };
-    const textBlock = data.content.find(c => c.type === 'text');
-    if (!textBlock?.text) throw new Error('No content generated.');
-
-    let raw = textBlock.text.trim();
-    if (raw.startsWith('```')) raw = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
-
-    try {
-        const parsed = JSON.parse(raw) as GeneratedContent;
-        return sanitizeContent({ headline: userProvided.headline || parsed.headline || 'Get Started Today', subheadline: userProvided.subheadline ?? parsed.subheadline ?? '', cta: userProvided.cta || parsed.cta || '', tag: userProvided.tag || parsed.tag || '' });
-    } catch {
-        return sanitizeContent({ headline: userProvided.headline || 'Get Started Today', subheadline: userProvided.subheadline || '', cta: userProvided.cta || '', tag: userProvided.tag || '' });
-    }
 }

@@ -198,12 +198,12 @@ describe('★ v735: Image prompt quality enhancement', () => {
     });
 
     it('instructs AI to never include text in images', () => {
-        expect(styleSrc).toContain('NEVER request text, logos, or typography');
+        expect(styleSrc).toContain('NEVER include text/logos');
     });
 
     it('includes photography-specific guidance', () => {
         expect(styleSrc).toContain('depth of field');
-        expect(styleSrc).toContain('rim lighting');
+        expect(styleSrc).toContain('color temperature');
     });
 });
 

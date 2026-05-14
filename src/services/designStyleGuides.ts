@@ -7,6 +7,7 @@
 import { callAnthropicApi, DEFAULT_CLAUDE_MODEL } from '@/services/anthropicClient';
 import { parseDesignStrategy, DEFAULT_STRATEGY } from '@/services/designStrategy';
 import type { DesignStrategy } from '@/services/designStrategy';
+import { selectFontPair } from '@/services/fontPairings';
 
 // ── Types ────────────────────────────────────────
 
@@ -107,59 +108,25 @@ const DEFAULT_PALETTE: DesignStyleGuide = {
 };
 
 // ── AI Color Palette Generation ──────────────────
+// ★ v744: Slimmed system prompt — 50% smaller.
+// Brief metadata (mood/industry) piped in → no re-analysis.
+// Font selection → code (fontPairings.ts). Image/overlay → code.
+// AI only decides: colors + background image prompt.
 
-const COLOR_SYSTEM_PROMPT = `You are a world-class brand color expert and creative director.
-Given a user's design prompt, determine the PERFECT color palette, typography, and VISUAL STRATEGY.
+const COLOR_SYSTEM_PROMPT = `You are a brand color expert. Given a design prompt with pre-analyzed mood/industry, determine the PERFECT color palette.
 
 RULES:
-1. If the prompt mentions a specific COLOR ("red", "blue", "make it green", "파란색", etc.), that color MUST be the accent/CTA color. User-specified colors ALWAYS override brand defaults.
-2. If the prompt mentions a KNOWN BRAND (Nike, Coca-Cola, Apple, Google, etc.) AND the user did NOT specify a color, use that brand's signature colors.
-3. If no brand or color is mentioned, infer the best palette from the INDUSTRY/MOOD:
-   - Finance/luxury → deep navy + gold
-   - Tech/SaaS → dark bg + electric blue or cyan
-   - Health/medical → light bg + teal
-   - Food/lifestyle → warm neutrals + coral
-   - Sport/energy → dark bg + bold red/orange
-   - Fashion/beauty → elegant dark or warm neutral
+1. User-specified colors ALWAYS win ("red", "blue", "파란색" → accent color).
+2. Known brands → use signature colors (Nike=red/black, Apple=white/black, etc.).
+3. Otherwise, match palette to the given mood/industry.
 4. ALWAYS ensure 4.5:1+ contrast between text and background.
-5. Dark backgrounds (< #333) should have white/light text. Light backgrounds (> #ccc) should have dark text.
-6. FONT SELECTION — choose fonts that match the design's mood. Use DIFFERENT fonts for headline vs body.
-   Available Google Fonts (pick from this list):
-   Sans-serif: Inter, DM Sans, Space Grotesk, Outfit, Sora, Montserrat, Poppins, Roboto, Oswald, Roboto Condensed, Raleway, Nunito
-   Serif: Playfair Display, DM Serif Display, Cormorant Garamond, Libre Baskerville, Fraunces, Lora
-   Display: Bebas Neue, Anton
-   RULES:
-   - fontPrimary (headlines) and fontSecondary (body) MUST be different fonts
-   - Choose fonts that feel right for the mood — trust your judgment
-   - NEVER return "Inter" for both — that's boring and generic
-7. Set needsBackgroundImage to true if the prompt describes a physical scene, product, or person. Set to false for abstract/digital concepts. This is a HINT — code may override your decision.
-   If true, write a backgroundImagePrompt for AD-READY photography. Rules:
-   - NEVER request text, logos, or typography in the image
-   - Include: lighting direction, depth of field, color temperature
-   - Leave negative space for text: specify "negative space on [top/bottom/left/right]"
-   - For lifestyle: "shallow depth of field, bokeh background, warm natural light, editorial photography"
-   - For product: "clean studio background, professional product shot, rim lighting, commercial photography"
-   - For food: "overhead flat lay OR 45-degree angle, styled food photography, soft diffused light"
-   - For landscape/travel: "golden hour, wide angle, atmospheric perspective, negative space in sky"
-8. DESIGN STRATEGY — You are the Creative Director. Decide HOW the design should look:
-   a. overlayApproach: How to make text readable over background images. Options:
-      - "gradient-scrim": Subtle gradient from transparent to background color (NOT black!). Best for hero images.
-      - "text-shadow-only": No overlay rectangle. Text gets strong shadows. Best when image must stay vivid.
-      - "color-tint": Semi-transparent brand color wash. Gives brand cohesion.
-      - "full-dim": Full canvas darkening. Only for moody/cinematic themes.
-      - "none": No treatment. Only when background is already dark/simple.
-   b. imageFilters: { brightness: -0.3 to 0, blur: 0 to 3 }
-      - If product/person is the hero → brightness: -0.1, blur: 0 (keep sharp!)
-      - If image is decorative/atmospheric → brightness: -0.2, blur: 1-2
-   c. ctaStyle: "pill" (default), "outlined" (elegant), "solid" (bold), "text-arrow" (minimal), "rounded-square" (professional)
-   d. textHierarchy: { headlineOpacity: 1.0, subheadlineOpacity: 0.65-0.85, tagIsAccent: true/false }
-      - tagIsAccent=true: tag text uses accent color (premium feel)
-      - subheadlineOpacity < 1.0: creates visual depth between headline and sub
-9. Return ONLY the JSON object, nothing else.
-10. templateId: You will be given a TEMPLATE CATALOG with available templates.
-   Choose the templateId that best fits the content mood, industry, and visual impact.
-   Pick based on the template's name, description, tags, and category — NOT randomly.
-   If no template catalog is provided, set templateId to null.`;
+5. Dark backgrounds (<#333) → white/light text. Light backgrounds (>#ccc) → dark text.
+6. needsBackgroundImage: true if prompt describes a physical scene/product/person. false for abstract.
+7. If needsBackgroundImage=true, write a backgroundImagePrompt for ad-ready photography:
+   - NEVER include text/logos in the image
+   - Include: lighting, depth of field, color temperature
+   - Leave negative space for text overlay
+8. Return ONLY valid JSON.`;
 
 interface AiColorResponse {
     name: string;
@@ -178,58 +145,63 @@ interface AiColorResponse {
     reasoning: string;
     needsBackgroundImage: boolean;
     backgroundImagePrompt: string;
-    // ★ v713: Design strategy fields
-    overlayApproach?: string;
-    imageFilters?: { brightness?: number; blur?: number };
-    ctaStyle?: string;
-    textHierarchy?: { headlineOpacity?: number; subheadlineOpacity?: number; tagIsAccent?: boolean };
-    // ★ v734: AI template selection from Supabase catalog
     templateId?: string | null;
 }
 
+/** Brief metadata from Phase 2 — eliminates re-analysis */
+export interface BriefHint {
+    mood: string;
+    industry: string;
+    slots: string[];
+    textDensity?: string;
+}
+
 /**
- * Ask AI to generate a brand-aware color palette from the prompt.
- * Falls back to DEFAULT_PALETTE on error.
+ * Generate a brand-aware color palette from the prompt.
+ * ★ v744: Accepts briefHint (mood/industry) from Phase 2.
+ * Font selection uses codified fontPairings.ts.
+ * Design strategy is deterministic (code, not AI).
  */
 export async function generateColorPalette(
     prompt: string,
     signal: AbortSignal,
     templateCatalog?: Array<{ id: string; name: string; description: string; tags: string[]; category: string }>,
+    briefHint?: BriefHint,
 ): Promise<{ palette: DesignStyleGuide; reasoning: string; needsBackgroundImage: boolean; backgroundImagePrompt: string; designStrategy: DesignStrategy; templateId: string | null }> {
     try {
+        // ★ v744: Inject brief metadata into user message (skip re-analysis)
+        const moodLine = briefHint ? `\nPre-analyzed: mood="${briefHint.mood}", industry="${briefHint.industry}", slots=[${briefHint.slots.join(',')}]` : '';
+        const catalogText = templateCatalog && templateCatalog.length > 0
+            ? `\n\nTEMPLATE CATALOG (pick best templateId):\n${templateCatalog.map(t => `- id:"${t.id}" name:"${t.name}" tags:[${t.tags.join(',')}]`).join('\n')}`
+            : '';
+
         const body = {
             model: DEFAULT_CLAUDE_MODEL,
-            max_tokens: 800,
+            max_tokens: 500, // ★ v744: 800→500 (no strategy fields needed)
             temperature: 0.4,
-            system: COLOR_SYSTEM_PROMPT,
+            system: [{
+                type: 'text' as const,
+                text: COLOR_SYSTEM_PROMPT,
+                cache_control: { type: 'ephemeral' as const }, // ★ P4: Prompt Caching
+            }],
             messages: [{
                 role: 'user' as const,
-                content: `Design prompt: "${prompt}"
+                content: `Design prompt: "${prompt}"${moodLine}
 
-Return a JSON object with these exact keys:
+Return JSON:
 {
-  "name": "short palette name (e.g. 'Nike Bold Red')",
-  "background": "#hex (canvas background)",
-  "surface": "#hex (slightly lighter than bg)",
-  "foreground": "#hex (primary text color)",
-  "secondary": "#hex (secondary text)",
-  "accent": "#hex (CTA/highlight color)",
-  "accentForeground": "#hex (text on accent bg)",
-  "gradientStart": "#hex",
-  "gradientEnd": "#hex",
-  "gradientAngle": number,
-  "fontPrimary": "font name for headlines",
-  "fontSecondary": "font name for body",
-  "radius": number (corner radius 0-12),
-  "reasoning": "1 sentence explaining why these colors",
+  "name": "short palette name",
+  "background": "#hex", "surface": "#hex",
+  "foreground": "#hex", "secondary": "#hex",
+  "accent": "#hex", "accentForeground": "#hex",
+  "gradientStart": "#hex", "gradientEnd": "#hex", "gradientAngle": number,
+  "fontPrimary": "headline font hint", "fontSecondary": "body font hint",
+  "radius": 0-12,
+  "reasoning": "1 sentence",
   "needsBackgroundImage": true/false,
-  "backgroundImagePrompt": "if needsBackgroundImage is true, a short image-gen prompt. If false, empty string.",
-  "overlayApproach": "gradient-scrim"|"text-shadow-only"|"color-tint"|"full-dim"|"none",
-  "imageFilters": { "brightness": -0.15, "blur": 0 },
-  "ctaStyle": "pill"|"outlined"|"solid"|"text-arrow"|"rounded-square",
-  "textHierarchy": { "headlineOpacity": 1.0, "subheadlineOpacity": 0.75, "tagIsAccent": true },
-  "templateId": "id-from-catalog-or-null"
-}${templateCatalog && templateCatalog.length > 0 ? `\n\nTEMPLATE CATALOG (pick the best templateId):\n${templateCatalog.map(t => `- id:"${t.id}" name:"${t.name}" desc:"${t.description}" tags:[${t.tags.join(',')}] cat:${t.category}`).join('\n')}` : ''}`,
+  "backgroundImagePrompt": "image prompt or empty",
+  "templateId": "id-or-null"
+}${catalogText}`,
             }],
         };
 
@@ -246,6 +218,13 @@ Return a JSON object with these exact keys:
         }
 
         const parsed = JSON.parse(raw) as AiColorResponse;
+
+        // ★ v744: Font selection — codified, AI is just a hint
+        const fontPair = selectFontPair(
+            briefHint?.mood ?? 'general',
+            briefHint?.industry ?? 'general',
+            { primary: parsed.fontPrimary, secondary: parsed.fontSecondary },
+        );
 
         // Build palette from AI response, filling gaps with defaults
         const palette: DesignStyleGuide = {
@@ -270,34 +249,32 @@ Return a JSON object with these exact keys:
             },
             typography: {
                 ...DEFAULT_PALETTE.typography,
-                primaryFont: parsed.fontPrimary || 'Inter',
-                secondaryFont: parsed.fontSecondary || 'DM Sans',
+                primaryFont: fontPair.primary,
+                secondaryFont: fontPair.secondary,
             },
             radius: parsed.radius ?? 6,
         };
+        console.log(`[ColorPalette] Fonts: ${fontPair.primary} / ${fontPair.secondary} (mood=${briefHint?.mood}, AI hint=${parsed.fontPrimary}/${parsed.fontSecondary})`);
 
-        // ★ v732: Font diversity guard — same font for both = boring, generic look
-        if (palette.typography.primaryFont === palette.typography.secondaryFont) {
-            const FONT_PAIRS: Record<string, string> = {
-                'Inter': 'DM Sans', 'DM Sans': 'Inter', 'Poppins': 'DM Sans',
-                'Roboto': 'Space Grotesk', 'Montserrat': 'DM Sans', 'Outfit': 'Inter',
-                'Playfair Display': 'DM Sans', 'DM Serif Display': 'Inter',
-                'Bebas Neue': 'DM Sans', 'Anton': 'Inter', 'Oswald': 'DM Sans',
-                'Sora': 'Inter', 'Space Grotesk': 'DM Sans', 'Nunito': 'Space Grotesk',
-                'Raleway': 'DM Sans', 'Cormorant Garamond': 'Inter', 'Lora': 'DM Sans',
-            };
-            palette.typography.secondaryFont = FONT_PAIRS[palette.typography.primaryFont] || 'DM Sans';
-            console.log(`[ColorPalette] Font diversity guard: primary="${palette.typography.primaryFont}" → secondary="${palette.typography.secondaryFont}"`);
-        }
-
-        // ★ v713: Parse design strategy from AI response
-        const designStrategy = parseDesignStrategy({
-            overlayApproach: parsed.overlayApproach,
-            imageFilters: parsed.imageFilters,
-            ctaStyle: parsed.ctaStyle,
-            textHierarchy: parsed.textHierarchy,
-        });
-        console.log(`[ColorPalette] Design strategy: overlay=${designStrategy.overlayApproach}, cta=${designStrategy.ctaStyle}, template=${parsed.templateId ?? 'auto'}`);
+        // ★ v744: Design strategy = DETERMINISTIC (code decides, not AI)
+        // overlayApproach and imageFilters depend on whether there's a bg image,
+        // which we don't know yet — use sensible defaults that downstream can override.
+        const mood = briefHint?.mood ?? 'general';
+        const ctaStyle = (['elegant', 'luxurious', 'minimal'].includes(mood) ? 'outlined'
+            : ['bold', 'intense', 'urgent'].includes(mood) ? 'solid'
+            : ['minimal', 'clean'].includes(mood) ? 'text-arrow'
+            : 'pill') as import('@/services/designStrategy').CtaStyle;
+        const designStrategy: DesignStrategy = {
+            ...DEFAULT_STRATEGY,
+            ctaStyle,
+            overlayApproach: 'text-shadow-only', // ★ default; processTemplateElements overrides per bgResult
+            textHierarchy: {
+                headlineOpacity: 1.0,
+                subheadlineOpacity: mood === 'minimal' ? 0.65 : 0.75,
+                tagIsAccent: true,
+            },
+        };
+        console.log(`[ColorPalette] Strategy: cta=${ctaStyle} (mood=${mood}), template=${parsed.templateId ?? 'auto'}`);
 
         // ★ v734: Validate AI-chosen template ID against catalog
         let aiTemplateId: string | null = null;
@@ -314,7 +291,9 @@ Return a JSON object with these exact keys:
         return { palette, reasoning: parsed.reasoning || '', needsBackgroundImage: !!parsed.needsBackgroundImage, backgroundImagePrompt: parsed.backgroundImagePrompt || '', designStrategy, templateId: aiTemplateId };
     } catch (err) {
         console.warn('[ColorPalette] AI generation failed, using default:', err);
-        return { palette: { ...DEFAULT_PALETTE }, reasoning: 'Using default palette (AI unavailable)', needsBackgroundImage: false, backgroundImagePrompt: '', designStrategy: { ...DEFAULT_STRATEGY }, templateId: null };
+        const fontPair = selectFontPair(briefHint?.mood ?? 'general', briefHint?.industry ?? 'general');
+        const fallback = { ...DEFAULT_PALETTE, typography: { ...DEFAULT_PALETTE.typography, primaryFont: fontPair.primary, secondaryFont: fontPair.secondary } };
+        return { palette: fallback, reasoning: 'Using default palette (AI unavailable)', needsBackgroundImage: false, backgroundImagePrompt: '', designStrategy: { ...DEFAULT_STRATEGY }, templateId: null };
     }
 }
 

@@ -1,5 +1,8 @@
 // ─────────────────────────────────────────────────
-// autoDesignService.test.ts — extractUserText + sanitizeContent
+// autoDesignService.test.ts — API call tests
+// ─────────────────────────────────────────────────
+// ★ v744: callTemplateContent tests REMOVED (dead code).
+// Content generation tests → designBrief.test.ts.
 // ─────────────────────────────────────────────────
 
 import { describe, it, expect, vi } from 'vitest';
@@ -9,13 +12,8 @@ vi.mock('@/services/anthropicClient', () => ({
     callAnthropicApi: vi.fn(),
     DEFAULT_CLAUDE_MODEL: 'claude-3-haiku-20240307',
 }));
-vi.mock('@/services/designTemplates', () => ({
-    buildContentPrompt: vi.fn(() => 'prompt'),
-}));
 
-// We test the internal pure functions by importing the module
-// and calling callTemplateContent with mocked API
-import { callFromScratch, callAssetContext, callTemplateContent } from './autoDesignService';
+import { callFromScratch, callAssetContext } from './autoDesignService';
 import { callAnthropicApi } from '@/services/anthropicClient';
 
 describe('autoDesignService — callFromScratch', () => {
@@ -50,117 +48,6 @@ describe('autoDesignService — callAssetContext', () => {
     });
 });
 
-describe('autoDesignService — callTemplateContent', () => {
-    it('should return user-provided headline/cta directly without API call', async () => {
-        vi.mocked(callAnthropicApi).mockClear();
-        const result = await callTemplateContent(
-            'headline= "Summer Sale" cta= "Buy Now"', 300, 250, 'modern', new AbortController().signal,
-        );
-        expect(result.headline).toBe('Summer Sale');
-        expect(result.cta).toBe('Buy Now');
-    });
-
-    it('should sanitize junk headlines', async () => {
-        vi.mocked(callAnthropicApi).mockResolvedValue({
-            content: [{ type: 'text', text: '{"headline": "inter", "cta": "click here", "subheadline": "", "tag": ""}' }],
-        });
-        const result = await callTemplateContent('design a banner', 300, 250, 'modern', new AbortController().signal);
-        expect(result.headline).toBe('Get Started Today'); // "inter" is a junk value
-        expect(result.cta).toBe(''); // "click here" is junk → no forced CTA
-    });
-
-    it('should handle API returning markdown-wrapped JSON', async () => {
-        vi.mocked(callAnthropicApi).mockResolvedValue({
-            content: [{ type: 'text', text: '```json\n{"headline": "Big Deal", "cta": "Shop", "subheadline": "", "tag": ""}\n```' }],
-        });
-        const result = await callTemplateContent('sale', 300, 250, 'classic', new AbortController().signal);
-        expect(result.headline).toBe('Big Deal');
-    });
-
-    it('should fallback to defaults on JSON parse failure', async () => {
-        vi.mocked(callAnthropicApi).mockResolvedValue({
-            content: [{ type: 'text', text: 'not valid json at all' }],
-        });
-        const result = await callTemplateContent('anything', 300, 250, 'modern', new AbortController().signal);
-        expect(result.headline).toBe('Get Started Today');
-        expect(result.cta).toBe(''); // No forced CTA fallback
-    });
-
-    it('★ REGRESSION: should sanitize Korean junk CTA "버튼"', async () => {
-        vi.mocked(callAnthropicApi).mockResolvedValue({
-            content: [{ type: 'text', text: '{"headline": "아이폰 17 — 혁신의 시작", "cta": "버튼", "subheadline": "", "tag": ""}' }],
-        });
-        const result = await callTemplateContent('아이폰 17 광고', 300, 250, 'modern', new AbortController().signal, 'Korean');
-        expect(result.headline).toBe('아이폰 17 — 혁신의 시작');
-        // "버튼" is a Korean UI term, not a CTA → must be sanitized to ""
-        expect(result.cta).toBe('');
-    });
-
-    it('★ REGRESSION: should sanitize Korean junk subheadline "텍스트"', async () => {
-        vi.mocked(callAnthropicApi).mockResolvedValue({
-            content: [{ type: 'text', text: '{"headline": "Summer Sale", "cta": "Shop Now", "subheadline": "텍스트", "tag": "태그"}' }],
-        });
-        const result = await callTemplateContent('summer sale', 300, 250, 'modern', new AbortController().signal);
-        expect(result.subheadline).toBe(''); // "텍스트" is junk
-        expect(result.tag).toBe(''); // "태그" is junk
-    });
-
-    it('should NOT apply title case to Korean headlines', async () => {
-        vi.mocked(callAnthropicApi).mockResolvedValue({
-            content: [{ type: 'text', text: '{"headline": "혁신의 새로운 기준", "cta": "지금 주문하기", "subheadline": "", "tag": ""}' }],
-        });
-        const result = await callTemplateContent('아이폰 광고', 300, 250, 'modern', new AbortController().signal, 'Korean');
-        // Korean text should remain as-is (no Title Case transformation)
-        expect(result.headline).toBe('혁신의 새로운 기준');
-        expect(result.cta).toBe('지금 주문하기');
-    });
-
-    it('★ REGRESSION v732: should strip "text about" descriptive prefix', async () => {
-        vi.mocked(callAnthropicApi).mockResolvedValue({
-            content: [{ type: 'text', text: '{"headline": "text about discovering Mallorca", "cta": "Book Now", "subheadline": "", "tag": ""}' }],
-        });
-        const result = await callTemplateContent('Mallorca travel', 300, 250, 'modern', new AbortController().signal);
-        expect(result.headline).not.toContain('text about');
-        expect(result.headline).toBe('Discovering Mallorca');
-    });
-
-    it('★ REGRESSION v732: should strip "an ad for" prefix', async () => {
-        vi.mocked(callAnthropicApi).mockResolvedValue({
-            content: [{ type: 'text', text: '{"headline": "an ad for summer shoes", "cta": "Shop", "subheadline": "", "tag": ""}' }],
-        });
-        const result = await callTemplateContent('shoes', 300, 250, 'modern', new AbortController().signal);
-        expect(result.headline).not.toContain('an ad for');
-        expect(result.headline).toBe('Summer Shoes');
-    });
-
-    it('★ REGRESSION v732: should strip "about the" prefix', async () => {
-        vi.mocked(callAnthropicApi).mockResolvedValue({
-            content: [{ type: 'text', text: '{"headline": "about the new collection", "cta": "", "subheadline": "", "tag": ""}' }],
-        });
-        const result = await callTemplateContent('fashion', 300, 250, 'modern', new AbortController().signal);
-        expect(result.headline).toBe('New Collection');
-    });
-
-    it('★ REGRESSION v737: should detect prompt leakage "like Just Do It"', async () => {
-        vi.mocked(callAnthropicApi).mockResolvedValue({
-            content: [{ type: 'text', text: '{"headline": "like \\"Just Do It\\" or similar motivational Korean text", "cta": "Shop Now", "subheadline": "", "tag": ""}' }],
-        });
-        const result = await callTemplateContent('sports ad', 300, 250, 'modern', new AbortController().signal);
-        // Prompt leakage → must be replaced with fallback
-        expect(result.headline).toBe('Get Started Today');
-        expect(result.headline).not.toContain('like');
-        expect(result.headline).not.toContain('similar');
-    });
-
-    it('★ REGRESSION v737: should detect "placeholder text" leakage', async () => {
-        vi.mocked(callAnthropicApi).mockResolvedValue({
-            content: [{ type: 'text', text: '{"headline": "Something like a compelling headline", "cta": "", "subheadline": "sample text for subheadline", "tag": ""}' }],
-        });
-        const result = await callTemplateContent('tech ad', 300, 250, 'modern', new AbortController().signal);
-        expect(result.headline).toBe('Get Started Today');
-    });
-});
-
 // ══════════════════════════════════════════════════
 // ★ v732: Design quality — overlay + font diversity
 // ══════════════════════════════════════════════════
@@ -184,35 +71,58 @@ describe('★ v732: Overlay readability improvements', () => {
     });
 });
 
-describe('★ v732: Font diversity guard', () => {
-    const styleSrc = readFileSync(resolve(__dirname, './designStyleGuides.ts'), 'utf-8');
+describe('★ v744: Font codification (fontPairings.ts)', () => {
+    const fontSrc = readFileSync(resolve(__dirname, './fontPairings.ts'), 'utf-8');
 
-    it('★ REGRESSION: detects same-font pair and auto-replaces', () => {
-        expect(styleSrc).toContain('Font diversity guard');
-        expect(styleSrc).toContain('primaryFont === palette.typography.secondaryFont');
+    it('has mood-based font pair mapping', () => {
+        expect(fontSrc).toContain('MOOD_FONTS');
+        expect(fontSrc).toContain('elegant');
+        expect(fontSrc).toContain('Playfair Display');
     });
 
-    it('★ REGRESSION: has FONT_PAIRS lookup table', () => {
-        expect(styleSrc).toContain("'Inter': 'DM Sans'");
-        expect(styleSrc).toContain("'Playfair Display': 'DM Sans'");
+    it('has industry-based font pair mapping', () => {
+        expect(fontSrc).toContain('INDUSTRY_FONTS');
+        expect(fontSrc).toContain('tech');
+        expect(fontSrc).toContain('Space Grotesk');
     });
 
-    it('★ REGRESSION: default secondary font is DM Sans not Inter', () => {
-        expect(styleSrc).toContain("secondaryFont: parsed.fontSecondary || 'DM Sans'");
+    it('rejects system fonts (Arial, Helvetica, etc.)', () => {
+        expect(fontSrc).toContain('SYSTEM_FONTS');
+        expect(fontSrc).toContain('arial');
+        expect(fontSrc).toContain('helvetica');
+    });
+
+    it('enforces diversity — primary ≠ secondary', () => {
+        expect(fontSrc).toContain('primary === result.secondary');
     });
 });
 
-describe('★ v732: User color priority over brand palette', () => {
+describe('★ v744: Palette accepts brief hint', () => {
     const styleSrc = readFileSync(resolve(__dirname, './designStyleGuides.ts'), 'utf-8');
 
-    it('★ REGRESSION: user-specified colors override brand defaults', () => {
-        expect(styleSrc).toContain('User-specified colors ALWAYS override brand defaults');
+    it('accepts briefHint parameter', () => {
+        expect(styleSrc).toContain('briefHint?: BriefHint');
     });
 
-    it('★ REGRESSION: user color is Rule 1, brand is Rule 2', () => {
-        // User color mention should be checked BEFORE brand recognition
-        const rule1Idx = styleSrc.indexOf('1. If the prompt mentions a specific COLOR');
-        const rule2Idx = styleSrc.indexOf('2. If the prompt mentions a KNOWN BRAND');
-        expect(rule1Idx).toBeLessThan(rule2Idx);
+    it('pipes mood/industry into user message', () => {
+        expect(styleSrc).toContain('Pre-analyzed: mood=');
+    });
+
+    it('uses selectFontPair for codified font selection', () => {
+        expect(styleSrc).toContain('selectFontPair');
+    });
+
+    it('has deterministic CTA style based on mood', () => {
+        expect(styleSrc).toContain("'elegant', 'luxurious', 'minimal'");
+        expect(styleSrc).toContain("'outlined'");
+    });
+
+    it('★ REGRESSION: user-specified colors override brand defaults', () => {
+        expect(styleSrc).toContain('User-specified colors ALWAYS win');
+    });
+
+    it('uses prompt caching', () => {
+        expect(styleSrc).toContain('cache_control');
+        expect(styleSrc).toContain('ephemeral');
     });
 });
