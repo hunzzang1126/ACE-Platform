@@ -1,9 +1,5 @@
-// ─────────────────────────────────────────────────
 // agentGenerateFlow — AI Design Generation Pipeline
-// ─────────────────────────────────────────────────
-// Phases: Canvas Scan → Brand Cloud → Copywriting →
-// Color Palette → BG Image → Carbon Layout → Render
-// ─────────────────────────────────────────────────
+// ★ v747: Image-First — BG image → color extraction → palette → layout
 
 import type { AgentFlowCallbacks, FlowEngine } from './agentFlowTypes';
 import { resilientImport } from '@/utils/resilientImport';
@@ -89,22 +85,69 @@ export async function executeGenerateFlow(
     cb.narrate(`Copy ready: "${brief.headline}" — ${brief.slots.length} content slots`);
     await pause(400);
 
-    // ── Phase 3: Color Palette + Template Selection ──
-    const { guide, designStrategy, aiTemplateId, backgroundImagePrompt, finalNeedsImage } =
-        await runPalettePhase(prompt, brief, brand, abort.signal, cb);
-    await pause(400);
-
-    // ── Phase 4: Background Image FIRST (★ v737: image before template) ──
-    // Must know where the subject is BEFORE picking a template layout.
+    // ── Phase 3: Background Image FIRST (★ v747: Image-First pipeline) ──
+    // Generate image BEFORE palette so colors can be derived from actual image.
     let bgResult: { hasImage: boolean; url: string | null };
+    let backgroundImagePrompt: string | undefined;
+
+    // Decide if we need an image (deterministic + AI hybrid)
+    const { decideBackgroundImage } = await resilientImport(() => import('@/services/backgroundImageDecider'));
+    const codeDecision = decideBackgroundImage(prompt);
+
     if (brand.selectedAssets?.background) {
+        // Brand asset takes priority
         bgResult = { hasImage: true, url: brand.selectedAssets.background.asset.src };
         cb.narrate(`Using brand background: ${brand.selectedAssets.background.reasoning}`);
         cb.addCard('bg-image', 'Brand background', 'done', {
             expandedDetail: `Brand asset: "${brand.selectedAssets.background.asset.name}"\n${brand.selectedAssets.background.reasoning}`,
         });
+    } else if (codeDecision.confidence === 'high' && codeDecision.needsImage) {
+        // User explicitly requested image — generate with minimal palette (dark default)
+        const dummyGuide = { colors: { accent: '#3b82f6', background: '#0B0F1A', gradientEnd: '#1a2e4a' } };
+        backgroundImagePrompt = prompt; // Will be enhanced by generateBgImage
+        bgResult = await generateBgImage(true, prompt, prompt, canvasW, canvasH, dummyGuide, abort, cb);
     } else {
-        bgResult = await generateBgImage(finalNeedsImage, backgroundImagePrompt, prompt, canvasW, canvasH, guide, abort, cb);
+        // Let AI palette phase decide (it returns needsBackgroundImage)
+        bgResult = { hasImage: false, url: null };
+    }
+    await pause(300);
+
+    // ── Phase 3.5: Extract colors from generated image (★ v747) ──
+    let imageColors: import('@/services/imageColorExtractor').ExtractedColors | undefined;
+    if (bgResult.hasImage && bgResult.url) {
+        try {
+            const { extractColorsFromImage } = await resilientImport(() => import('@/services/imageColorExtractor'));
+            imageColors = await extractColorsFromImage(bgResult.url);
+            cb.narrate(`Image colors extracted: dominant ${imageColors.dominant}, ${imageColors.warmth} tone`);
+            cb.addCard('img-colors', 'Extracting image colors', 'done', {
+                expandedDetail: `Dominant: ${imageColors.dominant}\nPalette: ${imageColors.palette.join(', ')}\nLuminance: ${imageColors.avgLuminance.toFixed(2)}\nWarmth: ${imageColors.warmth}\nSuggested text: ${imageColors.suggestedText}\nSuggested accent: ${imageColors.suggestedAccent}`,
+            });
+        } catch (err) {
+            console.warn('[Pipeline] Image color extraction failed (using AI palette):', err);
+        }
+    }
+
+    // ── Phase 4: Color Palette (★ v747: uses extracted image colors when available) ──
+    const paletteResult =
+        await runPalettePhase(prompt, brief, brand, abort.signal, cb, imageColors);
+    const { guide, designStrategy, aiTemplateId } = paletteResult;
+
+    // ★ v747: If palette says we need an image and we haven't generated one yet
+    if (!bgResult.hasImage && paletteResult.needsBackgroundImage && paletteResult.backgroundImagePrompt) {
+        backgroundImagePrompt = paletteResult.backgroundImagePrompt;
+        bgResult = await generateBgImage(true, backgroundImagePrompt, prompt, canvasW, canvasH, guide, abort, cb);
+        // Extract colors from the newly generated image and apply to guide
+        if (bgResult.hasImage && bgResult.url) {
+            try {
+                const { extractColorsFromImage } = await resilientImport(() => import('@/services/imageColorExtractor'));
+                imageColors = await extractColorsFromImage(bgResult.url);
+                guide.colors.gradientStart = imageColors.palette[0] ?? guide.colors.gradientStart;
+                guide.colors.gradientEnd = imageColors.palette[1] ?? guide.colors.gradientEnd;
+                guide.colors.background = imageColors.dominant;
+                guide.colors.foreground = imageColors.suggestedText;
+                cb.narrate(`Image colors applied: ${imageColors.dominant} (${imageColors.warmth})`);
+            } catch { /* best-effort */ }
+        }
     }
     await pause(300);
 
@@ -113,7 +156,7 @@ export async function executeGenerateFlow(
     if (bgResult.hasImage) {
         try {
             const { analyzeImageComposition } = await resilientImport(() => import('@/services/imageComposition'));
-            imageComposition = analyzeImageComposition(backgroundImagePrompt ?? '', prompt);
+            imageComposition = analyzeImageComposition(backgroundImagePrompt ?? prompt, prompt);
             cb.narrate(`Image composition: subject ${imageComposition.subjectZone}, safe text zone: ${imageComposition.safeTextZone}`);
         } catch { /* best-effort */ }
     }
@@ -132,13 +175,7 @@ export async function executeGenerateFlow(
     cb.updateCard('finalize', 'done', `${rendered} elements · Design complete`);
     cb.narrate(`Design finalized with ${rendered} elements. Style: ${guide.name}, Layout: Carbon Design System.`);
 
-    // ── Phase 6.5: Vision QA — REMOVED (v706) ──
-    // Rationale: Vision QA was producing false positives because:
-    //   1. It renders via resolveConstraints() → Canvas2D (different from actual Fabric.js canvas)
-    //   2. Text positioning differs → AI sees "clipping" that doesn't exist on real canvas
-    //   3. Costs tokens on EVERY generation with zero corrective action
-    //   4. We already have deterministic layoutValidator.ts that catches real issues
-    // If re-enabled in future: must use the SAME renderer as the actual canvas.
+
 
     // ── Phase 7: Save to AI Memory ──
     // Records this design in Supabase ai_memory for cross-session learning

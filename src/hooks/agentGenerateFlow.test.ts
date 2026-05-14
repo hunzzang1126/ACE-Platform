@@ -216,20 +216,24 @@ describe('reference-size scaling — math verification', () => {
 // Source: pipeline completeness checks
 // ══════════════════════════════════════════════════
 describe('agentGenerateFlow — pipeline completeness', () => {
-    it('Phase 3: generates color palette (extracted to agentFlowPalette)', () => {
-        // ★ v745: Phase 3 extracted to agentFlowPalette.ts
+    it('Phase 3: background image BEFORE palette (Image-First)', () => {
+        // ★ v747: Image-First — BG image is generated before palette
+        const phase3Idx = src.indexOf('Phase 3');
+        const bgImageIdx = src.indexOf('generateBgImage');
+        const paletteIdx = src.indexOf('runPalettePhase');
+        expect(phase3Idx).toBeGreaterThan(-1);
+        expect(bgImageIdx).toBeLessThan(paletteIdx);
+    });
+
+    it('Phase 3.5: extracts colors from generated image', () => {
+        expect(src).toContain('extractColorsFromImage');
+        expect(src).toContain('imageColorExtractor');
+    });
+
+    it('Phase 4: palette uses extracted image colors', () => {
         expect(src).toContain('runPalettePhase');
-        expect(paletteSrc).toContain('generateColorPalette');
-        expect(src).toContain('Phase 3');
-    });
-
-    it('Phase 4: palette module uses AI for colors', () => {
-        expect(paletteSrc).toContain('generateColorPalette');
-    });
-
-    it('Phase 4.5: generates background image when needed', () => {
-        expect(src).toContain('generateBgImage');
-        expect(paletteSrc).toContain('finalNeedsImage');
+        expect(src).toContain('imageColors');
+        expect(paletteSrc).toContain('imageColors?: ExtractedColors');
     });
 
     it('Phase 5: renders elements in layered passes', () => {
@@ -413,5 +417,53 @@ describe('★ REGRESSION: Template-based content injection (v734)', () => {
         expect(helpersSrc).toContain('Removing unused slot');
         // Shape elements tied to removed roles also get removed
         expect(helpersSrc).toContain('Removing CTA shape');
+    });
+});
+
+// ══════════════════════════════════════════════════
+// ★ v747: Image-First Pipeline Regression Guards
+// ══════════════════════════════════════════════════
+describe('★ v747: Image-First pipeline order', () => {
+    it('★ REGRESSION: generateBgImage appears BEFORE runPalettePhase in source', () => {
+        const bgImageIdx = src.indexOf('generateBgImage');
+        const paletteIdx = src.indexOf('runPalettePhase');
+        expect(bgImageIdx).toBeGreaterThan(-1);
+        expect(paletteIdx).toBeGreaterThan(-1);
+        expect(bgImageIdx).toBeLessThan(paletteIdx);
+    });
+
+    it('★ REGRESSION: extractColorsFromImage appears BEFORE runPalettePhase call', () => {
+        const extractIdx = src.indexOf('extractColorsFromImage');
+        const paletteIdx = src.indexOf('await runPalettePhase(');
+        expect(extractIdx).toBeGreaterThan(-1);
+        expect(extractIdx).toBeLessThan(paletteIdx);
+    });
+
+    it('★ REGRESSION: palette phase receives imageColors parameter', () => {
+        expect(paletteSrc).toContain('imageColors?: ExtractedColors');
+        expect(paletteSrc).toContain('imageColors');
+    });
+
+    it('★ REGRESSION: palette overrides colors when imageColors provided', () => {
+        expect(paletteSrc).toContain('Image-First palette override');
+        expect(paletteSrc).toContain('guide.colors.background = imageColors.dominant');
+        expect(paletteSrc).toContain('guide.colors.foreground = imageColors.suggestedText');
+    });
+
+    it('★ REGRESSION: uses decideBackgroundImage before palette call', () => {
+        const decideIdx = src.indexOf('decideBackgroundImage');
+        const paletteIdx = src.indexOf('await runPalettePhase(');
+        expect(decideIdx).toBeGreaterThan(-1);
+        expect(decideIdx).toBeLessThan(paletteIdx);
+    });
+
+    it('★ REGRESSION: fallback path generates image after palette if needed', () => {
+        expect(src).toContain('paletteResult.needsBackgroundImage');
+        expect(src).toContain('paletteResult.backgroundImagePrompt');
+    });
+
+    it('★ REGRESSION: PaletteResult includes backgroundImagePrompt', () => {
+        expect(paletteSrc).toContain('backgroundImagePrompt: string');
+        expect(paletteSrc).toContain('needsBackgroundImage: boolean');
     });
 });
