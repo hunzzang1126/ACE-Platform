@@ -11,6 +11,7 @@ import { renderElement, buildElementDetail } from './agentFlowRender';
 import { scanBrandCloud, recalcTextHeights, autoCreateSubheadline } from './agentFlowHelpers';
 import { hexLuminance, averageLuminance } from './contrastHelpers';
 import { generateBgImage, selectCompositionAwareTemplate } from './agentFlowImageHelpers';
+import { runPalettePhase } from './agentFlowPalette';
 
 /** Execute the full design generation pipeline */
 export async function executeGenerateFlow(
@@ -89,39 +90,8 @@ export async function executeGenerateFlow(
     await pause(400);
 
     // ── Phase 3: Color Palette + Template Selection ──
-    cb.narrate('Determining the perfect color palette and selecting template...');
-    cb.addCard('palette', 'Determining color palette', 'running');
-
-    // ★ v734: Build template catalog from Supabase store for AI selection
-    let templateCatalog: Array<{ id: string; name: string; description: string; tags: string[]; category: string }> = [];
-    try {
-        const { useTemplateStore } = await resilientImport(() => import('@/stores/templateStore'));
-        const allTemplates = useTemplateStore.getState().templates ?? [];
-        templateCatalog = allTemplates.map(t => ({
-            id: t.id, name: t.name, description: t.description,
-            tags: t.tags ?? [], category: t.category ?? 'display',
-        }));
-        console.log(`[Pipeline] Template catalog: ${templateCatalog.length} templates available for AI selection`);
-    } catch { /* fallback: empty catalog → AI won't pick, keyword matching will */ }
-
-    const { generateColorPalette } = await resilientImport(() => import('@/services/designStyleGuides'));
-    const colorPrompt = brand.paletteHint ? `${prompt}\n\n[BRAND PALETTE — Reference Only]\n${brand.paletteHint}\nUse brand colors as a STARTING POINT, but if the user's prompt explicitly requests a different color (e.g., "blue CTA", "make it green", "파란색"), the user's color ALWAYS wins.` : prompt;
-    // ★ v744: Pipe brief metadata → palette (eliminates re-analysis of mood/industry)
-    const briefHint = { mood: brief.mood, industry: brief.industry, slots: brief.slots, textDensity: brief.textDensity };
-    const { palette: guide, reasoning: colorReasoning, needsBackgroundImage: aiNeedsImage, backgroundImagePrompt, designStrategy, templateId: aiTemplateId } = await generateColorPalette(colorPrompt, abort.signal, templateCatalog, briefHint);
-
-    // ★ Code-first image decision: deterministic for 80% of cases, AI only for ambiguous.
-    const { decideBackgroundImage } = await resilientImport(() => import('@/services/backgroundImageDecider'));
-    const codeDecision = decideBackgroundImage(prompt);
-    const finalNeedsImage = codeDecision.confidence === 'high' ? codeDecision.needsImage : aiNeedsImage;
-    const imageSource = codeDecision.confidence === 'high' ? `Code: ${codeDecision.reason}` : `AI: ${aiNeedsImage ? 'yes' : 'no'}`;
-    console.log(`[Pipeline] Image decision: ${finalNeedsImage} (${imageSource})`);
-
-    cb.updateCard('palette', 'done', guide.name, {
-        reasoning: colorReasoning,
-        expandedDetail: [`Background: ${guide.colors.gradientStart} -> ${guide.colors.gradientEnd}`, `Accent: ${guide.colors.accent}`, `Text: ${guide.colors.foreground}`, `Font: ${guide.typography.primaryFont} / ${guide.typography.secondaryFont}`, `Overlay: ${designStrategy.overlayApproach} | CTA: ${designStrategy.ctaStyle}`, `Template: ${aiTemplateId ?? 'auto'}`, finalNeedsImage ? `Background Image: YES (${imageSource})` : `Background Image: NO (${imageSource})`].join('\n'),
-    });
-    cb.narrate(colorReasoning || `Color palette: ${guide.name}`);
+    const { guide, designStrategy, aiTemplateId, backgroundImagePrompt, finalNeedsImage } =
+        await runPalettePhase(prompt, brief, brand, abort.signal, cb);
     await pause(400);
 
     // ── Phase 4: Background Image FIRST (★ v737: image before template) ──

@@ -113,8 +113,10 @@ describe('★ v744: Palette accepts brief hint', () => {
     });
 
     it('has deterministic CTA style based on mood', () => {
-        expect(styleSrc).toContain("'elegant', 'luxurious', 'minimal'");
+        expect(styleSrc).toContain("'elegant', 'luxurious'");
         expect(styleSrc).toContain("'outlined'");
+        expect(styleSrc).toContain("'minimal', 'clean'");
+        expect(styleSrc).toContain("'text-arrow'");
     });
 
     it('★ REGRESSION: user-specified colors override brand defaults', () => {
@@ -124,5 +126,53 @@ describe('★ v744: Palette accepts brief hint', () => {
     it('uses prompt caching', () => {
         expect(styleSrc).toContain('cache_control');
         expect(styleSrc).toContain('ephemeral');
+    });
+});
+
+describe('★ v745: Hex color validation', () => {
+    const styleSrc = readFileSync(resolve(__dirname, './designStyleGuides.ts'), 'utf-8');
+
+    it('has hex validation regex', () => {
+        expect(styleSrc).toContain('HEX_RE');
+        expect(styleSrc).toContain('#[0-9a-fA-F]{6}');
+    });
+
+    it('applies hex() validator to all palette color fields', () => {
+        expect(styleSrc).toContain('hex(parsed.background');
+        expect(styleSrc).toContain('hex(parsed.accent');
+        expect(styleSrc).toContain('hex(parsed.foreground');
+    });
+
+    it('passes prompt as contentHint for CJK detection', () => {
+        expect(styleSrc).toContain('prompt, // ★ v745: CJK detection from user prompt');
+    });
+});
+
+describe('★ v745: Slot-aware template selection', () => {
+    const helperSrc = readFileSync(resolve(__dirname, '../hooks/agentFlowHelpers.ts'), 'utf-8');
+
+    it('selectTemplate accepts brief parameter', () => {
+        expect(helperSrc).toContain("brief?: import('@/services/designBrief').DesignBrief");
+    });
+
+    it('scores by mood/industry tags', () => {
+        expect(helperSrc).toContain('brief.mood');
+        expect(helperSrc).toContain('brief.industry');
+    });
+
+    it('penalizes slot-count mismatch', () => {
+        expect(helperSrc).toContain('slotCount <= 2');
+        expect(helperSrc).toContain('tmplElementCount');
+    });
+
+    it('has headlineLines-aware font sizing', () => {
+        expect(helperSrc).toContain('headlineLines');
+        expect(helperSrc).toContain('lineScale');
+    });
+
+    it('applies textHierarchy opacity', () => {
+        expect(helperSrc).toContain('textHierarchy');
+        expect(helperSrc).toContain('headlineOpacity');
+        expect(helperSrc).toContain('subheadlineOpacity');
     });
 });

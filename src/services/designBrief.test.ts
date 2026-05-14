@@ -156,3 +156,37 @@ describe('designBrief — fallback safety', () => {
         expect(src).toContain("slots.push('subheadline')");
     });
 });
+
+describe('★ v745: sanitizeBrief — full sanitization pipeline', () => {
+    it('has PROMPT_LEAKAGE detection', () => {
+        expect(src).toContain('PROMPT_LEAKAGE_RE');
+        expect(src).toContain('placeholder text');
+        expect(src).toContain('sample');
+    });
+
+    it('has DESCRIPTIVE_PREFIX stripping', () => {
+        expect(src).toContain('DESCRIPTIVE_PREFIX_RE');
+        expect(src).toContain('text about');
+        expect(src).toContain('ad copy');
+    });
+
+    it('has FONT_NAMES rejection', () => {
+        expect(src).toContain('FONT_NAMES_RE');
+        expect(src).toContain('inter');
+        expect(src).toContain('roboto');
+    });
+
+    it('has title case conversion for Latin', () => {
+        expect(src).toContain('toTitleCase');
+        expect(src).toContain('isLatinOnly');
+    });
+
+    it('has Korean CTA term rejection', () => {
+        expect(src).toContain('텍스트');
+        expect(src).toContain('라벨');
+    });
+
+    it('★ REGRESSION: has prompt caching on brief system prompt', () => {
+        expect(src).toContain("cache_control: { type: 'ephemeral'");
+    });
+});

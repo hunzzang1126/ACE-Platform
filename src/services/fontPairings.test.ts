@@ -73,3 +73,43 @@ describe('fontPairings — selectFontPair', () => {
         expect(pair.primary).toBe('Fraunces');
     });
 });
+
+describe('fontPairings — CJK font selection', () => {
+    it('detects Korean text and returns Korean font pair', () => {
+        const pair = selectFontPair('general', 'general', undefined, '아이폰 17 광고');
+        expect(pair.primary).toBe('Noto Sans KR');
+    });
+
+    it('uses elegant Korean pair for elegant mood', () => {
+        const pair = selectFontPair('elegant', 'general', undefined, '럭셔리 브랜드');
+        expect(pair.primary).toBe('Noto Serif KR');
+        expect(pair.secondary).toBe('Noto Sans KR');
+    });
+
+    it('uses bold Korean pair for bold mood', () => {
+        const pair = selectFontPair('bold', 'general', undefined, '세일 50%');
+        expect(pair.primary).toBe('Black Han Sans');
+        expect(pair.secondary).toBe('Noto Sans KR');
+    });
+
+    it('uses fun Korean pair for fun mood', () => {
+        const pair = selectFontPair('fun', 'general', undefined, '맛있는 음식');
+        expect(pair.primary).toBe('Jua');
+    });
+
+    it('does NOT use Korean fonts for English text', () => {
+        const pair = selectFontPair('elegant', 'general', undefined, 'Luxury Brand Sale');
+        expect(pair.primary).toBe('Playfair Display');
+        expect(pair.primary).not.toContain('KR');
+    });
+
+    it('detects Chinese characters as CJK', () => {
+        const pair = selectFontPair('general', 'general', undefined, '新品上市');
+        expect(pair.primary).toContain('KR'); // Uses Korean font for all CJK
+    });
+
+    it('ignores contentHint if undefined', () => {
+        const pair = selectFontPair('general', 'general');
+        expect(pair.primary).toBe('Montserrat'); // default, not Korean
+    });
+});

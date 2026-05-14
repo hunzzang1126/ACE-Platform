@@ -11,6 +11,7 @@ import { resolve } from 'path';
 
 const src = readFileSync(resolve(__dirname, './agentGenerateFlow.ts'), 'utf-8');
 const renderSrc = readFileSync(resolve(__dirname, './agentFlowRender.ts'), 'utf-8');
+const paletteSrc = readFileSync(resolve(__dirname, './agentFlowPalette.ts'), 'utf-8');
 
 describe('agentGenerateFlow — export', () => {
     it('exports executeGenerateFlow async function', () => {
@@ -109,8 +110,9 @@ describe('★ REGRESSION: Template-first pipeline (Carbon removed v734)', () => 
     });
 
     it('builds template catalog from Supabase store for AI selection', () => {
-        expect(src).toContain('templateCatalog');
-        expect(src).toContain('useTemplateStore');
+        // ★ v745: Catalog building extracted to agentFlowPalette.ts
+        expect(paletteSrc).toContain('templateCatalog');
+        expect(paletteSrc).toContain('useTemplateStore');
     });
 
     it('passes aiTemplateId to selectTemplate', () => {
@@ -214,19 +216,20 @@ describe('reference-size scaling — math verification', () => {
 // Source: pipeline completeness checks
 // ══════════════════════════════════════════════════
 describe('agentGenerateFlow — pipeline completeness', () => {
-    it('Phase 3: generates color palette (template selection removed)', () => {
-        expect(src).toContain('generateColorPalette');
-        // Template selection no longer in main flow — Carbon handles layout
-        expect(src).toContain('Color Palette');
+    it('Phase 3: generates color palette (extracted to agentFlowPalette)', () => {
+        // ★ v745: Phase 3 extracted to agentFlowPalette.ts
+        expect(src).toContain('runPalettePhase');
+        expect(paletteSrc).toContain('generateColorPalette');
+        expect(src).toContain('Phase 3');
     });
 
-    it('Phase 4: generates color palette via AI', () => {
-        expect(src).toContain('generateColorPalette');
+    it('Phase 4: palette module uses AI for colors', () => {
+        expect(paletteSrc).toContain('generateColorPalette');
     });
 
     it('Phase 4.5: generates background image when needed', () => {
         expect(src).toContain('generateBgImage');
-        expect(src).toContain('needsBackgroundImage');
+        expect(paletteSrc).toContain('finalNeedsImage');
     });
 
     it('Phase 5: renders elements in layered passes', () => {

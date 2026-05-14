@@ -48,6 +48,29 @@ const INDUSTRY_FONTS: Record<string, FontPair> = {
     music:         { primary: 'Anton', secondary: 'Inter' },
 };
 
+// ── CJK font pairs (Korean/Chinese/Japanese) ─────
+// ★ v745: When content language is CJK, use CJK-optimized Google Fonts.
+// Pairing rule: CJK headline font + CJK body font for proper glyph coverage.
+
+const CJK_MOOD_FONTS: Record<string, FontPair> = {
+    elegant:    { primary: 'Noto Serif KR', secondary: 'Noto Sans KR' },
+    luxurious:  { primary: 'Noto Serif KR', secondary: 'Noto Sans KR' },
+    bold:       { primary: 'Black Han Sans', secondary: 'Noto Sans KR' },
+    minimal:    { primary: 'Noto Sans KR', secondary: 'Noto Sans KR' },
+    fun:        { primary: 'Jua', secondary: 'Noto Sans KR' },
+    warm:       { primary: 'Nanum Myeongjo', secondary: 'Noto Sans KR' },
+    urgent:     { primary: 'Black Han Sans', secondary: 'Noto Sans KR' },
+    dramatic:   { primary: 'Black Han Sans', secondary: 'Noto Sans KR' },
+    clean:      { primary: 'Noto Sans KR', secondary: 'Noto Sans KR' },
+    premium:    { primary: 'Noto Serif KR', secondary: 'Noto Sans KR' },
+    general:    { primary: 'Noto Sans KR', secondary: 'Noto Sans KR' },
+};
+
+/** Detect if text contains CJK characters */
+function hasCJK(text: string): boolean {
+    return /[\u3000-\u9FFF\uAC00-\uD7AF\uF900-\uFAFF]/.test(text);
+}
+
 // ── Diversity guard — never return same font for both ─
 
 const FALLBACK_PAIRS: Record<string, string> = {
@@ -61,15 +84,29 @@ const FALLBACK_PAIRS: Record<string, string> = {
 };
 
 /**
- * Select a font pair based on mood and industry.
- * Priority: mood match > industry match > general default.
+ * Select a font pair based on mood, industry, and content language.
+ * Priority: CJK override > mood match > industry match > general default.
  * AI hint is used ONLY if it's a valid Google Font not already in our map.
+ * ★ v745: contentHint allows CJK detection from headline text.
  */
 export function selectFontPair(
     mood: string,
     industry: string,
     aiHint?: { primary?: string; secondary?: string },
+    contentHint?: string,
 ): FontPair {
+    // 0. CJK detection — if content contains Korean/Chinese/Japanese, use CJK fonts
+    const isCJK = contentHint ? hasCJK(contentHint) : false;
+    if (isCJK) {
+        const cjkPair = CJK_MOOD_FONTS[mood] ?? CJK_MOOD_FONTS.general!;
+        console.log(`[FontPair] CJK detected → ${cjkPair.primary} / ${cjkPair.secondary}`);
+        // Diversity guard for CJK
+        if (cjkPair.primary === cjkPair.secondary && mood !== 'minimal' && mood !== 'clean') {
+            return { primary: cjkPair.primary, secondary: 'Noto Sans KR' };
+        }
+        return { ...cjkPair };
+    }
+
     // 1. Try mood-based selection (most specific)
     let pair = MOOD_FONTS[mood];
 

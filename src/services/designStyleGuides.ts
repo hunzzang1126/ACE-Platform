@@ -195,7 +195,6 @@ Return JSON:
   "foreground": "#hex", "secondary": "#hex",
   "accent": "#hex", "accentForeground": "#hex",
   "gradientStart": "#hex", "gradientEnd": "#hex", "gradientAngle": number,
-  "fontPrimary": "headline font hint", "fontSecondary": "body font hint",
   "radius": 0-12,
   "reasoning": "1 sentence",
   "needsBackgroundImage": true/false,
@@ -219,12 +218,18 @@ Return JSON:
 
         const parsed = JSON.parse(raw) as AiColorResponse;
 
-        // ★ v744: Font selection — codified, AI is just a hint
+        // ★ v745: Font selection — codified, AI is just a hint. CJK-aware.
         const fontPair = selectFontPair(
             briefHint?.mood ?? 'general',
             briefHint?.industry ?? 'general',
             { primary: parsed.fontPrimary, secondary: parsed.fontSecondary },
+            prompt, // ★ v745: CJK detection from user prompt
         );
+
+        // ★ v745: Validate hex colors — reject malformed AI output
+        const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+        const hex = (val: string | undefined, fallback: string): string =>
+            val && HEX_RE.test(val) ? val : fallback;
 
         // Build palette from AI response, filling gaps with defaults
         const palette: DesignStyleGuide = {
@@ -234,17 +239,17 @@ Return JSON:
             description: parsed.reasoning || '',
             colors: {
                 ...DEFAULT_PALETTE.colors,
-                background: parsed.background || DEFAULT_PALETTE.colors.background,
-                surface: parsed.surface || DEFAULT_PALETTE.colors.surface,
-                border: darken(parsed.surface || DEFAULT_PALETTE.colors.surface, 0.3),
-                foreground: parsed.foreground || DEFAULT_PALETTE.colors.foreground,
-                secondary: parsed.secondary || DEFAULT_PALETTE.colors.secondary,
-                tertiary: lighten(parsed.secondary || DEFAULT_PALETTE.colors.secondary, 0.2),
-                muted: darken(parsed.secondary || DEFAULT_PALETTE.colors.secondary, 0.3),
-                accent: parsed.accent || DEFAULT_PALETTE.colors.accent,
-                accentForeground: parsed.accentForeground || DEFAULT_PALETTE.colors.accentForeground,
-                gradientStart: parsed.gradientStart || parsed.background || DEFAULT_PALETTE.colors.gradientStart,
-                gradientEnd: parsed.gradientEnd || DEFAULT_PALETTE.colors.gradientEnd,
+                background: hex(parsed.background, DEFAULT_PALETTE.colors.background),
+                surface: hex(parsed.surface, DEFAULT_PALETTE.colors.surface),
+                border: darken(hex(parsed.surface, DEFAULT_PALETTE.colors.surface), 0.3),
+                foreground: hex(parsed.foreground, DEFAULT_PALETTE.colors.foreground),
+                secondary: hex(parsed.secondary, DEFAULT_PALETTE.colors.secondary),
+                tertiary: lighten(hex(parsed.secondary, DEFAULT_PALETTE.colors.secondary), 0.2),
+                muted: darken(hex(parsed.secondary, DEFAULT_PALETTE.colors.secondary), 0.3),
+                accent: hex(parsed.accent, DEFAULT_PALETTE.colors.accent),
+                accentForeground: hex(parsed.accentForeground, DEFAULT_PALETTE.colors.accentForeground),
+                gradientStart: hex(parsed.gradientStart, hex(parsed.background, DEFAULT_PALETTE.colors.gradientStart)),
+                gradientEnd: hex(parsed.gradientEnd, DEFAULT_PALETTE.colors.gradientEnd),
                 gradientAngle: parsed.gradientAngle ?? 135,
             },
             typography: {
@@ -256,11 +261,9 @@ Return JSON:
         };
         console.log(`[ColorPalette] Fonts: ${fontPair.primary} / ${fontPair.secondary} (mood=${briefHint?.mood}, AI hint=${parsed.fontPrimary}/${parsed.fontSecondary})`);
 
-        // ★ v744: Design strategy = DETERMINISTIC (code decides, not AI)
-        // overlayApproach and imageFilters depend on whether there's a bg image,
-        // which we don't know yet — use sensible defaults that downstream can override.
+        // ★ v745: Design strategy = DETERMINISTIC (code decides, not AI)
         const mood = briefHint?.mood ?? 'general';
-        const ctaStyle = (['elegant', 'luxurious', 'minimal'].includes(mood) ? 'outlined'
+        const ctaStyle = (['elegant', 'luxurious'].includes(mood) ? 'outlined'
             : ['bold', 'intense', 'urgent'].includes(mood) ? 'solid'
             : ['minimal', 'clean'].includes(mood) ? 'text-arrow'
             : 'pill') as import('@/services/designStrategy').CtaStyle;
@@ -291,7 +294,7 @@ Return JSON:
         return { palette, reasoning: parsed.reasoning || '', needsBackgroundImage: !!parsed.needsBackgroundImage, backgroundImagePrompt: parsed.backgroundImagePrompt || '', designStrategy, templateId: aiTemplateId };
     } catch (err) {
         console.warn('[ColorPalette] AI generation failed, using default:', err);
-        const fontPair = selectFontPair(briefHint?.mood ?? 'general', briefHint?.industry ?? 'general');
+        const fontPair = selectFontPair(briefHint?.mood ?? 'general', briefHint?.industry ?? 'general', undefined, prompt);
         const fallback = { ...DEFAULT_PALETTE, typography: { ...DEFAULT_PALETTE.typography, primaryFont: fontPair.primary, secondaryFont: fontPair.secondary } };
         return { palette: fallback, reasoning: 'Using default palette (AI unavailable)', needsBackgroundImage: false, backgroundImagePrompt: '', designStrategy: { ...DEFAULT_STRATEGY }, templateId: null };
     }

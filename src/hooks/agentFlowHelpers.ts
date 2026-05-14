@@ -7,6 +7,7 @@
 import type { AgentFlowCallbacks } from './agentFlowTypes';
 import { resilientImport } from '@/utils/resilientImport';
 import type { AssetSelection } from '@/services/brandAssetSelector';
+import { applyHarmonyColors } from './agentColorRecolorHarmony';
 
 // ★ v739: Text layout extracted to agentTextLayout.ts — re-export for backward compat
 export { recalcTextHeights, autoCreateSubheadline } from './agentTextLayout';
@@ -115,7 +116,12 @@ export async function scanBrandCloud(
     return result;
 }
 
-export async function selectTemplate(prompt: string, canvasW: number, canvasH: number, _brandVisionBlocks: any[], _abort: AbortController, cb: AgentFlowCallbacks, aiTemplateId?: string | null) {
+export async function selectTemplate(
+    prompt: string, canvasW: number, canvasH: number,
+    _brandVisionBlocks: any[], _abort: AbortController,
+    cb: AgentFlowCallbacks, aiTemplateId?: string | null,
+    brief?: import('@/services/designBrief').DesignBrief,
+) {
     cb.narrate(`Selecting layout template for ${canvasW}×${canvasH}...`);
     cb.addCard('structure', 'Selecting layout template', 'running');
 
@@ -139,9 +145,10 @@ export async function selectTemplate(prompt: string, canvasW: number, canvasH: n
         console.warn(`[selectTemplate] AI-chosen template "${aiTemplateId}" not found in store, falling back to keyword match`);
     }
 
-    // ★ Fallback: keyword matching
+    // ★ v745: Slot-aware + mood/industry + keyword matching
     const promptLower = prompt.toLowerCase();
     const promptWords = promptLower.split(/\s+/);
+    const slotCount = brief?.slots.length ?? 4;
 
     let bestTemplate = allTemplates[0]!;
     let bestScore = 0;
@@ -151,23 +158,40 @@ export async function selectTemplate(prompt: string, canvasW: number, canvasH: n
         const descWords = (tmpl.description || '').toLowerCase().split(/[\s\-_]+/);
         const allWords = [...nameWords, ...descWords];
         let score = 0;
+
+        // Keyword matching
         for (const word of allWords) {
             if (word.length < 3) continue;
             if (promptLower.includes(word)) score += 2;
             if (promptWords.some(pw => pw.includes(word) || word.includes(pw))) score += 1;
         }
         const tags = (tmpl as any).tags ?? [];
-        for (const tag of tags) {
-            if (promptLower.includes(tag.toLowerCase())) score += 3;
+        for (const tag of tags) { if (promptLower.includes(tag.toLowerCase())) score += 3; }
+
+        // ★ v745: Mood/Industry tag matching
+        if (brief) {
+            for (const tag of tags) {
+                const tl = tag.toLowerCase();
+                if (tl === brief.mood) score += 5;
+                if (tl === brief.industry) score += 5;
+            }
         }
-        if (score > bestScore) {
-            bestScore = score;
-            bestTemplate = tmpl;
-        }
+
+        // ★ v745: Text density matching
+        const tmplDesc = (tmpl.description || '').toLowerCase();
+        if (brief?.textDensity === 'minimal' && tmplDesc.includes('minimal')) score += 4;
+        if (brief?.textDensity === 'dense' && tmplDesc.includes('detail')) score += 4;
+
+        // ★ v745: Penalize slot-count mismatch
+        const tmplElementCount = (tmpl as any).elements?.length ?? 0;
+        if (slotCount <= 2 && tmplElementCount > 8) score -= 3;
+        if (slotCount >= 4 && tmplElementCount < 4) score -= 3;
+
+        if (score > bestScore) { bestScore = score; bestTemplate = tmpl; }
     }
 
     const template = { id: bestTemplate.id, name: bestTemplate.name, description: bestTemplate.description ?? '' };
-    const method = bestScore > 0 ? `Matched by keywords (score: ${bestScore})` : 'Default template (no keyword match)';
+    const method = bestScore > 0 ? `Matched (score: ${bestScore}, slots: ${slotCount})` : 'Default template (no match)';
     cb.updateCard('structure', 'done', template.name, {
         reasoning: method,
         expandedDetail: `Template: ${template.name}\nID: ${template.id}\n${method}`,
@@ -184,29 +208,7 @@ const BG_NAMES = new Set([
     'accent_diagonal', 'bottom_border', 'bottom_accent',
 ]);
 
-/** ★ v737: Apply harmony colors to all elements by role */
-function applyHarmonyColors(elements: any[], harmony: import('@/services/colorHarmony').HarmonyPalette): void {
-    const hexToRgb01 = (hex: string) => {
-        const c = hex.replace('#', '');
-        return { r: parseInt(c.slice(0, 2), 16) / 255, g: parseInt(c.slice(2, 4), 16) / 255, b: parseInt(c.slice(4, 6), 16) / 255 };
-    };
-    for (const el of elements) {
-        const name = (el.name ?? '').toLowerCase();
-        if (el.type === 'text') {
-            if (name.includes('headline') && !name.includes('sub')) el.color_hex = harmony.headline;
-            else if (name.includes('sub')) el.color_hex = harmony.subheadline;
-            else if (name.includes('cta') || name.includes('label')) el.color_hex = harmony.accentForeground;
-            else if (name.includes('tag')) el.color_hex = harmony.tag;
-            else el.color_hex = harmony.body;
-        } else if (name.includes('cta') || name.includes('button')) {
-            const { r, g, b } = hexToRgb01(harmony.accent);
-            el.r = r; el.g = g; el.b = b;
-        } else if (name.includes('accent') || name.includes('badge') || name.includes('tag')) {
-            const { r, g, b } = hexToRgb01(harmony.accent);
-            el.r = r; el.g = g; el.b = b; el.a = el.a ?? 0.15;
-        }
-    }
-}
+// ★ v745: applyHarmonyColors → agentColorRecolorHarmony.ts
 
 
 /** Process template elements: BG handling, content injection, font, colors.
@@ -354,6 +356,12 @@ export async function processTemplateElements(
             el.letter_spacing = el.letter_spacing ?? -0.5;
             el.line_height = el.line_height ?? 1.1;
             el.font_weight = el.font_weight ?? '800';
+            // ★ v745: HeadlineLines-aware font sizing
+            // Multi-line headlines need smaller font to avoid overflow
+            if (brief && brief.headlineLines > 1 && el.font_size) {
+                const lineScale = brief.headlineLines === 2 ? 0.85 : brief.headlineLines >= 3 ? 0.7 : 1;
+                el.font_size = Math.round(el.font_size * lineScale);
+            }
         } else if (role === 'subheadline') {
             el.letter_spacing = el.letter_spacing ?? 0;
             el.line_height = el.line_height ?? 1.35;
@@ -361,6 +369,17 @@ export async function processTemplateElements(
         } else if (role === 'tag') {
             el.letter_spacing = el.letter_spacing ?? 2;
             el.font_weight = el.font_weight ?? '600';
+        }
+    }
+
+    // ★ v745: Apply textHierarchy opacity from designStrategy
+    if (designStrategy?.textHierarchy) {
+        const th = designStrategy.textHierarchy;
+        for (const el of allElements) {
+            if (el.type !== 'text') continue;
+            const role = roleMap.get(el);
+            if (role === 'headline') el.opacity = el.opacity ?? th.headlineOpacity;
+            else if (role === 'subheadline') el.opacity = el.opacity ?? th.subheadlineOpacity;
         }
     }
 

@@ -181,17 +181,50 @@ function validateBrief(brief: DesignBrief): { valid: boolean; issues: string[] }
 }
 
 // ── Sanitize AI output ───────────────────────────
+// ★ v745: Full sanitization pipeline (migrated from deleted sanitizeContent)
+// Guards: junk, font names, descriptive prefixes, prompt leakage, title case
+
+const FONT_NAMES_RE = /^(inter|roboto|montserrat|poppins|arial|helvetica|georgia|verdana|garamond|lato|opensans|raleway|playfair|outfit|nunito|space grotesk)$/i;
+const DESCRIPTIVE_PREFIX_RE = /^(text\s+(?:about|regarding|on|for|describing)\s+|about\s+(?:the\s+)?|regarding\s+(?:the\s+)?|description\s+(?:of|about)\s+|information\s+(?:about|on)\s+|details?\s+(?:about|on)\s+|an?\s+ad\s+(?:about|for)\s+|ad\s+(?:copy\s+)?(?:about|for)\s+)/i;
+const PROMPT_LEAKAGE_RE = /(?:like\s+["'"]|or\s+similar\s+|(?:motivational|inspirational|compelling)\s+(?:Korean|English|Chinese|Japanese)\s+text|(?:something|text)\s+(?:like|similar to)|(?:headline|tagline|slogan)\s+(?:such as|like)|placeholder\s+text|sample\s+(?:text|copy))/i;
+
+function toTitleCase(s: string): string {
+    return s.replace(/\w\S*/g, t => t.charAt(0).toUpperCase() + t.slice(1).toLowerCase());
+}
+
+function isLatinOnly(s: string): boolean { return /^[\x00-\x7F]+$/.test(s); }
+
+function sanitizeField(val: unknown, fallback: string): string {
+    let s = String(val ?? '').trim();
+    if (!s) return fallback;
+    if (JUNK_PATTERN.test(s)) return fallback;
+    if (FONT_NAMES_RE.test(s)) return fallback;
+    if (PROMPT_LEAKAGE_RE.test(s)) {
+        console.warn(`[sanitizeBrief] Prompt leakage: "${s}" → fallback`);
+        return fallback;
+    }
+    // Strip descriptive prefixes: "text about X" → "X"
+    if (DESCRIPTIVE_PREFIX_RE.test(s)) {
+        s = s.replace(DESCRIPTIVE_PREFIX_RE, '').trim();
+        if (!s) return fallback;
+        // Title case after strip (first word lowercase)
+        if (isLatinOnly(s)) s = toTitleCase(s);
+    }
+    // Title case for all-lowercase Latin (not Korean/CJK)
+    if (s === s.toLowerCase() && s.length > 0 && isLatinOnly(s)) {
+        s = toTitleCase(s);
+    }
+    return s;
+}
 
 function sanitizeBrief(raw: Record<string, unknown>): DesignBrief {
-    const clean = (val: unknown): string => {
-        const s = String(val ?? '').trim();
-        return JUNK_PATTERN.test(s) ? '' : s;
-    };
-    const headline = clean(raw.headline) || 'Get Started Today';
-    const subheadline = clean(raw.subheadline);
-    const cta = clean(raw.cta);
+    const headline = sanitizeField(raw.headline, 'Get Started Today');
+    const subheadline = sanitizeField(raw.subheadline, '');
+    let cta = sanitizeField(raw.cta, '');
+    // CTA extra guard: Korean UI terms
+    if (cta && /^(button|click|cta|label|클릭|버튼|텍스트|라벨)$/i.test(cta)) cta = '';
     const tag = String(raw.tag ?? '').trim().toUpperCase().slice(0, 20);
-    const cleanTag = JUNK_PATTERN.test(tag) ? '' : tag;
+    const cleanTag = (JUNK_PATTERN.test(tag) || FONT_NAMES_RE.test(tag)) ? '' : tag;
 
     // Build slots from what actually has content
     const slots: ContentSlot[] = ['headline'];
@@ -262,7 +295,11 @@ export async function generateDesignBrief(
             model: DEFAULT_CLAUDE_MODEL,
             max_tokens: 400,
             temperature: attempt === 0 ? 0.6 : 0.4, // Lower temp on retry
-            system: 'You are a professional creative director. Return ONLY valid JSON.',
+            system: [{
+                type: 'text' as const,
+                text: 'You are a professional creative director. Return ONLY valid JSON.',
+                cache_control: { type: 'ephemeral' as const }, // ★ v745: Prompt Caching
+            }],
             messages: [{ role: 'user' as const, content: prompt }],
         };
 
