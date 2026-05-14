@@ -30,7 +30,7 @@ export async function executeGenerateFlow(
         if (dims) { canvasW = dims.width ?? 300; canvasH = dims.height ?? 250; }
     } catch { /* ok */ }
 
-    // ★ Also read from designStore as fallback — engine may report stale size
+    // Store fallback for stale engine size
     try {
         const { useDesignStore } = await resilientImport(() => import('@/stores/designStore'));
         const cs = useDesignStore.getState().creativeSet;
@@ -38,7 +38,6 @@ export async function executeGenerateFlow(
         if (master?.preset) {
             const storeW = master.preset.width;
             const storeH = master.preset.height;
-            // Prefer store dimensions if engine returned default (300x250)
             if (canvasW === 300 && canvasH === 250 && storeW > 0 && storeH > 0) {
                 console.warn(`[Pipeline] Engine returned default 300x250, using store: ${storeW}x${storeH}`);
                 canvasW = storeW;
@@ -48,15 +47,13 @@ export async function executeGenerateFlow(
     } catch { /* ok */ }
 
     console.log(`[Pipeline] Canvas size: ${canvasW}x${canvasH}`);
-
     const abort = new AbortController();
 
-    // ── Phase 1.5: Brand Cloud Scan (★ v719: now includes hybrid asset selection) ──
+    // ── Phase 1.5: Brand Cloud ──
     const brand = await scanBrandCloud(prompt, canvasW, canvasH, cb, abort.signal);
     await pause(300);
 
-    // ── Phase 2: AI Design Brief (stepper: Planning) ──
-    // ★ v743: Content-First — one call generates content + structure decisions
+    // ── Phase 2: AI Design Brief ──
     cb.setPhase?.('planning');
     cb.narrate("Analyzing your brief and generating ad copy...");
     cb.addCard('content', 'Generating design brief', 'running');
@@ -85,14 +82,15 @@ export async function executeGenerateFlow(
     cb.narrate(`Copy ready: "${brief.headline}" — ${brief.slots.length} content slots`);
     await pause(400);
 
-    // ── Phase 3: Background Image FIRST (★ v747: Image-First pipeline) ──
-    // Generate image BEFORE palette so colors can be derived from actual image.
+    // ── Phase 3: Background Image FIRST (★ v748: Image before palette) ──
     let bgResult: { hasImage: boolean; url: string | null };
     let backgroundImagePrompt: string | undefined;
 
-    // Decide if we need an image (deterministic + AI hybrid)
+    // \u2605 v748: 3-tier image decision (uses brief mood/industry)
     const { decideBackgroundImage } = await resilientImport(() => import('@/services/backgroundImageDecider'));
-    const codeDecision = decideBackgroundImage(prompt);
+    const codeDecision = decideBackgroundImage(prompt, brief.mood, brief.industry);
+    const earlyGenerate = codeDecision.needsImage && (codeDecision.confidence === 'high' || codeDecision.confidence === 'medium');
+    console.log(`[Pipeline] Image decision: ${codeDecision.needsImage} (${codeDecision.confidence}: ${codeDecision.reason})`);
 
     if (brand.selectedAssets?.background) {
         // Brand asset takes priority
@@ -101,13 +99,22 @@ export async function executeGenerateFlow(
         cb.addCard('bg-image', 'Brand background', 'done', {
             expandedDetail: `Brand asset: "${brand.selectedAssets.background.asset.name}"\n${brand.selectedAssets.background.reasoning}`,
         });
-    } else if (codeDecision.confidence === 'high' && codeDecision.needsImage) {
-        // User explicitly requested image — generate with minimal palette (dark default)
+    } else if (earlyGenerate) {
+        // ★ v748: Generate image BEFORE palette (covers ~80% of ad prompts)
         const dummyGuide = { colors: { accent: '#3b82f6', background: '#0B0F1A', gradientEnd: '#1a2e4a' } };
-        backgroundImagePrompt = prompt; // Will be enhanced by generateBgImage
-        bgResult = await generateBgImage(true, prompt, prompt, canvasW, canvasH, dummyGuide, abort, cb);
+        // Build quality prompt from brief metadata
+        const bgPromptParts = [prompt];
+        if (brief.mood) bgPromptParts.push(`${brief.mood} mood`);
+        if (brief.industry) bgPromptParts.push(`${brief.industry} industry`);
+        bgPromptParts.push('professional advertisement background, plenty of negative space for text overlay');
+        backgroundImagePrompt = bgPromptParts.join('. ');
+        cb.narrate(`Image needed: ${codeDecision.reason}`);
+        bgResult = await generateBgImage(true, backgroundImagePrompt, prompt, canvasW, canvasH, dummyGuide, abort, cb);
+    } else if (codeDecision.confidence === 'high' && !codeDecision.needsImage) {
+        // User explicitly said no image
+        bgResult = { hasImage: false, url: null };
     } else {
-        // Let AI palette phase decide (it returns needsBackgroundImage)
+        // Tier 3: Can't decide → let AI palette decide later
         bgResult = { hasImage: false, url: null };
     }
     await pause(300);
@@ -166,8 +173,6 @@ export async function executeGenerateFlow(
     const rendered = await buildAndRender(prompt, guide, content, canvasW, canvasH, bgResult, brand.logoUrl, brand.logoW, brand.logoH, engine, abort, cb, designStrategy, aiTemplateId, brand.selectedAssets, imageComposition, brief);
 
     // ── Phase 6: Finalize (stepper: Finishing) ──
-    // ★ Vision QA removed — deterministic quality (recolor + contrast + layout validation)
-    // is more reliable and costs ZERO tokens vs. expensive post-hoc AI healing.
     cb.setPhase?.('reflecting');
     cb.addCard('finalize', 'Finalizing design', 'running');
     try { engine.reorder_by_z_index?.(); } catch { /* ok */ }
@@ -175,10 +180,7 @@ export async function executeGenerateFlow(
     cb.updateCard('finalize', 'done', `${rendered} elements · Design complete`);
     cb.narrate(`Design finalized with ${rendered} elements. Style: ${guide.name}, Layout: Carbon Design System.`);
 
-
-
     // ── Phase 7: Save to AI Memory ──
-    // Records this design in Supabase ai_memory for cross-session learning
     try {
         const { addDesignEntry, extractFacts, saveAiMemory } = await import('@/services/aiMemoryService');
         await addDesignEntry({
