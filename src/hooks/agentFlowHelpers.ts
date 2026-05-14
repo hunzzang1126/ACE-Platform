@@ -209,14 +209,19 @@ function applyHarmonyColors(elements: any[], harmony: import('@/services/colorHa
 }
 
 
-/** Process template elements: BG handling, content injection, font, colors. */
+/** Process template elements: BG handling, content injection, font, colors.
+ * ★ v743: Content-First — uses brief.slots to decide which text elements to keep.
+ * Elements for slots NOT in brief.slots are REMOVED, not filled with placeholders.
+ */
 export async function processTemplateElements(
     elements: any[], content: any, guide: any,
     canvasW: number, canvasH: number,
     bgResult: { hasImage: boolean; url: string | null },
     designStrategy?: any,
+    brief?: import('@/services/designBrief').DesignBrief,
 ): Promise<any[]> {
     let allElements = [...elements];
+    const activeSlots = new Set(brief?.slots ?? ['headline', 'subheadline', 'cta', 'tag']);
 
     // ★ v737: Analyze background for gradient/solid path (harmony colors)
     const { analyzeBackground, deriveHarmonyPalette } = await resilientImport(() => import('@/services/colorHarmony'));
@@ -224,12 +229,9 @@ export async function processTemplateElements(
     const harmony = deriveHarmonyPalette(bgAnalysis, { accent: guide.colors.accent ?? '#3b82f6', foreground: guide.colors.foreground ?? '#FFFFFF', secondary: guide.colors.secondary ?? '#CCCCCC' });
 
     if (bgResult.hasImage && bgResult.url) {
-        // Strip template BG shapes, keep text/decoration intact
         allElements = allElements.filter(el =>
             el.type === 'text' || !BG_NAMES.has((el.name ?? '').toLowerCase())
         );
-        // ★ v738: BG images are unpredictable — ALWAYS white text with shadow
-        // Harmony colors ONLY for accent shapes/CTA, NOT for text on photos
         for (const el of allElements) {
             if (el.type === 'text') {
                 el.color_hex = '#FFFFFF';
@@ -239,7 +241,6 @@ export async function processTemplateElements(
                 el.shadow_opacity = el.shadow_opacity ?? 0.7;
             }
         }
-        // Apply harmony to non-text elements only (accent shapes, CTA bg)
         for (const el of allElements) {
             if (el.type === 'text') continue;
             const name = (el.name ?? '').toLowerCase();
@@ -251,11 +252,9 @@ export async function processTemplateElements(
             }
         }
     } else {
-        // Gradient/solid background → recolor + harmony-derived colors
         const { recolorTemplateElements } = await resilientImport(() => import('./agentColorRecolor'));
         allElements = recolorTemplateElements(allElements, guide);
         applyHarmonyColors(allElements, harmony);
-        // ★ v740: Shadow as WCAG insurance when harmony engine says contrast is tight
         if (harmony.needsShadow) {
             for (const el of allElements) {
                 if (el.type === 'text') {
@@ -267,117 +266,112 @@ export async function processTemplateElements(
         }
     }
 
-    // ★ v741: Content injection — ROLE INFERENCE, not just name matching.
-    // 1. Try name-based matching first (fast path)
-    // 2. For unmatched elements: infer role from font_size + y-position
-    // 3. ALL template placeholders MUST be replaced — no text leaks through
+    // ★ v743: Content-First assembly — slot-based, not name-matching.
+    // 1. Classify each text element by role (name or font_size inference)
+    // 2. If the role's slot is in brief.slots → inject content
+    // 3. If the role's slot is NOT in brief.slots → REMOVE the element
+    // 4. No placeholders ever survive.
     const textEls = allElements.filter(el => el.type === 'text');
 
-    // Pass 1: Name-based matching (exact matches)
-    const injected = new Set<any>();
-    let headlineInjected = false;
-    let subInjected = false;
-    let ctaInjected = false;
-    let tagInjected = false;
+    // Classify elements into roles
+    type Role = 'headline' | 'subheadline' | 'cta' | 'tag' | 'unknown';
+    const roleMap = new Map<any, Role>();
 
     for (const el of textEls) {
         const name = (el.name ?? '').toLowerCase();
-        if (name.includes('headline') && !name.includes('sub')) {
-            if (content.headline) { el.content = content.headline; injected.add(el); headlineInjected = true; }
-        } else if (name.includes('sub') || name.includes('body') || name.includes('description') || name.includes('detail') || name.includes('tagline')) {
-            if (content.subheadline) { el.content = content.subheadline; injected.add(el); subInjected = true; }
-        } else if (name.includes('cta') || name.includes('label') || name.includes('button')) {
-            if (content.cta) { el.content = content.cta; injected.add(el); ctaInjected = true; }
-        } else if (name.includes('tag') || name.includes('badge') || name.includes('date')) {
-            if (content.tag) { el.content = content.tag; injected.add(el); tagInjected = true; }
-        }
+        if (name.includes('headline') && !name.includes('sub')) roleMap.set(el, 'headline');
+        else if (name.includes('sub') || name.includes('body') || name.includes('description') || name.includes('detail') || name.includes('tagline')) roleMap.set(el, 'subheadline');
+        else if (name.includes('cta') || name.includes('label') || name.includes('button')) roleMap.set(el, 'cta');
+        else if (name.includes('tag') || name.includes('badge') || name.includes('date')) roleMap.set(el, 'tag');
+        else roleMap.set(el, 'unknown');
     }
 
-    // Pass 2: Role inference for UNMATCHED text elements.
-    // Sort by font_size (desc) → largest = headline, next = sub, etc.
-    const unmatched = textEls.filter(el => !injected.has(el));
-    if (unmatched.length > 0) {
-        const sorted = [...unmatched].sort((a, b) => (b.font_size ?? 0) - (a.font_size ?? 0));
+    // Font-size inference for unknowns
+    const unknowns = textEls.filter(el => roleMap.get(el) === 'unknown');
+    if (unknowns.length > 0) {
+        const sorted = [...unknowns].sort((a, b) => (b.font_size ?? 0) - (a.font_size ?? 0));
+        const unfilledRoles: Role[] = (['headline', 'subheadline', 'tag', 'cta'] as Role[])
+            .filter(r => !textEls.some(el => roleMap.get(el) === r));
         for (const el of sorted) {
-            if (!headlineInjected && content.headline) {
-                el.content = content.headline;
-                headlineInjected = true;
-                console.log(`[Pipeline] Role-inferred headline → "${el.name}" (font=${el.font_size})`);
-            } else if (!subInjected && content.subheadline) {
-                el.content = content.subheadline;
-                subInjected = true;
-                console.log(`[Pipeline] Role-inferred subheadline → "${el.name}" (font=${el.font_size})`);
-            } else if (!tagInjected && content.tag) {
-                el.content = content.tag;
-                tagInjected = true;
-                console.log(`[Pipeline] Role-inferred tag → "${el.name}" (font=${el.font_size})`);
-            } else if (!ctaInjected && content.cta) {
-                el.content = content.cta;
-                ctaInjected = true;
-                console.log(`[Pipeline] Role-inferred CTA → "${el.name}" (font=${el.font_size})`);
-            } else if (content.subheadline && el.content && el.content.length > 3) {
-                // Extra text elements → replace with subheadline to prevent placeholders
-                el.content = content.subheadline;
-                console.log(`[Pipeline] Extra text → subheadline: "${el.name}" (font=${el.font_size})`);
+            const role = unfilledRoles.shift();
+            if (role) {
+                roleMap.set(el, role);
+                console.log(`[Pipeline] Role-inferred: "${el.name}" → ${role} (font=${el.font_size})`);
             }
         }
     }
 
-    // Pass 3: Kill remaining template placeholders that couldn't be replaced.
-    // If a text element STILL has its original template content and wasn't injected,
-    // it's a leaked placeholder. Mark it empty — it gets filtered out later.
+    // Inject content OR remove element based on brief.slots
+    const contentByRole: Record<string, string> = {
+        headline: content.headline ?? '',
+        subheadline: content.subheadline ?? '',
+        cta: content.cta ?? '',
+        tag: content.tag ?? '',
+    };
+
+    const toRemove = new Set<any>();
     for (const el of textEls) {
-        if (injected.has(el)) continue;
+        const role = roleMap.get(el) ?? 'unknown';
+        if (role === 'unknown') {
+            // Unknown element with no role assignment → remove
+            console.log(`[Pipeline] Removing unclassified text: "${el.name}"`);
+            toRemove.add(el);
+            continue;
+        }
+        if (!activeSlots.has(role) || !contentByRole[role]) {
+            // Slot not needed → remove element entirely (no placeholder!)
+            console.log(`[Pipeline] Removing unused slot "${role}": "${el.name}"`);
+            toRemove.add(el);
+            continue;
+        }
+        // Slot is active → inject content
+        el.content = contentByRole[role];
+    }
+    // Also remove shape elements tied to removed roles (CTA button bg, tag bg)
+    for (const el of allElements) {
+        if (el.type === 'text') continue;
         const name = (el.name ?? '').toLowerCase();
-        // Skip elements that WERE updated in Pass 2 (check if content matches any AI content)
-        const isAiContent = el.content === content.headline || el.content === content.subheadline
-            || el.content === content.cta || el.content === content.tag;
-        if (isAiContent) continue;
-        // This is a template placeholder that survived — hide it
-        if (el.content && el.content.length > 3) {
-            console.log(`[Pipeline] Killing leaked placeholder "${el.name}": "${el.content?.slice(0, 40)}"`);
-            el.content = '';
+        if ((name.includes('cta') || name.includes('button')) && !activeSlots.has('cta')) {
+            console.log(`[Pipeline] Removing CTA shape: "${el.name}"`);
+            toRemove.add(el);
+        }
+        if ((name.includes('tag') || name.includes('badge')) && !activeSlots.has('tag')) {
+            console.log(`[Pipeline] Removing tag shape: "${el.name}"`);
+            toRemove.add(el);
         }
     }
+    allElements = allElements.filter(el => !toRemove.has(el));
 
     // ★ v736: Preserve template fonts — they ARE the design
-    // Only apply AI palette fonts when template element has NO font specified.
-    // Typography defaults (tracking, weight) are fallbacks only (uses ?? operator).
     for (const el of allElements) {
         if (el.type !== 'text') continue;
-        const name = (el.name ?? '').toLowerCase();
-        // ★ Font fallback: template font > AI palette font > "Inter"
+        const role = roleMap.get(el);
         if (!el.font_family) {
-            if (name.includes('headline') && !name.includes('sub')) {
-                el.font_family = guide.typography.primaryFont;
-            } else {
-                el.font_family = guide.typography.secondaryFont;
-            }
+            if (role === 'headline') el.font_family = guide.typography.primaryFont;
+            else el.font_family = guide.typography.secondaryFont;
         }
-        // Typography defaults — only if template didn't specify
-        if (name.includes('headline') && !name.includes('sub')) {
+        if (role === 'headline') {
             el.letter_spacing = el.letter_spacing ?? -0.5;
             el.line_height = el.line_height ?? 1.1;
             el.font_weight = el.font_weight ?? '800';
-        } else if (name.includes('sub')) {
+        } else if (role === 'subheadline') {
             el.letter_spacing = el.letter_spacing ?? 0;
             el.line_height = el.line_height ?? 1.35;
             el.font_weight = el.font_weight ?? '400';
-        } else if (name.includes('tag')) {
+        } else if (role === 'tag') {
             el.letter_spacing = el.letter_spacing ?? 2;
             el.font_weight = el.font_weight ?? '600';
         }
     }
 
-    // Auto-create subheadline if template lacks one but AI generated it
-    if (content.subheadline) {
+    // Auto-create subheadline if brief says we need one but template doesn't have it
+    if (activeSlots.has('subheadline') && content.subheadline) {
         const hasSub = allElements.some((el: any) =>
-            el.type === 'text' && (el.name ?? '').toLowerCase().includes('sub')
+            el.type === 'text' && roleMap.get(el) === 'subheadline'
         );
         if (!hasSub) autoCreateSubheadline(allElements, content, canvasW, canvasH);
     }
 
-    // Recalculate text heights (AI copy may be longer than template placeholders)
     recalcTextHeights(allElements, canvasH);
 
     return allElements;

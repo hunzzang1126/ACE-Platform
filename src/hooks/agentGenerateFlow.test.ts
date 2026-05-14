@@ -34,8 +34,8 @@ describe('agentGenerateFlow — pipeline phases', () => {
         expect(src).toContain('scanBrandCloud');
     });
 
-    it('Phase 2: AI copywriting', () => {
-        expect(src).toContain('callTemplateContent');
+    it('Phase 2: AI design brief', () => {
+        expect(src).toContain('generateDesignBrief');
     });
 
     it('reads canvas dimensions', () => {
@@ -342,12 +342,12 @@ const helpersSrc = readFileSync(resolve(__dirname, './agentFlowHelpers.ts'), 'ut
 const textLayoutSrc = readFileSync(resolve(__dirname, './agentTextLayout.ts'), 'utf-8');
 
 describe('★ REGRESSION: Template-based content injection (v734)', () => {
-    it('injects AI-generated content into template text elements', () => {
-        // ★ v738: role-based matching instead of contentMap
+    it('★ v743: uses slot-based assembly from design brief', () => {
+        // Content-First: roleMap classifies elements, brief.slots decides what to keep
         expect(helpersSrc).toContain("name.includes('headline')");
-        expect(src).toContain('content.headline');
-        expect(src).toContain('content.subheadline');
-        expect(src).toContain('content.cta');
+        expect(helpersSrc).toContain('roleMap');
+        expect(helpersSrc).toContain('activeSlots');
+        expect(helpersSrc).toContain('contentByRole');
     });
 
     it('uses AI fonts as fallback only when template has none', () => {
@@ -400,13 +400,15 @@ describe('★ REGRESSION: Template-based content injection (v734)', () => {
         expect(helpersSrc).toContain('shadow_opacity');
     });
 
-    it('★ v741: content injection uses role inference (no template placeholders)', () => {
-        // Pass 1: name-based matching
+    it('★ v743: Content-First slot-based assembly (no template placeholders)', () => {
+        // Role classification by name
         expect(helpersSrc).toContain("name.includes('body')");
         expect(helpersSrc).toContain("name.includes('description')");
-        // Pass 2: role inference by font_size for unmatched elements
+        // Font-size inference for unknowns
         expect(helpersSrc).toContain('Role-inferred');
-        // Pass 3: kill remaining placeholders
-        expect(helpersSrc).toContain('Killing leaked placeholder');
+        // Unused slots get removed entirely
+        expect(helpersSrc).toContain('Removing unused slot');
+        // Shape elements tied to removed roles also get removed
+        expect(helpersSrc).toContain('Removing CTA shape');
     });
 });

@@ -73,11 +73,12 @@ describe('agentGenerateFlow — Template-first pipeline (v734)', () => {
         expect(flowSrc).not.toContain('@/carbon/');
     });
 
-    it('★ REGRESSION: injects content into template text elements', () => {
-        expect(flowSrc).toContain('content.headline');
-        expect(flowSrc).toContain('content.subheadline');
-        expect(flowSrc).toContain('content.cta');
-        // ★ v738: Broader matching — checks for role keywords in element names
+    it('★ REGRESSION: uses slot-based content assembly (v743)', () => {
+        // v743: Content-First — brief.slots drives assembly, not content.headline
+        expect(helpersSrc).toContain('activeSlots');
+        expect(helpersSrc).toContain('roleMap');
+        expect(helpersSrc).toContain('contentByRole');
+        // Role classification still uses name matching
         expect(helpersSrc).toContain("name.includes('headline')");
         expect(helpersSrc).toContain("name.includes('body')");
     });

@@ -58,22 +58,34 @@ export async function executeGenerateFlow(
     const brand = await scanBrandCloud(prompt, canvasW, canvasH, cb, abort.signal);
     await pause(300);
 
-    // ── Phase 2: AI Copywriting (stepper: Planning) ──
+    // ── Phase 2: AI Design Brief (stepper: Planning) ──
+    // ★ v743: Content-First — one call generates content + structure decisions
     cb.setPhase?.('planning');
-    cb.narrate("I'll generate the ad copy tailored for your prompt.");
-    cb.addCard('content', 'Generating creative copy', 'running');
+    cb.narrate("Analyzing your brief and generating ad copy...");
+    cb.addCard('content', 'Generating design brief', 'running');
     await pause(400);
 
-    const { callTemplateContent } = await resilientImport(() => import('@/services/autoDesignService'));
+    const { generateDesignBrief } = await resilientImport(() => import('@/services/designBrief'));
     const { loadUserPrefs } = await resilientImport(() => import('@/stores/userPrefs'));
     const preferredLang = loadUserPrefs().preferredLanguage;
     const contentPrompt = brand.context ? `${prompt}\n\n[BRAND CONTEXT]\n${brand.context}` : prompt;
-    const content = await callTemplateContent(contentPrompt, canvasW, canvasH, 'AI Pipeline', abort.signal, preferredLang);
+    const brief = await generateDesignBrief(contentPrompt, canvasW, canvasH, preferredLang, abort.signal, brand.context || undefined);
 
-    cb.updateCard('content', 'done', 'Copy generated', {
-        expandedDetail: [`Headline: "${content.headline}"`, `Subheadline: "${content.subheadline}"`, `CTA: "${content.cta}"`, content.tag ? `Tag: "${content.tag}"` : ''].filter(Boolean).join('\n'),
+    // ★ brief.slots tells downstream what elements to CREATE
+    const content = { headline: brief.headline, subheadline: brief.subheadline, cta: brief.cta, tag: brief.tag };
+
+    cb.updateCard('content', 'done', `Copy generated · ${brief.slots.length} slots`, {
+        expandedDetail: [
+            `Headline: "${brief.headline}"`,
+            brief.subheadline ? `Subheadline: "${brief.subheadline}"` : 'Subheadline: (not needed)',
+            brief.cta ? `CTA: "${brief.cta}"` : 'CTA: (not needed)',
+            brief.tag ? `Tag: "${brief.tag}"` : '',
+            `Slots: [${brief.slots.join(', ')}]`,
+            `Mood: ${brief.mood} · Industry: ${brief.industry}`,
+            brief.reasoning ? `Reasoning: ${brief.reasoning}` : '',
+        ].filter(Boolean).join('\n'),
     });
-    cb.narrate(`Copy ready: "${content.headline}"`);
+    cb.narrate(`Copy ready: "${brief.headline}" — ${brief.slots.length} content slots`);
     await pause(400);
 
     // ── Phase 3: Color Palette + Template Selection ──
@@ -136,7 +148,7 @@ export async function executeGenerateFlow(
 
     // ── Phase 5: Template Layout + Render (stepper: Executing) ──
     cb.setPhase?.('executing');
-    const rendered = await buildAndRender(prompt, guide, content, canvasW, canvasH, bgResult, brand.logoUrl, brand.logoW, brand.logoH, engine, abort, cb, designStrategy, aiTemplateId, brand.selectedAssets, imageComposition);
+    const rendered = await buildAndRender(prompt, guide, content, canvasW, canvasH, bgResult, brand.logoUrl, brand.logoW, brand.logoH, engine, abort, cb, designStrategy, aiTemplateId, brand.selectedAssets, imageComposition, brief);
 
     // ── Phase 6: Finalize (stepper: Finishing) ──
     // ★ Vision QA removed — deterministic quality (recolor + contrast + layout validation)
@@ -194,6 +206,7 @@ async function buildAndRender(
     aiTemplateId?: string | null,
     selectedAssets?: import('@/services/brandAssetSelector').AssetSelection | null,
     imageComposition?: import('@/services/imageComposition').ImageComposition | null,
+    brief?: import('@/services/designBrief').DesignBrief,
 ): Promise<number> {
     cb.narrate('Building the layout from template...');
     cb.addCard('build', 'Template layout engine', 'running');
@@ -217,8 +230,8 @@ async function buildAndRender(
     }
     const rawElements: any[] = resolveTemplateElements(tmpl.id, canvasW, canvasH);
 
-    // ★ Process: BG handling, content injection, font replacement, harmony colors
-    let allElements = await processTemplateElements(rawElements, content, guide, canvasW, canvasH, bgResult, designStrategy);
+    // ★ v743: Process with brief-aware assembly — only creates slots that brief says are needed
+    let allElements = await processTemplateElements(rawElements, content, guide, canvasW, canvasH, bgResult, designStrategy, brief);
 
     console.log(`[Pipeline/Template] Built ${allElements.length} elements from template "${tmpl.name}"`);
     cb.narrate(`Layout: Template "${tmpl.name}"`);
