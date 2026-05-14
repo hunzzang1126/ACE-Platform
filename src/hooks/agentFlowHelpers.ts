@@ -10,7 +10,8 @@ import type { AssetSelection } from '@/services/brandAssetSelector';
 import { applyHarmonyColors } from './agentColorRecolorHarmony';
 
 // ★ v739: Text layout extracted to agentTextLayout.ts — re-export for backward compat
-export { recalcTextHeights, autoCreateSubheadline } from './agentTextLayout';
+import { recalcTextHeights, autoCreateSubheadline } from './agentTextLayout';
+export { recalcTextHeights, autoCreateSubheadline };
 export interface BrandScanResult {
     context: string;
     paletteHint: string;
