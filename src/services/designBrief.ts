@@ -232,14 +232,12 @@ function sanitizeBrief(raw: Record<string, unknown>): DesignBrief {
     if (cta) slots.push('cta');
     if (cleanTag) slots.push('tag');
 
-    // Parse or default structural metadata
-    const rawSlots = Array.isArray(raw.slots) ? raw.slots.filter(
-        (s): s is ContentSlot => ['headline', 'subheadline', 'cta', 'tag'].includes(s as string)
-    ) : slots;
+    // ★ v745: Always use content-derived slots — AI rawSlots can desync with sanitized content
+    // e.g., AI says slots=["cta"] but sanitize removed the cta text → empty CTA element
 
     return {
         headline, subheadline, cta, tag: cleanTag,
-        slots: rawSlots.length > 0 ? rawSlots : slots,
+        slots,
         headlineLines: Math.max(1, Math.min(4, Number(raw.headlineLines) || 1)),
         textDensity: (['minimal', 'standard', 'dense'].includes(raw.textDensity as string)
             ? raw.textDensity as 'minimal' | 'standard' | 'dense' : 'standard'),

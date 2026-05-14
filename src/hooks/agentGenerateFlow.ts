@@ -195,10 +195,10 @@ async function buildAndRender(
     if (imageComposition && imageComposition.safeTextZone !== 'any' && imageComposition.confidence !== 'low') {
         tmpl = await selectCompositionAwareTemplate(
             prompt, canvasW, canvasH, abort, cb, aiTemplateId,
-            imageComposition, selectTmpl, resolveTemplateElements,
+            imageComposition, selectTmpl, resolveTemplateElements, brief,
         );
     } else {
-        tmpl = await selectTmpl(prompt ?? '', canvasW, canvasH, [], abort, cb, aiTemplateId);
+        tmpl = await selectTmpl(prompt ?? '', canvasW, canvasH, [], abort, cb, aiTemplateId, brief);
     }
     const rawElements: any[] = resolveTemplateElements(tmpl.id, canvasW, canvasH);
 

@@ -176,3 +176,27 @@ describe('★ v745: Slot-aware template selection', () => {
         expect(helperSrc).toContain('subheadlineOpacity');
     });
 });
+
+describe('★ v745 BUG FIX: brief wiring to template selection', () => {
+    const flowSrc = readFileSync(resolve(__dirname, '../hooks/agentGenerateFlow.ts'), 'utf-8');
+    const imgHelpersSrc = readFileSync(resolve(__dirname, '../hooks/agentFlowImageHelpers.ts'), 'utf-8');
+
+    it('★ REGRESSION: selectTmpl receives brief in normal path', () => {
+        expect(flowSrc).toContain('selectTmpl(prompt');
+        expect(flowSrc).toContain('aiTemplateId, brief)');
+    });
+
+    it('★ REGRESSION: selectCompositionAwareTemplate receives brief', () => {
+        expect(flowSrc).toContain('resolveTemplateElements, brief,');
+    });
+
+    it('★ REGRESSION: composition fallback passes brief to selectTmpl', () => {
+        expect(imgHelpersSrc).toContain('aiTemplateId, brief)');
+    });
+
+    it('★ REGRESSION: AiColorResponse font fields are optional', () => {
+        const styleSrc = readFileSync(resolve(__dirname, './designStyleGuides.ts'), 'utf-8');
+        expect(styleSrc).toContain('fontPrimary?: string');
+        expect(styleSrc).toContain('fontSecondary?: string');
+    });
+});

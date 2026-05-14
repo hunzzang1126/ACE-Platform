@@ -189,4 +189,10 @@ describe('★ v745: sanitizeBrief — full sanitization pipeline', () => {
     it('★ REGRESSION: has prompt caching on brief system prompt', () => {
         expect(src).toContain("cache_control: { type: 'ephemeral'");
     });
+
+    it('★ REGRESSION: slots are always content-derived, not AI rawSlots', () => {
+        // rawSlots from AI can desync with sanitized content
+        expect(src).toContain('Always use content-derived slots');
+        expect(src).not.toContain('rawSlots.length > 0 ? rawSlots : slots');
+    });
 });

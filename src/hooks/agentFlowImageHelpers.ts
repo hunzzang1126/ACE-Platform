@@ -45,11 +45,12 @@ export async function selectCompositionAwareTemplate(
     composition: import('@/services/imageComposition').ImageComposition,
     selectTmpl: typeof import('./agentFlowHelpers').selectTemplate,
     resolveElements: typeof import('@/services/templateResolver').resolveTemplateElements,
+    brief?: import('@/services/designBrief').DesignBrief,
 ): Promise<{ id: string; name: string; description: string }> {
     const { useTemplateStore } = await resilientImport(() => import('@/stores/templateStore'));
     const { analyzeTemplateTextZone, scoreTemplateComposition } = await resilientImport(() => import('@/services/imageComposition'));
     const allTemplates = useTemplateStore.getState().templates ?? [];
-    if (allTemplates.length <= 1) return selectTmpl(prompt, canvasW, canvasH, [], abort, cb, aiTemplateId);
+    if (allTemplates.length <= 1) return selectTmpl(prompt, canvasW, canvasH, [], abort, cb, aiTemplateId, brief);
 
     // Score all templates by composition compatibility
     let bestTmpl = allTemplates[0]!;

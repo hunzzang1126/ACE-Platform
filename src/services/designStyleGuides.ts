@@ -139,8 +139,8 @@ interface AiColorResponse {
     gradientStart: string;
     gradientEnd: string;
     gradientAngle: number;
-    fontPrimary: string;
-    fontSecondary: string;
+    fontPrimary?: string;
+    fontSecondary?: string;
     radius: number;
     reasoning: string;
     needsBackgroundImage: boolean;
