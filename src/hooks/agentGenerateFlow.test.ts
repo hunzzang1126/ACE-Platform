@@ -363,8 +363,8 @@ describe('★ REGRESSION: Template-based content injection (v734)', () => {
         expect(helpersSrc).toContain('guide.typography.secondaryFont');
     });
 
-    it('strips template BG when AI image exists', () => {
-        expect(helpersSrc).toContain('BG_NAMES');
+    it('★ v750: strips template BG via agentImageOverlay when AI image exists', () => {
+        expect(helpersSrc).toContain('stripCoveringRects');
         expect(helpersSrc).toContain('bgResult.hasImage');
     });
 
@@ -400,11 +400,11 @@ describe('★ REGRESSION: Template-based content injection (v734)', () => {
         expect(helpersSrc).toContain('applyHarmonyColors');
     });
 
-    it('★ v749: BG image text uses guide.colors.foreground (image-derived)', () => {
-        // When bgResult.hasImage, text color comes from imageColorExtractor, not hardcoded
-        expect(helpersSrc).toContain("guide.colors.foreground ?? '#FFFFFF'");
-        expect(helpersSrc).toContain('shadow_blur');
-        expect(helpersSrc).toContain('shadow_opacity');
+    it('★ v750: BG image uses agentImageOverlay (area strip + harmony colors + strong shadow)', () => {
+        // When bgResult.hasImage, delegates to agentImageOverlay module
+        expect(helpersSrc).toContain('stripCoveringRects');
+        expect(helpersSrc).toContain('styleTextForImage');
+        expect(helpersSrc).toContain('recolorCtaShapes');
     });
 
     it('★ v743: Content-First slot-based assembly (no template placeholders)', () => {

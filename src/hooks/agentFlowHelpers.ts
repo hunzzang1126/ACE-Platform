@@ -203,11 +203,6 @@ export async function selectTemplate(
 
 // ★ v739: recalcTextHeights, estimateTextHeight, autoCreateSubheadline → agentTextLayout.ts
 
-// ── BG element names — template backgrounds that get special treatment ──
-const BG_NAMES = new Set([
-    'background', 'accent_zone', 'accent_glow', 'text_overlay',
-    'accent_diagonal', 'bottom_border', 'bottom_accent',
-]);
 
 // ★ v745: applyHarmonyColors → agentColorRecolorHarmony.ts
 
@@ -232,30 +227,11 @@ export async function processTemplateElements(
     const harmony = deriveHarmonyPalette(bgAnalysis, { accent: guide.colors.accent ?? '#3b82f6', foreground: guide.colors.foreground ?? '#FFFFFF', secondary: guide.colors.secondary ?? '#CCCCCC' });
 
     if (bgResult.hasImage && bgResult.url) {
-        allElements = allElements.filter(el =>
-            el.type === 'text' || !BG_NAMES.has((el.name ?? '').toLowerCase())
-        );
-        for (const el of allElements) {
-            if (el.type === 'text') {
-                // ★ v749: Use image-derived text color (not always white!)
-                // guide.colors.foreground is set by imageColorExtractor.suggestedText
-                el.color_hex = guide.colors.foreground ?? '#FFFFFF';
-                el.shadow_blur = el.shadow_blur ?? 10;
-                el.shadow_offset_x = 0;
-                el.shadow_offset_y = el.shadow_offset_y ?? 2;
-                el.shadow_opacity = el.shadow_opacity ?? 0.7;
-            }
-        }
-        for (const el of allElements) {
-            if (el.type === 'text') continue;
-            const name = (el.name ?? '').toLowerCase();
-            if (name.includes('cta') || name.includes('button')) {
-                const c = harmony.accent.replace('#', '');
-                el.r = parseInt(c.slice(0, 2), 16) / 255;
-                el.g = parseInt(c.slice(2, 4), 16) / 255;
-                el.b = parseInt(c.slice(4, 6), 16) / 255;
-            }
-        }
+        // ★ v750: Area-based rect stripping + harmony text colors + strong shadow
+        const { stripCoveringRects, styleTextForImage, recolorCtaShapes } = await resilientImport(() => import('./agentImageOverlay'));
+        allElements = stripCoveringRects(allElements, canvasW, canvasH);
+        styleTextForImage(allElements, harmony, guide);
+        recolorCtaShapes(allElements, harmony);
     } else {
         const { recolorTemplateElements } = await resilientImport(() => import('./agentColorRecolor'));
         allElements = recolorTemplateElements(allElements, guide);
@@ -286,7 +262,7 @@ export async function processTemplateElements(
         const name = (el.name ?? '').toLowerCase();
         if (name.includes('headline') && !name.includes('sub')) roleMap.set(el, 'headline');
         else if (name.includes('sub') || name.includes('body') || name.includes('description') || name.includes('detail') || name.includes('tagline')) roleMap.set(el, 'subheadline');
-        else if (name.includes('cta') || name.includes('label') || name.includes('button')) roleMap.set(el, 'cta');
+        else if (/\bcta\b/.test(name) || /\blabel\b/.test(name) || name.includes('button')) roleMap.set(el, 'cta');
         else if (name.includes('tag') || name.includes('badge') || name.includes('date')) roleMap.set(el, 'tag');
         else roleMap.set(el, 'unknown');
     }
@@ -336,7 +312,7 @@ export async function processTemplateElements(
     for (const el of allElements) {
         if (el.type === 'text') continue;
         const name = (el.name ?? '').toLowerCase();
-        if ((name.includes('cta') || name.includes('button')) && !activeSlots.has('cta')) {
+        if ((/\bcta\b/.test(name) || name.includes('button')) && !activeSlots.has('cta')) {
             console.log(`[Pipeline] Removing CTA shape: "${el.name}"`);
             toRemove.add(el);
         }
