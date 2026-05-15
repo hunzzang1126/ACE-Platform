@@ -400,9 +400,9 @@ describe('★ REGRESSION: Template-based content injection (v734)', () => {
         expect(helpersSrc).toContain('applyHarmonyColors');
     });
 
-    it('★ v738: BG image text is always white (photos are unpredictable)', () => {
-        // When bgResult.hasImage is true, text must be white with shadow
-        expect(helpersSrc).toContain("el.color_hex = '#FFFFFF'");
+    it('★ v749: BG image text uses guide.colors.foreground (image-derived)', () => {
+        // When bgResult.hasImage, text color comes from imageColorExtractor, not hardcoded
+        expect(helpersSrc).toContain("guide.colors.foreground ?? '#FFFFFF'");
         expect(helpersSrc).toContain('shadow_blur');
         expect(helpersSrc).toContain('shadow_opacity');
     });

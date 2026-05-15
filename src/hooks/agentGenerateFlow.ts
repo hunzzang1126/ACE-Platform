@@ -86,7 +86,7 @@ export async function executeGenerateFlow(
     let bgResult: { hasImage: boolean; url: string | null };
     let backgroundImagePrompt: string | undefined;
 
-    // \u2605 v748: 3-tier image decision (uses brief mood/industry)
+    // ★ v748: 3-tier image decision (uses brief mood/industry)
     const { decideBackgroundImage } = await resilientImport(() => import('@/services/backgroundImageDecider'));
     const codeDecision = decideBackgroundImage(prompt, brief.mood, brief.industry);
     const earlyGenerate = codeDecision.needsImage && (codeDecision.confidence === 'high' || codeDecision.confidence === 'medium');

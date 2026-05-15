@@ -237,7 +237,9 @@ export async function processTemplateElements(
         );
         for (const el of allElements) {
             if (el.type === 'text') {
-                el.color_hex = '#FFFFFF';
+                // ★ v749: Use image-derived text color (not always white!)
+                // guide.colors.foreground is set by imageColorExtractor.suggestedText
+                el.color_hex = guide.colors.foreground ?? '#FFFFFF';
                 el.shadow_blur = el.shadow_blur ?? 10;
                 el.shadow_offset_x = 0;
                 el.shadow_offset_y = el.shadow_offset_y ?? 2;
