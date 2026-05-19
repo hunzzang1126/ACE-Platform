@@ -7,6 +7,7 @@
 // ─────────────────────────────────────────────────
 
 import type { RenderElement } from '@/services/autoDesignTypes';
+import { isCtaLabel } from '@/utils/nameRoleMatch';
 import type { DesignElement, TextElement, ShapeElement, ButtonElement } from '@/schema/elements.types';
 import type { BannerVariant } from '@/schema/design.types';
 import { constraintsToAbsolute } from '@/engine/constraintUtils';
@@ -89,7 +90,7 @@ export function resolveTemplateElements(
                 r.font_size = Math.max(14, r.font_size ?? 14);
             } else if (name.includes('sub')) {
                 r.font_size = Math.max(11, r.font_size ?? 11);
-            } else if (name.includes('cta') || name.includes('label')) {
+            } else if (isCtaLabel(name)) {
                 r.font_size = Math.max(12, r.font_size ?? 12);
             } else {
                 r.font_size = Math.max(10, r.font_size ?? 10);

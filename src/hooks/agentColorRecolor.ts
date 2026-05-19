@@ -7,6 +7,7 @@
 // ─────────────────────────────────────────────────
 
 import type { RenderElement } from '@/services/autoDesignTypes';
+import { isCtaOrButton, isCtaLabel } from '@/utils/nameRoleMatch';
 
 interface ColorGuide {
     colors: {
@@ -69,13 +70,13 @@ export function recolorTemplateElements(
         }
 
         // ── CTA button background ──
-        if (copy.type !== 'text' && (name.includes('cta') || name.includes('button'))) {
+        if (copy.type !== 'text' && isCtaOrButton(name)) {
             applyHexToRgb(copy, guide.colors.accent);
             return copy;
         }
 
         // ── CTA label text ──
-        if (copy.type === 'text' && (name.includes('cta') || name.includes('label'))) {
+        if (copy.type === 'text' && isCtaLabel(name)) {
             copy.color_hex = guide.colors.accentForeground;
             return copy;
         }

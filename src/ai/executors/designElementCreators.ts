@@ -6,6 +6,7 @@ import { useDesignStore } from '@/stores/designStore';
 import { v4 as uuid } from 'uuid';
 import { useAnimPresetStore } from '@/hooks/useAnimationPresets';
 import type { DashboardExecResult } from '../dashboardExecutor';
+import { isCtaName, isCtaOrButton, isLabelName } from '@/utils/nameRoleMatch';
 
 // ── Semantic Z-order type (matches designStore element shape) ──
 interface ZOrderElement { name: string; type: string; zIndex: number; role?: string }
@@ -247,11 +248,11 @@ function getSemanticLayer(el: ZOrderElement): number {
     // 2: images
     if (el.type === 'image') return 2;
     // 5: CTA button bg (shape with cta/button in name)
-    if (el.type === 'shape' && (name.includes('cta') || name.includes('button') || role === 'cta')) return 5;
+    if (el.type === 'shape' && (isCtaOrButton(name) || role === 'cta')) return 5;
     // 3: shapes (generic, not bg/cta)
     if (el.type === 'shape') return 3;
     // 6: CTA label text
-    if (el.type === 'text' && (name.includes('cta') || role === 'cta' || name.includes('label'))) return 6;
+    if (el.type === 'text' && (isCtaName(name) || role === 'cta' || isLabelName(name))) return 6;
     // 7: badges/tags (topmost)
     if (name.includes('tag') || name.includes('badge') || name.includes('new') || role === 'tag') return 7;
     // 4: headline & body text

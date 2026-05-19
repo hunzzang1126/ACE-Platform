@@ -5,6 +5,7 @@
 // ─────────────────────────────────────────────────
 
 import type { HarmonyPalette } from '@/services/colorHarmony';
+import { isCtaLabel, isCtaOrButton } from '@/utils/nameRoleMatch';
 
 const hexToRgb01 = (hex: string) => {
     const c = hex.replace('#', '');
@@ -22,10 +23,10 @@ export function applyHarmonyColors(elements: any[], harmony: HarmonyPalette): vo
         if (el.type === 'text') {
             if (name.includes('headline') && !name.includes('sub')) el.color_hex = harmony.headline;
             else if (name.includes('sub')) el.color_hex = harmony.subheadline;
-            else if (name.includes('cta') || name.includes('label')) el.color_hex = harmony.accentForeground;
+            else if (isCtaLabel(name)) el.color_hex = harmony.accentForeground;
             else if (name.includes('tag')) el.color_hex = harmony.tag;
             else el.color_hex = harmony.body;
-        } else if (name.includes('cta') || name.includes('button')) {
+        } else if (isCtaOrButton(name)) {
             const { r, g, b } = hexToRgb01(harmony.accent);
             el.r = r; el.g = g; el.b = b;
         } else if (name.includes('accent') || name.includes('badge') || name.includes('tag')) {

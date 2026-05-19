@@ -10,6 +10,7 @@
 // ─────────────────────────────────────────────────
 
 import type { HarmonyPalette } from '@/services/colorHarmony';
+import { isCtaOrButton, isCtaLabel } from '@/utils/nameRoleMatch';
 
 /**
  * Strip template rectangles that would cover the BG image.
@@ -29,7 +30,7 @@ export function stripCoveringRects(
         if (el.type === 'text') return true;
         const name = (el.name ?? '').toLowerCase();
         // Preserve CTA/button shapes (but NOT 'rectangle' which contains 'cta'!)
-        const isCta = /\bcta\b/.test(name) || name.includes('button') || /\blabel\b/.test(name);
+        const isCta = isCtaOrButton(name) || isCtaLabel(name);
         if (isCta) return true;
 
         const elArea = (el.w ?? 0) * (el.h ?? 0);
@@ -87,7 +88,7 @@ export function recolorCtaShapes(
     for (const el of elements) {
         if (el.type === 'text') continue;
         const name = (el.name ?? '').toLowerCase();
-        if (/\bcta\b/.test(name) || name.includes('button')) {
+        if (isCtaOrButton(name)) {
             const c = harmony.accent.replace('#', '');
             el.r = parseInt(c.slice(0, 2), 16) / 255;
             el.g = parseInt(c.slice(2, 4), 16) / 255;
@@ -101,7 +102,7 @@ function inferRole(el: any): 'headline' | 'subheadline' | 'cta' | 'body' {
     const name = (el.name ?? '').toLowerCase();
     if (name.includes('headline') && !name.includes('sub')) return 'headline';
     if (name.includes('sub') || name.includes('body') || name.includes('description')) return 'subheadline';
-    if (/\bcta\b/.test(name) || /\blabel\b/.test(name) || name.includes('button')) return 'cta';
+    if (isCtaLabel(name) || name.includes('button')) return 'cta';
     // Font size heuristic
     if ((el.font_size ?? 0) > 40) return 'headline';
     if ((el.font_size ?? 0) > 20) return 'subheadline';

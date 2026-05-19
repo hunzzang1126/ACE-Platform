@@ -7,6 +7,7 @@
 // ─────────────────────────────────────────────────
 
 import type { RenderElement } from '@/services/autoDesignTypes';
+import { isCtaOrButton } from '@/utils/nameRoleMatch';
 
 /**
  * Relative luminance from hex color (WCAG 2.0 formula).
@@ -80,7 +81,7 @@ export function polishDesign(
         // ── CTA minimum size: buttons must be tappable ──
         const name = (copy.name ?? '').toLowerCase();
         if ((copy.type === 'rounded_rect' || (copy.radius && copy.radius > 0)) &&
-            (name.includes('cta') || name.includes('button'))) {
+            isCtaOrButton(name)) {
             if ((copy.w ?? 0) < 80) {
                 fixes.push(`CTA fix: "${copy.name}" width ${copy.w} → 80px minimum`);
                 copy.w = 80;

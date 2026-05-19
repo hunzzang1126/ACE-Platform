@@ -6,6 +6,7 @@
 
 import type { AgentFlowCallbacks } from './agentFlowTypes';
 import { resilientImport } from '@/utils/resilientImport';
+import { isCtaLabel, isCtaOrButton } from '@/utils/nameRoleMatch';
 import type { AssetSelection } from '@/services/brandAssetSelector';
 import { applyHarmonyColors } from './agentColorRecolorHarmony';
 
@@ -262,7 +263,7 @@ export async function processTemplateElements(
         const name = (el.name ?? '').toLowerCase();
         if (name.includes('headline') && !name.includes('sub')) roleMap.set(el, 'headline');
         else if (name.includes('sub') || name.includes('body') || name.includes('description') || name.includes('detail') || name.includes('tagline')) roleMap.set(el, 'subheadline');
-        else if (/\bcta\b/.test(name) || /\blabel\b/.test(name) || name.includes('button')) roleMap.set(el, 'cta');
+        else if (isCtaLabel(name) || name.includes('button')) roleMap.set(el, 'cta');
         else if (name.includes('tag') || name.includes('badge') || name.includes('date')) roleMap.set(el, 'tag');
         else roleMap.set(el, 'unknown');
     }
@@ -312,7 +313,7 @@ export async function processTemplateElements(
     for (const el of allElements) {
         if (el.type === 'text') continue;
         const name = (el.name ?? '').toLowerCase();
-        if ((/\bcta\b/.test(name) || name.includes('button')) && !activeSlots.has('cta')) {
+        if (isCtaOrButton(name) && !activeSlots.has('cta')) {
             console.log(`[Pipeline] Removing CTA shape: "${el.name}"`);
             toRemove.add(el);
         }
